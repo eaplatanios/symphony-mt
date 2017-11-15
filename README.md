@@ -1,2 +1,1 @@
-# symphony-mt
-Symphony Machine Translation
+# Symphony Machine Translation

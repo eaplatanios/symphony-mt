@@ -1,0 +1,21 @@
+# Project Specific
+temp/
+datasets/
+
+# Scala Specific
+*.class
+*.log
+
+# SBT Specific
+.cache
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# IntelliJ Specific
+**/.idea/**/*
