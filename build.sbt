@@ -23,6 +23,8 @@ crossScalaVersions in ThisBuild := Seq("2.11.11", "2.12.4")
 
 organization in ThisBuild := "org.platanios"
 
+resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
+
 val tensorFlowForScalaVersion = "0.1.0-SNAPSHOT"
 
 autoCompilerPlugins in ThisBuild := true
@@ -78,6 +80,7 @@ lazy val mt = (project in file("./mt"))
     .settings(moduleName := "symphony-mt", name := "Symphony Machine Translation")
     .settings(commonSettings)
     .settings(publishSettings)
+    .settings(testSettings)
     .settings(
       libraryDependencies ++= Seq(
         "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion // classifier "darwin-cpu-x86_64"
