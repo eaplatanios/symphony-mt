@@ -23,6 +23,11 @@ crossScalaVersions in ThisBuild := Seq("2.11.11", "2.12.4")
 
 organization in ThisBuild := "org.platanios"
 
+// In order to update the snapshots more frequently, the Coursier "Time-To-Live" (TTL) option can be modified. This can
+// be done by modifying the "COURSIER_TTL" environment variable. Its value is parsed using
+// 'scala.concurrent.duration.Duration', so that things like "24 hours", "5 min", "10s", or "0s", are fine, and it also
+// accepts infinity ("Inf") as a duration. It defaults to 24 hours, meaning that the snapshot artifacts are updated
+// every 24 hours.
 resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
 
 val tensorFlowForScalaVersion = "0.1.0-SNAPSHOT"

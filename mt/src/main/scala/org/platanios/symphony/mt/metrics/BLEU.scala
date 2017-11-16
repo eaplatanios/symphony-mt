@@ -32,7 +32,7 @@ object BLEU {
     * @param  smooth      Boolean value indicating whether the BLEU score was smoothed using the method described in
     *                     [Lin et al. 2004](https://dl.acm.org/citation.cfm?id=1219032).
     */
-  case class Score(
+  case class BLEUScore(
       score: Double, precisions: Seq[Double], lengthRatio: Double, smooth: Boolean) {
     /** Maximum n-gram order used while computing the BLEU score. */
     val maxOrder: Int = precisions.size
@@ -44,7 +44,7 @@ object BLEU {
   /** Computes the BLEU score for the provided hypothesis sequences against one or more reference sequences.
     *
     * @param  referenceCorpus  Sequence of sequences of reference sequences to use as reference for each translation
-    *                          sequence. Each reference and translation sequence is supposed to be a sequence over
+    *                          sequence. Each reference and hypothesis sequence is supposed to be a sequence over
     *                          tokens of type `T` (typically `String`).
     * @param  hypothesisCorpus Sequence of hypothesis sequences to score.
     * @param  maxOrder         Maximum n-gram order to use when computing the BLEU score.
@@ -52,11 +52,11 @@ object BLEU {
     *                          [Lin et al. 2004](https://dl.acm.org/citation.cfm?id=1219032).
     * @return Computed BLEU score.
     */
-  def computeBLEU[T](
+  def bleu[T](
       referenceCorpus: Seq[Seq[Seq[T]]],
       hypothesisCorpus: Seq[Seq[T]],
       maxOrder: Int = 4,
-      smooth: Boolean = false): Score = {
+      smooth: Boolean = false): BLEUScore = {
     // Compute counts for matches and possible matches
     val matchesByOrder = mutable.ArrayBuffer.fill(maxOrder)(0L)
     val possibleMatchesByOrder = mutable.ArrayBuffer.fill(maxOrder)(0L)
@@ -101,6 +101,6 @@ object BLEU {
     val lengthRatio = hypothesisLength.toDouble / referenceLength.toDouble
     val brevityPenalty = if (lengthRatio > 1) 1.0 else Math.exp(1.0 - 1.0 / lengthRatio)
     val bleu = geometricMean * brevityPenalty
-    Score(bleu, precisions, lengthRatio, smooth)
+    BLEUScore(bleu, precisions, lengthRatio, smooth)
   }
 }
