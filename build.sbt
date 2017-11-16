@@ -88,7 +88,8 @@ lazy val mt = (project in file("./mt"))
     .settings(testSettings)
     .settings(
       libraryDependencies ++= Seq(
-        "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion // classifier "darwin-cpu-x86_64"
+        "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "darwin-cpu-x86_64"
+        "org.platanios" %% "tensorflow-data" % tensorFlowForScalaVersion
       )
     )
 
