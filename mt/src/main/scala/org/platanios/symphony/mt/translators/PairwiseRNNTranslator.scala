@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators
 
 import org.platanios.symphony.mt.core.Configuration
-import org.platanios.symphony.mt.data.Datasets.{MTLayer, MTTrainLayer}
+import org.platanios.symphony.mt.data.Datasets.{MTInferLayer, MTLossLayer, MTTrainLayer}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.layers.LayerInstance
@@ -108,8 +108,8 @@ class PairwiseRNNTranslator[S, SS](
       srcVocab: tf.LookupTable,
       tgtVocab: tf.LookupTable
   ): MTTrainLayer = {
-    new tf.learn.Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]("SimpleRNNTranslation") {
-      override val layerType: String = "SimpleRNNTranslation"
+    new tf.learn.Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]("PairwiseRNNTranslation") {
+      override val layerType: String = "PairwiseRNNTranslation"
 
       override def forward(
           input: ((Output, Output), (Output, Output, Output)),
@@ -129,9 +129,9 @@ class PairwiseRNNTranslator[S, SS](
       tgtVocabSize: Int,
       srcVocab: tf.LookupTable,
       tgtVocab: tf.LookupTable
-  ): MTLayer = {
-    new tf.learn.Layer[(Output, Output), (Output, Output)]("SimpleRNNTranslation") {
-      override val layerType: String = "SimpleRNNTranslation"
+  ): MTInferLayer = {
+    new tf.learn.Layer[(Output, Output), (Output, Output)]("PairwiseRNNTranslation") {
+      override val layerType: String = "PairwiseRNNTranslation"
 
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
         val variableFn = variable(_, _, _)
@@ -139,6 +139,19 @@ class PairwiseRNNTranslator[S, SS](
         val (decTuple, decTrVars, decNonTrVars) = decoder(input, tgtVocabSize, tgtVocab, encTuple, variableFn, mode)
         val (out, outTrVars, outNonTrVars) = output(decTuple._1._1, decTuple._3, tgtVocabSize, variableFn)
         LayerInstance(input, out, encTrVars ++ decTrVars ++ outTrVars, encNonTrVars ++ decNonTrVars ++ outNonTrVars)
+      }
+    }
+  }
+
+  override protected def translationLossLayer(): MTLossLayer = {
+    new tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]("PairwiseRNNTranslationLoss") {
+      override val layerType: String = "PairwiseRNNTranslationLoss"
+
+      override def forward(
+          input: ((Output, Output), (Output, Output, Output)),
+          mode: Mode
+      ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = {
+        ???
       }
     }
   }

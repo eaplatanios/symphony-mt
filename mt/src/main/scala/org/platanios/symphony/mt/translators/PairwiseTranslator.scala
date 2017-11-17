@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators
 
 import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
-import org.platanios.symphony.mt.data.Datasets.{MTLayer, MTTextLinesDataset, MTTrainLayer}
+import org.platanios.symphony.mt.data.Datasets.{MTInferLayer, MTLossLayer, MTTextLinesDataset, MTTrainLayer}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.StopCriteria
 
@@ -33,7 +33,6 @@ abstract class PairwiseTranslator(override protected var configuration: Configur
 
   override def train(datasets: Seq[Translator.DatasetPair], stopCriteria: StopCriteria): Unit = {
     type LanguagePair = (Language, Language)
-
 
     ???
   }
@@ -56,5 +55,7 @@ abstract class PairwiseTranslator(override protected var configuration: Configur
       targetVocabularySize: Int,
       sourceVocabularyTable: tf.LookupTable,
       targetVocabularyTable: tf.LookupTable
-  ): MTLayer
+  ): MTInferLayer
+
+  protected def translationLossLayer(): MTLossLayer
 }

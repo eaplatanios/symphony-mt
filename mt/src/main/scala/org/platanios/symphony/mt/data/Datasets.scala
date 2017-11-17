@@ -39,7 +39,8 @@ object Datasets {
       (Shape, Shape, Shape)]
 
   type MTTrainLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]
-  type MTLayer = tf.learn.Layer[(Output, Output), (Output, Output)]
+  type MTInferLayer = tf.learn.Layer[(Output, Output), (Output, Output)]
+  type MTLossLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]
 
   def createInferDataset(
       srcDataset: MTTextLinesDataset,
