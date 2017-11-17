@@ -17,9 +17,15 @@ package org.platanios.symphony.mt.core
 
 import org.platanios.tensorflow.api._
 
+import java.util.concurrent.atomic.AtomicInteger
+
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class Language(id: Int, name: String, vocabulary: tf.LookupTable)
+case class Language(name: String, abbreviation: String, vocabulary: () => tf.LookupTable) {
+  val id: Int = Language.currentId.getAndIncrement()
+}
 
-// TODO: Maybe 'vocabulary' should be a function returning a lookup table (i.e., not belonging to any graph).
+object Language {
+  private[Language] val currentId: AtomicInteger = new AtomicInteger(0)
+}

@@ -30,7 +30,7 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 object Vocabulary {
-  private[this] val logger: Logger = Logger(LoggerFactory.getLogger("Vocabulary Utilities"))
+  private[this] val logger: Logger = Logger(LoggerFactory.getLogger("Vocabulary"))
 
   val BEGIN_OF_SEQUENCE_TOKEN: String = "<s>"
   val END_OF_SEQUENCE_TOKEN  : String = "</s>"
@@ -92,6 +92,15 @@ object Vocabulary {
         }
       }
     }
+  }
+
+  /** Creates vocabulary lookup table (from word string to word ID), from the provided vocabulary file.
+    *
+    * @param  vocabFile Vocabulary file.
+    * @return Vocabulary lookup table.
+    */
+  def createTable(vocabFile: Path): tf.LookupTable = {
+    tf.indexTableFromFile(vocabFile.toAbsolutePath.toString, defaultValue = UNKNOWN_TOKEN_ID)
   }
 
   /** Creates vocabulary lookup tables (from word string to word ID), from the provided vocabulary files.
