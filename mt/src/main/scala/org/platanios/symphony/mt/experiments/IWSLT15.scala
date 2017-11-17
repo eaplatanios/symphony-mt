@@ -15,34 +15,48 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.core.Language
+import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
+import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
+import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.tensorflow.api._
 import java.nio.file.{Path, Paths}
 
-import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.symphony.mt.translators.PairwiseRNNTranslator
+import org.platanios.tensorflow.api.learn.layers.rnn.cell.BasicLSTMCell
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-object IWSLT15 {
+object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
   val dataDir   : Path = workingDir.resolve("data").resolve("iwslt15.en-vi")
 
-  // Load language vocabularies
-
-  val englishCheck   : Option[(Int, Path)] = Vocabulary.check(dataDir.resolve("vocab.en"))
-  val vietnameseCheck: Option[(Int, Path)] = Vocabulary.check(dataDir.resolve("vocab.vi"))
-
-  if (englishCheck.isEmpty)
+  // Create the languages and their corresponding vocabularies
+  val enCheck: Option[(Int, Path)] = Vocabulary.check(dataDir.resolve("vocab.en"))
+  val viCheck: Option[(Int, Path)] = Vocabulary.check(dataDir.resolve("vocab.vi"))
+  if (enCheck.isEmpty)
     throw new IllegalArgumentException("Could not load the english vocabulary file.")
-  if (vietnameseCheck.isEmpty)
+  if (viCheck.isEmpty)
     throw new IllegalArgumentException("Could not load the vietnamese vocabulary file.")
+  val enVocabSize: Int      = enCheck.get._1
+  val enVocabPath: Path     = enCheck.get._2
+  val viVocabSize: Int      = viCheck.get._1
+  val viVocabPath: Path     = viCheck.get._2
+  val srcLang    : Language = Language("English", "en", () => Vocabulary.createTable(enVocabPath), enVocabSize)
+  val tgtLang    : Language = Language("Vietnamese", "vi", () => Vocabulary.createTable(enVocabPath), viVocabSize)
 
-  val englishVocabSize   : Int      = englishCheck.get._1
-  val englishVocabPath   : Path     = englishCheck.get._2
-  val vietnameseVocabSize: Int      = vietnameseCheck.get._1
-  val vietnameseVocabPath: Path     = vietnameseCheck.get._2
-  val english            : Language = Language("English", "en", () => Vocabulary.createTable(englishVocabPath))
-  val vietnamese         : Language = Language("Vietnamese", "vi", () => Vocabulary.createTable(englishVocabPath))
+  // Create the datasets
+  val srcTrainDataset: MTTextLinesDataset = tf.data.TextLineDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
+  val tgtTrainDataset: MTTextLinesDataset = tf.data.TextLineDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
 
+  // Create a translator
+  val configuration: Configuration = Configuration()
+  val translator   : Translator    = new PairwiseRNNTranslator(
+    encoderCell = BasicLSTMCell(256, forgetBias = 0.0f),
+    decoderCell = BasicLSTMCell(256, forgetBias = 0.0f),
+    configuration = configuration)
 
+  translator.train(
+    Seq(Translator.DatasetPair(srcLang, tgtLang, srcTrainDataset, tgtTrainDataset)),
+    tf.learn.StopCriteria(Some(10000)))
 }

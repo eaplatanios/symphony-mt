@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators
 
 import org.platanios.symphony.mt.core.Configuration
-import org.platanios.symphony.mt.data.Datasets.{MTInferLayer, MTLossLayer, MTTrainLayer}
+import org.platanios.symphony.mt.translators.PairwiseTranslator.{MTInferLayer, MTLossLayer, MTTrainLayer}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.layers.LayerInstance
@@ -64,8 +64,8 @@ class PairwiseRNNTranslator[S, SS](
     val decEmbeddingFn = tf.embeddingLookup(decEmbeddings, _)
     val decCellInstance = decoderCell.createCell(encTuple.output, mode)
     val decHelper = BasicRNNDecoder.GreedyEmbeddingHelper[S](
-      decEmbeddingFn, tf.fill(dataType, Shape(configuration.batchSize))(tgtVocab.lookup(configuration.beginOfSequence)),
-      tgtVocab.lookup(configuration.endOfSequence))
+      decEmbeddingFn, tf.fill(dataType, Shape(configuration.batchSize))(tgtVocab.lookup(configuration.beginOfSequenceToken)),
+      tgtVocab.lookup(configuration.endOfSequenceToken))
     val decTuple = BasicRNNDecoder(decCellInstance.cell, encTuple.state, decHelper).dynamicDecode(
       outputTimeMajor = true, maximumIterations = tf.round(tf.max(input._2) * 2),
       parallelIterations = configuration.parallelIterations,
@@ -102,7 +102,7 @@ class PairwiseRNNTranslator[S, SS](
     ((output, lengths), Set(outWeights, outBias), Set.empty)
   }
 
-  override protected def translationTrainLayer(
+  override protected def trainLayer(
       srcVocabSize: Int,
       tgtVocabSize: Int,
       srcVocab: tf.LookupTable,
@@ -124,7 +124,7 @@ class PairwiseRNNTranslator[S, SS](
     }
   }
 
-  override protected def translationLayer(
+  override protected def inferLayer(
       srcVocabSize: Int,
       tgtVocabSize: Int,
       srcVocab: tf.LookupTable,
@@ -143,7 +143,7 @@ class PairwiseRNNTranslator[S, SS](
     }
   }
 
-  override protected def translationLossLayer(): MTLossLayer = {
+  override protected def lossLayer(): MTLossLayer = {
     new tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]("PairwiseRNNTranslationLoss") {
       override val layerType: String = "PairwiseRNNTranslationLoss"
 
@@ -151,8 +151,14 @@ class PairwiseRNNTranslator[S, SS](
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = {
-        ???
+        val loss = tf.sequenceLoss(
+          input._1._1, input._2._2,
+          weights = tf.sequenceMask(input._1._2, dataType = input._1._1.dataType),
+          averageAcrossTimeSteps = false, averageAcrossBatch = true)
+        LayerInstance(input, loss)
       }
     }
   }
+
+  override protected def optimizer(): tf.train.Optimizer = tf.train.GradientDescent(1.0)
 }

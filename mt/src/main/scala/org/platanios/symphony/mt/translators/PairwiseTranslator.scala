@@ -16,15 +16,23 @@
 package org.platanios.symphony.mt.translators
 
 import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
-import org.platanios.symphony.mt.data.Datasets.{MTInferLayer, MTLossLayer, MTTextLinesDataset, MTTrainLayer}
+import org.platanios.symphony.mt.data.Datasets
+import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
+import org.platanios.symphony.mt.translators.PairwiseTranslator._
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.StopCriteria
+import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
+
+import scala.collection.mutable
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class PairwiseTranslator(override protected var configuration: Configuration = Configuration())
-    extends Translator(configuration) {
+abstract class PairwiseTranslator(
+    override protected var configuration: Configuration = Configuration()
+) extends Translator(configuration) {
+  private[this] val estimators: mutable.Map[(Int, Int), MTPairwiseEstimator] = mutable.Map.empty
+
   // Create the input and the train input parts of the model.
   private[this] val seqShape   = Shape(configuration.batchSize, -1)
   private[this] val lenShape   = Shape(configuration.batchSize)
@@ -32,30 +40,97 @@ abstract class PairwiseTranslator(override protected var configuration: Configur
   private[this] val trainInput = tf.learn.Input((INT32, INT32, INT32), (seqShape, seqShape, lenShape))
 
   override def train(datasets: Seq[Translator.DatasetPair], stopCriteria: StopCriteria): Unit = {
-    type LanguagePair = (Language, Language)
-
-    ???
+    datasets
+        .map(p => (p.sourceLanguage, p.targetLanguage) -> (p.sourceDataset, p.targetDataset))
+        .groupBy(p => (p._1._1.id, p._1._2.id))
+        .foreach {
+          case (languageIdPair, datasetPairs) =>
+            val srcLang = datasetPairs.head._1._1
+            val tgtLang = datasetPairs.head._1._2
+            val workingDir = configuration.workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}")
+            val srcVocab = srcLang.vocabulary()
+            val tgtVocab = tgtLang.vocabulary()
+            val srcVocabSize = srcLang.vocabularySize
+            val tgtVocabSize = tgtLang.vocabularySize
+            val srcDataset = Datasets.joinDatasets(datasetPairs.map(_._2._1))
+            val tgtDataset = Datasets.joinDatasets(datasetPairs.map(_._2._2))
+            val trainDataset = Datasets.createTrainDataset(
+              srcDataset, tgtDataset, srcVocab, tgtVocab, configuration.batchSize,
+              configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
+              configuration.sourceReverse, configuration.randomSeed, configuration.numBuckets,
+              configuration.sourceMaxLength, configuration.targetMaxLength, configuration.parallelIterations,
+              configuration.dataBufferSize, configuration.dataDropCount, configuration.dataNumShards,
+              configuration.dataShardIndex)
+            val estimator = estimators.getOrElse(languageIdPair, {
+              val tLayer = trainLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
+              val iLayer = inferLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
+              val model = tf.learn.Model(
+                input = input,
+                layer = iLayer,
+                trainLayer = tLayer,
+                trainInput = trainInput,
+                loss = lossLayer(),
+                optimizer = optimizer())
+              val summariesDir = workingDir.resolve("summaries")
+              val tensorBoardConfig = {
+                if (configuration.launchTensorBoard)
+                  tf.learn.TensorBoardConfig(summariesDir, reloadInterval = 1)
+                else
+                  null
+              }
+              tf.learn.InMemoryEstimator(
+                model,
+                tf.learn.Configuration(Some(workingDir)),
+                stopCriteria,
+                Set(
+                  tf.learn.StepRateHook(log = false, summaryDirectory = summariesDir, trigger = StepHookTrigger(100)),
+                  tf.learn.SummarySaverHook(summariesDir, StepHookTrigger(10)),
+                  tf.learn.CheckpointSaverHook(workingDir, StepHookTrigger(1000))),
+                tensorBoardConfig = tensorBoardConfig)
+            })
+            estimator.train(trainDataset, stopCriteria)
+        }
   }
 
   override def translate(
-      sourceLanguage: Language,
-      targetLanguage: Language,
+      srcLanguage: Language,
+      tgtLanguage: Language,
       dataset: MTTextLinesDataset
   ): MTTextLinesDataset = ???
 
-  protected def translationTrainLayer(
-      sourceVocabularySize: Int,
-      targetVocabularySize: Int,
-      sourceVocabularyTable: tf.LookupTable,
-      targetVocabularyTable: tf.LookupTable
+  protected def trainLayer(
+      srcVocabSize: Int,
+      tgtVocabSize: Int,
+      srcVocab: tf.LookupTable,
+      tgtVocab: tf.LookupTable
   ): MTTrainLayer
 
-  protected def translationLayer(
-      sourceVocabularySize: Int,
-      targetVocabularySize: Int,
-      sourceVocabularyTable: tf.LookupTable,
-      targetVocabularyTable: tf.LookupTable
+  protected def inferLayer(
+      srcVocabSize: Int,
+      tgtVocabSize: Int,
+      srcVocab: tf.LookupTable,
+      tgtVocab: tf.LookupTable
   ): MTInferLayer
 
-  protected def translationLossLayer(): MTLossLayer
+  protected def lossLayer(): MTLossLayer
+
+  protected def optimizer(): tf.train.Optimizer
+}
+
+object PairwiseTranslator {
+  type MTInput = tf.learn.Input[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
+  type MTTrainInput = tf.learn.Input[
+      (Tensor, Tensor, Tensor),
+      (Output, Output, Output),
+      (DataType, DataType, DataType),
+      (Shape, Shape, Shape)]
+
+  type MTTrainLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]
+  type MTInferLayer = tf.learn.Layer[(Output, Output), (Output, Output)]
+  type MTLossLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]
+
+  type MTPairwiseEstimator = tf.learn.Estimator[
+      (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
+      (Tensor, Tensor, Tensor), (Output, Output, Output), (DataType, DataType, DataType), (Shape, Shape, Shape),
+      ((Output, Output), (Output, Output, Output))]
 }

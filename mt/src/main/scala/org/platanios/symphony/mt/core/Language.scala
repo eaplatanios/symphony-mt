@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class Language(name: String, abbreviation: String, vocabulary: () => tf.LookupTable) {
+case class Language(name: String, abbreviation: String, vocabulary: () => tf.LookupTable, vocabularySize: Int) {
   val id: Int = Language.currentId.getAndIncrement()
 }
 

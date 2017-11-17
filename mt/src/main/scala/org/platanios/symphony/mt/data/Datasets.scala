@@ -31,16 +31,9 @@ object Datasets {
       ((DataType, DataType), (DataType, DataType, DataType)),
       ((Shape, Shape), (Shape, Shape, Shape))]
 
-  type MTInput = tf.learn.Input[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
-  type MTTrainInput = tf.learn.Input[
-      (Tensor, Tensor, Tensor),
-      (Output, Output, Output),
-      (DataType, DataType, DataType),
-      (Shape, Shape, Shape)]
-
-  type MTTrainLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]
-  type MTInferLayer = tf.learn.Layer[(Output, Output), (Output, Output)]
-  type MTLossLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]
+  def joinDatasets(datasets: Seq[MTTextLinesDataset]): MTTextLinesDataset = {
+    datasets.reduce((d1, d2) => d1.concatenate(d2))
+  }
 
   def createInferDataset(
       srcDataset: MTTextLinesDataset,
@@ -85,8 +78,8 @@ object Datasets {
       srcVocabularyTable: tf.LookupTable,
       tgtVocabularyTable: tf.LookupTable,
       batchSize: Int,
-      beginSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
-      endSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
+      beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
+      endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
       srcReverse: Boolean = false,
       randomSeed: Option[Int] = None,
       numBuckets: Int = 1,
@@ -99,9 +92,9 @@ object Datasets {
       shardIndex: Int = 0
   ): MTTrainDataset = {
     val bufferSize = if (outputBufferSize == -1L) 1000 * batchSize else outputBufferSize
-    val srcEosId = srcVocabularyTable.lookup(tf.constant(endSequenceToken)).cast(INT32)
-    val tgtBosId = tgtVocabularyTable.lookup(tf.constant(beginSequenceToken)).cast(INT32)
-    val tgtEosId = tgtVocabularyTable.lookup(tf.constant(endSequenceToken)).cast(INT32)
+    val srcEosId = srcVocabularyTable.lookup(tf.constant(endOfSequenceToken)).cast(INT32)
+    val tgtBosId = tgtVocabularyTable.lookup(tf.constant(beginOfSequenceToken)).cast(INT32)
+    val tgtEosId = tgtVocabularyTable.lookup(tf.constant(endOfSequenceToken)).cast(INT32)
 
     val batchingFn = (dataset: MTTrainDataset) => {
       dataset.dynamicPaddedBatch(

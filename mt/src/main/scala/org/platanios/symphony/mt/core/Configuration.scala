@@ -15,9 +15,9 @@
 
 package org.platanios.symphony.mt.core
 
-import java.nio.file.{Path, Paths}
-
 import org.platanios.symphony.mt.data.Vocabulary
+
+import java.nio.file.{Path, Paths}
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -30,12 +30,17 @@ case class Configuration(
     sourceMaxLength: Int = -1,
     targetMaxLength: Int = -1,
     sourceReverse: Boolean = false,
+    dataBufferSize: Long = -1L,
+    dataDropCount: Int = 0,
+    dataNumShards: Int = 1,
+    dataShardIndex: Int = 0,
     // Vocabulary
-    beginOfSequence: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
-    endOfSequence: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
+    beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
+    endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
     // Miscellaneous
     logDevicePlacement: Boolean = false,
     randomSeed: Option[Int] = None,
     parallelIterations: Int = 10,
-    swapMemory: Boolean = false)
+    swapMemory: Boolean = false,
+    launchTensorBoard: Boolean = true)
