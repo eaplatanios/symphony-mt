@@ -22,24 +22,36 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 object Datasets {
-  type NMTInferDataset = tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
-  type NMTTrainDataset = tf.data.Dataset[
-      (Tensor, Tensor, Tensor, Tensor, Tensor),
-      (Output, Output, Output, Output, Output),
-      (DataType, DataType, DataType, DataType, DataType),
-      (Shape, Shape, Shape, Shape, Shape)]
+  type MTTextLinesDataset = tf.data.Dataset[Tensor, Output, DataType, Shape]
+  type MTInferDataset = tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
+
+  type MTTrainDataset = tf.data.Dataset[
+      ((Tensor, Tensor), (Tensor, Tensor, Tensor)),
+      ((Output, Output), (Output, Output, Output)),
+      ((DataType, DataType), (DataType, DataType, DataType)),
+      ((Shape, Shape), (Shape, Shape, Shape))]
+
+  type MTInput = tf.learn.Input[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
+  type MTTrainInput = tf.learn.Input[
+      (Tensor, Tensor, Tensor),
+      (Output, Output, Output),
+      (DataType, DataType, DataType),
+      (Shape, Shape, Shape)]
+
+  type MTTrainLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]
+  type MTLayer = tf.learn.Layer[(Output, Output), (Output, Output)]
 
   def createInferDataset(
-      srcDataset: tf.data.Dataset[Tensor, Output, DataType, Shape],
+      srcDataset: MTTextLinesDataset,
       srcVocabularyTable: tf.LookupTable,
       batchSize: Int,
       endSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
       srcReverse: Boolean = false,
       srcMaxLength: Int = -1
-  ): NMTInferDataset = {
+  ): MTInferDataset = {
     val srcEosId = srcVocabularyTable.lookup(tf.constant(endSequenceToken)).cast(INT32)
 
-    val batchingFn = (dataset: NMTInferDataset) => {
+    val batchingFn = (dataset: MTInferDataset) => {
       dataset.dynamicPaddedBatch(
         batchSize,
         // The first entry represents the source line rows, which are unknown-length vectors.
@@ -67,8 +79,8 @@ object Datasets {
   }
 
   def createTrainDataset(
-      srcDataset: tf.data.Dataset[Tensor, Output, DataType, Shape],
-      tgtDataset: tf.data.Dataset[Tensor, Output, DataType, Shape],
+      srcDataset: MTTextLinesDataset,
+      tgtDataset: MTTextLinesDataset,
       srcVocabularyTable: tf.LookupTable,
       tgtVocabularyTable: tf.LookupTable,
       batchSize: Int,
@@ -84,21 +96,21 @@ object Datasets {
       dropCount: Int = 0,
       numShards: Int = 1,
       shardIndex: Int = 0
-  ): NMTTrainDataset = {
+  ): MTTrainDataset = {
     val bufferSize = if (outputBufferSize == -1L) 1000 * batchSize else outputBufferSize
     val srcEosId = srcVocabularyTable.lookup(tf.constant(endSequenceToken)).cast(INT32)
     val tgtBosId = tgtVocabularyTable.lookup(tf.constant(beginSequenceToken)).cast(INT32)
     val tgtEosId = tgtVocabularyTable.lookup(tf.constant(endSequenceToken)).cast(INT32)
 
-    val batchingFn = (dataset: NMTTrainDataset) => {
+    val batchingFn = (dataset: MTTrainDataset) => {
       dataset.dynamicPaddedBatch(
         batchSize,
         // The first three entries are the source and target line rows, which are unknown-length vectors.
         // The last two entries are the source and target row sizes, which are scalars.
-        (Shape(-1), Shape(-1), Shape(-1), Shape.scalar(), Shape.scalar()),
+        ((Shape(-1), Shape.scalar()), (Shape(-1), Shape(-1), Shape.scalar())),
         // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
         // generally need to do this since later on we will be masking out calculations past the true sequence.
-        (srcEosId, tgtEosId, tgtEosId, tf.zeros(INT32, Shape.scalar()), tf.zeros(INT32, Shape.scalar())))
+        ((srcEosId, tf.zeros(INT32, Shape.scalar())), (tgtEosId, tgtEosId, tf.zeros(INT32, Shape.scalar()))))
     }
 
     val datasetBeforeBucketing =
@@ -143,7 +155,7 @@ object Datasets {
               tf.concatenate(Seq(d._2, tgtEosId.expandDims(0)), axis = 0)),
             numParallelCalls).prefetch(bufferSize)
           // Add sequence lengths.
-          .map(d => (d._1, d._2, d._3, tf.size(d._1, INT32), tf.size(d._2, INT32)), numParallelCalls)
+          .map(d => ((d._1, tf.size(d._1, INT32)), (d._2, d._3, tf.size(d._2, INT32))), numParallelCalls)
           .prefetch(bufferSize)
 
     if (numBuckets == 1) {
@@ -154,15 +166,15 @@ object Datasets {
       // over ((numBuckets - 1) * bucketWidth) all go into the last bucket.
       val bucketWidth = if (srcMaxLength != -1) (srcMaxLength + numBuckets - 1) / numBuckets else 10
 
-      def keyFn(element: (Output, Output, Output, Output, Output)): Output = {
+      def keyFn(element: ((Output, Output), (Output, Output, Output))): Output = {
         // Bucket sequence  pairs based on the length of their source sequence and target sequence.
         val bucketId = tf.maximum(
-          tf.truncateDivide(element._4, bucketWidth),
-          tf.truncateDivide(element._5, bucketWidth))
+          tf.truncateDivide(element._1._2, bucketWidth),
+          tf.truncateDivide(element._2._3, bucketWidth))
         tf.minimum(numBuckets, bucketId).cast(INT64)
       }
 
-      def reduceFn(pair: (Output, NMTTrainDataset)): NMTTrainDataset = {
+      def reduceFn(pair: (Output, MTTrainDataset)): MTTrainDataset = {
         batchingFn(pair._2)
       }
 
