@@ -29,7 +29,7 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 abstract class PairwiseTranslator(
-    override protected var configuration: Configuration = Configuration()
+    override val configuration: Configuration = Configuration()
 ) extends Translator(configuration) {
   private[this] val estimators: mutable.Map[(Int, Int), MTPairwiseEstimator] = mutable.Map.empty
 
@@ -41,19 +41,18 @@ abstract class PairwiseTranslator(
 
   override def train(datasets: Seq[Translator.DatasetPair], stopCriteria: StopCriteria): Unit = {
     datasets
-        .map(p => (p.sourceLanguage, p.targetLanguage) -> (p.sourceDataset, p.targetDataset))
-        .groupBy(p => (p._1._1.id, p._1._2.id))
+        .groupBy(p => (p.sourceLanguage.id, p.targetLanguage.id))
         .foreach {
           case (languageIdPair, datasetPairs) =>
-            val srcLang = datasetPairs.head._1._1
-            val tgtLang = datasetPairs.head._1._2
+            val srcLang = datasetPairs.head.sourceLanguage
+            val tgtLang = datasetPairs.head.targetLanguage
             val workingDir = configuration.workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}")
             val srcVocab = srcLang.vocabulary()
             val tgtVocab = tgtLang.vocabulary()
             val srcVocabSize = srcLang.vocabularySize
             val tgtVocabSize = tgtLang.vocabularySize
-            val srcDataset = Datasets.joinDatasets(datasetPairs.map(_._2._1))
-            val tgtDataset = Datasets.joinDatasets(datasetPairs.map(_._2._2))
+            val srcDataset = Datasets.joinDatasets(datasetPairs.map(_.sourceDataset))
+            val tgtDataset = Datasets.joinDatasets(datasetPairs.map(_.targetDataset))
             val trainDataset = Datasets.createTrainDataset(
               srcDataset, tgtDataset, srcVocab, tgtVocab, configuration.batchSize,
               configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
@@ -118,19 +117,13 @@ abstract class PairwiseTranslator(
 }
 
 object PairwiseTranslator {
-  type MTInput = tf.learn.Input[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
-  type MTTrainInput = tf.learn.Input[
-      (Tensor, Tensor, Tensor),
-      (Output, Output, Output),
-      (DataType, DataType, DataType),
-      (Shape, Shape, Shape)]
-
   type MTTrainLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]
   type MTInferLayer = tf.learn.Layer[(Output, Output), (Output, Output)]
   type MTLossLayer = tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]
 
   type MTPairwiseEstimator = tf.learn.Estimator[
       (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
-      (Tensor, Tensor, Tensor), (Output, Output, Output), (DataType, DataType, DataType), (Shape, Shape, Shape),
+      ((Tensor, Tensor), (Tensor, Tensor, Tensor)), ((Output, Output), (Output, Output, Output)),
+      ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape)),
       ((Output, Output), (Output, Output, Output))]
 }

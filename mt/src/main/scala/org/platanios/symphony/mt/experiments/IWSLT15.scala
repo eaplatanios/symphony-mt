@@ -18,11 +18,11 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.Vocabulary
-import org.platanios.tensorflow.api._
-import java.nio.file.{Path, Paths}
-
 import org.platanios.symphony.mt.translators.PairwiseRNNTranslator
+import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.BasicLSTMCell
+
+import java.nio.file.{Path, Paths}
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -54,7 +54,7 @@ object IWSLT15 extends App {
   val translator   : Translator    = new PairwiseRNNTranslator(
     encoderCell = BasicLSTMCell(256, forgetBias = 0.0f),
     decoderCell = BasicLSTMCell(256, forgetBias = 0.0f),
-    configuration = configuration)
+    _configuration = configuration)
 
   translator.train(
     Seq(Translator.DatasetPair(srcLang, tgtLang, srcTrainDataset, tgtTrainDataset)),

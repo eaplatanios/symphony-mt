@@ -32,7 +32,7 @@ class PairwiseRNNTranslator[S, SS](
     val targetEmbeddingSize: Int = 300,
     val encoderCell: tf.learn.RNNCell[Output, Shape, S, SS],
     val decoderCell: tf.learn.RNNCell[Output, Shape, S, SS],
-    override protected var configuration: Configuration = Configuration()
+    override val configuration: Configuration = Configuration()
 )(implicit
     evSupportedS: ops.rnn.cell.RNNCell.Supported.Aux[S, SS]
 ) extends PairwiseTranslator(configuration) {
@@ -45,7 +45,7 @@ class PairwiseRNNTranslator[S, SS](
     val encEmbeddings = variableFn("EncoderEmbeddings", dataType, Shape(sourceVocabularySize, sourceEmbeddingSize))
     val encEmbeddedInput = tf.embeddingLookup(encEmbeddings, input._1)
     val encCellInstance = encoderCell.createCell(encEmbeddedInput, mode)
-    val encTuple = tf.dynamicRNN(
+    val encTuple = tf.dynamicRNN[Output, Shape, S, SS](
       encCellInstance.cell, encEmbeddedInput, timeMajor = true,
       parallelIterations = configuration.parallelIterations, swapMemory = configuration.swapMemory,
       sequenceLengths = input._2)
@@ -61,7 +61,7 @@ class PairwiseRNNTranslator[S, SS](
       mode: Mode
   ): (((Output, Output), S, Output), Set[Variable], Set[Variable]) = {
     val decEmbeddings = variableFn("DecoderEmbeddings", dataType, Shape(tgtVocabSize, targetEmbeddingSize))
-    val decEmbeddingFn = tf.embeddingLookup(decEmbeddings, _)
+    val decEmbeddingFn = (o: Output) => tf.embeddingLookup(decEmbeddings, o)
     val decCellInstance = decoderCell.createCell(encTuple.output, mode)
     val decHelper = BasicRNNDecoder.GreedyEmbeddingHelper[S](
       decEmbeddingFn, tf.fill(dataType, Shape(configuration.batchSize))(tgtVocab.lookup(configuration.beginOfSequenceToken)),
@@ -115,7 +115,7 @@ class PairwiseRNNTranslator[S, SS](
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
-        val variableFn = variable(_, _, _)
+        val variableFn: (String, DataType, Shape) => Variable = variable(_, _, _)
         val (encTuple, encTrVars, encNonTrVars) = encoder(input._1, srcVocabSize, variableFn, mode)
         val (decTuple, decTrVars, decNonTrVars) = trainDecoder(input._2, tgtVocabSize, encTuple, variableFn, mode)
         val (out, outTrVars, outNonTrVars) = output(decTuple._1._1, decTuple._3, tgtVocabSize, variableFn)
@@ -134,7 +134,7 @@ class PairwiseRNNTranslator[S, SS](
       override val layerType: String = "PairwiseRNNTranslation"
 
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
-        val variableFn = variable(_, _, _)
+        val variableFn: (String, DataType, Shape) => Variable = variable(_, _, _)
         val (encTuple, encTrVars, encNonTrVars) = encoder(input, srcVocabSize, variableFn, mode)
         val (decTuple, decTrVars, decNonTrVars) = decoder(input, tgtVocabSize, tgtVocab, encTuple, variableFn, mode)
         val (out, outTrVars, outNonTrVars) = output(decTuple._1._1, decTuple._3, tgtVocabSize, variableFn)

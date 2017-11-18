@@ -21,12 +21,7 @@ import org.platanios.tensorflow.api.learn.StopCriteria
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Translator(protected var configuration: Configuration = Configuration()) {
-  def configure(configuration: Configuration): Translator = {
-    this.configuration = configuration
-    this
-  }
-
+abstract class Translator(val configuration: Configuration = Configuration()) {
   def train(datasets: Seq[Translator.DatasetPair], stopCriteria: StopCriteria): Unit
   def translate(sourceLanguage: Language, targetLanguage: Language, dataset: MTTextLinesDataset): MTTextLinesDataset
 }
