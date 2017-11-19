@@ -23,6 +23,7 @@ import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.LayerInstance
+import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
 
 import scala.collection.mutable
 
@@ -35,12 +36,14 @@ abstract class PairwiseTranslator(
   private[this] val estimators: mutable.Map[(Int, Int), MTPairwiseEstimator] = mutable.Map.empty
 
   // Create the input and the train input parts of the model.
-  private[this] val seqShape   = Shape(configuration.batchSize, -1)
-  private[this] val lenShape   = Shape(configuration.batchSize)
+  private[this] val seqShape   = Shape(configuration.trainBatchSize, -1)
+  private[this] val lenShape   = Shape(configuration.trainBatchSize)
   private[this] val input      = tf.learn.Input((INT32, INT32), (seqShape, lenShape))
   private[this] val trainInput = tf.learn.Input((INT32, INT32, INT32), (seqShape, seqShape, lenShape))
 
-  override def train(datasets: Seq[Translator.DatasetPair], stopCriteria: StopCriteria): Unit = {
+  override def train(
+      datasets: Seq[Translator.DatasetPair],
+      stopCriteria: StopCriteria = StopCriteria(Some(configuration.trainNumSteps))): Unit = {
     datasets
         .groupBy(p => (p.sourceLanguage.id, p.targetLanguage.id))
         .foreach {
@@ -55,10 +58,10 @@ abstract class PairwiseTranslator(
             val srcDataset = Datasets.joinDatasets(datasetPairs.map(_.sourceDataset))
             val tgtDataset = Datasets.joinDatasets(datasetPairs.map(_.targetDataset))
             val trainDataset = () => Datasets.createTrainDataset(
-              srcDataset, tgtDataset, srcVocab(), tgtVocab(), configuration.batchSize,
+              srcDataset, tgtDataset, srcVocab(), tgtVocab(), configuration.trainBatchSize,
               configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
-              configuration.sourceReverse, configuration.randomSeed, configuration.numBuckets,
-              configuration.sourceMaxLength, configuration.targetMaxLength, configuration.parallelIterations,
+              configuration.dataSrcReverse, configuration.randomSeed, configuration.dataNumBuckets,
+              configuration.dataSrcMaxLength, configuration.dataTgtMaxLength, configuration.parallelIterations,
               configuration.dataBufferSize, configuration.dataDropCount, configuration.dataNumShards,
               configuration.dataShardIndex)
             val estimator = estimators.getOrElse(languageIdPair, {
@@ -70,7 +73,8 @@ abstract class PairwiseTranslator(
                 trainLayer = tLayer,
                 trainInput = trainInput,
                 loss = lossLayer(),
-                optimizer = optimizer())
+                optimizer = optimizer(),
+                clipGradients = tf.learn.ClipGradientsByGlobalNorm(configuration.trainMaxGradNorm))
               val summariesDir = workingDir.resolve("summaries")
               val tensorBoardConfig = {
                 if (configuration.launchTensorBoard)
@@ -129,13 +133,20 @@ abstract class PairwiseTranslator(
     }
   }
 
-  protected def optimizer(): tf.train.Optimizer = tf.train.GradientDescent(1.0)
+  protected def optimizer(): tf.train.Optimizer = {
+    val decay = ExponentialDecay(
+      configuration.trainLearningRateDecayRate,
+      configuration.trainLearningRateDecaySteps,
+      staircase = true,
+      configuration.trainLearningRateDecayStartStep)
+    configuration.trainOptimizer(configuration.trainLearningRateInitial, decay)
+  }
 
   /** Returns the maximum sequence length to consider while decoding during inference, given the provided source
     * sequence length. */
   protected def inferMaxLength(srcLength: Output): Output = {
-    if (configuration.targetMaxLength != -1)
-      tf.constant(configuration.targetMaxLength)
+    if (configuration.dataTgtMaxLength != -1)
+      tf.constant(configuration.dataTgtMaxLength)
     else
       tf.round(tf.max(srcLength) * configuration.decodingMaxLengthFactor).cast(INT32)
   }

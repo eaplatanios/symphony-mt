@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators
 
 import org.platanios.symphony.mt.core.Configuration
-import org.platanios.symphony.mt.translators.PairwiseTranslator.{MTInferLayer, MTLossLayer, MTTrainLayer}
+import org.platanios.symphony.mt.translators.PairwiseTranslator.{MTInferLayer, MTTrainLayer}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.layers.LayerInstance
@@ -67,7 +67,7 @@ class PairwiseRNNTranslator[S, SS](
     val decCellInstance = decoderCell.createCell(decEmbeddingFn(input._1)(0), mode)
     val decHelper = BasicRNNDecoder.GreedyEmbeddingHelper[S](
       decEmbeddingFn,
-      tf.fill(INT32, Shape(configuration.batchSize))(tgtVocab.lookup(bosToken)),
+      tf.fill(INT32, Shape(configuration.trainBatchSize))(tgtVocab.lookup(bosToken)),
       tgtVocab.lookup(eosToken).cast(INT32))
     val decTuple = BasicRNNDecoder(decCellInstance.cell, encTuple.state, decHelper).dynamicDecode(
       outputTimeMajor = true, maximumIterations = inferMaxLength(tf.max(input._2)),
