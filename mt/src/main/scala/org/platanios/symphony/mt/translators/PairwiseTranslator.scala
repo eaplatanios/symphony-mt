@@ -20,8 +20,9 @@ import org.platanios.symphony.mt.data.Datasets
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.translators.PairwiseTranslator._
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.StopCriteria
+import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
+import org.platanios.tensorflow.api.learn.layers.LayerInstance
 
 import scala.collection.mutable
 
@@ -79,7 +80,7 @@ abstract class PairwiseTranslator(
               }
               tf.learn.InMemoryEstimator(
                 model,
-                tf.learn.Configuration(Some(workingDir)),
+                tf.learn.Configuration(Some(workingDir), StepHookTrigger(10)),
                 stopCriteria,
                 Set(
                   tf.learn.StepRateHook(log = false, summaryDirectory = summariesDir, trigger = StepHookTrigger(100)),
@@ -111,9 +112,33 @@ abstract class PairwiseTranslator(
       tgtVocab: () => tf.LookupTable
   ): MTInferLayer
 
-  protected def lossLayer(): MTLossLayer
+  protected def lossLayer(): MTLossLayer = {
+    new tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]("PairwiseTranslationLoss") {
+      override val layerType: String = "PairwiseTranslationLoss"
 
-  protected def optimizer(): tf.train.Optimizer
+      override def forward(
+          input: ((Output, Output), (Output, Output, Output)),
+          mode: Mode
+      ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = {
+        val loss = tf.sum(tf.sequenceLoss(
+          input._1._1, input._2._2,
+          weights = tf.sequenceMask(input._1._2, tf.shape(input._1._1)(1), dataType = input._1._1.dataType),
+          averageAcrossTimeSteps = false, averageAcrossBatch = true))
+        LayerInstance(input, loss)
+      }
+    }
+  }
+
+  protected def optimizer(): tf.train.Optimizer = tf.train.GradientDescent(1.0)
+
+  /** Returns the maximum sequence length to consider while decoding during inference, given the provided source
+    * sequence length. */
+  protected def inferMaxLength(srcLength: Output): Output = {
+    if (configuration.targetMaxLength != -1)
+      tf.constant(configuration.targetMaxLength)
+    else
+      tf.round(tf.max(srcLength) * configuration.decodingMaxLengthFactor).cast(INT32)
+  }
 }
 
 object PairwiseTranslator {

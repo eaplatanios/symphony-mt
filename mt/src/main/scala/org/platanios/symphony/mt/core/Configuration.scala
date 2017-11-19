@@ -38,6 +38,8 @@ case class Configuration(
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
     endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
+    // Decoder
+    decodingMaxLengthFactor: Float = 2.0f,
     // Miscellaneous
     logDevicePlacement: Boolean = false,
     randomSeed: Option[Int] = None,

@@ -70,7 +70,7 @@ class PairwiseRNNTranslator[S, SS](
       tf.fill(INT32, Shape(configuration.batchSize))(tgtVocab.lookup(bosToken)),
       tgtVocab.lookup(eosToken).cast(INT32))
     val decTuple = BasicRNNDecoder(decCellInstance.cell, encTuple.state, decHelper).dynamicDecode(
-      outputTimeMajor = true, maximumIterations = tf.round(tf.max(input._2) * 2),
+      outputTimeMajor = true, maximumIterations = inferMaxLength(tf.max(input._2)),
       parallelIterations = configuration.parallelIterations,
       swapMemory = configuration.swapMemory)
     (decTuple, decCellInstance.trainableVariables + decEmbeddings, decCellInstance.nonTrainableVariables)
@@ -157,23 +157,4 @@ class PairwiseRNNTranslator[S, SS](
       }
     }
   }
-
-  override protected def lossLayer(): MTLossLayer = {
-    new tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]("PairwiseRNNTranslationLoss") {
-      override val layerType: String = "PairwiseRNNTranslationLoss"
-
-      override def forward(
-          input: ((Output, Output), (Output, Output, Output)),
-          mode: Mode
-      ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = {
-        val loss = tf.sum(tf.sequenceLoss(
-          input._1._1, input._2._2,
-          weights = tf.sequenceMask(input._1._2, tf.shape(input._1._1)(1), dataType = input._1._1.dataType),
-          averageAcrossTimeSteps = false, averageAcrossBatch = true))
-        LayerInstance(input, loss)
-      }
-    }
-  }
-
-  override protected def optimizer(): tf.train.Optimizer = tf.train.GradientDescent(1.0)
 }
