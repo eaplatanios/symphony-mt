@@ -47,14 +47,14 @@ abstract class PairwiseTranslator(
             val srcLang = datasetPairs.head.sourceLanguage
             val tgtLang = datasetPairs.head.targetLanguage
             val workingDir = configuration.workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}")
-            val srcVocab = srcLang.vocabulary()
-            val tgtVocab = tgtLang.vocabulary()
+            val srcVocab = srcLang.vocabulary
+            val tgtVocab = tgtLang.vocabulary
             val srcVocabSize = srcLang.vocabularySize
             val tgtVocabSize = tgtLang.vocabularySize
             val srcDataset = Datasets.joinDatasets(datasetPairs.map(_.sourceDataset))
             val tgtDataset = Datasets.joinDatasets(datasetPairs.map(_.targetDataset))
-            val trainDataset = Datasets.createTrainDataset(
-              srcDataset, tgtDataset, srcVocab, tgtVocab, configuration.batchSize,
+            val trainDataset = () => Datasets.createTrainDataset(
+              srcDataset, tgtDataset, srcVocab(), tgtVocab(), configuration.batchSize,
               configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
               configuration.sourceReverse, configuration.randomSeed, configuration.numBuckets,
               configuration.sourceMaxLength, configuration.targetMaxLength, configuration.parallelIterations,
@@ -100,15 +100,15 @@ abstract class PairwiseTranslator(
   protected def trainLayer(
       srcVocabSize: Int,
       tgtVocabSize: Int,
-      srcVocab: tf.LookupTable,
-      tgtVocab: tf.LookupTable
+      srcVocab: () => tf.LookupTable,
+      tgtVocab: () => tf.LookupTable
   ): MTTrainLayer
 
   protected def inferLayer(
       srcVocabSize: Int,
       tgtVocabSize: Int,
-      srcVocab: tf.LookupTable,
-      tgtVocab: tf.LookupTable
+      srcVocab: () => tf.LookupTable,
+      tgtVocab: () => tf.LookupTable
   ): MTInferLayer
 
   protected def lossLayer(): MTLossLayer

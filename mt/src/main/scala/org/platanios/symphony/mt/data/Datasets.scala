@@ -58,7 +58,7 @@ object Datasets {
     }
 
     val datasetBeforeBatching = srcDataset
-        .map(o => tf.stringSplit(o).values)
+        .map(o => tf.stringSplit(o.expandDims(0)).values)
         // Crop based on the maximum allowed sequence length.
         .transform(d => if (srcMaxLength != -1) d.map(dd => dd(0 :: srcMaxLength)) else d)
         // Reverse the source sequence if necessary.
@@ -113,7 +113,7 @@ object Datasets {
           .drop(dropCount)
           .shuffle(bufferSize, randomSeed)
           // Tokenize by splitting on white spaces.
-          .map(d => (tf.stringSplit(d._1).values, tf.stringSplit(d._2).values))
+          .map(d => (tf.stringSplit(d._1.expandDims(0)).values, tf.stringSplit(d._2.expandDims(0)).values))
           .prefetch(bufferSize)
           // Filter zero length input sequences and sequences exceeding the maximum length.
           .filter(d => tf.logicalAnd(tf.size(d._1) > 0, tf.size(d._2) > 0))

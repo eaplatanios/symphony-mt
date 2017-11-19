@@ -100,23 +100,30 @@ object Vocabulary {
     * @return Vocabulary lookup table.
     */
   def createTable(vocabFile: Path): tf.LookupTable = {
-    tf.indexTableFromFile(vocabFile.toAbsolutePath.toString, defaultValue = UNKNOWN_TOKEN_ID)
+    val table = tf.indexTableFromFile(vocabFile.toAbsolutePath.toString, defaultValue = UNKNOWN_TOKEN_ID)
+    table.initialize()
+    table
   }
 
   /** Creates vocabulary lookup tables (from word string to word ID), from the provided vocabulary files.
     *
-    * @param  sourceFile Source vocabulary file.
-    * @param  targetFile Target vocabulary file.
+    * @param  srcFile Source vocabulary file.
+    * @param  tgtFile Target vocabulary file.
     * @return Tuple contain the source vocabulary lookup table and the target one.
     */
-  def createTables(sourceFile: Path, targetFile: Path): (tf.LookupTable, tf.LookupTable) = {
-    val sourceTable = tf.indexTableFromFile(sourceFile.toAbsolutePath.toString, defaultValue = UNKNOWN_TOKEN_ID)
+  def createTables(srcFile: Path, tgtFile: Path): (tf.LookupTable, tf.LookupTable) = {
+    val srcPath = srcFile.toAbsolutePath.toString
+    val tgtPath = tgtFile.toAbsolutePath.toString
+    val sourceTable = tf.indexTableFromFile(srcPath, defaultValue = UNKNOWN_TOKEN_ID)
     val targetTable = {
-      if (sourceFile == targetFile)
+      if (srcFile == tgtFile)
         sourceTable
       else
-        tf.indexTableFromFile(targetFile.toAbsolutePath.toString, defaultValue = UNKNOWN_TOKEN_ID)
+        tf.indexTableFromFile(tgtPath, defaultValue = UNKNOWN_TOKEN_ID)
     }
+    sourceTable.initialize()
+    if (srcFile != tgtFile)
+      targetTable.initialize()
     (sourceTable, targetTable)
   }
 }

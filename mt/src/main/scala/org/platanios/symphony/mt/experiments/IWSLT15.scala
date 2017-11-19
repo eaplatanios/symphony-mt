@@ -21,6 +21,7 @@ import org.platanios.symphony.mt.data.Vocabulary
 import org.platanios.symphony.mt.translators.PairwiseRNNTranslator
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.BasicLSTMCell
+import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 
 import java.nio.file.{Path, Paths}
 
@@ -43,18 +44,18 @@ object IWSLT15 extends App {
   val viVocabSize: Int      = viCheck.get._1
   val viVocabPath: Path     = viCheck.get._2
   val srcLang    : Language = Language("English", "en", () => Vocabulary.createTable(enVocabPath), enVocabSize)
-  val tgtLang    : Language = Language("Vietnamese", "vi", () => Vocabulary.createTable(enVocabPath), viVocabSize)
+  val tgtLang    : Language = Language("Vietnamese", "vi", () => Vocabulary.createTable(viVocabPath), viVocabSize)
 
   // Create the datasets
-  val srcTrainDataset: MTTextLinesDataset = tf.data.TextLineDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
-  val tgtTrainDataset: MTTextLinesDataset = tf.data.TextLineDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
+  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
+  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
 
   // Create a translator
   val configuration: Configuration = Configuration()
   val translator   : Translator    = new PairwiseRNNTranslator(
-    encoderCell = BasicLSTMCell(256, forgetBias = 0.0f),
-    decoderCell = BasicLSTMCell(256, forgetBias = 0.0f),
-    _configuration = configuration)
+    encoderCell = BasicLSTMCell(256, forgetBias = 0.0f, name = "EncoderCell"),
+    decoderCell = BasicLSTMCell(256, forgetBias = 0.0f, name = "DecoderCell"),
+    configuration = configuration)
 
   translator.train(
     Seq(Translator.DatasetPair(srcLang, tgtLang, srcTrainDataset, tgtTrainDataset)),
