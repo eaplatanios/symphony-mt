@@ -53,8 +53,8 @@ object IWSLT15 extends App {
   // Create a translator
   val configuration: Configuration = Configuration()
   val translator   : Translator    = new PairwiseRNNTranslator(
-    encoderCell = BasicLSTMCell(256, forgetBias = 0.0f, name = "EncoderCell"),
-    decoderCell = BasicLSTMCell(256, forgetBias = 0.0f, name = "DecoderCell"),
+    encoderCell = BasicLSTMCell(configuration.modelNumUnits, forgetBias = 0.0f, name = "EncoderCell"),
+    decoderCell = BasicLSTMCell(configuration.modelNumUnits, forgetBias = 0.0f, name = "DecoderCell"),
     configuration = configuration)
 
   translator.train(

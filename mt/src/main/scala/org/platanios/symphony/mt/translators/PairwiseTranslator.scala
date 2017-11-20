@@ -128,6 +128,7 @@ abstract class PairwiseTranslator(
           input._1._1, input._2._2,
           weights = tf.sequenceMask(input._1._2, tf.shape(input._1._1)(1), dataType = input._1._1.dataType),
           averageAcrossTimeSteps = false, averageAcrossBatch = true))
+        tf.summary.scalar("Loss", loss)
         LayerInstance(input, loss)
       }
     }
@@ -148,7 +149,7 @@ abstract class PairwiseTranslator(
     if (configuration.dataTgtMaxLength != -1)
       tf.constant(configuration.dataTgtMaxLength)
     else
-      tf.round(tf.max(srcLength) * configuration.decodingMaxLengthFactor).cast(INT32)
+      tf.round(tf.max(srcLength) * configuration.modelDecodingMaxLengthFactor).cast(INT32)
   }
 }
 

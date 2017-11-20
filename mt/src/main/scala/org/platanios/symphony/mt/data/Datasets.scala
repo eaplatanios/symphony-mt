@@ -104,7 +104,7 @@ object Datasets {
         ((Shape(-1), Shape.scalar()), (Shape(-1), Shape(-1), Shape.scalar())),
         // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
         // generally need to do this since later on we will be masking out calculations past the true sequence.
-        ((srcEosId, tf.zeros(INT32, Shape.scalar())), (tgtEosId, tgtEosId, tf.zeros(INT32, Shape.scalar()))))
+        ((srcEosId, tf.zeros(INT32, Shape.scalar().toOutput())), (tgtEosId, tgtEosId, tf.zeros(INT32, Shape.scalar().toOutput()))))
     }
 
     val datasetBeforeBucketing =
@@ -113,43 +113,52 @@ object Datasets {
           .drop(dropCount)
           .shuffle(bufferSize, randomSeed)
           // Tokenize by splitting on white spaces.
-          .map(d => (tf.stringSplit(d._1.expandDims(0)).values, tf.stringSplit(d._2.expandDims(0)).values))
+          .map(
+            d => (tf.stringSplit(d._1(NewAxis)).values, tf.stringSplit(d._2(NewAxis)).values),
+            name = "Map/StringSplit")
           .prefetch(bufferSize)
           // Filter zero length input sequences and sequences exceeding the maximum length.
           .filter(d => tf.logicalAnd(tf.size(d._1) > 0, tf.size(d._2) > 0))
           // Crop based on the maximum allowed sequence lengths.
           .transform(d => {
             if (srcMaxLength != -1 && tgtMaxLength != -1)
-              d.map(dd => (dd._1(0 :: srcMaxLength), dd._2(0 :: tgtMaxLength)), numParallelCalls).prefetch(bufferSize)
+              d.map(dd => (dd._1(0 :: srcMaxLength), dd._2(0 :: tgtMaxLength)), numParallelCalls, name = "Map/MaxLength")
+                  .prefetch(bufferSize)
             else if (srcMaxLength != -1)
-              d.map(dd => (dd._1(0 :: srcMaxLength), dd._2), numParallelCalls).prefetch(bufferSize)
+              d.map(dd => (dd._1(0 :: srcMaxLength), dd._2), numParallelCalls, name = "Map/MaxLength")
+                  .prefetch(bufferSize)
             else if (tgtMaxLength != -1)
-              d.map(dd => (dd._1, dd._2(0 :: tgtMaxLength)), numParallelCalls).prefetch(bufferSize)
+              d.map(dd => (dd._1, dd._2(0 :: tgtMaxLength)), numParallelCalls, name = "Map/MaxLength")
+                  .prefetch(bufferSize)
             else
               d
           })
           // Reverse the source sequence if necessary.
           .transform(d => {
             if (srcReverse)
-              d.map(dd => (tf.reverse(dd._1, axes = 0), dd._2)).prefetch(bufferSize)
+              d.map(dd => (tf.reverse(dd._1, axes = 0), dd._2), name = "Map/SrcReverse").prefetch(bufferSize)
             else
               d
           })
           // Convert the word strings to IDs. Word strings that are not in the vocabulary
           // get the lookup table's default value.
           .map(d => (
-              tf.cast(srcVocabularyTable.lookup(d._1), INT32),
-              tf.cast(tgtVocabularyTable.lookup(d._2), INT32)),
-            numParallelCalls).prefetch(bufferSize)
+          tf.cast(srcVocabularyTable.lookup(d._1), INT32),
+          tf.cast(tgtVocabularyTable.lookup(d._2), INT32)),
+        numParallelCalls, name = "Map/VocabularyLookup")
+          .prefetch(bufferSize)
           // Create a target input prefixed with 'beginSequenceToken'
           // and a target output suffixed with 'endSequenceToken'.
           .map(d => (
-              d._1,
-              tf.concatenate(Seq(tgtBosId.expandDims(0), d._2), axis = 0),
-              tf.concatenate(Seq(d._2, tgtEosId.expandDims(0)), axis = 0)),
-            numParallelCalls).prefetch(bufferSize)
+          d._1,
+          tf.concatenate(Seq(tgtBosId.expandDims(0), d._2), axis = 0),
+          tf.concatenate(Seq(d._2, tgtEosId.expandDims(0)), axis = 0)),
+        numParallelCalls, name = "Map/AddDecoderOutput")
+          .prefetch(bufferSize)
           // Add sequence lengths.
-          .map(d => ((d._1, tf.size(d._1, INT32)), (d._2, d._3, tf.size(d._2, INT32))), numParallelCalls)
+          .map(
+            d => ((d._1, tf.size(d._1, INT32)), (d._2, d._3, tf.size(d._2, INT32))), numParallelCalls,
+            name = "Map/AddLengths")
           .prefetch(bufferSize)
 
     if (numBuckets == 1) {

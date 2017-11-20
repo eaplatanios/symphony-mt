@@ -27,7 +27,7 @@ import java.nio.file.{Path, Paths}
 case class Configuration(
     workingDir: Path = Paths.get("temp"),
     // Data
-    dataNumBuckets: Int = 5,
+    dataNumBuckets: Int = 1,
     dataSrcMaxLength: Int = 50,
     dataTgtMaxLength: Int = 50,
     dataSrcReverse: Boolean = false,
@@ -40,8 +40,9 @@ case class Configuration(
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
     endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
-    // Decoder
-    decodingMaxLengthFactor: Float = 2.0f,
+    // Model
+    modelNumUnits: Int = 32,
+    modelDecodingMaxLengthFactor: Float = 2.0f,
     // Training
     trainBatchSize: Int = 128,
     trainMaxGradNorm: Float = 5.0f,
