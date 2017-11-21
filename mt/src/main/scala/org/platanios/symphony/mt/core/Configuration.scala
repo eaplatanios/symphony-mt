@@ -28,32 +28,42 @@ case class Configuration(
     workingDir: Path = Paths.get("temp"),
     // Data
     dataNumBuckets: Int = 1,
-    dataSrcMaxLength: Int = 50,
-    dataTgtMaxLength: Int = 50,
+    dataSrcMaxLength: Int = -1, // 50,
+    dataTgtMaxLength: Int = -1, // 50,
     dataSrcReverse: Boolean = false,
     dataBufferSize: Long = -1L,
     dataDropCount: Int = 0,
     dataNumShards: Int = 1,
     dataShardIndex: Int = 0,
-    dataTimeMajor: Boolean = true, // TODO: Currently unused.
+    dataTimeMajor: Boolean = false, // TODO: Currently unused.
     // Vocabulary
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
     endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
     // Model
+    modelSrcEmbeddingSize: Int = 128,
+    modelTgtEmbeddingSize: Int = 128,
     modelNumUnits: Int = 32,
     modelDecodingMaxLengthFactor: Float = 2.0f,
     // Training
     trainBatchSize: Int = 128,
     trainMaxGradNorm: Float = 5.0f,
     trainNumSteps: Int = 12000,
-    trainOptimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
+    trainOptimizer: (Float, Decay) => Optimizer = GradientDescent(_, _), // , learningRateSummaryTag = "LearningRate"),
     trainLearningRateInitial: Float = 1.0f,
     trainLearningRateDecayRate: Float = 0.5f,
     trainLearningRateDecaySteps: Int = 1000,
     trainLearningRateDecayStartStep: Int = 8000,
+    trainSummarySteps: Int = 100,
+    trainCheckpointSteps: Int = 100,
     // Inference
-    inferBatchSize: Int = 32,
+    inferBatchSize: Int = 128,
+    // Logging
+    logLossSteps: Int = 10,
+    logEvalBatchSize: Int = 128,
+    logTrainPerplexitySteps: Int = 100,
+    logDevPerplexitySteps: Int = 100,
+    logTestPerplexitySteps: Int = 100,
     // Miscellaneous
     colocateGradientsWithOps: Boolean = true, // TODO: Currently unused.
     logDevicePlacement: Boolean = false,

@@ -143,17 +143,17 @@ object Datasets {
           // Convert the word strings to IDs. Word strings that are not in the vocabulary
           // get the lookup table's default value.
           .map(d => (
-          tf.cast(srcVocabularyTable.lookup(d._1), INT32),
-          tf.cast(tgtVocabularyTable.lookup(d._2), INT32)),
-        numParallelCalls, name = "Map/VocabularyLookup")
+              tf.cast(srcVocabularyTable.lookup(d._1), INT32),
+              tf.cast(tgtVocabularyTable.lookup(d._2), INT32)),
+            numParallelCalls, name = "Map/VocabularyLookup")
           .prefetch(bufferSize)
           // Create a target input prefixed with 'beginSequenceToken'
           // and a target output suffixed with 'endSequenceToken'.
           .map(d => (
-          d._1,
-          tf.concatenate(Seq(tgtBosId.expandDims(0), d._2), axis = 0),
-          tf.concatenate(Seq(d._2, tgtEosId.expandDims(0)), axis = 0)),
-        numParallelCalls, name = "Map/AddDecoderOutput")
+              d._1,
+              tf.concatenate(Seq(tgtBosId.expandDims(0), d._2), axis = 0),
+              tf.concatenate(Seq(d._2, tgtEosId.expandDims(0)), axis = 0)),
+            numParallelCalls, name = "Map/AddDecoderOutput")
           .prefetch(bufferSize)
           // Add sequence lengths.
           .map(
