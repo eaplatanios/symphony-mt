@@ -22,14 +22,24 @@ import org.platanios.tensorflow.api.learn.StopCriteria
   * @author Emmanouil Antonios Platanios
   */
 abstract class Translator(val configuration: Configuration = Configuration()) {
-  def train(datasets: Seq[Translator.DatasetPair], stopCriteria: StopCriteria): Unit
-  def translate(sourceLanguage: Language, targetLanguage: Language, dataset: MTTextLinesDataset): MTTextLinesDataset
+  def train(
+      trainDatasets: Seq[Translator.DatasetPair],
+      devDatasets: Seq[Translator.DatasetPair] = null,
+      testDatasets: Seq[Translator.DatasetPair] = null,
+      stopCriteria: StopCriteria
+  ): Unit
+
+  def translate(
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      dataset: MTTextLinesDataset
+  ): MTTextLinesDataset
 }
 
 object Translator {
   case class DatasetPair(
-      sourceLanguage: Language,
-      targetLanguage: Language,
-      sourceDataset: MTTextLinesDataset,
-      targetDataset: MTTextLinesDataset)
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      srcDataset: MTTextLinesDataset,
+      tgtDataset: MTTextLinesDataset)
 }

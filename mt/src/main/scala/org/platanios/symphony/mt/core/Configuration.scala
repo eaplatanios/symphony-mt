@@ -16,9 +16,8 @@
 package org.platanios.symphony.mt.core
 
 import org.platanios.symphony.mt.data.Vocabulary
-import org.platanios.tensorflow.api.ops.training.optimizers.{Optimizer, GradientDescent}
-import org.platanios.tensorflow.api.ops.training.optimizers.decay.Decay
-
+import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
+import org.platanios.tensorflow.api.ops.training.optimizers.decay.{Decay, ExponentialDecay}
 import java.nio.file.{Path, Paths}
 
 /**
@@ -27,9 +26,9 @@ import java.nio.file.{Path, Paths}
 case class Configuration(
     workingDir: Path = Paths.get("temp"),
     // Data
-    dataNumBuckets: Int = 1,
-    dataSrcMaxLength: Int = -1, // 50,
-    dataTgtMaxLength: Int = -1, // 50,
+    dataNumBuckets: Int = 5,
+    dataSrcMaxLength: Int = 50,
+    dataTgtMaxLength: Int = 50,
     dataSrcReverse: Boolean = false,
     dataBufferSize: Long = -1L,
     dataDropCount: Int = 0,
@@ -49,11 +48,11 @@ case class Configuration(
     trainBatchSize: Int = 128,
     trainMaxGradNorm: Float = 5.0f,
     trainNumSteps: Int = 12000,
-    trainOptimizer: (Float, Decay) => Optimizer = GradientDescent(_, _), // , learningRateSummaryTag = "LearningRate"),
+    trainOptimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
     trainLearningRateInitial: Float = 1.0f,
-    trainLearningRateDecayRate: Float = 0.5f,
-    trainLearningRateDecaySteps: Int = 1000,
-    trainLearningRateDecayStartStep: Int = 8000,
+    trainLearningRateDecayRate: Float = 1.0f,
+    trainLearningRateDecaySteps: Int = 10000,
+    trainLearningRateDecayStartStep: Int = 0,
     trainSummarySteps: Int = 100,
     trainCheckpointSteps: Int = 100,
     // Inference

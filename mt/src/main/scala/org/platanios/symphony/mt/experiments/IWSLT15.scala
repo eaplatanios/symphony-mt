@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.Vocabulary
 import org.platanios.symphony.mt.translators.PairwiseRNNTranslator
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.layers.rnn.cell.BasicLSTMCell
+import org.platanios.tensorflow.api.learn.layers.rnn.cell.{BasicLSTMCell, MultiRNNCell}
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 
 import java.nio.file.{Path, Paths}
@@ -49,15 +49,33 @@ object IWSLT15 extends App {
   // Create the datasets
   val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
   val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
+  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.en").toAbsolutePath.toString)
+  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.vi").toAbsolutePath.toString)
+  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
+  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.vi").toAbsolutePath.toString)
 
   // Create a translator
   val configuration: Configuration = Configuration()
   val translator   : Translator    = new PairwiseRNNTranslator(
-    encoderCell = BasicLSTMCell(configuration.modelNumUnits, FLOAT32, Shape(-1, 300), forgetBias = 0.0f, name = "EncoderCell"),
-    decoderCell = BasicLSTMCell(configuration.modelNumUnits, FLOAT32, Shape(-1, 300), forgetBias = 0.0f, name = "DecoderCell"),
+    encoderCell = MultiRNNCell(Seq(
+      BasicLSTMCell(
+        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelSrcEmbeddingSize), forgetBias = 1.0f,
+        name = "EncoderCell1"),
+      BasicLSTMCell(
+        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,
+        name = "EncoderCell2"))),
+    decoderCell = MultiRNNCell(Seq(
+      BasicLSTMCell(
+        configuration.modelNumUnits, FLOAT32, Shape(4 * configuration.modelNumUnits), forgetBias = 1.0f,
+        name = "DecoderCell1"),
+      BasicLSTMCell(
+        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,
+        name = "DecoderCell2"))),
     configuration = configuration)
 
   translator.train(
     Seq(Translator.DatasetPair(srcLang, tgtLang, srcTrainDataset, tgtTrainDataset)),
+    Seq(Translator.DatasetPair(srcLang, tgtLang, srcDevDataset, tgtDevDataset)),
+    Seq(Translator.DatasetPair(srcLang, tgtLang, srcTestDataset, tgtTestDataset)),
     tf.learn.StopCriteria(Some(10000)))
 }

@@ -15,9 +15,11 @@
 
 package org.platanios.symphony.mt.translators
 
+import org.platanios.symphony.mt.core.hooks.PerplexityLoggingHook
 import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
 import org.platanios.symphony.mt.data.Datasets
-import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
+import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
+import org.platanios.symphony.mt.metrics.Perplexity
 import org.platanios.symphony.mt.translators.PairwiseTranslator._
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
@@ -36,64 +38,118 @@ abstract class PairwiseTranslator(
   private[this] val estimators: mutable.Map[(Int, Int), MTPairwiseEstimator] = mutable.Map.empty
 
   // Create the input and the train input parts of the model.
-  private[this] val seqShape   = Shape(configuration.trainBatchSize, -1)
-  private[this] val lenShape   = Shape(configuration.trainBatchSize)
+  private[this] val seqShape   = Shape(-1, -1)
+  private[this] val lenShape   = Shape(-1)
   private[this] val input      = tf.learn.Input((INT32, INT32), (seqShape, lenShape))
   private[this] val trainInput = tf.learn.Input((INT32, INT32, INT32), (seqShape, seqShape, lenShape))
 
   override def train(
-      datasets: Seq[Translator.DatasetPair],
-      stopCriteria: StopCriteria = StopCriteria(Some(configuration.trainNumSteps))): Unit = {
-    datasets
-        .groupBy(p => (p.sourceLanguage.id, p.targetLanguage.id))
-        .foreach {
-          case (languageIdPair, datasetPairs) =>
-            val srcLang = datasetPairs.head.sourceLanguage
-            val tgtLang = datasetPairs.head.targetLanguage
-            val workingDir = configuration.workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}")
-            val srcVocab = srcLang.vocabulary
-            val tgtVocab = tgtLang.vocabulary
-            val srcVocabSize = srcLang.vocabularySize
-            val tgtVocabSize = tgtLang.vocabularySize
-            val srcDataset = Datasets.joinDatasets(datasetPairs.map(_.sourceDataset))
-            val tgtDataset = Datasets.joinDatasets(datasetPairs.map(_.targetDataset))
-            val trainDataset = () => Datasets.createTrainDataset(
-              srcDataset, tgtDataset, srcVocab(), tgtVocab(), configuration.trainBatchSize,
-              configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
-              configuration.dataSrcReverse, configuration.randomSeed, configuration.dataNumBuckets,
-              configuration.dataSrcMaxLength, configuration.dataTgtMaxLength, configuration.parallelIterations,
-              configuration.dataBufferSize, configuration.dataDropCount, configuration.dataNumShards,
-              configuration.dataShardIndex)
-            val estimator = estimators.getOrElse(languageIdPair, {
-              val tLayer = trainLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
-              val iLayer = inferLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
-              val model = tf.learn.Model(
-                input = input,
-                layer = iLayer,
-                trainLayer = tLayer,
-                trainInput = trainInput,
-                loss = lossLayer(),
-                optimizer = optimizer(),
-                clipGradients = tf.learn.ClipGradientsByGlobalNorm(configuration.trainMaxGradNorm))
-              val summariesDir = workingDir.resolve("summaries")
-              val tensorBoardConfig = {
-                if (configuration.launchTensorBoard)
-                  tf.learn.TensorBoardConfig(summariesDir, reloadInterval = 1)
-                else
-                  null
-              }
-              tf.learn.InMemoryEstimator(
-                model,
-                tf.learn.Configuration(Some(workingDir), StepHookTrigger(10)),
-                stopCriteria,
-                Set(
-                  tf.learn.StepRateHook(log = false, summaryDirectory = summariesDir, trigger = StepHookTrigger(100)),
-                  tf.learn.SummarySaverHook(summariesDir, StepHookTrigger(10)),
-                  tf.learn.CheckpointSaverHook(workingDir, StepHookTrigger(1000))),
-                tensorBoardConfig = tensorBoardConfig)
-            })
-            estimator.train(trainDataset, stopCriteria)
+      trainDatasets: Seq[Translator.DatasetPair],
+      devDatasets: Seq[Translator.DatasetPair] = null,
+      testDatasets: Seq[Translator.DatasetPair] = null,
+      stopCriteria: StopCriteria = StopCriteria(Some(configuration.trainNumSteps))
+  ): Unit = {
+    val groupedTrainDatasets = groupAndJoinDatasets(trainDatasets)
+    val groupedDevDatasets = groupAndJoinDatasets(devDatasets)
+    val groupedTestDatasets = groupAndJoinDatasets(testDatasets)
+    groupedTrainDatasets.keys.foreach(pair => {
+      val srcLang = pair._1
+      val tgtLang = pair._2
+      val workingDir = configuration.workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}")
+      val srcVocab = srcLang.vocabulary
+      val tgtVocab = tgtLang.vocabulary
+      val srcVocabSize = srcLang.vocabularySize
+      val tgtVocabSize = tgtLang.vocabularySize
+      val srcTrainDataset = groupedTrainDatasets(pair)._1
+      val tgtTrainDataset = groupedTrainDatasets(pair)._2
+      val srcDevDataset = groupedDevDatasets(pair)._1
+      val tgtDevDataset = groupedDevDatasets(pair)._2
+      val srcTestDataset = groupedTestDatasets(pair)._1
+      val tgtTestDataset = groupedTestDatasets(pair)._2
+      val trainDataset = () => createTrainDataset(
+        srcTrainDataset, tgtTrainDataset, srcVocab(), tgtVocab(), configuration.trainBatchSize)
+      val estimator = estimators.getOrElse((pair._1.id, pair._2.id), {
+        val tLayer = trainLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
+        val iLayer = inferLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
+        val model = tf.learn.Model(
+          input = input,
+          layer = iLayer,
+          trainLayer = tLayer,
+          trainInput = trainInput,
+          loss = lossLayer(),
+          optimizer = optimizer(),
+          clipGradients = tf.learn.ClipGradientsByGlobalNorm(configuration.trainMaxGradNorm))
+        val summariesDir = workingDir.resolve("summaries")
+        val tensorBoardConfig = {
+          if (configuration.launchTensorBoard)
+            tf.learn.TensorBoardConfig(summariesDir, reloadInterval = 1)
+          else
+            null
         }
+        var hooks = Set[tf.learn.Hook](
+          tf.learn.StepRateHook(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
+          tf.learn.SummarySaverHook(summariesDir, StepHookTrigger(configuration.trainSummarySteps)),
+          tf.learn.CheckpointSaverHook(workingDir, StepHookTrigger(configuration.trainCheckpointSteps)))
+        if (configuration.logLossSteps > 0)
+          hooks += PerplexityLoggingHook(StepHookTrigger(10))
+        if (configuration.logTrainPerplexitySteps > 0)
+          hooks += tf.learn.EvaluationHook(
+            log = true, summariesDir,
+            () => createTrainDataset(
+              srcTrainDataset, tgtTrainDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize),
+            Seq(Perplexity()), StepHookTrigger(configuration.logTrainPerplexitySteps), triggerAtEnd = true,
+            name = "Train Evaluation")
+        if (configuration.logDevPerplexitySteps > 0 && srcDevDataset != null && tgtDevDataset != null)
+          hooks += tf.learn.EvaluationHook(
+            log = true, summariesDir,
+            () => createTrainDataset(
+              srcDevDataset, tgtDevDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize),
+            Seq(Perplexity()), StepHookTrigger(configuration.logDevPerplexitySteps), triggerAtEnd = true,
+            name = "Dev Evaluation")
+        if (configuration.logTestPerplexitySteps > 0 && srcTestDataset != null && tgtTestDataset != null)
+          hooks += tf.learn.EvaluationHook(
+            log = true, summariesDir,
+            () => createTrainDataset(
+              srcTestDataset, tgtTestDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize),
+            Seq(Perplexity()), StepHookTrigger(configuration.logTestPerplexitySteps), triggerAtEnd = true,
+            name = "Test Evaluation")
+        tf.learn.InMemoryEstimator(
+          model, tf.learn.Configuration(Some(workingDir)), stopCriteria, hooks,
+          tensorBoardConfig = tensorBoardConfig)
+      })
+      estimator.train(trainDataset, stopCriteria)
+    })
+  }
+
+  private[this] def groupAndJoinDatasets(
+      datasets: Seq[Translator.DatasetPair]
+  ): Map[(Language, Language), (MTTextLinesDataset, MTTextLinesDataset)] = {
+    if (datasets == null) {
+      Map.empty.withDefault(_ => (null, null))
+    } else {
+      datasets
+          .groupBy(p => (p.srcLanguage.id, p.tgtLanguage.id)).values
+          .map(p => (
+              (p.head.srcLanguage, p.head.tgtLanguage),
+              (Datasets.joinDatasets(p.map(_.srcDataset)), Datasets.joinDatasets(p.map(_.tgtDataset)))))
+          .toMap
+    }
+  }
+
+  private[this] def createTrainDataset(
+      srcDataset: MTTextLinesDataset,
+      tgtDataset: MTTextLinesDataset,
+      srcVocab: tf.LookupTable,
+      tgtVocab: tf.LookupTable,
+      batchSize: Int
+  ): MTTrainDataset = {
+    Datasets.createTrainDataset(
+      srcDataset, tgtDataset, srcVocab, tgtVocab, batchSize,
+      configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
+      configuration.dataSrcReverse, configuration.randomSeed, configuration.dataNumBuckets,
+      configuration.dataSrcMaxLength, configuration.dataTgtMaxLength, configuration.parallelIterations,
+      configuration.dataBufferSize, configuration.dataDropCount, configuration.dataNumShards,
+      configuration.dataShardIndex)
   }
 
   override def translate(

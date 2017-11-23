@@ -107,7 +107,7 @@ object PerplexityLoggingHook {
       trigger: HookTrigger = StepHookTrigger(1),
       triggerAtEnd: Boolean = true,
       formatter: (Double, Long, Float) => String = { (time, step, perplexity) =>
-        f"($time%.3f s) Step: $step%06d, Perplexity: $perplexity%.4f"
+        f"($time%8.3f s) Step: $step%6d, Perplexity: $perplexity%.4f"
       }
   ): PerplexityLoggingHook = {
     new PerplexityLoggingHook(trigger, triggerAtEnd, formatter)
