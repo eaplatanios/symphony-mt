@@ -18,12 +18,17 @@ package org.platanios.symphony.mt.core.hooks
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.Graph
 import org.platanios.tensorflow.api.core.client.{Executable, Fetchable, Session}
+import org.platanios.tensorflow.api.io.events.{SummaryFileWriter, SummaryFileWriterCache}
 import org.platanios.tensorflow.api.learn.{Counter, SessionCreator}
 import org.platanios.tensorflow.api.learn.hooks._
 import org.platanios.tensorflow.api.ops.variables.Variable
+import org.platanios.tensorflow.api.tensors.Tensor
+
+import java.nio.file.Path
 
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
+import org.tensorflow.framework.Summary
 
 /** Hooks that logs the perplexity value.
   *
@@ -40,21 +45,30 @@ import org.slf4j.LoggerFactory
   * @author Emmanouil Antonios Platanios
   */
 class PerplexityLogger(
-    trigger: HookTrigger = StepHookTrigger(1),
-    triggerAtEnd: Boolean = true,
-    formatter: (Double, Long, Float) => String = (time, step, perplexity) => {
+    val log: Boolean = true,
+    val trigger: HookTrigger = StepHookTrigger(1),
+    val triggerAtEnd: Boolean = true,
+    val average: Boolean = true,
+    val formatter: (Double, Long, Float) => String = (time, step, perplexity) => {
       f"($time%8.3f s) Step: $step%6d, Perplexity: $perplexity%.4f"
-    }
+    },
+    val summaryDir: Path = null,
+    val summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
     (Output, Output),
     ((Tensor, Tensor), (Tensor, Tensor, Tensor)), ((Output, Output), (Output, Output, Output)),
     ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape))] {
-  private[this] var step      : Variable = _
-  private[this] var perplexity: Output   = _
+  require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
+
+  private[this] var step         : Variable                  = _
+  private[this] var perplexity   : Output                    = _
+  private[this] var summaryWriter: Option[SummaryFileWriter] = None
 
   private[this] val internalTrigger: HookTrigger = trigger.copy()
   private[this] var lastStep       : Long        = 0L
   private[this] var shouldTrigger  : Boolean     = false
+  private[this] var totalPerplexity: Float       = 0.0f
+  private[this] var totalSteps     : Long        = 0L
 
   override def begin(sessionCreator: SessionCreator): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
@@ -64,6 +78,9 @@ class PerplexityLogger(
     perplexity = modelInstance.loss.map(_.cast(FLOAT32)).map(l => {
       tf.exp(l * tf.size(modelInstance.output._2) / tf.sum(modelInstance.output._2))
     }).orNull
+    summaryWriter = Option(summaryDir).map(SummaryFileWriterCache.get(_))
+    totalPerplexity = 0.0f
+    totalSteps = 0L
   }
 
   override def afterSessionCreation(session: Session): Unit = {
@@ -75,7 +92,7 @@ class PerplexityLogger(
       fetchableEv: Fetchable.Aux[F, R]
   ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor]]] = {
     shouldTrigger = perplexity != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
-    if (shouldTrigger)
+    if (average || shouldTrigger)
       Some(Hook.SessionRunArgs(fetches = Seq(step.value, perplexity)))
     else
       Some(Hook.SessionRunArgs(fetches = Seq(step.value)))
@@ -88,14 +105,36 @@ class PerplexityLogger(
       executableEv: Executable[E],
       fetchableEv: Fetchable.Aux[F, R]
   ): Unit = {
-    lastStep = runResult.values.head.scalar.asInstanceOf[Long]
-    if (shouldTrigger) {
-      val perplexity = runResult.values(1).scalar.asInstanceOf[Float]
-      val log = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1) match {
-        case Some(s) => formatter(s, lastStep, perplexity)
-        case None => formatter(0.0, lastStep, perplexity)
+    processFetches(runResult.values)
+  }
+
+  override def end(session: Session): Unit = {
+    if (triggerAtEnd && lastStep.toInt != internalTrigger.lastTriggerStep().getOrElse(-1)) {
+      shouldTrigger = true
+      processFetches(session.run(fetches = Seq(step.value, perplexity)))
+    }
+    summaryWriter.foreach(_.flush())
+  }
+
+  private[this] def processFetches(fetches: Seq[Tensor]): Unit = {
+    lastStep = fetches.head.scalar.asInstanceOf[Long]
+    if (average || shouldTrigger) {
+      totalPerplexity += fetches(1).scalar.asInstanceOf[Float]
+      totalSteps += 1L
+      if (shouldTrigger) {
+        val meanPerplexity = totalPerplexity / totalSteps
+        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1).getOrElse(0.0)
+        if (log)
+          PerplexityLogger.logger.info(formatter(elapsed, lastStep, meanPerplexity))
+        summaryWriter.foreach(_.writeSummary(
+          Summary.newBuilder()
+              .addValue(Summary.Value.newBuilder()
+                  .setTag(summaryTag)
+                  .setSimpleValue(meanPerplexity))
+              .build(), lastStep))
+        totalPerplexity = 0.0f
+        totalSteps = 0L
       }
-      PerplexityLogger.logger.info(log)
     }
   }
 }
@@ -104,12 +143,15 @@ object PerplexityLogger {
   private[PerplexityLogger] val logger = Logger(LoggerFactory.getLogger("Learn / Hooks / Perplexity Logger"))
 
   def apply(
+      log: Boolean = true,
       trigger: HookTrigger = StepHookTrigger(1),
       triggerAtEnd: Boolean = true,
-      formatter: (Double, Long, Float) => String = { (time, step, perplexity) =>
+      average: Boolean = true,
+      formatter: (Double, Long, Float) => String = (time, step, perplexity) => {
         f"($time%8.3f s) Step: $step%6d, Perplexity: $perplexity%.4f"
-      }
+      },
+      summaryDir: Path = null,
   ): PerplexityLogger = {
-    new PerplexityLogger(trigger, triggerAtEnd, formatter)
+    new PerplexityLogger(log, trigger, triggerAtEnd, average, formatter, summaryDir)
   }
 }

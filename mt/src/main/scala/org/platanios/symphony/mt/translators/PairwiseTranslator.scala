@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators
 
 import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
-import org.platanios.symphony.mt.core.hooks.MeanPerplexityLogger
+import org.platanios.symphony.mt.core.hooks.PerplexityLogger
 import org.platanios.symphony.mt.data.Datasets
 import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
 import org.platanios.symphony.mt.metrics.Perplexity
@@ -91,7 +91,7 @@ abstract class PairwiseTranslator(
           tf.learn.SummarySaverHook(summariesDir, StepHookTrigger(configuration.trainSummarySteps)),
           tf.learn.CheckpointSaverHook(workingDir, StepHookTrigger(configuration.trainCheckpointSteps)))
         if (configuration.logLossSteps > 0)
-          hooks += MeanPerplexityLogger(StepHookTrigger(configuration.logLossSteps))
+          hooks += PerplexityLogger(log = true, trigger = StepHookTrigger(configuration.logLossSteps))
         if (configuration.logTrainPerplexitySteps > 0)
           hooks += tf.learn.EvaluationHook(
             log = true, summariesDir,
