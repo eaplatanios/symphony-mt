@@ -18,14 +18,16 @@ package org.platanios.symphony.mt.core.hooks
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.Graph
 import org.platanios.tensorflow.api.core.client.{Executable, Fetchable, Session}
-import org.platanios.tensorflow.api.learn.{Counter, SessionCreator}
 import org.platanios.tensorflow.api.learn.hooks._
+import org.platanios.tensorflow.api.learn.{Counter, SessionCreator}
 import org.platanios.tensorflow.api.ops.variables.Variable
 
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-/** Hooks that logs the perplexity value.
+/** Hooks that logs the mean perplexity value across multiple steps.
+  *
+  * Whenever this hook is triggered it logs the mean perplexity over all steps since the last time it was triggered.
   *
   * @param  trigger      Hook trigger specifying when this hook is triggered (i.e., when it executes). If you only want
   *                      to log the tensor values at the end of a run and not during, then you should set `trigger` to
@@ -39,26 +41,28 @@ import org.slf4j.LoggerFactory
   *
   * @author Emmanouil Antonios Platanios
   */
-class PerplexityLoggingHook(
+class MeanPerplexityLogger(
     trigger: HookTrigger = StepHookTrigger(1),
     triggerAtEnd: Boolean = true,
     formatter: (Double, Long, Float) => String = (time, step, perplexity) => {
-      f"($time%8.3f s) Step: $step%6d, Perplexity: $perplexity%.4f"
+      f"($time%8.3f s) Step: $step%6d, Mean Perplexity: $perplexity%.4f"
     }
 ) extends ModelDependentHook[
     (Output, Output),
     ((Tensor, Tensor), (Tensor, Tensor, Tensor)), ((Output, Output), (Output, Output, Output)),
     ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape))] {
-  private[this] var step: Variable = _
+  private[this] var step      : Variable = _
   private[this] var perplexity: Output   = _
 
   private[this] val internalTrigger: HookTrigger = trigger.copy()
   private[this] var lastStep       : Long        = 0L
   private[this] var shouldTrigger  : Boolean     = false
+  private[this] var totalPerplexity: Float       = 0.0f
+  private[this] var totalSteps     : Long        = 0L
 
   override def begin(sessionCreator: SessionCreator): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
-      s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'PerplexityLoggingHook'."))
+      s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'MeanPerplexityLogger'."))
     internalTrigger.reset()
     shouldTrigger = false
     perplexity = modelInstance.loss.map(_.cast(FLOAT32)).map(l => {
@@ -75,10 +79,7 @@ class PerplexityLoggingHook(
       fetchableEv: Fetchable.Aux[F, R]
   ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor]]] = {
     shouldTrigger = perplexity != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
-    if (shouldTrigger)
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value, perplexity)))
-    else
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value)))
+    Some(Hook.SessionRunArgs(fetches = Seq(step.value, perplexity)))
   }
 
   override def afterSessionRun[F, E, R](
@@ -89,27 +90,31 @@ class PerplexityLoggingHook(
       fetchableEv: Fetchable.Aux[F, R]
   ): Unit = {
     lastStep = runResult.values.head.scalar.asInstanceOf[Long]
+    totalPerplexity += runResult.values(1).scalar.asInstanceOf[Float]
+    totalSteps += 1L
     if (shouldTrigger) {
-      val perplexity = runResult.values(1).scalar.asInstanceOf[Float]
+      val meanPerplexity = totalPerplexity / totalSteps
       val log = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1) match {
-        case Some(s) => formatter(s, lastStep, perplexity)
-        case None => formatter(0.0, lastStep, perplexity)
+        case Some(s) => formatter(s, lastStep, meanPerplexity)
+        case None => formatter(0.0, lastStep, meanPerplexity)
       }
-      PerplexityLoggingHook.logger.info(log)
+      MeanPerplexityLogger.logger.info(log)
+      totalPerplexity = 0.0f
+      totalSteps = 0L
     }
   }
 }
 
-object PerplexityLoggingHook {
-  private[PerplexityLoggingHook] val logger = Logger(LoggerFactory.getLogger("Learn / Hooks / Perplexity Logging"))
+object MeanPerplexityLogger {
+  private[MeanPerplexityLogger] val logger = Logger(LoggerFactory.getLogger("Learn / Hooks / Mean Perplexity Logger"))
 
   def apply(
       trigger: HookTrigger = StepHookTrigger(1),
       triggerAtEnd: Boolean = true,
       formatter: (Double, Long, Float) => String = { (time, step, perplexity) =>
-        f"($time%8.3f s) Step: $step%6d, Perplexity: $perplexity%.4f"
+        f"($time%8.3f s) Step: $step%6d, Mean Perplexity: $perplexity%.4f"
       }
-  ): PerplexityLoggingHook = {
-    new PerplexityLoggingHook(trigger, triggerAtEnd, formatter)
+  ): MeanPerplexityLogger = {
+    new MeanPerplexityLogger(trigger, triggerAtEnd, formatter)
   }
 }

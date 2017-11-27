@@ -17,7 +17,8 @@ package org.platanios.symphony.mt.core
 
 import org.platanios.symphony.mt.data.Vocabulary
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
-import org.platanios.tensorflow.api.ops.training.optimizers.decay.{Decay, ExponentialDecay}
+import org.platanios.tensorflow.api.ops.training.optimizers.decay.Decay
+
 import java.nio.file.{Path, Paths}
 
 /**
@@ -54,15 +55,15 @@ case class Configuration(
     trainLearningRateDecaySteps: Int = 10000,
     trainLearningRateDecayStartStep: Int = 0,
     trainSummarySteps: Int = 100,
-    trainCheckpointSteps: Int = 100,
+    trainCheckpointSteps: Int = 1000,
     // Inference
-    inferBatchSize: Int = 128,
+    inferBatchSize: Int = 32,
     // Logging
-    logLossSteps: Int = 10,
+    logLossSteps: Int = 100,
     logEvalBatchSize: Int = 128,
-    logTrainPerplexitySteps: Int = 100,
-    logDevPerplexitySteps: Int = 100,
-    logTestPerplexitySteps: Int = 100,
+    logTrainPerplexitySteps: Int = -1,
+    logDevPerplexitySteps: Int = -1,
+    logTestPerplexitySteps: Int = 1000,
     // Miscellaneous
     colocateGradientsWithOps: Boolean = true, // TODO: Currently unused.
     logDevicePlacement: Boolean = false,
