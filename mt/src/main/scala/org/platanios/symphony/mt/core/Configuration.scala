@@ -60,10 +60,10 @@ case class Configuration(
     inferBatchSize: Int = 32,
     // Logging
     logLossSteps: Int = 100,
-    logEvalBatchSize: Int = 128,
-    logTrainPerplexitySteps: Int = -1,
-    logDevPerplexitySteps: Int = -1,
-    logTestPerplexitySteps: Int = 1000,
+    logEvalBatchSize: Int = 512,
+    logTrainEvalSteps: Int = -1,
+    logDevEvalSteps: Int = 1000,
+    logTestEvalSteps: Int = 1000,
     // Miscellaneous
     colocateGradientsWithOps: Boolean = true, // TODO: Currently unused.
     logDevicePlacement: Boolean = false,

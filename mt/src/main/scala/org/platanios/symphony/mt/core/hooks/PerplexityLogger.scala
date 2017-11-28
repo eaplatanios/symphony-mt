@@ -16,12 +16,9 @@
 package org.platanios.symphony.mt.core.hooks
 
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.Graph
-import org.platanios.tensorflow.api.core.client.{Executable, Fetchable, Session}
-import org.platanios.tensorflow.api.learn.{Counter, SessionCreator}
+import org.platanios.tensorflow.api.core.client.{Executable, Fetchable}
+import org.platanios.tensorflow.api.learn.Counter
 import org.platanios.tensorflow.api.learn.hooks._
-import org.platanios.tensorflow.api.ops.variables.Variable
-import org.platanios.tensorflow.api.tensors.Tensor
 
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
@@ -34,7 +31,7 @@ import java.nio.file.Path
   *                      to log the tensor values at the end of a run and not during, then you should set `trigger` to
   *                      [[NoHookTrigger]] and `logAtEnd` to `true`.
   * @param  triggerAtEnd If `true`, this hook will be triggered at the end of the run. Note that if this flag is set to
-  *                      `true`, then `tensors` must be computable without using a feed map for the [[Session.run()]]
+  *                      `true`, then `tensors` must be computable without using a feed map for the `Session.run()`
   *                      call.
   * @param  formatter    Function used to format the message that is being logged. It takes the time taken since the
   *                      last logged message, the current step, and the current loss value, as input, and returns a
@@ -48,14 +45,13 @@ case class PerplexityLogger(
     trigger: HookTrigger = StepHookTrigger(1),
     triggerAtEnd: Boolean = true,
     average: Boolean = true,
-    formatter: (Double, Long, Float, Double) => String = (time, step, perplexity, wordsPerSecond) => {
-      f"($time%8.3f s) Step: $step%6d, Perplexity: $perplexity%.4f, Words/Second: ${wordsPerSecond / 1000}%.2fk"
-    },
+    formatter: (Option[Double], Long, Float, Option[Double]) => String = null,
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
-    (Output, Output),
+    (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
     ((Tensor, Tensor), (Tensor, Tensor, Tensor)), ((Output, Output), (Output, Output, Output)),
-    ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape))]
+    ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape)),
+    ((Output, Output), (Output, Output, Output))]
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 
@@ -69,13 +65,13 @@ case class PerplexityLogger(
   private[this] var totalLoss      : Float       = 0.0f
   private[this] var totalWordCount : Long        = 0L
 
-  override protected def begin(sessionCreator: SessionCreator): Unit = {
+  override protected def begin(): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
       s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'PerplexityLogger'."))
     internalTrigger.reset()
     shouldTrigger = false
-    loss = modelInstance.loss.map(_.cast(FLOAT32)).map(l => l * tf.size(modelInstance.output._2)).orNull
-    wordCount = tf.sum(modelInstance.output._2)
+    loss = modelInstance.loss.map(_.cast(FLOAT32)).flatMap(l => modelInstance.output.map(o => l * tf.size(o._2))).orNull
+    wordCount = modelInstance.output.map(o => tf.sum(o._2)).orNull
     totalLoss = 0.0f
     totalWordCount = 0L
   }
@@ -119,10 +115,21 @@ case class PerplexityLogger(
       totalWordCount += fetches(2).scalar.asInstanceOf[Int]
       if (shouldTrigger) {
         val meanPerplexity = Math.exp(totalLoss / totalWordCount).toFloat
-        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1).orElse(Some(0.0))
-        val wordsPerSecond = elapsed.map(s => totalWordCount / s)
+        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1)
+        val message = {
+          if (formatter != null) {
+            formatter(elapsed, lastStep, meanPerplexity, elapsed.map(s => totalWordCount / (1000 * s)))
+          } else {
+            elapsed match {
+              case Some(s) =>
+                val wps = totalWordCount / (1000 * s)
+                f"($s%9.3f s / $wps%5.2fk words/s ) Step: $lastStep%6d, Perplexity: $meanPerplexity%.4f"
+              case None => f"(   timing not available yet ) Step: $lastStep%6d, Perplexity: $meanPerplexity%.4f"
+            }
+          }
+        }
         if (log)
-          PerplexityLogger.logger.info(formatter(elapsed.get, lastStep, meanPerplexity, wordsPerSecond.get))
+          PerplexityLogger.logger.info(message)
         writeSummary(lastStep, summaryTag, meanPerplexity)
         totalLoss = 0.0f
         totalWordCount = 0L
