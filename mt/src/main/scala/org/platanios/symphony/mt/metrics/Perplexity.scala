@@ -57,8 +57,8 @@ class Perplexity(
     tf.createWithVariableScope(name) {
       tf.createWithNameScope(name) {
         // Create accumulator variables
-        val loss = variable(s"$name/Loss", values._1._1.dataType, Shape.scalar(), tf.zerosInitializer)
-        val length = variable(s"$name/Length", values._1._1.dataType, Shape.scalar(), tf.zerosInitializer)
+        val loss = variable(s"$name/Loss", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)
+        val length = variable(s"$name/Length", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)
 
         // Create update ops
         val mask  = tf.sequenceMask(values._1._2, tf.shape(values._1._1)(1), dataType = values._1._1.dataType)

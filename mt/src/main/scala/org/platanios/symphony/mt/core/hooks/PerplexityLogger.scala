@@ -48,8 +48,8 @@ case class PerplexityLogger(
     trigger: HookTrigger = StepHookTrigger(1),
     triggerAtEnd: Boolean = true,
     average: Boolean = true,
-    formatter: (Double, Long, Float) => String = (time, step, perplexity) => {
-      f"($time%8.3f s) Step: $step%6d, Perplexity: $perplexity%.4f"
+    formatter: (Double, Long, Float, Double) => String = (time, step, perplexity, wordsPerSecond) => {
+      f"($time%8.3f s) Step: $step%6d, Perplexity: $perplexity%.4f, Words/Second: ${wordsPerSecond / 1000}%.2fk"
     },
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
@@ -59,25 +59,25 @@ case class PerplexityLogger(
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 
-  private[this] var step         : Variable                  = _
-  private[this] var perplexity   : Output                    = _
+  private[this] var step     : Variable = _
+  private[this] var loss     : Output   = _
+  private[this] var wordCount: Output   = _
 
   private[this] val internalTrigger: HookTrigger = trigger.copy()
   private[this] var lastStep       : Long        = 0L
   private[this] var shouldTrigger  : Boolean     = false
-  private[this] var totalPerplexity: Float       = 0.0f
-  private[this] var totalSteps     : Long        = 0L
+  private[this] var totalLoss      : Float       = 0.0f
+  private[this] var totalWordCount : Long        = 0L
 
   override protected def begin(sessionCreator: SessionCreator): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
       s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'PerplexityLogger'."))
     internalTrigger.reset()
     shouldTrigger = false
-    perplexity = modelInstance.loss.map(_.cast(FLOAT32)).map(l => {
-      tf.exp(l * tf.size(modelInstance.output._2) / tf.sum(modelInstance.output._2))
-    }).orNull
-    totalPerplexity = 0.0f
-    totalSteps = 0L
+    loss = modelInstance.loss.map(_.cast(FLOAT32)).map(l => l * tf.size(modelInstance.output._2)).orNull
+    wordCount = tf.sum(modelInstance.output._2)
+    totalLoss = 0.0f
+    totalWordCount = 0L
   }
 
   override protected def afterSessionCreation(session: Session): Unit = {
@@ -88,9 +88,9 @@ case class PerplexityLogger(
       executableEv: Executable[E],
       fetchableEv: Fetchable.Aux[F, R]
   ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor]]] = {
-    shouldTrigger = perplexity != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
+    shouldTrigger = loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
     if (average || shouldTrigger)
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value, perplexity)))
+      Some(Hook.SessionRunArgs(fetches = Seq(step.value, loss, wordCount)))
     else
       Some(Hook.SessionRunArgs(fetches = Seq(step.value)))
   }
@@ -108,23 +108,24 @@ case class PerplexityLogger(
   override protected def end(session: Session): Unit = {
     if (triggerAtEnd && lastStep.toInt != internalTrigger.lastTriggerStep().getOrElse(-1)) {
       shouldTrigger = true
-      processFetches(session.run(fetches = Seq(step.value, perplexity)))
+      processFetches(session.run(fetches = Seq(step.value, loss, wordCount)))
     }
   }
 
   private[this] def processFetches(fetches: Seq[Tensor]): Unit = {
     lastStep = fetches.head.scalar.asInstanceOf[Long]
     if (average || shouldTrigger) {
-      totalPerplexity += fetches(1).scalar.asInstanceOf[Float]
-      totalSteps += 1L
+      totalLoss += fetches(1).scalar.asInstanceOf[Float]
+      totalWordCount += fetches(2).scalar.asInstanceOf[Int]
       if (shouldTrigger) {
-        val meanPerplexity = totalPerplexity / totalSteps
-        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1).getOrElse(0.0)
+        val meanPerplexity = Math.exp(totalLoss / totalWordCount).toFloat
+        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1).orElse(Some(0.0))
+        val wordsPerSecond = elapsed.map(s => totalWordCount / s)
         if (log)
-          PerplexityLogger.logger.info(formatter(elapsed, lastStep, meanPerplexity))
+          PerplexityLogger.logger.info(formatter(elapsed.get, lastStep, meanPerplexity, wordsPerSecond.get))
         writeSummary(lastStep, summaryTag, meanPerplexity)
-        totalPerplexity = 0.0f
-        totalSteps = 0L
+        totalLoss = 0.0f
+        totalWordCount = 0L
       }
     }
   }

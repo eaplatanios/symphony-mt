@@ -67,7 +67,7 @@ abstract class PairwiseTranslator(
       val srcTestDataset = groupedTestDatasets(pair)._1
       val tgtTestDataset = groupedTestDatasets(pair)._2
       val trainDataset = () => createTrainDataset(
-        srcTrainDataset, tgtTrainDataset, srcVocab(), tgtVocab(), configuration.trainBatchSize)
+        srcTrainDataset, tgtTrainDataset, srcVocab(), tgtVocab(), configuration.trainBatchSize, repeat = true)
       val estimator = estimators.getOrElse((pair._1.id, pair._2.id), {
         val tLayer = trainLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
         val iLayer = inferLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
@@ -96,21 +96,21 @@ abstract class PairwiseTranslator(
           hooks += tf.learn.Evaluator(
             log = true, summariesDir,
             () => createTrainDataset(
-              srcTrainDataset, tgtTrainDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize),
+              srcTrainDataset, tgtTrainDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize, repeat = false),
             Seq(Perplexity()), StepHookTrigger(configuration.logTrainPerplexitySteps), triggerAtEnd = true,
             name = "Train Evaluation")
         if (configuration.logDevPerplexitySteps > 0 && srcDevDataset != null && tgtDevDataset != null)
           hooks += tf.learn.Evaluator(
             log = true, summariesDir,
             () => createTrainDataset(
-              srcDevDataset, tgtDevDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize),
+              srcDevDataset, tgtDevDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize, repeat = false),
             Seq(Perplexity()), StepHookTrigger(configuration.logDevPerplexitySteps), triggerAtEnd = true,
             name = "Dev Evaluation")
         if (configuration.logTestPerplexitySteps > 0 && srcTestDataset != null && tgtTestDataset != null)
           hooks += tf.learn.Evaluator(
             log = true, summariesDir,
             () => createTrainDataset(
-              srcTestDataset, tgtTestDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize),
+              srcTestDataset, tgtTestDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize, repeat = false),
             Seq(Perplexity()), StepHookTrigger(configuration.logTestPerplexitySteps), triggerAtEnd = true,
             name = "Test Evaluation")
         tf.learn.InMemoryEstimator(
@@ -141,12 +141,13 @@ abstract class PairwiseTranslator(
       tgtDataset: MTTextLinesDataset,
       srcVocab: tf.LookupTable,
       tgtVocab: tf.LookupTable,
-      batchSize: Int
+      batchSize: Int,
+      repeat: Boolean
   ): MTTrainDataset = {
     Datasets.createTrainDataset(
       srcDataset, tgtDataset, srcVocab, tgtVocab, batchSize,
       configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
-      configuration.dataSrcReverse, configuration.randomSeed, configuration.dataNumBuckets,
+      repeat, configuration.dataSrcReverse, configuration.randomSeed, configuration.dataNumBuckets,
       configuration.dataSrcMaxLength, configuration.dataTgtMaxLength, configuration.parallelIterations,
       configuration.dataBufferSize, configuration.dataDropCount, configuration.dataNumShards,
       configuration.dataShardIndex)

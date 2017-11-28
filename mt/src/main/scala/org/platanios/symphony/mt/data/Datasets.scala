@@ -80,6 +80,7 @@ object Datasets {
       batchSize: Int,
       beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
       endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
+      repeat: Boolean = true,
       srcReverse: Boolean = false,
       randomSeed: Option[Int] = None,
       numBuckets: Int = 1,
@@ -111,6 +112,12 @@ object Datasets {
       srcDataset.zip(tgtDataset)
           .shard(numShards, shardIndex)
           .drop(dropCount)
+          .transform(d => {
+            if (repeat)
+              d.repeat().prefetch(bufferSize)
+            else
+              d
+          })
           .shuffle(bufferSize, randomSeed)
           // Tokenize by splitting on white spaces.
           .map(
