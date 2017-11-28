@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
 import org.platanios.symphony.mt.core.hooks.PerplexityLogger
 import org.platanios.symphony.mt.data.Datasets
 import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
-import org.platanios.symphony.mt.metrics.Perplexity
+import org.platanios.symphony.mt.metrics.{BLEUTensorFlow, Perplexity}
 import org.platanios.symphony.mt.translators.PairwiseTranslator._
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
@@ -67,7 +67,8 @@ abstract class PairwiseTranslator(
       val srcTestDataset = groupedTestDatasets(pair)._1
       val tgtTestDataset = groupedTestDatasets(pair)._2
       val trainDataset = () => createTrainDataset(
-        srcTrainDataset, tgtTrainDataset, srcVocab(), tgtVocab(), configuration.trainBatchSize, repeat = true)
+        srcTrainDataset, tgtTrainDataset, srcVocab, tgtVocab, configuration.trainBatchSize, repeat = true,
+        configuration.dataNumBuckets)
       val estimator = estimators.getOrElse((pair._1.id, pair._2.id), {
         val tLayer = trainLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
         val iLayer = inferLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
@@ -92,27 +93,27 @@ abstract class PairwiseTranslator(
           tf.learn.CheckpointSaver(workingDir, StepHookTrigger(configuration.trainCheckpointSteps)))
         if (configuration.logLossSteps > 0)
           hooks += PerplexityLogger(log = true, trigger = StepHookTrigger(configuration.logLossSteps))
-        if (configuration.logTrainPerplexitySteps > 0)
+        if (configuration.logTrainEvalSteps > 0)
           hooks += tf.learn.Evaluator(
             log = true, summariesDir,
             () => createTrainDataset(
-              srcTrainDataset, tgtTrainDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize, repeat = false),
-            Seq(Perplexity()), StepHookTrigger(configuration.logTrainPerplexitySteps), triggerAtEnd = true,
-            name = "Train Evaluation")
-        if (configuration.logDevPerplexitySteps > 0 && srcDevDataset != null && tgtDevDataset != null)
+              srcTrainDataset, tgtTrainDataset, srcVocab, tgtVocab, configuration.logEvalBatchSize, repeat = false, 1),
+            Seq(BLEUTensorFlow()), StepHookTrigger(configuration.logTrainEvalSteps),
+            triggerAtEnd = true, name = "Train Evaluation")
+        if (configuration.logDevEvalSteps > 0 && srcDevDataset != null && tgtDevDataset != null)
           hooks += tf.learn.Evaluator(
             log = true, summariesDir,
             () => createTrainDataset(
-              srcDevDataset, tgtDevDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize, repeat = false),
-            Seq(Perplexity()), StepHookTrigger(configuration.logDevPerplexitySteps), triggerAtEnd = true,
-            name = "Dev Evaluation")
-        if (configuration.logTestPerplexitySteps > 0 && srcTestDataset != null && tgtTestDataset != null)
+              srcDevDataset, tgtDevDataset, srcVocab, tgtVocab, configuration.logEvalBatchSize, repeat = false, 1),
+            Seq(BLEUTensorFlow()), StepHookTrigger(configuration.logDevEvalSteps),
+            triggerAtEnd = true, name = "Dev Evaluation")
+        if (configuration.logTestEvalSteps > 0 && srcTestDataset != null && tgtTestDataset != null)
           hooks += tf.learn.Evaluator(
             log = true, summariesDir,
             () => createTrainDataset(
-              srcTestDataset, tgtTestDataset, srcVocab(), tgtVocab(), configuration.logEvalBatchSize, repeat = false),
-            Seq(Perplexity()), StepHookTrigger(configuration.logTestPerplexitySteps), triggerAtEnd = true,
-            name = "Test Evaluation")
+              srcTestDataset, tgtTestDataset, srcVocab, tgtVocab, configuration.logEvalBatchSize, repeat = false, 1),
+            Seq(BLEUTensorFlow()), StepHookTrigger(configuration.logTestEvalSteps),
+            triggerAtEnd = true, name = "Test Evaluation")
         tf.learn.InMemoryEstimator(
           model, tf.learn.Configuration(Some(workingDir)), stopCriteria, hooks,
           tensorBoardConfig = tensorBoardConfig)
@@ -139,15 +140,16 @@ abstract class PairwiseTranslator(
   private[this] def createTrainDataset(
       srcDataset: MTTextLinesDataset,
       tgtDataset: MTTextLinesDataset,
-      srcVocab: tf.LookupTable,
-      tgtVocab: tf.LookupTable,
+      srcVocab: () => tf.LookupTable,
+      tgtVocab: () => tf.LookupTable,
       batchSize: Int,
-      repeat: Boolean
+      repeat: Boolean,
+      numBuckets: Int
   ): MTTrainDataset = {
     Datasets.createTrainDataset(
-      srcDataset, tgtDataset, srcVocab, tgtVocab, batchSize,
+      srcDataset, tgtDataset, srcVocab(), tgtVocab(), batchSize,
       configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
-      repeat, configuration.dataSrcReverse, configuration.randomSeed, configuration.dataNumBuckets,
+      repeat, configuration.dataSrcReverse, configuration.randomSeed, numBuckets,
       configuration.dataSrcMaxLength, configuration.dataTgtMaxLength, configuration.parallelIterations,
       configuration.dataBufferSize, configuration.dataDropCount, configuration.dataNumShards,
       configuration.dataShardIndex)
