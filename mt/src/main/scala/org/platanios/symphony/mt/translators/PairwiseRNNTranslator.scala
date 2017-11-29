@@ -117,16 +117,14 @@ class PairwiseRNNTranslator[S, SS](
     val w = variableFn(
       "OutWeights", dataType, Shape(decOutputDepth, tgtVocabSize), tf.RandomUniformInitializer(-0.1f, 0.1f))
     val layer = (logits: Output) => {
-      val product = {
-        if (logits.rank > 2) {
-          // Broadcasting is required for the inputs.
-          val product = tf.tensorDot(logits, w.value, Seq(logits.rank - 1), Seq(0))
-          // Reshape the output back to the original rank of the input.
-          product.setShape(logits.shape(0 :: -1) + tgtVocabSize)
-          product
-        } else {
-          tf.matmul(logits, w.value)
-        }
+      if (logits.rank > 2) {
+        // Broadcasting is required for the inputs.
+        val product = tf.tensorDot(logits, w.value, Seq(logits.rank - 1), Seq(0))
+        // Reshape the output back to the original rank of the input.
+        product.setShape(logits.shape(0 :: -1) + tgtVocabSize)
+        product
+      } else {
+        tf.matmul(logits, w.value)
       }
     }
     (layer, Set(w))
