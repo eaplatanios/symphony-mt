@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.translators.PairwiseRNNTranslator
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.{BasicLSTMCell, MultiRNNCell}
@@ -31,6 +32,8 @@ import java.nio.file.{Path, Paths}
 object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
   val dataDir   : Path = workingDir.resolve("data").resolve("iwslt15.en-vi")
+
+  IWSLT15Loader.load(dataDir, IWSLT15Loader.EnglishVietnamese)
 
   // Create the languages and their corresponding vocabularies
   val enCheck: Option[(Int, Path)] = Vocabulary.check(dataDir.resolve("vocab.en"))
