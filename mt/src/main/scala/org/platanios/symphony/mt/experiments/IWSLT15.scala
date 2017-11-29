@@ -33,7 +33,7 @@ object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
   val dataDir   : Path = workingDir.resolve("data").resolve("iwslt15.en-vi")
 
-  IWSLT15Loader.load(dataDir, IWSLT15Loader.EnglishVietnamese)
+  IWSLT15Loader.load(workingDir.resolve("data"), IWSLT15Loader.EnglishVietnamese)
 
   // Create the languages and their corresponding vocabularies
   val enCheck: Option[(Int, Path)] = Vocabulary.check(dataDir.resolve("vocab.en"))
