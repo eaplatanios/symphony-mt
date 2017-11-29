@@ -55,15 +55,17 @@ case class PerplexityLogger(
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 
-  private[this] var step     : Variable = _
-  private[this] var loss     : Output   = _
-  private[this] var wordCount: Output   = _
+  private[this] var step        : Variable = _
+  private[this] var loss        : Output   = _
+  private[this] var srcWordCount: Output   = _
+  private[this] var tgtWordCount: Output   = _
 
-  private[this] val internalTrigger: HookTrigger = trigger.copy()
-  private[this] var lastStep       : Long        = 0L
-  private[this] var shouldTrigger  : Boolean     = false
-  private[this] var totalLoss      : Float       = 0.0f
-  private[this] var totalWordCount : Long        = 0L
+  private[this] val internalTrigger  : HookTrigger = trigger.copy()
+  private[this] var lastStep         : Long        = 0L
+  private[this] var shouldTrigger    : Boolean     = false
+  private[this] var totalLoss        : Float       = 0.0f
+  private[this] var totalSrcWordCount: Long        = 0L
+  private[this] var totalTgtWordCount: Long        = 0L
 
   override protected def begin(): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
@@ -72,9 +74,11 @@ case class PerplexityLogger(
     shouldTrigger = false
     loss = modelInstance.loss.map(_.cast(FLOAT32))
         .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._3))).orNull
-    wordCount = modelInstance.trainInput.map(o => tf.sum(o._1._2) + tf.sum(o._2._3)).orNull
+    srcWordCount = modelInstance.trainInput.map(o => tf.sum(o._1._2)).orNull
+    tgtWordCount = modelInstance.trainInput.map(o => tf.sum(o._2._3)).orNull
     totalLoss = 0.0f
-    totalWordCount = 0L
+    totalSrcWordCount = 0L
+    totalTgtWordCount = 0L
   }
 
   override protected def afterSessionCreation(session: Session): Unit = {
@@ -87,7 +91,7 @@ case class PerplexityLogger(
   ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor]]] = {
     shouldTrigger = loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
     if (average || shouldTrigger)
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value, loss, wordCount)))
+      Some(Hook.SessionRunArgs(fetches = Seq(step.value, loss, srcWordCount, tgtWordCount)))
     else
       Some(Hook.SessionRunArgs(fetches = Seq(step.value)))
   }
@@ -105,7 +109,7 @@ case class PerplexityLogger(
   override protected def end(session: Session): Unit = {
     if (triggerAtEnd && lastStep.toInt != internalTrigger.lastTriggerStep().getOrElse(-1)) {
       shouldTrigger = true
-      processFetches(session.run(fetches = Seq(step.value, loss, wordCount)))
+      processFetches(session.run(fetches = Seq(step.value, loss, srcWordCount, tgtWordCount)))
     }
   }
 
@@ -113,9 +117,11 @@ case class PerplexityLogger(
     lastStep = fetches.head.scalar.asInstanceOf[Long]
     if (average || shouldTrigger) {
       totalLoss += fetches(1).scalar.asInstanceOf[Float]
-      totalWordCount += fetches(2).scalar.asInstanceOf[Int]
+      totalSrcWordCount += fetches(2).scalar.asInstanceOf[Int]
+      totalTgtWordCount += fetches(3).scalar.asInstanceOf[Int]
       if (shouldTrigger) {
-        val meanPerplexity = Math.exp(totalLoss / totalWordCount).toFloat
+        val totalWordCount = totalSrcWordCount + totalTgtWordCount
+        val meanPerplexity = Math.exp(totalLoss / totalTgtWordCount).toFloat
         val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1)
         val message = {
           if (formatter != null) {
@@ -133,7 +139,8 @@ case class PerplexityLogger(
           PerplexityLogger.logger.info(message)
         writeSummary(lastStep, summaryTag, meanPerplexity)
         totalLoss = 0.0f
-        totalWordCount = 0L
+        totalSrcWordCount = 0L
+        totalTgtWordCount = 0L
       }
     }
   }
