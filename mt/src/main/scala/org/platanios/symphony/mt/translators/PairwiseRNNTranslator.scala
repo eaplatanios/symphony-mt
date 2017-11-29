@@ -42,7 +42,7 @@ class PairwiseRNNTranslator[S, SS](
   ): (tf.learn.RNNTuple[Output, S], Set[Variable], Set[Variable]) = tf.createWithNameScope("Encoder") {
     val encEmbeddings = variableFn(
       "EncoderEmbeddings", dataType, Shape(sourceVocabularySize, configuration.modelSrcEmbeddingSize),
-      tf.DefaultInitializer(dataType))
+      tf.RandomUniformInitializer(-0.1f, 0.1f))
     val encEmbeddedInput = tf.embeddingLookup(encEmbeddings, input._1)
     val encCellInstance = encoderCell.createCell(mode)
     val encTuple = tf.dynamicRNN[Output, Shape, S, SS](
@@ -65,7 +65,7 @@ class PairwiseRNNTranslator[S, SS](
       val eosToken = tf.constant(configuration.endOfSequenceToken)
       val decEmbeddings = variableFn(
         "DecoderEmbeddings", dataType, Shape(tgtVocabSize, configuration.modelTgtEmbeddingSize),
-        tf.DefaultInitializer(dataType))
+        tf.RandomUniformInitializer(-0.1f, 0.1f))
       val decEmbeddingFn = (o: Output) => tf.embeddingLookup(decEmbeddings, o)
       val decCellInstance = decoderCell.createCell(mode)
       val decHelper = BasicRNNDecoder.GreedyEmbeddingHelper[S](
@@ -94,7 +94,7 @@ class PairwiseRNNTranslator[S, SS](
     tf.createWithNameScope("TrainDecoder") {
       val decEmbeddings = variableFn(
         "DecoderEmbeddings", dataType, Shape(tgtVocabSize, configuration.modelTgtEmbeddingSize),
-        tf.DefaultInitializer(dataType))
+        tf.RandomUniformInitializer(-0.1f, 0.1f))
       val decEmbeddedInput = tf.embeddingLookup(decEmbeddings, input._1)
       val decCellInstance = decoderCell.createCell(mode)
       val decHelper = BasicRNNDecoder.TrainingHelper(decEmbeddedInput, input._3, timeMajor = false)
@@ -114,7 +114,8 @@ class PairwiseRNNTranslator[S, SS](
       tgtVocabSize: Int,
       variableFn: (String, DataType, Shape, Initializer) => Variable
   ): (Output => Output, Set[Variable]) = {
-    val w = variableFn("OutWeights", dataType, Shape(decOutputDepth, tgtVocabSize), tf.DefaultInitializer(dataType))
+    val w = variableFn(
+      "OutWeights", dataType, Shape(decOutputDepth, tgtVocabSize), tf.RandomUniformInitializer(-0.1f, 0.1f))
     val b = variableFn("OutBias", dataType, Shape(tgtVocabSize), tf.ZerosInitializer)
     val layer = (logits: Output) => {
       val product = {
