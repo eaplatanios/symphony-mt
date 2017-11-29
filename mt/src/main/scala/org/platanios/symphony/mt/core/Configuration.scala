@@ -43,7 +43,7 @@ case class Configuration(
     // Model
     modelSrcEmbeddingSize: Int = 128,
     modelTgtEmbeddingSize: Int = 128,
-    modelNumUnits: Int = 32,
+    modelNumUnits: Int = 128,
     modelDecodingMaxLengthFactor: Float = 2.0f,
     // Training
     trainBatchSize: Int = 128,

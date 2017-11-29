@@ -69,7 +69,7 @@ object IWSLT15 extends App {
         name = "EncoderCell2"))),
     decoderCell = MultiRNNCell(Seq(
       BasicLSTMCell(
-        configuration.modelNumUnits, FLOAT32, Shape(4 * configuration.modelNumUnits), forgetBias = 1.0f,
+        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,
         name = "DecoderCell1"),
       BasicLSTMCell(
         configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,

@@ -123,8 +123,8 @@ case class PerplexityLogger(
             elapsed match {
               case Some(s) =>
                 val wps = totalWordCount / (1000 * s)
-                f"($s%9.3f s / $wps%6.2fk words/s ) Step: $lastStep%6d, Perplexity: $meanPerplexity%.4f"
-              case None => f"(   timing not available yet ) Step: $lastStep%6d, Perplexity: $meanPerplexity%.4f"
+                f"($s%9.3f s / $wps%5.2fk words/s ) Step: $lastStep%6d, Perplexity: $meanPerplexity%.4f"
+              case None => f"(    timing not available yet ) Step: $lastStep%6d, Perplexity: $meanPerplexity%.4f"
             }
           }
         }
