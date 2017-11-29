@@ -46,16 +46,16 @@ object IWSLT15 extends App {
   val enVocabPath: Path     = enCheck.get._2
   val viVocabSize: Int      = viCheck.get._1
   val viVocabPath: Path     = viCheck.get._2
-  val srcLang    : Language = Language("English", "en", () => Vocabulary.createTable(enVocabPath), enVocabSize)
-  val tgtLang    : Language = Language("Vietnamese", "vi", () => Vocabulary.createTable(viVocabPath), viVocabSize)
+  val srcLang    : Language = Language("Vietnamese", "vi", () => Vocabulary.createTable(viVocabPath), viVocabSize)
+  val tgtLang    : Language = Language("English", "en", () => Vocabulary.createTable(enVocabPath), enVocabSize)
 
   // Create the datasets
-  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
-  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
-  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.en").toAbsolutePath.toString)
-  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.vi").toAbsolutePath.toString)
-  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
-  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.vi").toAbsolutePath.toString)
+  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
+  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
+  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.vi").toAbsolutePath.toString)
+  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.en").toAbsolutePath.toString)
+  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.vi").toAbsolutePath.toString)
+  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
 
   // Create a translator
   val configuration: Configuration = Configuration()
