@@ -79,7 +79,8 @@ abstract class PairwiseTranslator(
           trainInput = trainInput,
           loss = lossLayer(),
           optimizer = optimizer(),
-          clipGradients = tf.learn.ClipGradientsByGlobalNorm(configuration.trainMaxGradNorm))
+          clipGradients = tf.learn.ClipGradientsByGlobalNorm(configuration.trainMaxGradNorm),
+          colocateWithGradientsWithOps = configuration.trainColocateGradientsWithOps)
         val summariesDir = workingDir.resolve("summaries")
         val tensorBoardConfig = {
           if (configuration.launchTensorBoard)

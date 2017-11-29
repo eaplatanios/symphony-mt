@@ -56,6 +56,7 @@ case class Configuration(
     trainLearningRateDecayStartStep: Int = 0,
     trainSummarySteps: Int = 100,
     trainCheckpointSteps: Int = 1000,
+    trainColocateGradientsWithOps: Boolean = true,
     // Inference
     inferBatchSize: Int = 32,
     // Logging
