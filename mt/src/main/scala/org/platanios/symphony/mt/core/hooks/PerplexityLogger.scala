@@ -70,8 +70,9 @@ case class PerplexityLogger(
       s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'PerplexityLogger'."))
     internalTrigger.reset()
     shouldTrigger = false
-    loss = modelInstance.loss.map(_.cast(FLOAT32)).flatMap(l => modelInstance.output.map(o => l * tf.size(o._2))).orNull
-    wordCount = modelInstance.output.map(o => tf.sum(o._2)).orNull
+    loss = modelInstance.loss.map(_.cast(FLOAT32))
+        .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._2))).orNull
+    wordCount = modelInstance.trainInput.map(o => tf.sum(o._1._2) + tf.sum(o._2._3)).orNull
     totalLoss = 0.0f
     totalWordCount = 0L
   }
