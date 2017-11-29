@@ -116,7 +116,6 @@ class PairwiseRNNTranslator[S, SS](
   ): (Output => Output, Set[Variable]) = {
     val w = variableFn(
       "OutWeights", dataType, Shape(decOutputDepth, tgtVocabSize), tf.RandomUniformInitializer(-0.1f, 0.1f))
-    val b = variableFn("OutBias", dataType, Shape(tgtVocabSize), tf.ZerosInitializer)
     val layer = (logits: Output) => {
       val product = {
         if (logits.rank > 2) {
@@ -129,10 +128,8 @@ class PairwiseRNNTranslator[S, SS](
           tf.matmul(logits, w.value)
         }
       }
-      tf.addBias(product, b.value)
     }
-    val variables = Set(w, b)
-    (layer, variables)
+    (layer, Set(w))
   }
 
   private[this] def output(

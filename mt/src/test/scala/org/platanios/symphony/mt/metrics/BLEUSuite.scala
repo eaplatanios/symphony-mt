@@ -24,7 +24,7 @@ import org.scalatest.junit.JUnitSuite
   * @author Emmanouil Antonios Platanios
   */
 class BLEUSuite extends JUnitSuite with Matchers {
-  @Test def testbleuSingleReference(): Unit = {
+  @Test def testBleuSingleReference(): Unit = {
     val reference = Seq(
       Seq(Seq("a", "b", "c", "d", "e")),
       Seq(Seq("a", "b", "c", "d", "e")),
@@ -50,7 +50,7 @@ class BLEUSuite extends JUnitSuite with Matchers {
     assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = true).score === 0.698623472351266 +- 1e-14)
   }
 
-  @Test def testbleuMultipleReferences(): Unit = {
+  @Test def testBleuMultipleReferences(): Unit = {
     val reference = Seq(
       Seq(Seq("a", "b", "c", "d", "e"), Seq("a", "c", "d", "e")),
       Seq(Seq("a", "b", "c", "d", "e")),
