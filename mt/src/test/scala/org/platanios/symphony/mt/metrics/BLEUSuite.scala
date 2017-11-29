@@ -40,14 +40,14 @@ class BLEUSuite extends JUnitSuite with Matchers {
       Seq("a", "b", "c", "d", "e", "f", "g"),
       Seq("a", "b", "c", "d", "e"),
       Seq("a", "b", "x", "d", "e"))
-    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 4, smooth = false).score === 0.666112590882706 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 5, smooth = false).score === 0.628973162582494 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 4, smooth = true).score === 0.697390001644341 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 5, smooth = true).score === 0.676722822649727 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 4, smooth = false).score === 0.713449180942819 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = false).score === 0.664483858835372 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 4, smooth = true).score === 0.734621235774005 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = true).score === 0.698623472351266 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 4, smooth = false).score === 66.6112590882706 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 5, smooth = false).score === 62.8973162582494 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 4, smooth = true).score === 69.7390001644341 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 5, smooth = true).score === 67.6722822649727 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 4, smooth = false).score === 71.3449180942819 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = false).score === 66.4483858835372 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 4, smooth = true).score === 73.4621235774005 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = true).score === 69.8623472351266 +- 1e-14)
   }
 
   @Test def testBleuMultipleReferences(): Unit = {
@@ -66,13 +66,13 @@ class BLEUSuite extends JUnitSuite with Matchers {
       Seq("a", "b", "c", "d", "e", "f", "g"),
       Seq("a", "b", "c", "d", "e"),
       Seq("a", "b", "x", "d", "e"))
-    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 4, smooth = false).score === 0.742956966550210 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 5, smooth = false).score === 0.686380486706770 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 4, smooth = true).score === 0.765782309941811 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 5, smooth = true).score === 0.729313938509302 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 4, smooth = false).score === 0.713449180942819 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = false).score === 0.664483858835372 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 4, smooth = true).score === 0.734621235774005 +- 1e-14)
-    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = true).score === 0.698623472351266 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 4, smooth = false).score === 74.2956966550210 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 5, smooth = false).score === 68.6380486706770 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 4, smooth = true).score === 76.5782309941811 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis1, maxOrder = 5, smooth = true).score === 72.9313938509302 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 4, smooth = false).score === 71.3449180942819 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = false).score === 66.4483858835372 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 4, smooth = true).score === 73.4621235774005 +- 1e-14)
+    assert(BLEU.bleu(reference, hypothesis2, maxOrder = 5, smooth = true).score === 69.8623472351266 +- 1e-14)
   }
 }

@@ -41,7 +41,7 @@ class PairwiseRNNTranslator[S, SS](
       mode: Mode
   ): (tf.learn.RNNTuple[Output, S], Set[Variable], Set[Variable]) = tf.createWithNameScope("Encoder") {
     val encEmbeddings = variableFn(
-      "EncoderEmbeddings", dataType, Shape(sourceVocabularySize, configuration.modelSrcEmbeddingSize),
+      "EncoderEmbeddings", dataType, Shape(sourceVocabularySize, configuration.modelNumUnits),
       tf.RandomUniformInitializer(-0.1f, 0.1f))
     val encEmbeddedInput = tf.embeddingLookup(encEmbeddings, input._1)
     val encCellInstance = encoderCell.createCell(mode)
@@ -64,7 +64,7 @@ class PairwiseRNNTranslator[S, SS](
       val bosToken = tf.constant(configuration.beginOfSequenceToken)
       val eosToken = tf.constant(configuration.endOfSequenceToken)
       val decEmbeddings = variableFn(
-        "DecoderEmbeddings", dataType, Shape(tgtVocabSize, configuration.modelTgtEmbeddingSize),
+        "DecoderEmbeddings", dataType, Shape(tgtVocabSize, configuration.modelNumUnits),
         tf.RandomUniformInitializer(-0.1f, 0.1f))
       val decEmbeddingFn = (o: Output) => tf.embeddingLookup(decEmbeddings, o)
       val decCellInstance = decoderCell.createCell(mode)
@@ -93,7 +93,7 @@ class PairwiseRNNTranslator[S, SS](
   ): ((BasicRNNDecoder.Output[Output, Shape], S, Output), Set[Variable], Set[Variable]) = {
     tf.createWithNameScope("TrainDecoder") {
       val decEmbeddings = variableFn(
-        "DecoderEmbeddings", dataType, Shape(tgtVocabSize, configuration.modelTgtEmbeddingSize),
+        "DecoderEmbeddings", dataType, Shape(tgtVocabSize, configuration.modelNumUnits),
         tf.RandomUniformInitializer(-0.1f, 0.1f))
       val decEmbeddedInput = tf.embeddingLookup(decEmbeddings, input._1)
       val decCellInstance = decoderCell.createCell(mode)

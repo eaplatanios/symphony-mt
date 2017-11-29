@@ -80,7 +80,7 @@ abstract class PairwiseTranslator(
           loss = lossLayer(),
           optimizer = optimizer(),
           clipGradients = tf.learn.ClipGradientsByGlobalNorm(configuration.trainMaxGradNorm),
-          colocateWithGradientsWithOps = configuration.trainColocateGradientsWithOps)
+          colocateGradientsWithOps = configuration.trainColocateGradientsWithOps)
         val summariesDir = workingDir.resolve("summaries")
         val tensorBoardConfig = {
           if (configuration.launchTensorBoard)
@@ -151,7 +151,7 @@ abstract class PairwiseTranslator(
       srcDataset, tgtDataset, srcVocab(), tgtVocab(), batchSize,
       configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
       repeat, configuration.dataSrcReverse, configuration.randomSeed, numBuckets,
-      configuration.dataSrcMaxLength, configuration.dataTgtMaxLength, configuration.parallelIterations,
+      configuration.dataSrcMaxLength, configuration.dataTgtMaxLength, configuration.dataNumParallelCalls,
       configuration.dataBufferSize, configuration.dataDropCount, configuration.dataNumShards,
       configuration.dataShardIndex)
   }

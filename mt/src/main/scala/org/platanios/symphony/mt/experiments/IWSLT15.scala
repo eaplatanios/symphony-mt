@@ -62,7 +62,7 @@ object IWSLT15 extends App {
   val translator   : Translator    = new PairwiseRNNTranslator(
     encoderCell = MultiRNNCell(Seq(
       BasicLSTMCell(
-        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelSrcEmbeddingSize), forgetBias = 1.0f,
+        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,
         name = "EncoderCell1"),
       BasicLSTMCell(
         configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,

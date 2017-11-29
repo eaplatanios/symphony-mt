@@ -36,13 +36,12 @@ case class Configuration(
     dataNumShards: Int = 1,
     dataShardIndex: Int = 0,
     dataTimeMajor: Boolean = false, // TODO: Currently unused.
+    dataNumParallelCalls: Int = 4,
     // Vocabulary
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
     endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
     // Model
-    modelSrcEmbeddingSize: Int = 128,
-    modelTgtEmbeddingSize: Int = 128,
     modelNumUnits: Int = 128,
     modelDecodingMaxLengthFactor: Float = 2.0f,
     // Training

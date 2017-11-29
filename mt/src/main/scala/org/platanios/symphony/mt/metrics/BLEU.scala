@@ -83,7 +83,7 @@ object BLEU {
     val geometricMean = if (precisions.min > 0) Math.exp(precisions.map(Math.log(_) / maxOrder).sum) else 0.0
     val lengthRatio = hypothesisLength.toDouble / referenceLength.toDouble
     val brevityPenalty = if (lengthRatio > 1) 1.0 else Math.exp(1.0 - 1.0 / lengthRatio)
-    val bleu = geometricMean * brevityPenalty
+    val bleu = geometricMean * brevityPenalty * 100
     BLEUScore(bleu, precisions, lengthRatio, smooth)
   }
 
@@ -181,7 +181,7 @@ case class BLEUTensorFlow(
       () => tf.ones(FLOAT32, Shape()),
       () => tf.exp(1.0f - (1.0f / lengthRatio)))
 
-    geometricMean * brevityPenalty
+    geometricMean * brevityPenalty * 100
   }
 
   override def compute(
