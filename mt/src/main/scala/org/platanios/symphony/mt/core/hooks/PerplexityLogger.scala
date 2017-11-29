@@ -71,7 +71,7 @@ case class PerplexityLogger(
     internalTrigger.reset()
     shouldTrigger = false
     loss = modelInstance.loss.map(_.cast(FLOAT32))
-        .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._2))).orNull
+        .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._3))).orNull
     wordCount = modelInstance.trainInput.map(o => tf.sum(o._1._2) + tf.sum(o._2._3)).orNull
     totalLoss = 0.0f
     totalWordCount = 0L
