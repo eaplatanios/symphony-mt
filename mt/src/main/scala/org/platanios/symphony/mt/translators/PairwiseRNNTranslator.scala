@@ -80,7 +80,7 @@ class PairwiseRNNTranslator[S, SS](
           outputTimeMajor = false, maximumIterations = inferMaxLength(tf.max(input._2)),
           parallelIterations = configuration.parallelIterations,
           swapMemory = configuration.swapMemory)
-        ((decTuple._1.predictedIDs(::, 0), decTuple._3(::, 0).cast(INT32)),
+        ((decTuple._1.predictedIDs(---, 0), decTuple._3(---, 0).cast(INT32)),
             decCellInstance.trainableVariables ++ decOutputLayer._2 + decEmbeddings,
             decCellInstance.nonTrainableVariables)
       } else {
