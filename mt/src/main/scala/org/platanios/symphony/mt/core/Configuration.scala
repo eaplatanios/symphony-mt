@@ -58,7 +58,7 @@ case class Configuration(
     trainColocateGradientsWithOps: Boolean = true,
     // Inference
     inferBatchSize: Int = 32,
-    inferBeamWidth: Int = 1,
+    inferBeamWidth: Int = 5,
     inferLengthPenaltyWeight: Float = 0.0f,
     // Logging
     logLossSteps: Int = 100,

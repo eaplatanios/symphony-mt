@@ -72,14 +72,15 @@ class PairwiseRNNTranslator[S, SS](
       val decOutputLayer = decoderOutputLayer(decCellInstance.cell.outputShape(-1), tgtVocabSize, variableFn)
       if (configuration.inferBeamWidth > 1) {
         val decoder = BeamSearchRNNDecoder(
-          decCellInstance.cell, encTuple.state, decEmbeddingFn,
-          tf.fill(INT32, tf.shape(input._2))(tgtVocab.lookup(bosToken)), tgtVocab.lookup(eosToken).cast(INT32),
-          configuration.inferBeamWidth, configuration.inferLengthPenaltyWeight, decOutputLayer._1)
+          decCellInstance.cell, tf.beamSearchRNNDecoderTileBatch(encTuple.state, configuration.inferBeamWidth),
+          decEmbeddingFn, tf.fill(INT32, tf.shape(input._2))(tgtVocab.lookup(bosToken)),
+          tgtVocab.lookup(eosToken).cast(INT32), configuration.inferBeamWidth, configuration.inferLengthPenaltyWeight,
+          decOutputLayer._1)
         val decTuple = decoder.decode(
           outputTimeMajor = false, maximumIterations = inferMaxLength(tf.max(input._2)),
           parallelIterations = configuration.parallelIterations,
           swapMemory = configuration.swapMemory)
-        ((decTuple._1.predictedIDs, decTuple._3),
+        ((decTuple._1.predictedIDs(::, 0), decTuple._3(::, 0).cast(INT32)),
             decCellInstance.trainableVariables ++ decOutputLayer._2 + decEmbeddings,
             decCellInstance.nonTrainableVariables)
       } else {
