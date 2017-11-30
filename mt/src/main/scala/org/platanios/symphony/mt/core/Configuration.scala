@@ -58,6 +58,8 @@ case class Configuration(
     trainColocateGradientsWithOps: Boolean = true,
     // Inference
     inferBatchSize: Int = 32,
+    inferBeamWidth: Int = 1,
+    inferLengthPenaltyWeight: Float = 0.0f,
     // Logging
     logLossSteps: Int = 100,
     logEvalBatchSize: Int = 512,
@@ -65,7 +67,6 @@ case class Configuration(
     logDevEvalSteps: Int = 1000,
     logTestEvalSteps: Int = 1000,
     // Miscellaneous
-    colocateGradientsWithOps: Boolean = true, // TODO: Currently unused.
     logDevicePlacement: Boolean = false,
     randomSeed: Option[Int] = None,
     parallelIterations: Int = 10,

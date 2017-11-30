@@ -116,7 +116,7 @@ abstract class PairwiseTranslator(
             Seq(BLEUTensorFlow()), StepHookTrigger(configuration.logTestEvalSteps),
             triggerAtEnd = true, name = "Test Evaluation")
         tf.learn.InMemoryEstimator(
-          model, tf.learn.Configuration(Some(workingDir), randomSeed = configuration.randomSeed.getOrElse(1)),
+          model, tf.learn.Configuration(Some(workingDir), randomSeed = configuration.randomSeed),
           stopCriteria, hooks, tensorBoardConfig = tensorBoardConfig)
       })
       estimator.train(trainDataset, stopCriteria)

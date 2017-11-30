@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.translators.PairwiseTranslator.{MTInferLayer, M
 import org.platanios.tensorflow.api.learn.{EVALUATION, INFERENCE, Mode}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.layers.LayerInstance
-import org.platanios.tensorflow.api.ops.rnn.decoder.BasicRNNDecoder
+import org.platanios.tensorflow.api.ops.rnn.decoder.{BasicRNNDecoder, BeamSearchRNNDecoder}
 import org.platanios.tensorflow.api.ops.variables.Initializer
 
 /**
@@ -32,7 +32,8 @@ class PairwiseRNNTranslator[S, SS](
     val decoderCell: tf.learn.RNNCell[Output, Shape, S, SS],
     override val configuration: Configuration = Configuration()
 )(implicit
-    evSupportedS: ops.control_flow.WhileLoopVariable.Aux[S, SS]
+    evSWhileLoopVariable: ops.control_flow.WhileLoopVariable.Aux[S, SS],
+    evSBeamSearchRNNDecoderSupported: BeamSearchRNNDecoder.Supported.Aux[S, SS]
 ) extends PairwiseTranslator(configuration) {
   private[this] def encoder(
       input: (Output, Output),
@@ -59,7 +60,7 @@ class PairwiseRNNTranslator[S, SS](
       encTuple: tf.learn.RNNTuple[Output, S],
       variableFn: (String, DataType, Shape, Initializer) => Variable,
       mode: Mode
-  ): ((BasicRNNDecoder.Output[Output, Shape], S, Output), Set[Variable], Set[Variable]) = {
+  ): ((Output, Output), Set[Variable], Set[Variable]) = {
     tf.createWithNameScope("Decoder") {
       val bosToken = tf.constant(configuration.beginOfSequenceToken)
       val eosToken = tf.constant(configuration.endOfSequenceToken)
@@ -68,19 +69,33 @@ class PairwiseRNNTranslator[S, SS](
         tf.RandomUniformInitializer(-0.1f, 0.1f))
       val decEmbeddingFn = (o: Output) => tf.embeddingLookup(decEmbeddings, o)
       val decCellInstance = decoderCell.createCell(mode)
-      val decHelper = BasicRNNDecoder.GreedyEmbeddingHelper[S](
-        decEmbeddingFn,
-        tf.fill(INT32, tf.shape(input._2))(tgtVocab.lookup(bosToken)),
-        tgtVocab.lookup(eosToken).cast(INT32))
       val decOutputLayer = decoderOutputLayer(decCellInstance.cell.outputShape(-1), tgtVocabSize, variableFn)
-      val decoder = BasicRNNDecoder(decCellInstance.cell, encTuple.state, decHelper, decOutputLayer._1)
-      val decTuple = decoder.dynamicDecode(
-        outputTimeMajor = false, maximumIterations = inferMaxLength(tf.max(input._2)),
-        parallelIterations = configuration.parallelIterations,
-        swapMemory = configuration.swapMemory)
-      (decTuple,
-          decCellInstance.trainableVariables ++ decOutputLayer._2 + decEmbeddings,
-          decCellInstance.nonTrainableVariables)
+      if (configuration.inferBeamWidth > 1) {
+        val decoder = BeamSearchRNNDecoder(
+          decCellInstance.cell, encTuple.state, decEmbeddingFn,
+          tf.fill(INT32, tf.shape(input._2))(tgtVocab.lookup(bosToken)), tgtVocab.lookup(eosToken).cast(INT32),
+          configuration.inferBeamWidth, configuration.inferLengthPenaltyWeight, decOutputLayer._1)
+        val decTuple = decoder.decode(
+          outputTimeMajor = false, maximumIterations = inferMaxLength(tf.max(input._2)),
+          parallelIterations = configuration.parallelIterations,
+          swapMemory = configuration.swapMemory)
+        ((decTuple._1.predictedIDs, decTuple._3),
+            decCellInstance.trainableVariables ++ decOutputLayer._2 + decEmbeddings,
+            decCellInstance.nonTrainableVariables)
+      } else {
+        val decHelper = BasicRNNDecoder.GreedyEmbeddingHelper[S](
+          decEmbeddingFn,
+          tf.fill(INT32, tf.shape(input._2))(tgtVocab.lookup(bosToken)),
+          tgtVocab.lookup(eosToken).cast(INT32))
+        val decoder = BasicRNNDecoder(decCellInstance.cell, encTuple.state, decHelper, decOutputLayer._1)
+        val decTuple = decoder.decode(
+          outputTimeMajor = false, maximumIterations = inferMaxLength(tf.max(input._2)),
+          parallelIterations = configuration.parallelIterations,
+          swapMemory = configuration.swapMemory)
+        ((decTuple._1.sample, decTuple._3),
+            decCellInstance.trainableVariables ++ decOutputLayer._2 + decEmbeddings,
+            decCellInstance.nonTrainableVariables)
+      }
     }
   }
 
@@ -100,7 +115,7 @@ class PairwiseRNNTranslator[S, SS](
       val decHelper = BasicRNNDecoder.TrainingHelper(decEmbeddedInput, input._3, timeMajor = false)
       val decOutputLayer = decoderOutputLayer(decCellInstance.cell.outputShape(-1), tgtVocabSize, variableFn)
       val decoder = BasicRNNDecoder(decCellInstance.cell, encTuple.state, decHelper, decOutputLayer._1)
-      val decTuple = decoder.dynamicDecode(
+      val decTuple = decoder.decode(
         outputTimeMajor = false, parallelIterations = configuration.parallelIterations,
         swapMemory = configuration.swapMemory)
       (decTuple,
@@ -177,8 +192,7 @@ class PairwiseRNNTranslator[S, SS](
         val variableFn: (String, DataType, Shape, Initializer) => Variable = variable(_, _, _, _)
         srcVocab()
         val (encTuple, encTrVars, encNonTrVars) = encoder(input, srcVocabSize, variableFn, mode)
-        val (decTuple, decTrVars, decNonTrVars) = decoder(input, tgtVocabSize, tgtVocab(), encTuple, variableFn, mode)
-        val out = output(decTuple, tgtVocabSize, mode)
+        val (out, decTrVars, decNonTrVars) = decoder(input, tgtVocabSize, tgtVocab(), encTuple, variableFn, mode)
         LayerInstance(input, out, encTrVars ++ decTrVars, encNonTrVars ++ decNonTrVars)
       }
     }
