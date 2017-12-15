@@ -63,7 +63,7 @@ case class Configuration(
     // Logging
     logLossSteps: Int = 100,
     logEvalBatchSize: Int = 512,
-    logTrainEvalSteps: Int = -1,
+    logTrainEvalSteps: Int = 1000,
     logDevEvalSteps: Int = 1000,
     logTestEvalSteps: Int = 1000,
     // Miscellaneous
