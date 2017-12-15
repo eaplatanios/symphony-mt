@@ -146,7 +146,7 @@ class GNMTDecoder[S, SS](
               configuration.cell, configuration.numUnits, dataType, configuration.numUniLayers,
               configuration.numUniResLayers, configuration.dropout, configuration.residualFn, 0,
               configuration.numGPUs, configuration.randomSeed, s"$name/MultiCell")
-            val cellInstance = cell.createCell(mode, embeddedInput.shape)
+            val cellInstance = cell.createCell(mode, Shape(embeddedInput.shape(-1) + configuration.numUnits))
             val attentionCell = tf.AttentionWrapperCell(
               cellInstance.cell, Seq(attention), Seq(attentionWeights.value),
               outputAttention = configuration.decoderOutputAttention)
