@@ -13,9 +13,10 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.core
+package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.Decay
 
@@ -24,8 +25,31 @@ import java.nio.file.{Path, Paths}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class Configuration(
+case class Configuration[S, SS](
     workingDir: Path = Paths.get("temp"),
+    // Model
+    cell: Cell[S, SS],
+    srcVocabSize: Int,
+    tgtVocabSize: Int,
+    srcVocab: () => tf.LookupTable,
+    tgtVocab: () => tf.LookupTable,
+    numUnits: Int,
+    numUniLayers: Int = 1,
+    numUniResLayers: Int = 0,
+    numBiLayers: Int = 0,
+    numBiResLayers: Int = 0,
+    dataType: DataType = FLOAT32,
+    dropout: Option[Float] = None,
+    residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
+    decoderAttention: Option[Attention] = None,
+    decoderAttentionArchitecture: AttentionArchitecture = StandardAttention,
+    decoderOutputAttention: Boolean = false,
+    decoderMaxLengthFactor: Float = 2.0f,
+    numGPUs: Int = 0,
+    parallelIterations: Int = 32,
+    swapMemory: Boolean = true,
+    sequenceLengths: Tensor = null,
+    randomSeed: Option[Int] = None,
     // Data
     dataNumBuckets: Int = 5,
     dataSrcMaxLength: Int = 50,
@@ -35,15 +59,12 @@ case class Configuration(
     dataDropCount: Int = 0,
     dataNumShards: Int = 1,
     dataShardIndex: Int = 0,
-    dataTimeMajor: Boolean = false, // TODO: Currently unused.
+    dataTimeMajor: Boolean = false,
     dataNumParallelCalls: Int = 4,
     // Vocabulary
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
     endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
-    // Model
-    modelNumUnits: Int = 128,
-    modelDecodingMaxLengthFactor: Float = 2.0f,
     // Training
     trainBatchSize: Int = 128,
     trainMaxGradNorm: Float = 5.0f,
@@ -56,6 +77,7 @@ case class Configuration(
     trainSummarySteps: Int = 100,
     trainCheckpointSteps: Int = 1000,
     trainColocateGradientsWithOps: Boolean = true,
+    trainLaunchTensorBoard: Boolean = true,
     // Inference
     inferBatchSize: Int = 32,
     inferBeamWidth: Int = 1,
@@ -66,9 +88,4 @@ case class Configuration(
     logTrainEvalSteps: Int = -1,
     logDevEvalSteps: Int = 1000,
     logTestEvalSteps: Int = 1000,
-    // Miscellaneous
-    logDevicePlacement: Boolean = false,
-    randomSeed: Option[Int] = None,
-    parallelIterations: Int = 10,
-    swapMemory: Boolean = false,
-    launchTensorBoard: Boolean = true)
+    logDevicePlacement: Boolean = false)

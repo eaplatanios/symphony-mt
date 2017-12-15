@@ -15,13 +15,12 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.core.{Configuration, Language, Translator}
+import org.platanios.symphony.mt.core.Language
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.Vocabulary
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
-import org.platanios.symphony.mt.translators.PairwiseRNNTranslator
+import org.platanios.symphony.mt.models.rnn.{Configuration, GNMTModel, LSTM}
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.layers.rnn.cell.{BasicLSTMCell, MultiRNNCell}
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 
 import java.nio.file.{Path, Paths}
@@ -58,27 +57,35 @@ object IWSLT15 extends App {
   val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
 
   // Create a translator
-  val configuration: Configuration = Configuration()
-  val translator   : Translator    = new PairwiseRNNTranslator(
-    encoderCell = MultiRNNCell(Seq(
-      BasicLSTMCell(
-        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,
-        name = "EncoderCell1"),
-      BasicLSTMCell(
-        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,
-        name = "EncoderCell2"))),
-    decoderCell = MultiRNNCell(Seq(
-      BasicLSTMCell(
-        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,
-        name = "DecoderCell1"),
-      BasicLSTMCell(
-        configuration.modelNumUnits, FLOAT32, Shape(configuration.modelNumUnits), forgetBias = 1.0f,
-        name = "DecoderCell2"))),
-    configuration = configuration)
+  val configuration = Configuration(
+    workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+    cell = LSTM(),
+    srcVocabSize = viVocabSize,
+    tgtVocabSize = enVocabSize,
+    srcVocab = srcLang.vocabulary,
+    tgtVocab = tgtLang.vocabulary,
+    numUnits = 128)
 
-  translator.train(
-    Seq(Translator.DatasetPair(srcLang, tgtLang, srcTrainDataset, tgtTrainDataset)),
-    Seq(Translator.DatasetPair(srcLang, tgtLang, srcDevDataset, tgtDevDataset)),
-    Seq(Translator.DatasetPair(srcLang, tgtLang, srcTestDataset, tgtTestDataset)),
-    tf.learn.StopCriteria(Some(10000)))
+  val model = GNMTModel(
+    configuration, srcLang, tgtLang,
+    srcTrainDataset, tgtTrainDataset,
+    srcDevDataset, tgtDevDataset,
+    srcTestDataset, tgtTestDataset)
+
+  model.train(tf.learn.StopCriteria(Some(10000)))
+
+//  val translator   : Translator    = new PairwiseRNNTranslator(
+//    encoderCell = MultiRNNCell(Seq(
+//      BasicLSTMCell(configuration.modelNumUnits, FLOAT32, forgetBias = 1.0f, name = "EncoderCell1"),
+//      BasicLSTMCell(configuration.modelNumUnits, FLOAT32, forgetBias = 1.0f, name = "EncoderCell2"))),
+//    decoderCell = MultiRNNCell(Seq(
+//      BasicLSTMCell(configuration.modelNumUnits, FLOAT32, forgetBias = 1.0f, name = "DecoderCell1"),
+//      BasicLSTMCell(configuration.modelNumUnits, FLOAT32, forgetBias = 1.0f, name = "DecoderCell2"))),
+//    configuration = configuration)
+//
+//  translator.train(
+//    Seq(Translator.DatasetPair(srcLang, tgtLang, srcTrainDataset, tgtTrainDataset)),
+//    Seq(Translator.DatasetPair(srcLang, tgtLang, srcDevDataset, tgtDevDataset)),
+//    Seq(Translator.DatasetPair(srcLang, tgtLang, srcTestDataset, tgtTestDataset)),
+//    tf.learn.StopCriteria(Some(10000)))
 }
