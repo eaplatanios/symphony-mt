@@ -38,12 +38,10 @@ object Datasets {
   def createInferDataset(
       srcDataset: MTTextLinesDataset,
       srcVocabularyTable: tf.LookupTable,
-      batchSize: Int,
-      endSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
-      srcReverse: Boolean = false,
-      srcMaxLength: Int = -1
+      dataConfig: DataConfiguration,
+      batchSize: Int
   ): MTInferDataset = {
-    val srcEosId = srcVocabularyTable.lookup(tf.constant(endSequenceToken)).cast(INT32)
+    val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
     val batchingFn = (dataset: MTInferDataset) => {
       dataset.dynamicPaddedBatch(
@@ -60,9 +58,9 @@ object Datasets {
     val datasetBeforeBatching = srcDataset
         .map(o => tf.stringSplit(o.expandDims(0)).values)
         // Crop based on the maximum allowed sequence length.
-        .transform(d => if (srcMaxLength != -1) d.map(dd => dd(0 :: srcMaxLength)) else d)
+        .transform(d => if (dataConfig.srcMaxLength != -1) d.map(dd => dd(0 :: dataConfig.srcMaxLength)) else d)
         // Reverse the source sequence if necessary.
-        .transform(d => if (srcReverse) d.map(dd => tf.reverse(dd, axes = 0)) else d)
+        .transform(d => if (dataConfig.srcReverse) d.map(dd => tf.reverse(dd, axes = 0)) else d)
         // Convert the word strings to IDs. Word strings that are not in the vocabulary
         // get the lookup table's default value.
         .map(d => tf.cast(srcVocabularyTable.lookup(d), INT32))
@@ -77,25 +75,15 @@ object Datasets {
       tgtDataset: MTTextLinesDataset,
       srcVocabularyTable: tf.LookupTable,
       tgtVocabularyTable: tf.LookupTable,
+      dataConfig: DataConfiguration,
       batchSize: Int,
-      beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
-      endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
       repeat: Boolean = true,
-      srcReverse: Boolean = false,
-      randomSeed: Option[Int] = None,
-      numBuckets: Int = 1,
-      srcMaxLength: Int = -1,
-      tgtMaxLength: Int = -1,
-      numParallelCalls: Int = 4,
-      bufferSize: Long = -1L,
-      dropCount: Int = 0,
-      numShards: Int = 1,
-      shardIndex: Int = 0
+      randomSeed: Option[Int] = None
   ): MTTrainDataset = {
-    val actualBufferSize = if (bufferSize == -1L) 1000 * batchSize else bufferSize
-    val srcEosId = srcVocabularyTable.lookup(tf.constant(endOfSequenceToken)).cast(INT32)
-    val tgtBosId = tgtVocabularyTable.lookup(tf.constant(beginOfSequenceToken)).cast(INT32)
-    val tgtEosId = tgtVocabularyTable.lookup(tf.constant(endOfSequenceToken)).cast(INT32)
+    val actualBufferSize = if (dataConfig.bufferSize == -1L) 1000 * batchSize else dataConfig.bufferSize
+    val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+    val tgtBosId = tgtVocabularyTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+    val tgtEosId = tgtVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
     val batchingFn = (dataset: MTTrainDataset) => {
       dataset.dynamicPaddedBatch(
@@ -111,8 +99,8 @@ object Datasets {
 
     val datasetBeforeBucketing =
       srcDataset.zip(tgtDataset)
-          .shard(numShards, shardIndex)
-          .drop(dropCount)
+          .shard(dataConfig.numShards, dataConfig.shardIndex)
+          .drop(dataConfig.dropCount)
           .transform(d => {
             if (repeat)
               d.repeat().prefetch(actualBufferSize)
@@ -129,24 +117,24 @@ object Datasets {
           .filter(d => tf.logicalAnd(tf.size(d._1) > 0, tf.size(d._2) > 0))
           // Crop based on the maximum allowed sequence lengths.
           .transform(d => {
-            if (srcMaxLength != -1 && tgtMaxLength != -1)
+            if (dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1)
               d.map(
-                dd => (dd._1(0 :: srcMaxLength), dd._2(0 :: tgtMaxLength)),
-                numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
-            else if (srcMaxLength != -1)
+                dd => (dd._1(0 :: dataConfig.srcMaxLength), dd._2(0 :: dataConfig.tgtMaxLength)),
+                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+            else if (dataConfig.srcMaxLength != -1)
               d.map(
-                dd => (dd._1(0 :: srcMaxLength), dd._2),
-                numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
-            else if (tgtMaxLength != -1)
+                dd => (dd._1(0 :: dataConfig.srcMaxLength), dd._2),
+                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+            else if (dataConfig.tgtMaxLength != -1)
               d.map(
-                dd => (dd._1, dd._2(0 :: tgtMaxLength)),
-                numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+                dd => (dd._1, dd._2(0 :: dataConfig.tgtMaxLength)),
+                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
             else
               d
           })
           // Reverse the source sequence if necessary.
           .transform(d => {
-            if (srcReverse)
+            if (dataConfig.srcReverse)
               d.map(dd => (tf.reverse(dd._1, axes = 0), dd._2), name = "Map/SrcReverse").prefetch(actualBufferSize)
             else
               d
@@ -157,7 +145,7 @@ object Datasets {
             d => (
               tf.cast(srcVocabularyTable.lookup(d._1), INT32),
               tf.cast(tgtVocabularyTable.lookup(d._2), INT32)),
-            numParallelCalls, name = "Map/VocabularyLookup")
+            dataConfig.numParallelCalls, name = "Map/VocabularyLookup")
           .prefetch(actualBufferSize)
           // Create a target input prefixed with 'beginSequenceToken'
           // and a target output suffixed with 'endSequenceToken'.
@@ -166,28 +154,33 @@ object Datasets {
               d._1,
               tf.concatenate(Seq(tgtBosId.expandDims(0), d._2), axis = 0),
               tf.concatenate(Seq(d._2, tgtEosId.expandDims(0)), axis = 0)),
-            numParallelCalls, name = "Map/AddDecoderOutput")
+            dataConfig.numParallelCalls, name = "Map/AddDecoderOutput")
           .prefetch(actualBufferSize)
           // Add sequence lengths.
           .map(
-            d => ((d._1, tf.size(d._1, INT32)), (d._2, d._3, tf.size(d._2, INT32))), numParallelCalls,
+            d => ((d._1, tf.size(d._1, INT32)), (d._2, d._3, tf.size(d._2, INT32))), dataConfig.numParallelCalls,
             name = "Map/AddLengths")
           .prefetch(actualBufferSize)
 
-    if (numBuckets == 1) {
+    if (dataConfig.numBuckets == 1) {
       batchingFn(datasetBeforeBucketing)
     } else {
       // Calculate the bucket width by using the maximum source sequence length, if provided. Pairs with length
       // [0, bucketWidth) go to bucket 0, length [bucketWidth, 2 * bucketWidth) go to bucket 1, etc. Pairs with length
       // over ((numBuckets - 1) * bucketWidth) all go into the last bucket.
-      val bucketWidth = if (srcMaxLength != -1) (srcMaxLength + numBuckets - 1) / numBuckets else 10
+      val bucketWidth = {
+        if (dataConfig.srcMaxLength != -1)
+          (dataConfig.srcMaxLength + dataConfig.numBuckets - 1) / dataConfig.numBuckets
+        else
+          10
+      }
 
       def keyFn(element: ((Output, Output), (Output, Output, Output))): Output = {
         // Bucket sequence  pairs based on the length of their source sequence and target sequence.
         val bucketId = tf.maximum(
           tf.truncateDivide(element._1._2, bucketWidth),
           tf.truncateDivide(element._2._3, bucketWidth))
-        tf.minimum(numBuckets, bucketId).cast(INT64)
+        tf.minimum(dataConfig.numBuckets, bucketId).cast(INT64)
       }
 
       def reduceFn(pair: (Output, MTTrainDataset)): MTTrainDataset = {

@@ -56,12 +56,12 @@ object IWSLT15Loader extends Loader {
     override val vocabularyFilenames  : (String, String) = ("vocab.en", "vocab.vi")
   }
 
-  def load(path: Path, datasetType: DatasetType = EnglishVietnamese, bufferSize: Int = 8192): Unit = {
+  def maybeDownload(path: Path, datasetType: DatasetType = EnglishVietnamese, bufferSize: Int = 8192): Unit = {
     // Download the data, if necessary.
     datasetType.files.map(f => maybeDownload(path.resolve(f._1), f._2, bufferSize))
   }
 
   def main(args: Array[String]): Unit = {
-    load(Paths.get(args(0)))
+    maybeDownload(Paths.get(args(0)))
   }
 }
