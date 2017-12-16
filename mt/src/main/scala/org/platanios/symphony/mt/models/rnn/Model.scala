@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.{Environment, Language}
+import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.core.hooks.PerplexityLogger
 import org.platanios.symphony.mt.data.{DataConfig, Datasets, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
@@ -54,6 +54,7 @@ trait Model[S, SS] {
   val dataConfig : DataConfig  = DataConfig()
   val trainConfig: TrainConfig = TrainConfig()
   val inferConfig: InferConfig = InferConfig()
+  val logConfig  : LogConfig   = LogConfig()
 
   // Create the input and the train input parts of the model.
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
@@ -100,25 +101,25 @@ trait Model[S, SS] {
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainConfig.summarySteps)),
       tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
-    if (config.logLossSteps > 0)
-      hooks += PerplexityLogger(log = true, trigger = StepHookTrigger(config.logLossSteps))
-    if (config.logTrainEvalSteps > 0 && srcTrainDataset != null && tgtTrainDataset != null)
+    if (logConfig.logLossSteps > 0)
+      hooks += PerplexityLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
+    if (logConfig.logTrainEvalSteps > 0 && srcTrainDataset != null && tgtTrainDataset != null)
       hooks += tf.learn.Evaluator(
         log = true, summariesDir,
-        () => createTrainDataset(srcTrainDataset, tgtTrainDataset, config.logEvalBatchSize, repeat = false, 1),
-        Seq(BLEUTensorFlow()), StepHookTrigger(config.logTrainEvalSteps),
+        () => createTrainDataset(srcTrainDataset, tgtTrainDataset, logConfig.logEvalBatchSize, repeat = false, 1),
+        Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTrainEvalSteps),
         triggerAtEnd = true, name = "Train Evaluation")
-    if (config.logDevEvalSteps > 0 && srcDevDataset != null && tgtDevDataset != null)
+    if (logConfig.logDevEvalSteps > 0 && srcDevDataset != null && tgtDevDataset != null)
       hooks += tf.learn.Evaluator(
         log = true, summariesDir,
-        () => createTrainDataset(srcDevDataset, tgtDevDataset, config.logEvalBatchSize, repeat = false, 1),
-        Seq(BLEUTensorFlow()), StepHookTrigger(config.logDevEvalSteps),
+        () => createTrainDataset(srcDevDataset, tgtDevDataset, logConfig.logEvalBatchSize, repeat = false, 1),
+        Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logDevEvalSteps),
         triggerAtEnd = true, name = "Dev Evaluation")
-    if (config.logTestEvalSteps > 0 && srcTestDataset != null && tgtTestDataset != null)
+    if (logConfig.logTestEvalSteps > 0 && srcTestDataset != null && tgtTestDataset != null)
       hooks += tf.learn.Evaluator(
         log = true, summariesDir,
-        () => createTrainDataset(srcTestDataset, tgtTestDataset, config.logEvalBatchSize, repeat = false, 1),
-        Seq(BLEUTensorFlow()), StepHookTrigger(config.logTestEvalSteps),
+        () => createTrainDataset(srcTestDataset, tgtTestDataset, logConfig.logEvalBatchSize, repeat = false, 1),
+        Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTestEvalSteps),
         triggerAtEnd = true, name = "Test Evaluation")
     tf.learn.InMemoryEstimator(
       model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),

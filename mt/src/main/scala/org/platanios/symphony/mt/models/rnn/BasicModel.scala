@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.{Environment, Language}
+import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
@@ -46,6 +46,7 @@ class BasicModel[S, SS](
     override val dataConfig: DataConfig = DataConfig(),
     override val trainConfig: TrainConfig = TrainConfig(),
     override val inferConfig: InferConfig = InferConfig(),
+    override val logConfig: LogConfig = LogConfig(),
     override val name: String = "BasicModel"
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
@@ -245,6 +246,7 @@ object BasicModel {
       dataConfig: DataConfig = DataConfig(),
       trainConfig: TrainConfig = TrainConfig(),
       inferConfig: InferConfig = InferConfig(),
+      logConfig: LogConfig = LogConfig(),
       name: String = "BasicModel"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
@@ -252,7 +254,7 @@ object BasicModel {
   ): BasicModel[S, SS] = {
     new BasicModel[S, SS](
       config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary, srcTrainDataset, tgtTrainDataset, srcDevDataset,
-      tgtDevDataset, srcTestDataset, tgtTestDataset, env, dataConfig, trainConfig, inferConfig, name)
+      tgtDevDataset, srcTestDataset, tgtTestDataset, env, dataConfig, trainConfig, inferConfig, logConfig, name)
   }
 
   sealed trait EncoderType

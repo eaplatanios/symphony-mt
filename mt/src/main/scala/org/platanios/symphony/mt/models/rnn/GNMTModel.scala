@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.{Environment, Language}
+import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
@@ -46,6 +46,7 @@ class GNMTModel[S, SS](
     override val dataConfig: DataConfig = DataConfig(),
     override val trainConfig: TrainConfig = TrainConfig(),
     override val inferConfig: InferConfig = InferConfig(),
+    override val logConfig: LogConfig = LogConfig(),
     override val name: String = "GNMTModel"
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
@@ -257,6 +258,7 @@ object GNMTModel {
       dataConfig: DataConfig = DataConfig(),
       trainConfig: TrainConfig = TrainConfig(),
       inferConfig: InferConfig = InferConfig(),
+      logConfig: LogConfig = LogConfig(),
       name: String = "GNMTModel"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
@@ -264,7 +266,7 @@ object GNMTModel {
   ): GNMTModel[S, SS] = {
     new GNMTModel[S, SS](
       config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary, srcTrainDataset, tgtTrainDataset, srcDevDataset,
-      tgtDevDataset, srcTestDataset, tgtTestDataset, env, dataConfig, trainConfig, inferConfig, name)
+      tgtDevDataset, srcTestDataset, tgtTestDataset, env, dataConfig, trainConfig, inferConfig, logConfig, name)
   }
 
   case class Config[S, SS](
@@ -278,7 +280,6 @@ object GNMTModel {
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
       decoderAttention: Option[Attention] = None,
-      decoderAttentionArchitecture: AttentionArchitecture = StandardAttention,
       decoderOutputAttention: Boolean = false,
       decoderUseNewAttention: Boolean = false)
 }
