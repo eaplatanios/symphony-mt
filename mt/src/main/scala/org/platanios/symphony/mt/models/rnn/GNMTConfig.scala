@@ -22,8 +22,7 @@ import java.nio.file.{Path, Paths}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class Configuration[S, SS](
-    workingDir: Path = Paths.get("temp"),
+case class GNMTConfig[S, SS](
     // Model
     cell: Cell[S, SS],
     numUnits: Int,

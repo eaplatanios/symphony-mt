@@ -39,7 +39,7 @@ trait Encoder[S, SS] {
 }
 
 class GNMTEncoder[S, SS](
-    val config: Configuration[S, SS],
+    val config: GNMTConfig[S, SS],
     val srcVocabulary: Vocabulary,
     override val env: Environment,
     override val dataConfig: DataConfig,
@@ -121,7 +121,7 @@ class GNMTEncoder[S, SS](
 
 object GNMTEncoder {
   def apply[S, SS](
-      config: Configuration[S, SS],
+      config: GNMTConfig[S, SS],
       srcVocabulary: Vocabulary,
       env: Environment,
       dataConfig: DataConfig,

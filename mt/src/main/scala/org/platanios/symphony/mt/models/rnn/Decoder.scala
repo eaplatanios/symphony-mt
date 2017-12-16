@@ -42,7 +42,7 @@ trait Decoder[S, SS] {
 }
 
 class GNMTDecoder[S, SS](
-    val config: Configuration[S, SS],
+    val config: GNMTConfig[S, SS],
     val srcVocabulary: Vocabulary,
     val tgtVocabulary: Vocabulary,
     override val env: Environment,
@@ -246,7 +246,7 @@ class GNMTDecoder[S, SS](
 
 object GNMTDecoder {
   def apply[S, SS](
-      config: Configuration[S, SS],
+      config: GNMTConfig[S, SS],
       srcVocabulary: Vocabulary,
       tgtVocabulary: Vocabulary,
       env: Environment,

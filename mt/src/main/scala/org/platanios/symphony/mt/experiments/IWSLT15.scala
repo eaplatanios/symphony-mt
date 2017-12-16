@@ -20,12 +20,11 @@ import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
-import org.platanios.symphony.mt.models.rnn.{Configuration, GNMTModel, LSTM}
+import org.platanios.symphony.mt.models.rnn.{GNMTConfig, GNMTModel, LSTM}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 
 import java.nio.file.{Path, Paths}
-
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -51,15 +50,13 @@ object IWSLT15 extends App {
   val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
 
   // Create a translator
-  val env = Environment()
-
-  val configuration = Configuration(
-    workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+  val configuration = GNMTConfig(
     cell = LSTM(),
     numUnits = 128,
     logTrainEvalSteps = 10,
     logTestEvalSteps = 10)
 
+  val env = Environment(workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"))
   val dataConfig = DataConfig()
   val trainConfig = TrainConfig()
   val inferConfig = InferConfig()

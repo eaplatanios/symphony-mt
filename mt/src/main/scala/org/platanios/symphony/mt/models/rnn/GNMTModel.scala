@@ -26,7 +26,7 @@ import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
   * @author Emmanouil Antonios Platanios
   */
 class GNMTModel[S, SS](
-    override val config: Configuration[S, SS],
+    val config: GNMTConfig[S, SS],
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     override val srcVocabulary: Vocabulary,
@@ -57,7 +57,7 @@ class GNMTModel[S, SS](
 
 object GNMTModel {
   def apply[S, SS](
-      config: Configuration[S, SS],
+      config: GNMTConfig[S, SS],
       srcLanguage: Language,
       tgtLanguage: Language,
       srcVocabulary: Vocabulary,

@@ -29,6 +29,8 @@ import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
 import org.platanios.tensorflow.api.types.DataType
 
+import java.nio.file.Path
+
 /**
   * @author Emmanouil Antonios Platanios
   */
@@ -45,8 +47,6 @@ trait Model[S, SS] {
   val tgtDevDataset : MTTextLinesDataset = null
   val srcTestDataset: MTTextLinesDataset = null
   val tgtTestDataset: MTTextLinesDataset = null
-
-  val config: Configuration[S, SS]
 
   val env        : Environment = Environment()
   val dataConfig : DataConfig  = DataConfig()
@@ -86,7 +86,7 @@ trait Model[S, SS] {
       optimizer = optimizer,
       clipGradients = tf.learn.ClipGradientsByGlobalNorm(trainConfig.maxGradNorm),
       colocateGradientsWithOps = trainConfig.colocateGradientsWithOps)
-    val summariesDir = config.workingDir.resolve("summaries")
+    val summariesDir = env.workingDir.resolve("summaries")
     val tensorBoardConfig = {
       if (trainConfig.launchTensorBoard)
         tf.learn.TensorBoardConfig(summariesDir, reloadInterval = 1)
@@ -96,7 +96,7 @@ trait Model[S, SS] {
     var hooks = Set[tf.learn.Hook](
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainConfig.summarySteps)),
-      tf.learn.CheckpointSaver(config.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
+      tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
     if (config.logLossSteps > 0)
       hooks += PerplexityLogger(log = true, trigger = StepHookTrigger(config.logLossSteps))
     if (config.logTrainEvalSteps > 0 && srcTrainDataset != null && tgtTrainDataset != null)
@@ -118,7 +118,7 @@ trait Model[S, SS] {
         Seq(BLEUTensorFlow()), StepHookTrigger(config.logTestEvalSteps),
         triggerAtEnd = true, name = "Test Evaluation")
     tf.learn.InMemoryEstimator(
-      model, tf.learn.Configuration(Some(config.workingDir), randomSeed = env.randomSeed),
+      model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),
       StopCriteria(Some(trainConfig.numSteps)), hooks, tensorBoardConfig = tensorBoardConfig)
   }
 
