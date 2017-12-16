@@ -21,4 +21,5 @@ package org.platanios.symphony.mt.models
 case class InferConfig(
     batchSize: Int = 32, // TODO: This is not currently being used.
     beamWidth: Int = 1,
-    lengthPenaltyWeight: Float = 0.0f)
+    lengthPenaltyWeight: Float = 0.0f,
+    decoderMaxLengthFactor: Float = 2.0f)

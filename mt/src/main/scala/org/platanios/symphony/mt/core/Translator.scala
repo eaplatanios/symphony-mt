@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.core
 
+import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.tensorflow.api.learn.StopCriteria
 

@@ -13,13 +13,16 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.rnn
+package org.platanios.symphony.mt
+
+import java.nio.file.{Path, Paths}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-sealed trait AttentionArchitecture
-
-case object StandardAttention extends AttentionArchitecture
-
-case class GNMTAttention(useNewAttention: Boolean = false) extends AttentionArchitecture
+case class Environment(
+    workingDir: Path = Paths.get("temp"),
+    numGPUs: Int = 0,
+    parallelIterations: Int = 32,
+    swapMemory: Boolean = true,
+    randomSeed: Option[Int] = None)

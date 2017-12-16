@@ -13,16 +13,17 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.core
+package org.platanios.symphony.mt
 
-import java.nio.file.{Path, Paths}
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class Environment(
-    workingDir: Path = Paths.get("temp"),
-    numGPUs: Int = 0,
-    parallelIterations: Int = 32,
-    swapMemory: Boolean = true,
-    randomSeed: Option[Int] = None)
+case class Language(name: String, abbreviation: String) {
+  val id: Int = Language.currentId.getAndIncrement()
+}
+
+object Language {
+  private[Language] val currentId: AtomicInteger = new AtomicInteger(0)
+}

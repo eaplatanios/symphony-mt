@@ -15,21 +15,23 @@
 
 package org.platanios.symphony.mt.models.rnn
 
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.core.hooks.PerplexityLogger
-import org.platanios.symphony.mt.core.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Datasets, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
 import org.platanios.symphony.mt.metrics.BLEUTensorFlow
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
-import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
+import org.platanios.tensorflow.api.learn.layers.rnn.cell.CellInstance
+import org.platanios.tensorflow.api.learn.{EVALUATION, INFERENCE, Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer, LayerInstance}
+import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
+import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
+import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSearchDecoder, GooglePenalty}
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
 import org.platanios.tensorflow.api.types.DataType
-
-import java.nio.file.Path
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -57,8 +59,9 @@ trait Model[S, SS] {
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
   protected val trainInput = Input((INT32, INT32, INT32), (Shape(-1, -1), Shape(-1, -1), Shape(-1)))
 
-  protected def encoder: Encoder[S, SS]
-  protected def decoder: Decoder[S, SS]
+  protected def encoder: Layer[(Output, Output), Tuple[Output, Seq[S]]]
+  protected def trainDecoder: Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]
+  protected def inferDecoder: Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]
 
   protected def createTrainDataset(
       srcDataset: MTTextLinesDataset,
@@ -130,8 +133,8 @@ trait Model[S, SS] {
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
-        val encLayerInstance = encoder.layer(input._1, mode)
-        val decLayerInstance = decoder.trainLayer((input._2, encLayerInstance.output), mode)
+        val encLayerInstance = encoder(input._1, mode)
+        val decLayerInstance = trainDecoder((input._2, encLayerInstance.output), mode)
         LayerInstance(
           input, decLayerInstance.output,
           encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
@@ -145,8 +148,8 @@ trait Model[S, SS] {
       override val layerType: String = "GNMTModelInferLayer"
 
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
-        val encLayerInstance = encoder.layer(input, mode)
-        val decLayerInstance = decoder.inferLayer((input, encLayerInstance.output), mode)
+        val encLayerInstance = encoder(input, mode)
+        val decLayerInstance = inferDecoder((input, encLayerInstance.output), mode)
         LayerInstance(
           input, decLayerInstance.output,
           encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
@@ -186,6 +189,70 @@ trait Model[S, SS] {
     val trainDataset = () => createTrainDataset(
       srcTrainDataset, tgtTrainDataset, trainConfig.batchSize, repeat = true, dataConfig.numBuckets)
     estimator.train(trainDataset, stopCriteria)
+  }
+
+  protected def decode[DS, DSS](
+      inputSequenceLengths: Output,
+      inputState: DS,
+      embeddings: Variable,
+      embeddedInput: Output,
+      cellInstance: CellInstance[Output, Shape, DS, DSS],
+      variableFn: (String, DataType, Shape, tf.VariableInitializer) => Variable,
+      isTrain: Boolean,
+      mode: Mode
+  )(implicit
+      evS: WhileLoopVariable.Aux[DS, DSS]
+  ): (Output, Output) = {
+    val outputWeights = variableFn(
+      "OutWeights", embeddings.dataType, Shape(cellInstance.cell.outputShape(-1), tgtVocabulary.size),
+      tf.RandomUniformInitializer(-0.1f, 0.1f))
+    val outputLayer = (logits: Output) => tf.linear(logits, outputWeights.value)
+    if (isTrain) {
+      val helper = BasicDecoder.TrainingHelper(embeddedInput, inputSequenceLengths, dataConfig.timeMajor)
+      val decoder = BasicDecoder(cellInstance.cell, inputState, helper, outputLayer)
+      val tuple = decoder.decode(
+        outputTimeMajor = dataConfig.timeMajor, parallelIterations = env.parallelIterations,
+        swapMemory = env.swapMemory)
+      val lengths = tuple._3
+      mode match {
+        case INFERENCE | EVALUATION => (tuple._1.sample, lengths)
+        case _ => (tuple._1.rnnOutput, lengths)
+      }
+    } else {
+      val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, o)
+      val tgtVocabLookupTable = tgtVocabulary.lookupTable()
+      val tgtBosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+      val tgtEosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+      if (inferConfig.beamWidth > 1) {
+        val decoder = BeamSearchDecoder(
+          cellInstance.cell, inputState,
+          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID, inferConfig.beamWidth,
+          GooglePenalty(inferConfig.lengthPenaltyWeight), outputLayer)
+        val tuple = decoder.decode(
+          outputTimeMajor = dataConfig.timeMajor,
+          maximumIterations = inferMaxLength(tf.max(inputSequenceLengths)),
+          parallelIterations = env.parallelIterations, swapMemory = env.swapMemory)
+        (tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
+      } else {
+        val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
+          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID)
+        val decoder = BasicDecoder(cellInstance.cell, inputState, decHelper, outputLayer)
+        val tuple = decoder.decode(
+          outputTimeMajor = dataConfig.timeMajor,
+          maximumIterations = inferMaxLength(tf.max(inputSequenceLengths)),
+          parallelIterations = env.parallelIterations, swapMemory = env.swapMemory)
+        (tuple._1.sample, tuple._3)
+      }
+    }
+  }
+
+  /** Returns the maximum sequence length to consider while decoding during inference, given the provided source
+    * sequence length. */
+  protected def inferMaxLength(srcLength: Output): Output = {
+    if (dataConfig.tgtMaxLength != -1)
+      tf.constant(dataConfig.tgtMaxLength)
+    else
+      tf.round(tf.max(srcLength) * inferConfig.decoderMaxLengthFactor).cast(INT32)
   }
 }
 
