@@ -15,7 +15,6 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.data.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.Decay
@@ -29,10 +28,6 @@ case class Configuration[S, SS](
     workingDir: Path = Paths.get("temp"),
     // Model
     cell: Cell[S, SS],
-    srcVocabSize: Int,
-    tgtVocabSize: Int,
-    srcVocab: () => tf.LookupTable,
-    tgtVocab: () => tf.LookupTable,
     numUnits: Int,
     numUniLayers: Int = 1,
     numUniResLayers: Int = 0,
@@ -45,26 +40,6 @@ case class Configuration[S, SS](
     decoderAttentionArchitecture: AttentionArchitecture = StandardAttention,
     decoderOutputAttention: Boolean = false,
     decoderMaxLengthFactor: Float = 2.0f,
-    numGPUs: Int = 0,
-    parallelIterations: Int = 32,
-    swapMemory: Boolean = true,
-    sequenceLengths: Tensor = null,
-    randomSeed: Option[Int] = None,
-    // Data
-    dataNumBuckets: Int = 5,
-    dataSrcMaxLength: Int = 50,
-    dataTgtMaxLength: Int = 50,
-    dataSrcReverse: Boolean = false,
-    dataBufferSize: Long = -1L,
-    dataDropCount: Int = 0,
-    dataNumShards: Int = 1,
-    dataShardIndex: Int = 0,
-    dataTimeMajor: Boolean = false,
-    dataNumParallelCalls: Int = 4,
-    // Vocabulary
-    beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
-    endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
-    unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
     // Training
     trainBatchSize: Int = 128,
     trainMaxGradNorm: Float = 5.0f,

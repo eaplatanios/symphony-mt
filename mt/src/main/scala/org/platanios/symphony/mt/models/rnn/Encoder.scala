@@ -15,6 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
+import org.platanios.symphony.mt.core.Environment
+import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.learn.layers.{Layer, LayerInstance}
@@ -30,17 +32,23 @@ import scala.language.postfixOps
 trait Encoder[S, SS] {
   val name: String = "Encoder"
 
+  val env       : Environment
+  val dataConfig: DataConfig
+
   def layer: Layer[(Output, Output), Tuple[Output, Seq[S]]]
 }
 
 class GNMTEncoder[S, SS](
-    val configuration: Configuration[S, SS],
+    override val env: Environment,
+    val config: Configuration[S, SS],
+    override val dataConfig: DataConfig,
+    val srcVocabulary: Vocabulary,
     override val name: String = "GNMTEncoder"
 )(implicit
   evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Encoder[S, SS] {
-  def timeMajor: Boolean = configuration.dataTimeMajor
+  def timeMajor: Boolean = dataConfig.timeMajor
 
   def layer: Layer[(Output, Output), Tuple[Output, Seq[S]]] = {
     new Layer[(Output, Output), Tuple[Output, Seq[S]]](name) {
@@ -50,7 +58,7 @@ class GNMTEncoder[S, SS](
           input: (Output, Output),
           mode: Mode
       ): LayerInstance[(Output, Output), Tuple[Output, Seq[S]]] = {
-        val dataType = configuration.dataType
+        val dataType = config.dataType
         tf.createWithNameScope(uniquifiedName) {
           // Keep track of trainable and non-trainable variables
           var trainableVariables = Set.empty[Variable]
@@ -59,26 +67,26 @@ class GNMTEncoder[S, SS](
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val embeddings = variable(
-            "Embeddings", dataType, Shape(configuration.srcVocabSize, configuration.numUnits), embeddingsInitializer)
+            "Embeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
           val embeddedInput = tf.embeddingLookup(embeddings, input._1)
           trainableVariables += embeddings
 
           // Bidirectional Layers
           val (output, state) = {
-            if (configuration.numBiLayers > 0) {
-              val biCellFw = GNMTModel.multiCell(
-                configuration.cell, configuration.numUnits, dataType, configuration.numBiLayers,
-                configuration.numBiResLayers, configuration.dropout, configuration.residualFn, 0, configuration.numGPUs,
-                configuration.randomSeed, s"$name/MultiBiCellFw")
-              val biCellBw = GNMTModel.multiCell(
-                configuration.cell, configuration.numUnits, dataType, configuration.numBiLayers,
-                configuration.numBiResLayers, configuration.dropout, configuration.residualFn, configuration.numBiLayers,
-                configuration.numGPUs, configuration.randomSeed, s"$name/MultiBiCellBw")
+            if (config.numBiLayers > 0) {
+              val biCellFw = Model.multiCell(
+                config.cell, config.numUnits, dataType, config.numBiLayers,
+                config.numBiResLayers, config.dropout, config.residualFn, 0, env.numGPUs,
+                env.randomSeed, s"$name/MultiBiCellFw")
+              val biCellBw = Model.multiCell(
+                config.cell, config.numUnits, dataType, config.numBiLayers,
+                config.numBiResLayers, config.dropout, config.residualFn, config.numBiLayers,
+                env.numGPUs, env.randomSeed, s"$name/MultiBiCellBw")
               val biCellInstanceFw = biCellFw.createCell(mode, embeddedInput.shape)
               val biCellInstanceBw = biCellBw.createCell(mode, embeddedInput.shape)
               val unmergedBiTuple = tf.bidirectionalDynamicRNN(
                 biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, timeMajor,
-                configuration.parallelIterations, configuration.swapMemory, input._2,
+                env.parallelIterations, env.swapMemory, input._2,
                 s"$uniquifiedName/BiDirectionalLayers")
               val mergedBiTuple = Tuple(
                 tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1), unmergedBiTuple._2.state)
@@ -91,14 +99,14 @@ class GNMTEncoder[S, SS](
           }
 
           // Unidirectional Layers
-          val uniCell = GNMTModel.multiCell(
-            configuration.cell, configuration.numUnits, dataType, configuration.numUniLayers,
-            configuration.numUniResLayers, configuration.dropout, configuration.residualFn,
-            2 * configuration.numBiLayers, configuration.numGPUs, configuration.randomSeed, s"$name/MultiUniCell")
+          val uniCell = Model.multiCell(
+            config.cell, config.numUnits, dataType, config.numUniLayers,
+            config.numUniResLayers, config.dropout, config.residualFn,
+            2 * config.numBiLayers, env.numGPUs, env.randomSeed, s"$name/MultiUniCell")
           val uniCellInstance = uniCell.createCell(mode, output.shape)
           val uniTuple = tf.dynamicRNN(
-            uniCellInstance.cell, output, null, timeMajor, configuration.parallelIterations,
-            configuration.swapMemory, input._2, s"$uniquifiedName/UniDirectionalLayers")
+            uniCellInstance.cell, output, null, timeMajor, env.parallelIterations,
+            env.swapMemory, input._2, s"$uniquifiedName/UniDirectionalLayers")
           trainableVariables ++= uniCellInstance.trainableVariables
           nonTrainableVariables ++= uniCellInstance.nonTrainableVariables
 
@@ -112,10 +120,16 @@ class GNMTEncoder[S, SS](
 }
 
 object GNMTEncoder {
-  def apply[S, SS](configuration: Configuration[S, SS], name: String = "GNMTEncoder")(implicit
+  def apply[S, SS](
+      env: Environment,
+      config: Configuration[S, SS],
+      dataConfig: DataConfig,
+      srcVocabulary: Vocabulary,
+      name: String = "GNMTEncoder"
+  )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): Encoder[S, SS] = {
-    new GNMTEncoder(configuration, name)(evS, evSDropout)
+    new GNMTEncoder(env, config, dataConfig, srcVocabulary, name)(evS, evSDropout)
   }
 }

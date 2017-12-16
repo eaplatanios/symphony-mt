@@ -15,9 +15,9 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.core.Language
+import org.platanios.symphony.mt.core.{Environment, Language}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
-import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.models.rnn.{Configuration, GNMTModel, LSTM}
 import org.platanios.tensorflow.api._
@@ -32,21 +32,13 @@ object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
   val dataDir   : Path = workingDir.resolve("data").resolve("iwslt15.en-vi")
 
-  IWSLT15Loader.load(workingDir.resolve("data"), IWSLT15Loader.EnglishVietnamese)
+  IWSLT15Loader.maybeDownload(workingDir.resolve("data"), IWSLT15Loader.EnglishVietnamese)
 
   // Create the languages and their corresponding vocabularies
-  val enCheck: Option[(Int, Path)] = Vocabulary.check(dataDir.resolve("vocab.en"))
-  val viCheck: Option[(Int, Path)] = Vocabulary.check(dataDir.resolve("vocab.vi"))
-  if (enCheck.isEmpty)
-    throw new IllegalArgumentException("Could not load the english vocabulary file.")
-  if (viCheck.isEmpty)
-    throw new IllegalArgumentException("Could not load the vietnamese vocabulary file.")
-  val enVocabSize: Int      = enCheck.get._1
-  val enVocabPath: Path     = enCheck.get._2
-  val viVocabSize: Int      = viCheck.get._1
-  val viVocabPath: Path     = viCheck.get._2
-  val srcLang    : Language = Language("Vietnamese", "vi", () => Vocabulary.createTable(viVocabPath), viVocabSize)
-  val tgtLang    : Language = Language("English", "en", () => Vocabulary.createTable(enVocabPath), enVocabSize)
+  val srcLang : Language   = Language("Vietnamese", "vi")
+  val tgtLang : Language   = Language("English", "en")
+  val srcVocab: Vocabulary = Vocabulary(dataDir.resolve("vocab.vi"))
+  val tgtVocab: Vocabulary = Vocabulary(dataDir.resolve("vocab.en"))
 
   // Create the datasets
   val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
@@ -57,35 +49,20 @@ object IWSLT15 extends App {
   val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
 
   // Create a translator
+  val env = Environment()
+
   val configuration = Configuration(
     workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
     cell = LSTM(),
-    srcVocabSize = viVocabSize,
-    tgtVocabSize = enVocabSize,
-    srcVocab = srcLang.vocabulary,
-    tgtVocab = tgtLang.vocabulary,
-    numUnits = 128)
+    numUnits = 128,
+    logTrainEvalSteps = 10,
+    logTestEvalSteps = 10)
+
+  val dataConfig = DataConfig()
 
   val model = GNMTModel(
-    configuration, srcLang, tgtLang,
-    srcTrainDataset, tgtTrainDataset,
-    srcDevDataset, tgtDevDataset,
-    srcTestDataset, tgtTestDataset)
+    env, configuration, dataConfig, srcLang, tgtLang, srcVocab, tgtVocab,
+    srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset)
 
   model.train(tf.learn.StopCriteria(Some(10000)))
-
-//  val translator   : Translator    = new PairwiseRNNTranslator(
-//    encoderCell = MultiRNNCell(Seq(
-//      BasicLSTMCell(configuration.modelNumUnits, FLOAT32, forgetBias = 1.0f, name = "EncoderCell1"),
-//      BasicLSTMCell(configuration.modelNumUnits, FLOAT32, forgetBias = 1.0f, name = "EncoderCell2"))),
-//    decoderCell = MultiRNNCell(Seq(
-//      BasicLSTMCell(configuration.modelNumUnits, FLOAT32, forgetBias = 1.0f, name = "DecoderCell1"),
-//      BasicLSTMCell(configuration.modelNumUnits, FLOAT32, forgetBias = 1.0f, name = "DecoderCell2"))),
-//    configuration = configuration)
-//
-//  translator.train(
-//    Seq(Translator.DatasetPair(srcLang, tgtLang, srcTrainDataset, tgtTrainDataset)),
-//    Seq(Translator.DatasetPair(srcLang, tgtLang, srcDevDataset, tgtDevDataset)),
-//    Seq(Translator.DatasetPair(srcLang, tgtLang, srcTestDataset, tgtTestDataset)),
-//    tf.learn.StopCriteria(Some(10000)))
 }
