@@ -69,7 +69,7 @@ class GNMTModel[S, SS](
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val embeddings = variable(
-            "Embeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
+            "EncoderEmbeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
           val embeddedInput = tf.embeddingLookup(embeddings, input._1)
           trainableVariables += embeddings
 
@@ -137,7 +137,7 @@ class GNMTModel[S, SS](
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val embeddings = variable(
-            "Embeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+            "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
           val embeddedInput = tf.embeddingLookup(embeddings, input._1._1)
           trainableVariables += embeddings
 
@@ -173,7 +173,7 @@ class GNMTModel[S, SS](
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val embeddings = variable(
-            "Embeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+            "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
           val embeddedInput = tf.embeddingLookup(embeddings, input._1._1)
           trainableVariables += embeddings
 

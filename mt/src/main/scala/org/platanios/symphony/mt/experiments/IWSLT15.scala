@@ -33,7 +33,7 @@ object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
   val dataDir   : Path = workingDir.resolve("data").resolve("iwslt15.en-vi")
 
-  IWSLT15Loader.maybeDownload(workingDir.resolve("data"), IWSLT15Loader.EnglishVietnamese)
+  IWSLT15Loader.download(workingDir.resolve("data"), IWSLT15Loader.EnglishVietnamese)
 
   // Create the languages and their corresponding vocabularies
   val srcLang : Language   = Language("Vietnamese", "vi")

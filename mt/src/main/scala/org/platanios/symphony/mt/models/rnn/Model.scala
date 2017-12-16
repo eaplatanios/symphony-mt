@@ -22,6 +22,7 @@ import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDatas
 import org.platanios.symphony.mt.metrics.BLEUTensorFlow
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.learn
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.CellInstance
 import org.platanios.tensorflow.api.learn.{EVALUATION, INFERENCE, Mode, StopCriteria}
@@ -83,7 +84,7 @@ trait Model[S, SS] {
       ((Tensor, Tensor), (Tensor, Tensor, Tensor)), ((Output, Output), (Output, Output, Output)),
       ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape)),
       ((Output, Output), (Output, Output, Output))] = tf.createWithNameScope(name) {
-    val model = tf.learn.Model(
+    val model = learn.Model(
       input = input,
       layer = inferLayer,
       trainLayer = trainLayer,
