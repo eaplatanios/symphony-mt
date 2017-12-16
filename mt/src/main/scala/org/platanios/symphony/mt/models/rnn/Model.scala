@@ -20,6 +20,7 @@ import org.platanios.symphony.mt.core.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Datasets, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
 import org.platanios.symphony.mt.metrics.BLEUTensorFlow
+import org.platanios.symphony.mt.models.TrainConfig
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
@@ -38,16 +39,18 @@ trait Model[S, SS] {
   val srcVocabulary: Vocabulary
   val tgtVocabulary: Vocabulary
 
-  val srcTrainDataset: MTTextLinesDataset = null
-  val tgtTrainDataset: MTTextLinesDataset = null
-  val srcDevDataset: MTTextLinesDataset = null
-  val tgtDevDataset: MTTextLinesDataset = null
+  val srcTrainDataset: MTTextLinesDataset
+  val tgtTrainDataset: MTTextLinesDataset
+  val srcDevDataset : MTTextLinesDataset = null
+  val tgtDevDataset : MTTextLinesDataset = null
   val srcTestDataset: MTTextLinesDataset = null
   val tgtTestDataset: MTTextLinesDataset = null
 
-  val env       : Environment
-  val config    : Configuration[S, SS]
-  val dataConfig: DataConfig
+  val config: Configuration[S, SS]
+
+  val env        : Environment = Environment()
+  val dataConfig : DataConfig  = DataConfig()
+  val trainConfig: TrainConfig = TrainConfig()
 
   // Create the input and the train input parts of the model.
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
@@ -80,19 +83,19 @@ trait Model[S, SS] {
       trainInput = trainInput,
       loss = lossLayer,
       optimizer = optimizer,
-      clipGradients = tf.learn.ClipGradientsByGlobalNorm(config.trainMaxGradNorm),
-      colocateGradientsWithOps = config.trainColocateGradientsWithOps)
+      clipGradients = tf.learn.ClipGradientsByGlobalNorm(trainConfig.maxGradNorm),
+      colocateGradientsWithOps = trainConfig.colocateGradientsWithOps)
     val summariesDir = config.workingDir.resolve("summaries")
     val tensorBoardConfig = {
-      if (config.trainLaunchTensorBoard)
+      if (trainConfig.launchTensorBoard)
         tf.learn.TensorBoardConfig(summariesDir, reloadInterval = 1)
       else
         null
     }
     var hooks = Set[tf.learn.Hook](
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-      tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.trainSummarySteps)),
-      tf.learn.CheckpointSaver(config.workingDir, StepHookTrigger(config.trainCheckpointSteps)))
+      tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainConfig.summarySteps)),
+      tf.learn.CheckpointSaver(config.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
     if (config.logLossSteps > 0)
       hooks += PerplexityLogger(log = true, trigger = StepHookTrigger(config.logLossSteps))
     if (config.logTrainEvalSteps > 0 && srcTrainDataset != null && tgtTrainDataset != null)
@@ -115,7 +118,7 @@ trait Model[S, SS] {
         triggerAtEnd = true, name = "Test Evaluation")
     tf.learn.InMemoryEstimator(
       model, tf.learn.Configuration(Some(config.workingDir), randomSeed = env.randomSeed),
-      StopCriteria(Some(config.trainNumSteps)), hooks, tensorBoardConfig = tensorBoardConfig)
+      StopCriteria(Some(trainConfig.numSteps)), hooks, tensorBoardConfig = tensorBoardConfig)
   }
 
   protected def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
@@ -171,16 +174,16 @@ trait Model[S, SS] {
 
   protected def optimizer: tf.train.Optimizer = {
     val decay = ExponentialDecay(
-      config.trainLearningRateDecayRate,
-      config.trainLearningRateDecaySteps,
+      trainConfig.learningRateDecayRate,
+      trainConfig.learningRateDecaySteps,
       staircase = true,
-      config.trainLearningRateDecayStartStep)
-    config.trainOptimizer(config.trainLearningRateInitial, decay)
+      trainConfig.learningRateDecayStartStep)
+    trainConfig.optimizer(trainConfig.learningRateInitial, decay)
   }
 
-  def train(stopCriteria: StopCriteria = StopCriteria(Some(config.trainNumSteps))): Unit = {
+  def train(stopCriteria: StopCriteria = StopCriteria(Some(trainConfig.numSteps))): Unit = {
     val trainDataset = () => createTrainDataset(
-      srcTrainDataset, tgtTrainDataset, config.trainBatchSize, repeat = true, dataConfig.numBuckets)
+      srcTrainDataset, tgtTrainDataset, trainConfig.batchSize, repeat = true, dataConfig.numBuckets)
     estimator.train(trainDataset, stopCriteria)
   }
 }

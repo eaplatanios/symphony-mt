@@ -16,8 +16,6 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
-import org.platanios.tensorflow.api.ops.training.optimizers.decay.Decay
 
 import java.nio.file.{Path, Paths}
 
@@ -40,19 +38,6 @@ case class Configuration[S, SS](
     decoderAttentionArchitecture: AttentionArchitecture = StandardAttention,
     decoderOutputAttention: Boolean = false,
     decoderMaxLengthFactor: Float = 2.0f,
-    // Training
-    trainBatchSize: Int = 128,
-    trainMaxGradNorm: Float = 5.0f,
-    trainNumSteps: Int = 12000,
-    trainOptimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
-    trainLearningRateInitial: Float = 1.0f,
-    trainLearningRateDecayRate: Float = 1.0f,
-    trainLearningRateDecaySteps: Int = 10000,
-    trainLearningRateDecayStartStep: Int = 0,
-    trainSummarySteps: Int = 100,
-    trainCheckpointSteps: Int = 1000,
-    trainColocateGradientsWithOps: Boolean = true,
-    trainLaunchTensorBoard: Boolean = true,
     // Inference
     inferBatchSize: Int = 32,
     inferBeamWidth: Int = 1,

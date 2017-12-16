@@ -40,11 +40,11 @@ trait Decoder[S, SS] {
 }
 
 class GNMTDecoder[S, SS](
-    override val env: Environment,
     val config: Configuration[S, SS],
-    override val dataConfig: DataConfig,
     val srcVocabulary: Vocabulary,
     val tgtVocabulary: Vocabulary,
+    override val env: Environment,
+    override val dataConfig: DataConfig,
     override val name: String = "GNMTDecoder"
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
@@ -243,16 +243,16 @@ class GNMTDecoder[S, SS](
 
 object GNMTDecoder {
   def apply[S, SS](
-      env: Environment,
       config: Configuration[S, SS],
-      dataConfig: DataConfig,
       srcVocabulary: Vocabulary,
       tgtVocabulary: Vocabulary,
+      env: Environment,
+      dataConfig: DataConfig,
       name: String = "GNMTDecoder"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): GNMTDecoder[S, SS] = {
-    new GNMTDecoder(env, config, dataConfig, srcVocabulary, tgtVocabulary, name)(evS, evSDropout)
+    new GNMTDecoder(config, srcVocabulary, tgtVocabulary, env, dataConfig, name)(evS, evSDropout)
   }
 }

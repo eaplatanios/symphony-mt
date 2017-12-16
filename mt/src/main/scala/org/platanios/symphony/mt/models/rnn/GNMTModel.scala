@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.symphony.mt.core.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
+import org.platanios.symphony.mt.models.TrainConfig
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 
@@ -25,9 +26,7 @@ import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
   * @author Emmanouil Antonios Platanios
   */
 class GNMTModel[S, SS](
-    override val env: Environment,
     override val config: Configuration[S, SS],
-    override val dataConfig: DataConfig,
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     override val srcVocabulary: Vocabulary,
@@ -38,6 +37,9 @@ class GNMTModel[S, SS](
     override val tgtDevDataset: MTTextLinesDataset = null,
     override val srcTestDataset: MTTextLinesDataset = null,
     override val tgtTestDataset: MTTextLinesDataset = null,
+    override val env: Environment = Environment(),
+    override val trainConfig: TrainConfig = TrainConfig(),
+    override val dataConfig: DataConfig = DataConfig(),
     override val name: String = "GNMTModel"
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
@@ -54,9 +56,7 @@ class GNMTModel[S, SS](
 
 object GNMTModel {
   def apply[S, SS](
-      env: Environment,
       config: Configuration[S, SS],
-      dataConfig: DataConfig,
       srcLanguage: Language,
       tgtLanguage: Language,
       srcVocabulary: Vocabulary,
@@ -67,13 +67,16 @@ object GNMTModel {
       tgtDevDataset: MTTextLinesDataset = null,
       srcTestDataset: MTTextLinesDataset = null,
       tgtTestDataset: MTTextLinesDataset = null,
+      env: Environment = Environment(),
+      trainConfig: TrainConfig = TrainConfig(),
+      dataConfig: DataConfig = DataConfig(),
       name: String = "GNMTModel"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): GNMTModel[S, SS] = {
     new GNMTModel[S, SS](
-      env, config, dataConfig, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary,
-      srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset)
+      config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary, srcTrainDataset, tgtTrainDataset, srcDevDataset,
+      tgtDevDataset, srcTestDataset, tgtTestDataset, env, trainConfig, dataConfig, name)
   }
 }

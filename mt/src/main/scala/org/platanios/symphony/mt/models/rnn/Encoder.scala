@@ -39,10 +39,10 @@ trait Encoder[S, SS] {
 }
 
 class GNMTEncoder[S, SS](
-    override val env: Environment,
     val config: Configuration[S, SS],
-    override val dataConfig: DataConfig,
     val srcVocabulary: Vocabulary,
+    override val env: Environment,
+    override val dataConfig: DataConfig,
     override val name: String = "GNMTEncoder"
 )(implicit
   evS: WhileLoopVariable.Aux[S, SS],
@@ -121,15 +121,15 @@ class GNMTEncoder[S, SS](
 
 object GNMTEncoder {
   def apply[S, SS](
-      env: Environment,
       config: Configuration[S, SS],
-      dataConfig: DataConfig,
       srcVocabulary: Vocabulary,
+      env: Environment,
+      dataConfig: DataConfig,
       name: String = "GNMTEncoder"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): Encoder[S, SS] = {
-    new GNMTEncoder(env, config, dataConfig, srcVocabulary, name)(evS, evSDropout)
+    new GNMTEncoder(config, srcVocabulary, env, dataConfig, name)(evS, evSDropout)
   }
 }
