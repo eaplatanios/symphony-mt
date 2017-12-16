@@ -38,10 +38,6 @@ case class Configuration[S, SS](
     decoderAttentionArchitecture: AttentionArchitecture = StandardAttention,
     decoderOutputAttention: Boolean = false,
     decoderMaxLengthFactor: Float = 2.0f,
-    // Inference
-    inferBatchSize: Int = 32,
-    inferBeamWidth: Int = 1,
-    inferLengthPenaltyWeight: Float = 0.0f,
     // Logging
     logLossSteps: Int = 100,
     logEvalBatchSize: Int = 512,

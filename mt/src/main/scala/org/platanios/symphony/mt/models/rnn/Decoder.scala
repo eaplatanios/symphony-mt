@@ -17,6 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.core.Environment
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
+import org.platanios.symphony.mt.models.InferConfig
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.{EVALUATION, INFERENCE, Mode}
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.CellInstance
@@ -32,8 +33,9 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSear
 trait Decoder[S, SS] {
   val name: String = "Decoder"
 
-  val env       : Environment
-  val dataConfig: DataConfig
+  val env        : Environment
+  val dataConfig : DataConfig
+  val inferConfig: InferConfig
 
   def trainLayer: Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]
   def inferLayer: Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]
@@ -45,6 +47,7 @@ class GNMTDecoder[S, SS](
     val tgtVocabulary: Vocabulary,
     override val env: Environment,
     override val dataConfig: DataConfig,
+    override val inferConfig: InferConfig,
     override val name: String = "GNMTDecoder"
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
@@ -208,11 +211,11 @@ class GNMTDecoder[S, SS](
       val tgtVocabLookupTable = tgtVocabulary.lookupTable()
       val tgtBosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
       val tgtEosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-      if (config.inferBeamWidth > 1) {
+      if (inferConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
           cellInstance.cell, inputState,
-          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID, config.inferBeamWidth,
-          GooglePenalty(config.inferLengthPenaltyWeight), outputLayer)
+          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID, inferConfig.beamWidth,
+          GooglePenalty(inferConfig.lengthPenaltyWeight), outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = dataConfig.timeMajor,
           maximumIterations = inferMaxLength(tf.max(inputSequenceLengths)),
@@ -248,11 +251,12 @@ object GNMTDecoder {
       tgtVocabulary: Vocabulary,
       env: Environment,
       dataConfig: DataConfig,
+      inferConfig: InferConfig,
       name: String = "GNMTDecoder"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): GNMTDecoder[S, SS] = {
-    new GNMTDecoder(config, srcVocabulary, tgtVocabulary, env, dataConfig, name)(evS, evSDropout)
+    new GNMTDecoder(config, srcVocabulary, tgtVocabulary, env, dataConfig, inferConfig, name)(evS, evSDropout)
   }
 }

@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.core.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Datasets, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
 import org.platanios.symphony.mt.metrics.BLEUTensorFlow
-import org.platanios.symphony.mt.models.TrainConfig
+import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
@@ -51,6 +51,7 @@ trait Model[S, SS] {
   val env        : Environment = Environment()
   val dataConfig : DataConfig  = DataConfig()
   val trainConfig: TrainConfig = TrainConfig()
+  val inferConfig: InferConfig = InferConfig()
 
   // Create the input and the train input parts of the model.
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))

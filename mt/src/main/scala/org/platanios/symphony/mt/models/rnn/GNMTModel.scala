@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.symphony.mt.core.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
-import org.platanios.symphony.mt.models.TrainConfig
+import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 
@@ -38,19 +38,20 @@ class GNMTModel[S, SS](
     override val srcTestDataset: MTTextLinesDataset = null,
     override val tgtTestDataset: MTTextLinesDataset = null,
     override val env: Environment = Environment(),
-    override val trainConfig: TrainConfig = TrainConfig(),
     override val dataConfig: DataConfig = DataConfig(),
+    override val trainConfig: TrainConfig = TrainConfig(),
+    override val inferConfig: InferConfig = InferConfig(),
     override val name: String = "GNMTModel"
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Model[S, SS] {
   override protected def encoder: Encoder[S, SS] = {
-    GNMTEncoder(env, config, dataConfig, srcVocabulary, "Encoder")(evS, evSDropout)
+    GNMTEncoder(config, srcVocabulary, env, dataConfig, "Encoder")(evS, evSDropout)
   }
 
   override protected def decoder: Decoder[S, SS] = {
-    GNMTDecoder(env, config, dataConfig, srcVocabulary, tgtVocabulary, "Decoder")(evS, evSDropout)
+    GNMTDecoder(config, srcVocabulary, tgtVocabulary, env, dataConfig, inferConfig, "Decoder")(evS, evSDropout)
   }
 }
 
@@ -68,8 +69,9 @@ object GNMTModel {
       srcTestDataset: MTTextLinesDataset = null,
       tgtTestDataset: MTTextLinesDataset = null,
       env: Environment = Environment(),
-      trainConfig: TrainConfig = TrainConfig(),
       dataConfig: DataConfig = DataConfig(),
+      trainConfig: TrainConfig = TrainConfig(),
+      inferConfig: InferConfig = InferConfig(),
       name: String = "GNMTModel"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
@@ -77,6 +79,6 @@ object GNMTModel {
   ): GNMTModel[S, SS] = {
     new GNMTModel[S, SS](
       config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary, srcTrainDataset, tgtTrainDataset, srcDevDataset,
-      tgtDevDataset, srcTestDataset, tgtTestDataset, env, trainConfig, dataConfig, name)
+      tgtDevDataset, srcTestDataset, tgtTestDataset, env, dataConfig, trainConfig, inferConfig, name)
   }
 }

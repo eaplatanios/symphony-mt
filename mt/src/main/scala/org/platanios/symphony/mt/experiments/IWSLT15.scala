@@ -19,11 +19,13 @@ import org.platanios.symphony.mt.core.{Environment, Language}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
+import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
 import org.platanios.symphony.mt.models.rnn.{Configuration, GNMTModel, LSTM}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 
 import java.nio.file.{Path, Paths}
+
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -59,10 +61,13 @@ object IWSLT15 extends App {
     logTestEvalSteps = 10)
 
   val dataConfig = DataConfig()
+  val trainConfig = TrainConfig()
+  val inferConfig = InferConfig()
 
   val model = GNMTModel(
-    env, configuration, dataConfig, srcLang, tgtLang, srcVocab, tgtVocab,
-    srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset)
+    configuration, srcLang, tgtLang, srcVocab, tgtVocab,
+    srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
+    env, dataConfig, trainConfig, inferConfig)
 
   model.train(tf.learn.StopCriteria(Some(10000)))
 }
