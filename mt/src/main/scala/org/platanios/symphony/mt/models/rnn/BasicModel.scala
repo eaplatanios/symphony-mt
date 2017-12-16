@@ -61,6 +61,7 @@ class BasicModel[S, SS](
           mode: Mode
       ): LayerInstance[(Output, Output), Tuple[Output, Seq[S]]] = {
         val dataType = config.dataType
+        val numResLayers = if (config.residual && config.numLayers > 1) config.numLayers - 1 else 0
         tf.createWithNameScope(uniquifiedName) {
           // Keep track of trainable and non-trainable variables
           var trainableVariables = Set.empty[Variable]
@@ -76,7 +77,7 @@ class BasicModel[S, SS](
           val tuple = config.encoderType match {
             case BasicModel.UnidirectionalEncoder =>
               val uniCell = Model.multiCell(
-                config.cell, config.numUnits, dataType, config.numLayers, config.numResLayers, config.dropout,
+                config.cell, config.numUnits, dataType, config.numLayers, numResLayers, config.dropout,
                 config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiUniCell")
               val uniCellInstance = uniCell.createCell(mode, embeddedInput.shape)
               trainableVariables ++= uniCellInstance.trainableVariables
@@ -85,13 +86,11 @@ class BasicModel[S, SS](
                 uniCellInstance.cell, embeddedInput, null, dataConfig.timeMajor, env.parallelIterations,
                 env.swapMemory, input._2, s"$uniquifiedName/UnidirectionalLayers")
             case BasicModel.BidirectionalEncoder =>
-              require(config.numLayers % 2 == 0, "Layers number must be even for bidirectional encoders.")
-              require(config.numResLayers % 2 == 0, "Residual layers number must be even for bidirectional encoders.")
               val biCellFw = Model.multiCell(
-                config.cell, config.numUnits, dataType, config.numLayers / 2, config.numResLayers / 2, config.dropout,
+                config.cell, config.numUnits, dataType, config.numLayers / 2, numResLayers / 2, config.dropout,
                 config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiBiCellFw")
               val biCellBw = Model.multiCell(
-                config.cell, config.numUnits, dataType, config.numLayers / 2, config.numResLayers / 2, config.dropout,
+                config.cell, config.numUnits, dataType, config.numLayers / 2, numResLayers / 2, config.dropout,
                 config.residualFn, config.numLayers / 2, env.numGPUs, env.randomSeed, s"$name/MultiBiCellBw")
               val biCellInstanceFw = biCellFw.createCell(mode, embeddedInput.shape)
               val biCellInstanceBw = biCellBw.createCell(mode, embeddedInput.shape)
@@ -194,10 +193,11 @@ class BasicModel[S, SS](
       mode: Mode
   ): ((Output, Output), Set[Variable], Set[Variable]) = {
     val dataType = config.dataType
+    val numResLayers = if (config.residual && config.numLayers > 1) config.numLayers - 1 else 0
     config.decoderAttention match {
       case None =>
         val cellInstance = Model.multiCell(
-          config.cell, config.numUnits, dataType, config.numLayers, config.numResLayers, config.dropout,
+          config.cell, config.numUnits, dataType, config.numLayers, numResLayers, config.dropout,
           config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiCell").createCell(mode, embeddedInput.shape)
         (decode(
           inputSequenceLengths, inputState, embeddings, embeddedInput, cellInstance, variableFn, isTrain, mode),
@@ -206,12 +206,12 @@ class BasicModel[S, SS](
         // Ensure memory is batch-major
         val memory = if (dataConfig.timeMajor) encoderOutput.transpose(Tensor(1, 0, 2)) else encoderOutput
         val memoryWeights = variableFn("MemoryWeights", dataType, Shape(memory.shape(-1), config.numUnits), null)
-        val attention = a.create(memory, memoryWeights.value, inputSequenceLengths, "Attention")
+        val attention = a.create(memory, memoryWeights.value, inputSequenceLengths, variableFn, "Attention")
         val attentionWeights = variableFn(
           "AttentionWeights", attention.dataType,
           Shape(config.numUnits + memory.shape(-1), config.numUnits), null)
         val cell = Model.multiCell(
-          config.cell, config.numUnits, dataType, config.numLayers, config.numResLayers, config.dropout,
+          config.cell, config.numUnits, dataType, config.numLayers, numResLayers, config.dropout,
           config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiCell")
         val cellInstance = cell.createCell(mode, Shape(embeddedInput.shape(-1) + config.numUnits))
         val attentionCell = tf.AttentionWrapperCell(
@@ -265,7 +265,7 @@ object BasicModel {
       cell: Cell[S, SS],
       numUnits: Int,
       numLayers: Int = 1,
-      numResLayers: Int = 0,
+      residual: Boolean = false,
       encoderType: BasicModel.EncoderType = BasicModel.UnidirectionalEncoder,
       dataType: DataType = FLOAT32,
       dropout: Option[Float] = None,

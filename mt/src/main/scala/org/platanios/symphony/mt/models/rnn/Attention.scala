@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.ops.variables.OnesInitializer
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -25,12 +26,13 @@ trait Attention {
       memory: Output,
       memoryWeights: Output,
       memorySequenceLengths: Output = null,
+      variableFn: (String, DataType, Shape, tf.VariableInitializer) => Variable,
       name: String = "Attention"
   ): tf.Attention
 }
 
 case class LuongAttention(
-    scale: Float = 1.0f,
+    scaled: Boolean = false,
     probabilityFn: (Output) => Output = tf.softmax(_, name = "Probability"),
     scoreMask: Float = Float.NegativeInfinity
 ) extends Attention {
@@ -38,8 +40,10 @@ case class LuongAttention(
       memory: Output,
       memoryWeights: Output,
       memorySequenceLengths: Output = null,
+      variableFn: (String, DataType, Shape, tf.VariableInitializer) => Variable,
       name: String = "LuongAttention"
   ): tf.Attention = {
+    val scale = if (scaled) variableFn("LuongFactor", memory.dataType, Shape.scalar(), OnesInitializer) else null
     tf.LuongAttention(memory, memoryWeights, memorySequenceLengths, scale, probabilityFn, scoreMask, name)
   }
 }

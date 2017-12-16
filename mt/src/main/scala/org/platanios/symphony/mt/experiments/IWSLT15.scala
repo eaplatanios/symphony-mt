@@ -20,9 +20,10 @@ import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
-import org.platanios.symphony.mt.models.rnn.{BasicModel, LSTM}
+import org.platanios.symphony.mt.models.rnn.{BasicModel, LSTM, LuongAttention}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
+import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
 import java.nio.file.{Path, Paths}
 
@@ -50,13 +51,40 @@ object IWSLT15 extends App {
   val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
 
   // Create a translator
-  val config = BasicModel.Config(cell = LSTM(), numUnits = 128)
+  val config = BasicModel.Config(
+    cell = LSTM(forgetBias = 1.0f),
+    numUnits = 512,
+    numLayers = 2,
+    residual = false,
+    dropout = Some(0.2f),
+    encoderType = BasicModel.BidirectionalEncoder,
+    decoderAttention = Some(LuongAttention(scaled = true)))
 
   val env = Environment(workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"))
-  val dataConfig = DataConfig()
-  val trainConfig = TrainConfig()
-  val inferConfig = InferConfig()
-  val logConfig = LogConfig()
+
+  val dataConfig = DataConfig(
+    numBuckets = 5,
+    srcMaxLength = 50,
+    tgtMaxLength = 50,
+    timeMajor = false) // TODO: Why do they set this to true?
+
+  val trainConfig = TrainConfig(
+    batchSize = 128,
+    maxGradNorm = 5.0f,
+    numSteps = 12000,
+    optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
+    learningRateInitial = 1.0f,
+    learningRateDecayRate = 0.5f,
+    learningRateDecaySteps = 12000 * 1 / (3 * 4),
+    learningRateDecayStartStep = 12000 * 2 / 3,
+    colocateGradientsWithOps = true)
+
+  val inferConfig = InferConfig(
+    batchSize = 32,
+    beamWidth = 1)
+
+  val logConfig = LogConfig(
+    logLossSteps = 100)
 
   val model = BasicModel(
     config, srcLang, tgtLang, srcVocab, tgtVocab,
