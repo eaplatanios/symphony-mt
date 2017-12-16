@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
-import org.platanios.symphony.mt.models.rnn.{BasicModel, LSTM, LuongAttention, ModelConfig}
+import org.platanios.symphony.mt.models.rnn.{BasicModel, LSTM, LuongAttention, RNNConfig}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
@@ -60,9 +60,13 @@ object IWSLT15 extends App {
     encoderType = BasicModel.BidirectionalEncoder,
     decoderAttention = Some(LuongAttention(scaled = true)))
 
-  val env = Environment(workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"))
+  val env = Environment(
+    workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"))
 
-  val modelConfig = ModelConfig(timeMajor = true)
+  val modelConfig = RNNConfig(
+    timeMajor = true,
+    parallelIterations = 32,
+    swapMemory = true)
 
   val dataConfig = DataConfig(
     numBuckets = 5,

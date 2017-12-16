@@ -18,8 +18,7 @@ package org.platanios.symphony.mt.models.rnn
 /**
   * @author Emmanouil Antonios Platanios
   */
-class ModelConfig(val timeMajor: Boolean = false)
-
-object ModelConfig {
-  def apply(timeMajor: Boolean = false): ModelConfig = new ModelConfig(timeMajor)
-}
+case class RNNConfig(
+    timeMajor: Boolean = false,
+    parallelIterations: Int = 32,
+    swapMemory: Boolean = true)

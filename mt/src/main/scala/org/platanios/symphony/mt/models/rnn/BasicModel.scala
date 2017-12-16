@@ -43,7 +43,7 @@ class BasicModel[S, SS](
     override val srcTestDataset: MTTextLinesDataset = null,
     override val tgtTestDataset: MTTextLinesDataset = null,
     override val env: Environment = Environment(),
-    override val modelConfig: ModelConfig = ModelConfig(),
+    override val rnnConfig: RNNConfig = RNNConfig(),
     override val dataConfig: DataConfig = DataConfig(),
     override val trainConfig: TrainConfig = TrainConfig(),
     override val inferConfig: InferConfig = InferConfig(),
@@ -68,7 +68,7 @@ class BasicModel[S, SS](
           var trainableVariables = Set.empty[Variable]
           var nonTrainableVariables = Set.empty[Variable]
 
-          val inputSequence = if (modelConfig.timeMajor) input._1.transpose() else input._1
+          val inputSequence = if (rnnConfig.timeMajor) input._1.transpose() else input._1
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
@@ -86,8 +86,8 @@ class BasicModel[S, SS](
               trainableVariables ++= uniCellInstance.trainableVariables
               nonTrainableVariables ++= uniCellInstance.nonTrainableVariables
               tf.dynamicRNN(
-                uniCellInstance.cell, embeddedInput, null, modelConfig.timeMajor, env.parallelIterations,
-                env.swapMemory, input._2, s"$uniquifiedName/UnidirectionalLayers")
+                uniCellInstance.cell, embeddedInput, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
+                rnnConfig.swapMemory, input._2, s"$uniquifiedName/UnidirectionalLayers")
             case BasicModel.BidirectionalEncoder =>
               val biCellFw = Model.multiCell(
                 config.cell, config.numUnits, dataType, config.numLayers / 2, numResLayers / 2, config.dropout,
@@ -98,8 +98,8 @@ class BasicModel[S, SS](
               val biCellInstanceFw = biCellFw.createCell(mode, embeddedInput.shape)
               val biCellInstanceBw = biCellBw.createCell(mode, embeddedInput.shape)
               val unmergedBiTuple = tf.bidirectionalDynamicRNN(
-                biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, modelConfig.timeMajor,
-                env.parallelIterations, env.swapMemory, input._2,
+                biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, rnnConfig.timeMajor,
+                rnnConfig.parallelIterations, rnnConfig.swapMemory, input._2,
                 s"$uniquifiedName/BidirectionalLayers")
               trainableVariables ++= biCellInstanceFw.trainableVariables ++ biCellInstanceBw.trainableVariables
               nonTrainableVariables ++= biCellInstanceFw.nonTrainableVariables ++ biCellInstanceBw.nonTrainableVariables
@@ -207,7 +207,7 @@ class BasicModel[S, SS](
             cellInstance.trainableVariables, cellInstance.nonTrainableVariables)
       case Some(a) =>
         // Ensure memory is batch-major
-        val memory = if (dataConfig.timeMajor) encoderOutput.transpose(Tensor(1, 0, 2)) else encoderOutput
+        val memory = if (rnnConfig.timeMajor) encoderOutput.transpose(Tensor(1, 0, 2)) else encoderOutput
         val memoryWeights = variableFn("MemoryWeights", dataType, Shape(memory.shape(-1), config.numUnits), null)
         val attention = a.create(memory, memoryWeights.value, inputSequenceLengths, variableFn, "Attention")
         val attentionWeights = variableFn(
@@ -246,7 +246,7 @@ object BasicModel {
       srcTestDataset: MTTextLinesDataset = null,
       tgtTestDataset: MTTextLinesDataset = null,
       env: Environment = Environment(),
-      modelConfig: ModelConfig = ModelConfig(),
+      rnnConfig: RNNConfig = RNNConfig(),
       dataConfig: DataConfig = DataConfig(),
       trainConfig: TrainConfig = TrainConfig(),
       inferConfig: InferConfig = InferConfig(),
@@ -258,7 +258,7 @@ object BasicModel {
   ): BasicModel[S, SS] = {
     new BasicModel[S, SS](
       config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary, srcTrainDataset, tgtTrainDataset, srcDevDataset,
-      tgtDevDataset, srcTestDataset, tgtTestDataset, env, modelConfig, dataConfig, trainConfig, inferConfig, logConfig,
+      tgtDevDataset, srcTestDataset, tgtTestDataset, env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig,
       name)
   }
 
