@@ -33,6 +33,8 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSear
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
 import org.platanios.tensorflow.api.types.DataType
 
+// TODO: Customize evaluation metrics, hooks, etc.
+
 /**
   * @author Emmanouil Antonios Platanios
   */

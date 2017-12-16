@@ -15,12 +15,12 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.core.{Environment, Language}
+import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
-import org.platanios.symphony.mt.models.rnn.{GNMTConfig, GNMTModel, LSTM}
+import org.platanios.symphony.mt.models.rnn.{BasicModel, LSTM}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 
@@ -50,21 +50,18 @@ object IWSLT15 extends App {
   val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
 
   // Create a translator
-  val configuration = GNMTConfig(
-    cell = LSTM(),
-    numUnits = 128,
-    logTrainEvalSteps = 10,
-    logTestEvalSteps = 10)
+  val config = BasicModel.Config(cell = LSTM(), numUnits = 128)
 
   val env = Environment(workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"))
   val dataConfig = DataConfig()
   val trainConfig = TrainConfig()
   val inferConfig = InferConfig()
+  val logConfig = LogConfig()
 
-  val model = GNMTModel(
-    configuration, srcLang, tgtLang, srcVocab, tgtVocab,
+  val model = BasicModel(
+    config, srcLang, tgtLang, srcVocab, tgtVocab,
     srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
-    env, dataConfig, trainConfig, inferConfig)
+    env, dataConfig, trainConfig, inferConfig, logConfig, "BasicModel")
 
   model.train(tf.learn.StopCriteria(Some(10000)))
 }
