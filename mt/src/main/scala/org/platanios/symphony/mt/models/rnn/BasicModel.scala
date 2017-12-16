@@ -129,11 +129,13 @@ class BasicModel[S, SS](
           var trainableVariables = Set.empty[Variable]
           var nonTrainableVariables = Set.empty[Variable]
 
+          val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
+
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val embeddings = variable(
             "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, input._1._1)
+          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
           // Decoder
@@ -165,11 +167,13 @@ class BasicModel[S, SS](
           var trainableVariables = Set.empty[Variable]
           var nonTrainableVariables = Set.empty[Variable]
 
+          val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
+
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val embeddings = variable(
             "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, input._1._1)
+          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
           // Decoder

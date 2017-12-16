@@ -173,17 +173,18 @@ trait Model[S, SS] {
   }
 
   protected def lossLayer: Layer[((Output, Output), (Output, Output, Output)), Output] = {
-    new tf.learn.Layer[((Output, Output), (Output, Output, Output)), Output]("GNMTModelLoss") {
-      override val layerType: String = "GNMTModelLoss"
+    new Layer[((Output, Output), (Output, Output, Output)), Output]("ModelLoss") {
+      override val layerType: String = "ModelLoss"
 
       override def forward(
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = {
-        val targetSequence = if (rnnConfig.timeMajor) input._2._2.transpose() else input._2._2
+        val predictedSequence = if (rnnConfig.timeMajor) input._1._1.transpose(Tensor(1, 0, 2)) else input._1._1
+        val targetSequence = input._2._2
         val loss = tf.sum(tf.sequenceLoss(
-          input._1._1, targetSequence,
-          weights = tf.sequenceMask(input._1._2, tf.shape(input._1._1)(1), dataType = input._1._1.dataType),
+          predictedSequence, targetSequence,
+          weights = tf.sequenceMask(input._1._2, tf.shape(predictedSequence)(1), dataType = input._1._1.dataType),
           averageAcrossTimeSteps = false, averageAcrossBatch = true))
         tf.summary.scalar("Loss", loss)
         LayerInstance(input, loss)
@@ -234,7 +235,7 @@ trait Model[S, SS] {
         case _ => (tuple._1.rnnOutput, lengths)
       }
     } else {
-      val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, o)
+      val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, if (rnnConfig.timeMajor) o.transpose() else o)
       val tgtVocabLookupTable = tgtVocabulary.lookupTable()
       val tgtBosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
       val tgtEosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
