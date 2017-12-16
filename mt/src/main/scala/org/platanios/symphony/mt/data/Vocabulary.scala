@@ -30,7 +30,7 @@ import scala.collection.mutable
   *
   * @author Emmanouil Antonios Platanios
   */
-case class Vocabulary(path: Path, size: Int, dataConfig: DataConfiguration) {
+case class Vocabulary(path: Path, size: Int, dataConfig: DataConfig) {
   /** Creates a vocabulary lookup table (from word string to word ID), from the provided vocabulary file.
     *
     * @return Vocabulary lookup table.
@@ -67,7 +67,7 @@ object Vocabulary {
   @throws[IllegalArgumentException]
   def apply(
       file: Path, checkSpecialTokens: Boolean = true, directory: Path = null,
-      dataConfig: DataConfiguration = DataConfiguration()
+      dataConfig: DataConfig = DataConfig()
   ): Vocabulary = {
     val check = Vocabulary.check(
       file, checkSpecialTokens, directory,

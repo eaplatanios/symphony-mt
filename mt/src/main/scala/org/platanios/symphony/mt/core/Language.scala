@@ -15,14 +15,12 @@
 
 package org.platanios.symphony.mt.core
 
-import org.platanios.tensorflow.api._
-
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class Language(name: String, abbreviation: String, vocabulary: () => tf.LookupTable, vocabularySize: Int) {
+case class Language(name: String, abbreviation: String) {
   val id: Int = Language.currentId.getAndIncrement()
 }
 

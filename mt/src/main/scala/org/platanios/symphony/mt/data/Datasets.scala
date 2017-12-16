@@ -38,7 +38,7 @@ object Datasets {
   def createInferDataset(
       srcDataset: MTTextLinesDataset,
       srcVocabularyTable: tf.LookupTable,
-      dataConfig: DataConfiguration,
+      dataConfig: DataConfig,
       batchSize: Int
   ): MTInferDataset = {
     val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
@@ -75,7 +75,7 @@ object Datasets {
       tgtDataset: MTTextLinesDataset,
       srcVocabularyTable: tf.LookupTable,
       tgtVocabularyTable: tf.LookupTable,
-      dataConfig: DataConfiguration,
+      dataConfig: DataConfig,
       batchSize: Int,
       repeat: Boolean = true,
       randomSeed: Option[Int] = None

@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.data
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class DataConfiguration(
+case class DataConfig(
     // Corpus
     numBuckets: Int = 5,
     srcMaxLength: Int = 50,
