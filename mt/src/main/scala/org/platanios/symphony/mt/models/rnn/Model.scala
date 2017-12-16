@@ -154,8 +154,17 @@ trait Model[S, SS] {
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
         val encLayerInstance = encoder(input, mode)
         val decLayerInstance = inferDecoder((input, encLayerInstance.output), mode)
+        // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time] when using beam search.
+        val outputSequence = {
+          if (dataConfig.timeMajor)
+            decLayerInstance.output._1.transpose()
+          else if (decLayerInstance.output._1.rank == 3)
+            decLayerInstance.output._1.transpose(Tensor(2, 0, 1))
+          else
+            decLayerInstance.output._1
+        }
         LayerInstance(
-          input, decLayerInstance.output,
+          input, (outputSequence, decLayerInstance.output._2),
           encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
           encLayerInstance.nonTrainableVariables ++ decLayerInstance.nonTrainableVariables)
       }
@@ -170,8 +179,9 @@ trait Model[S, SS] {
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = {
+        val targetSequence = if (dataConfig.timeMajor) input._2._2.transpose() else input._2._2
         val loss = tf.sum(tf.sequenceLoss(
-          input._1._1, input._2._2,
+          input._1._1, targetSequence,
           weights = tf.sequenceMask(input._1._2, tf.shape(input._1._1)(1), dataType = input._1._1.dataType),
           averageAcrossTimeSteps = false, averageAcrossBatch = true))
         tf.summary.scalar("Loss", loss)

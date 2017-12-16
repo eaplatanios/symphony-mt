@@ -66,11 +66,13 @@ class GNMTModel[S, SS](
           var trainableVariables = Set.empty[Variable]
           var nonTrainableVariables = Set.empty[Variable]
 
+          val inputSequence = if (dataConfig.timeMajor) input._1.transpose() else input._1
+
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val embeddings = variable(
             "EncoderEmbeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, input._1)
+          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
           // Bidirectional Layers

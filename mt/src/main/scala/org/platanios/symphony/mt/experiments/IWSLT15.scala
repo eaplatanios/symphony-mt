@@ -66,7 +66,7 @@ object IWSLT15 extends App {
     numBuckets = 5,
     srcMaxLength = 50,
     tgtMaxLength = 50,
-    timeMajor = false) // TODO: Why do they set this to true?
+    timeMajor = true)
 
   val trainConfig = TrainConfig(
     batchSize = 128,
