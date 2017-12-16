@@ -43,6 +43,7 @@ class GNMTModel[S, SS](
     override val srcTestDataset: MTTextLinesDataset = null,
     override val tgtTestDataset: MTTextLinesDataset = null,
     override val env: Environment = Environment(),
+    override val modelConfig: ModelConfig = ModelConfig(),
     override val dataConfig: DataConfig = DataConfig(),
     override val trainConfig: TrainConfig = TrainConfig(),
     override val inferConfig: InferConfig = InferConfig(),
@@ -66,7 +67,7 @@ class GNMTModel[S, SS](
           var trainableVariables = Set.empty[Variable]
           var nonTrainableVariables = Set.empty[Variable]
 
-          val inputSequence = if (dataConfig.timeMajor) input._1.transpose() else input._1
+          val inputSequence = if (modelConfig.timeMajor) input._1.transpose() else input._1
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
@@ -89,7 +90,7 @@ class GNMTModel[S, SS](
               val biCellInstanceFw = biCellFw.createCell(mode, embeddedInput.shape)
               val biCellInstanceBw = biCellBw.createCell(mode, embeddedInput.shape)
               val unmergedBiTuple = tf.bidirectionalDynamicRNN(
-                biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, dataConfig.timeMajor,
+                biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, modelConfig.timeMajor,
                 env.parallelIterations, env.swapMemory, input._2,
                 s"$uniquifiedName/BidirectionalLayers")
               val mergedBiTuple = Tuple(
@@ -109,7 +110,7 @@ class GNMTModel[S, SS](
             2 * config.numBiLayers, env.numGPUs, env.randomSeed, s"$name/MultiUniCell")
           val uniCellInstance = uniCell.createCell(mode, output.shape)
           val uniTuple = tf.dynamicRNN(
-            uniCellInstance.cell, output, null, dataConfig.timeMajor, env.parallelIterations,
+            uniCellInstance.cell, output, null, modelConfig.timeMajor, env.parallelIterations,
             env.swapMemory, input._2, s"$uniquifiedName/UnidirectionalLayers")
           trainableVariables ++= uniCellInstance.trainableVariables
           nonTrainableVariables ++= uniCellInstance.nonTrainableVariables
@@ -257,6 +258,7 @@ object GNMTModel {
       srcTestDataset: MTTextLinesDataset = null,
       tgtTestDataset: MTTextLinesDataset = null,
       env: Environment = Environment(),
+      modelConfig: ModelConfig = ModelConfig(),
       dataConfig: DataConfig = DataConfig(),
       trainConfig: TrainConfig = TrainConfig(),
       inferConfig: InferConfig = InferConfig(),
@@ -268,7 +270,8 @@ object GNMTModel {
   ): GNMTModel[S, SS] = {
     new GNMTModel[S, SS](
       config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary, srcTrainDataset, tgtTrainDataset, srcDevDataset,
-      tgtDevDataset, srcTestDataset, tgtTestDataset, env, dataConfig, trainConfig, inferConfig, logConfig, name)
+      tgtDevDataset, srcTestDataset, tgtTestDataset, env, modelConfig, dataConfig, trainConfig, inferConfig, logConfig,
+      name)
   }
 
   case class Config[S, SS](

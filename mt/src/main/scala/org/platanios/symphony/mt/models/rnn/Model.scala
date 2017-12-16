@@ -54,6 +54,7 @@ trait Model[S, SS] {
   val tgtTestDataset: MTTextLinesDataset = null
 
   val env        : Environment = Environment()
+  val modelConfig: ModelConfig = ModelConfig()
   val dataConfig : DataConfig  = DataConfig()
   val trainConfig: TrainConfig = TrainConfig()
   val inferConfig: InferConfig = InferConfig()
@@ -156,7 +157,7 @@ trait Model[S, SS] {
         val decLayerInstance = inferDecoder((input, encLayerInstance.output), mode)
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time] when using beam search.
         val outputSequence = {
-          if (dataConfig.timeMajor)
+          if (modelConfig.timeMajor)
             decLayerInstance.output._1.transpose()
           else if (decLayerInstance.output._1.rank == 3)
             decLayerInstance.output._1.transpose(Tensor(2, 0, 1))
@@ -179,7 +180,7 @@ trait Model[S, SS] {
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = {
-        val targetSequence = if (dataConfig.timeMajor) input._2._2.transpose() else input._2._2
+        val targetSequence = if (modelConfig.timeMajor) input._2._2.transpose() else input._2._2
         val loss = tf.sum(tf.sequenceLoss(
           input._1._1, targetSequence,
           weights = tf.sequenceMask(input._1._2, tf.shape(input._1._1)(1), dataType = input._1._1.dataType),
@@ -222,10 +223,10 @@ trait Model[S, SS] {
       tf.RandomUniformInitializer(-0.1f, 0.1f))
     val outputLayer = (logits: Output) => tf.linear(logits, outputWeights.value)
     if (isTrain) {
-      val helper = BasicDecoder.TrainingHelper(embeddedInput, inputSequenceLengths, dataConfig.timeMajor)
+      val helper = BasicDecoder.TrainingHelper(embeddedInput, inputSequenceLengths, modelConfig.timeMajor)
       val decoder = BasicDecoder(cellInstance.cell, inputState, helper, outputLayer)
       val tuple = decoder.decode(
-        outputTimeMajor = dataConfig.timeMajor, parallelIterations = env.parallelIterations,
+        outputTimeMajor = modelConfig.timeMajor, parallelIterations = env.parallelIterations,
         swapMemory = env.swapMemory)
       val lengths = tuple._3
       mode match {
@@ -243,7 +244,7 @@ trait Model[S, SS] {
           embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID, inferConfig.beamWidth,
           GooglePenalty(inferConfig.lengthPenaltyWeight), outputLayer)
         val tuple = decoder.decode(
-          outputTimeMajor = dataConfig.timeMajor,
+          outputTimeMajor = modelConfig.timeMajor,
           maximumIterations = inferMaxLength(tf.max(inputSequenceLengths)),
           parallelIterations = env.parallelIterations, swapMemory = env.swapMemory)
         (tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
@@ -252,7 +253,7 @@ trait Model[S, SS] {
           embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID)
         val decoder = BasicDecoder(cellInstance.cell, inputState, decHelper, outputLayer)
         val tuple = decoder.decode(
-          outputTimeMajor = dataConfig.timeMajor,
+          outputTimeMajor = modelConfig.timeMajor,
           maximumIterations = inferMaxLength(tf.max(inputSequenceLengths)),
           parallelIterations = env.parallelIterations, swapMemory = env.swapMemory)
         (tuple._1.sample, tuple._3)

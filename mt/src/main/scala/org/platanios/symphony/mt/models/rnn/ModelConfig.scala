@@ -13,23 +13,13 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data
+package org.platanios.symphony.mt.models.rnn
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class DataConfig(
-    // Corpus
-    numBuckets: Int = 5,
-    srcMaxLength: Int = 50,
-    tgtMaxLength: Int = 50,
-    srcReverse: Boolean = false,
-    bufferSize: Long = -1L,
-    dropCount: Int = 0,
-    numShards: Int = 1,
-    shardIndex: Int = 0,
-    numParallelCalls: Int = 4,
-    // Vocabulary
-    beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
-    endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
-    unknownToken: String = Vocabulary.UNKNOWN_TOKEN)
+class ModelConfig(val timeMajor: Boolean = false)
+
+object ModelConfig {
+  def apply(timeMajor: Boolean = false): ModelConfig = new ModelConfig(timeMajor)
+}
