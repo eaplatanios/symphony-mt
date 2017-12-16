@@ -17,8 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.core.Language
 import org.platanios.symphony.mt.core.hooks.PerplexityLogger
-import org.platanios.symphony.mt.data.Datasets
-import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
+import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.metrics.BLEUTensorFlow
 import org.platanios.tensorflow.api
 import org.platanios.tensorflow.api._
@@ -32,31 +31,6 @@ import org.platanios.tensorflow.api.types.DataType
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Model[S, SS] {
-  val name         : String
-  val configuration: Configuration[S, SS]
-
-  protected def createTrainDataset(
-      srcDataset: MTTextLinesDataset,
-      tgtDataset: MTTextLinesDataset,
-      srcVocab: () => tf.LookupTable,
-      tgtVocab: () => tf.LookupTable,
-      batchSize: Int,
-      repeat: Boolean,
-      numBuckets: Int
-  ): MTTrainDataset = {
-    Datasets.createTrainDataset(
-      srcDataset, tgtDataset, srcVocab(), tgtVocab(), batchSize,
-      configuration.beginOfSequenceToken, configuration.endOfSequenceToken,
-      repeat, configuration.dataSrcReverse, configuration.randomSeed, numBuckets,
-      configuration.dataSrcMaxLength, configuration.dataTgtMaxLength, configuration.dataNumParallelCalls,
-      configuration.dataBufferSize, configuration.dataDropCount, configuration.dataNumShards,
-      configuration.dataShardIndex)
-  }
-
-  def train(stopCriteria: StopCriteria = StopCriteria(Some(configuration.trainNumSteps))): Unit
-}
-
 class GNMTModel[S, SS](
     override val configuration: Configuration[S, SS],
     val srcLanguage: Language,
