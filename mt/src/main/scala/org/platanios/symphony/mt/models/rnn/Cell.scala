@@ -25,14 +25,12 @@ import org.platanios.tensorflow.api.types.DataType
   * @author Emmanouil Antonios Platanios
   */
 trait Cell[S, SS] {
-  def create(numUnits: Int, dataType: DataType, name: String = "RNNCell"): RNNCell[Output, Shape, S, SS]
+  def create(name: String, numUnits: Int, dataType: DataType): RNNCell[Output, Shape, S, SS]
 }
 
 case class GRU(activation: Output => Output = Math.tanh(_)) extends Cell[Output, Shape] {
-  override def create(
-      numUnits: Int, dataType: DataType, name: String = "GRUCell"
-  ): RNNCell[Output, Shape, Output, Shape] = {
-    GRUCell(numUnits, dataType, activation, name = name)
+  override def create(name: String, numUnits: Int, dataType: DataType): RNNCell[Output, Shape, Output, Shape] = {
+    GRUCell(name, numUnits, dataType, activation)
   }
 }
 
@@ -40,10 +38,7 @@ case class LSTM(
     forgetBias: Float = 1.0f, usePeepholes: Boolean = false, cellClip: Float = -1,
     projectionSize: Int = -1, projectionClip: Float = -1, activation: Output => Output = Math.tanh(_)
 ) extends Cell[LSTMState, (Shape, Shape)] {
-  override def create(
-      numUnits: Int, dataType: DataType, name: String = "LSTMCell"
-  ): RNNCell[Output, Shape, LSTMState, (Shape, Shape)] = {
-    LSTMCell(
-      numUnits, dataType, forgetBias, usePeepholes, cellClip, projectionSize, projectionClip, activation, name = name)
+  override def create(name: String, numUnits: Int, dataType: DataType): LSTMCell = {
+    LSTMCell(name, numUnits, dataType, forgetBias, usePeepholes, cellClip, projectionSize, projectionClip, activation)
   }
 }

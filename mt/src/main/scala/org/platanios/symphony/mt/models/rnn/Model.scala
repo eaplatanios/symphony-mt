@@ -24,7 +24,7 @@ import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
-import org.platanios.tensorflow.api.learn.layers.rnn.cell.CellInstance
+import org.platanios.tensorflow.api.learn.layers.rnn.cell._
 import org.platanios.tensorflow.api.learn.{EVALUATION, INFERENCE, Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer, LayerInstance}
 import org.platanios.tensorflow.api.ops.Output
@@ -290,15 +290,15 @@ object Model {
       residualFn: Option[(Output, Output) => Output] = None,
       device: Option[String] = None,
       seed: Option[Int] = None,
-      name: String = "RNNCell"
+      name: String
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): tf.learn.RNNCell[Output, Shape, S, SS] = tf.createWithNameScope(name) {
-    var createdCell = cellCreator.create(numUnits, dataType, name)
-    createdCell = dropout.map(p => tf.learn.DropoutWrapper(createdCell, 1.0f - p, seed = seed)).getOrElse(createdCell)
-    createdCell = residualFn.map(tf.learn.ResidualWrapper(createdCell, _)).getOrElse(createdCell)
-    createdCell = device.map(tf.learn.DeviceWrapper(createdCell, _)).getOrElse(createdCell)
+  ): tf.learn.RNNCell[Output, Shape, S, SS] = tf.learn.nameScope(name) {
+    var createdCell = cellCreator.create(name, numUnits, dataType)
+    createdCell = dropout.map(p => DropoutWrapper("Dropout", createdCell, 1.0f - p, seed = seed)).getOrElse(createdCell)
+    createdCell = residualFn.map(ResidualWrapper("Residual", createdCell, _)).getOrElse(createdCell)
+    createdCell = device.map(DeviceWrapper("Device", createdCell, _)).getOrElse(createdCell)
     createdCell
   }
 
@@ -313,15 +313,15 @@ object Model {
       baseGPU: Int = 0,
       numGPUs: Int = 0,
       seed: Option[Int] = None,
-      name: String = "RNNCells"
+      name: String
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): Seq[tf.learn.RNNCell[Output, Shape, S, SS]] = tf.createWithNameScope(name) {
+  ): Seq[tf.learn.RNNCell[Output, Shape, S, SS]] = tf.learn.nameScope(name) {
     (0 until numLayers).map(i => {
       cell(
         cellCreator, numUnits, dataType, dropout, if (i >= numLayers - numResidualLayers) residualFn else None,
-        Some(device(i + baseGPU, numGPUs)), seed, s"$name/Cell$i")
+        Some(device(i + baseGPU, numGPUs)), seed, s"Cell$i")
     })
   }
 
@@ -336,13 +336,13 @@ object Model {
       baseGPU: Int = 0,
       numGPUs: Int = 0,
       seed: Option[Int] = None,
-      name: String = "RNNMultiCell"
+      name: String,
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.learn.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {
-    tf.learn.MultiRNNCell(cells(
+    MultiRNNCell(name, cells(
       cellCreator, numUnits, dataType, numLayers, numResidualLayers, dropout,
-      residualFn, baseGPU, numGPUs, seed, name), name)
+      residualFn, baseGPU, numGPUs, seed, name))
   }
 }
