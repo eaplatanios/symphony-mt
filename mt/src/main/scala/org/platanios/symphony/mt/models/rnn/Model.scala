@@ -133,7 +133,7 @@ trait Model[S, SS] {
   }
 
   protected def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
-    new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]("Model") {
+    new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)](name) {
       override val layerType: String = "ModelTrainLayer"
 
       override def forward(
@@ -151,7 +151,7 @@ trait Model[S, SS] {
   }
 
   protected def inferLayer: Layer[(Output, Output), (Output, Output)] = {
-    new Layer[(Output, Output), (Output, Output)]("Model") {
+    new Layer[(Output, Output), (Output, Output)](name) {
       override val layerType: String = "ModelInferLayer"
 
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
@@ -175,7 +175,7 @@ trait Model[S, SS] {
   }
 
   protected def lossLayer: Layer[((Output, Output), (Output, Output, Output)), Output] = {
-    new Layer[((Output, Output), (Output, Output, Output)), Output]("Model") {
+    new Layer[((Output, Output), (Output, Output, Output)), Output](name) {
       override val layerType: String = "ModelLoss"
 
       override def forward(
