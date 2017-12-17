@@ -195,24 +195,27 @@ class BasicModel[S, SS](
   ): ((Output, Output), Set[Variable], Set[Variable]) = {
     val dataType = config.dataType
     val numResLayers = if (config.residual && config.numLayers > 1) config.numLayers - 1 else 0
+    var initialState = inputState
+    if (inferConfig.batchSize > 1 && !isTrain) {
+      // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
+      initialState = BeamSearchDecoder.tileForBeamSearch(initialState, inferConfig.beamWidth)
+    }
     config.decoderAttention match {
       case None =>
         val cellInstance = Model.multiCell(
           config.cell, config.numUnits, dataType, config.numLayers, numResLayers, config.dropout,
           config.residualFn, 0, env.numGPUs, env.randomSeed, "MultiCell").createCell(mode, embeddedInput.shape)
         (decode(
-          inputSequenceLengths, inputState, embeddings, embeddedInput, cellInstance, variableFn, isTrain, mode),
+          inputSequenceLengths, initialState, embeddings, embeddedInput, cellInstance, variableFn, isTrain, mode),
             cellInstance.trainableVariables, cellInstance.nonTrainableVariables)
       case Some(a) =>
         // Ensure memory is batch-major
         var memory = if (rnnConfig.timeMajor) encoderOutput.transpose(Tensor(1, 0, 2)) else encoderOutput
         var memorySequenceLengths = inputSequenceLengths
-        var initialState = inputState
         if (inferConfig.batchSize > 1 && !isTrain) {
           // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
           memory = BeamSearchDecoder.tileForBeamSearch(memory, inferConfig.beamWidth)
           memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, inferConfig.beamWidth)
-          initialState = BeamSearchDecoder.tileForBeamSearch(initialState, inferConfig.beamWidth)
         }
         val memoryWeights = variableFn("MemoryWeights", dataType, Shape(memory.shape(-1), config.numUnits), null)
         val attention = a.create(memory, memoryWeights.value, memorySequenceLengths, variableFn, "Attention")
