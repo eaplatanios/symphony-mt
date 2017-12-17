@@ -26,6 +26,7 @@ import org.platanios.tensorflow.api.learn.layers.{Layer, LayerInstance}
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
+import org.platanios.tensorflow.api.ops.seq2seq.decoders.BeamSearchDecoder
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -211,9 +212,17 @@ class BasicModel[S, SS](
             cellInstance.trainableVariables, cellInstance.nonTrainableVariables)
       case Some(a) =>
         // Ensure memory is batch-major
-        val memory = if (rnnConfig.timeMajor) encoderOutput.transpose(Tensor(1, 0, 2)) else encoderOutput
+        var memory = if (rnnConfig.timeMajor) encoderOutput.transpose(Tensor(1, 0, 2)) else encoderOutput
+        var memorySequenceLengths = inputSequenceLengths
+        var initialState = inputState
+        if (inferConfig.batchSize > 1 && !isTrain) {
+          // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
+          memory = BeamSearchDecoder.tileForBeamSearch(memory, inferConfig.beamWidth)
+          memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, inferConfig.beamWidth)
+          initialState = BeamSearchDecoder.tileForBeamSearch(initialState, inferConfig.beamWidth)
+        }
         val memoryWeights = variableFn("MemoryWeights", dataType, Shape(memory.shape(-1), config.numUnits), null)
-        val attention = a.create(memory, memoryWeights.value, inputSequenceLengths, variableFn, "Attention")
+        val attention = a.create(memory, memoryWeights.value, memorySequenceLengths, variableFn, "Attention")
         val attentionWeights = variableFn(
           "AttentionWeights", attention.dataType,
           Shape(config.numUnits + memory.shape(-1), config.numUnits), null)
@@ -228,7 +237,7 @@ class BasicModel[S, SS](
           cell = attentionCell, trainableVariables = cellInstance.trainableVariables + attentionWeights,
           nonTrainableVariables = cellInstance.nonTrainableVariables)
         (decode(
-          inputSequenceLengths, attentionCell.initialState(inputState, dataType), embeddings, embeddedInput,
+          inputSequenceLengths, attentionCell.initialState(initialState, dataType), embeddings, embeddedInput,
           attentionCellInstance, variableFn, isTrain, mode),
             cellInstance.trainableVariables + attentionWeights,
             cellInstance.nonTrainableVariables)

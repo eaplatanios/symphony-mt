@@ -82,19 +82,20 @@ object IWSLT15 extends App {
     learningRateDecayRate = 0.5f,
     learningRateDecaySteps = 12000 * 1 / (3 * 4),
     learningRateDecayStartStep = 12000 * 2 / 3,
-    colocateGradientsWithOps = true)
+    colocateGradientsWithOps = true) // TODO: This option currently fails on the servers.
 
   val inferConfig = InferConfig(
     batchSize = 32,
-    beamWidth = 1)
+    beamWidth = 10)
 
   val logConfig = LogConfig(
-    logLossSteps = 100)
+    logLossSteps = 100,
+    logTrainEvalSteps = -1)
 
   val model = BasicModel(
     config, srcLang, tgtLang, srcVocab, tgtVocab,
     srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
     env, modelConfig, dataConfig, trainConfig, inferConfig, logConfig, "BasicModel")
 
-  model.train(tf.learn.StopCriteria(Some(10000)))
+  model.train(tf.learn.StopCriteria(Some(trainConfig.numSteps)))
 }

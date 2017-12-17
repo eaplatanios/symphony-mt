@@ -102,6 +102,7 @@ trait Model[S, SS] {
         null
     }
     var hooks = Set[tf.learn.Hook](
+      // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainConfig.summarySteps)),
       tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
@@ -112,27 +113,27 @@ trait Model[S, SS] {
         log = true, summariesDir,
         () => createTrainDataset(srcTrainDataset, tgtTrainDataset, logConfig.logEvalBatchSize, repeat = false, 1),
         Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTrainEvalSteps),
-        triggerAtEnd = true, name = "Train Evaluation")
+        triggerAtEnd = true, name = "TrainEvaluator")
     if (logConfig.logDevEvalSteps > 0 && srcDevDataset != null && tgtDevDataset != null)
       hooks += tf.learn.Evaluator(
         log = true, summariesDir,
         () => createTrainDataset(srcDevDataset, tgtDevDataset, logConfig.logEvalBatchSize, repeat = false, 1),
         Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logDevEvalSteps),
-        triggerAtEnd = true, name = "Dev Evaluation")
+        triggerAtEnd = true, name = "DevEvaluator")
     if (logConfig.logTestEvalSteps > 0 && srcTestDataset != null && tgtTestDataset != null)
       hooks += tf.learn.Evaluator(
         log = true, summariesDir,
         () => createTrainDataset(srcTestDataset, tgtTestDataset, logConfig.logEvalBatchSize, repeat = false, 1),
         Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTestEvalSteps),
-        triggerAtEnd = true, name = "Test Evaluation")
+        triggerAtEnd = true, name = "TestEvaluator")
     tf.learn.InMemoryEstimator(
       model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),
       StopCriteria(Some(trainConfig.numSteps)), hooks, tensorBoardConfig = tensorBoardConfig)
   }
 
   protected def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
-    new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]("GNMTModelTrainLayer") {
-      override val layerType: String = "GNMTModelTrainLayer"
+    new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]("ModelTrainLayer") {
+      override val layerType: String = "ModelTrainLayer"
 
       override def forward(
           input: ((Output, Output), (Output, Output, Output)),
@@ -149,8 +150,8 @@ trait Model[S, SS] {
   }
 
   protected def inferLayer: Layer[(Output, Output), (Output, Output)] = {
-    new Layer[(Output, Output), (Output, Output)]("GNMTModelInferLayer") {
-      override val layerType: String = "GNMTModelInferLayer"
+    new Layer[(Output, Output), (Output, Output)]("ModelInferLayer") {
+      override val layerType: String = "ModelInferLayer"
 
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
         val encLayerInstance = encoder(input, mode)
