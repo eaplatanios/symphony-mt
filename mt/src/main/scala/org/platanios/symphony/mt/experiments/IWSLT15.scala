@@ -37,18 +37,18 @@ object IWSLT15 extends App {
   IWSLT15Loader.download(workingDir.resolve("data"), IWSLT15Loader.EnglishVietnamese)
 
   // Create the languages and their corresponding vocabularies
-  val srcLang : Language   = Language("Vietnamese", "vi")
-  val tgtLang : Language   = Language("English", "en")
-  val srcVocab: Vocabulary = Vocabulary(dataDir.resolve("vocab.vi"))
-  val tgtVocab: Vocabulary = Vocabulary(dataDir.resolve("vocab.en"))
+  val srcLang : Language   = Language("English", "en")
+  val tgtLang : Language   = Language("Vietnamese", "vi")
+  val srcVocab: Vocabulary = Vocabulary(dataDir.resolve("vocab.en"))
+  val tgtVocab: Vocabulary = Vocabulary(dataDir.resolve("vocab.vi"))
 
   // Create the datasets
-  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
-  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
-  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.vi").toAbsolutePath.toString)
-  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.en").toAbsolutePath.toString)
-  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.vi").toAbsolutePath.toString)
-  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
+  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
+  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
+  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.en").toAbsolutePath.toString)
+  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.vi").toAbsolutePath.toString)
+  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
+  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.vi").toAbsolutePath.toString)
 
   // Create a translator
   val config = BasicModel.Config(
@@ -82,7 +82,7 @@ object IWSLT15 extends App {
     learningRateDecayRate = 0.5f,
     learningRateDecaySteps = 12000 * 1 / (3 * 4),
     learningRateDecayStartStep = 12000 * 2 / 3,
-    colocateGradientsWithOps = true) // TODO: This option currently fails on the servers.
+    colocateGradientsWithOps = false) // TODO: This option currently fails on the servers.
 
   val inferConfig = InferConfig(
     batchSize = 32,
