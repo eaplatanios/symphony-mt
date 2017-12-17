@@ -133,7 +133,7 @@ trait Model[S, SS] {
   }
 
   protected def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
-    new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]("ModelTrainLayer") {
+    new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)]("Model") {
       override val layerType: String = "ModelTrainLayer"
 
       override def forward(
@@ -151,7 +151,7 @@ trait Model[S, SS] {
   }
 
   protected def inferLayer: Layer[(Output, Output), (Output, Output)] = {
-    new Layer[(Output, Output), (Output, Output)]("ModelInferLayer") {
+    new Layer[(Output, Output), (Output, Output)]("Model") {
       override val layerType: String = "ModelInferLayer"
 
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
@@ -175,13 +175,13 @@ trait Model[S, SS] {
   }
 
   protected def lossLayer: Layer[((Output, Output), (Output, Output, Output)), Output] = {
-    new Layer[((Output, Output), (Output, Output, Output)), Output]("ModelLoss") {
+    new Layer[((Output, Output), (Output, Output, Output)), Output]("Model") {
       override val layerType: String = "ModelLoss"
 
       override def forward(
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
-      ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = {
+      ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = tf.createWithNameScope("Loss") {
         val predictedSequence = if (rnnConfig.timeMajor) input._1._1.transpose(Tensor(1, 0, 2)) else input._1._1
         val targetSequence = input._2._2
         val loss = tf.sum(tf.sequenceLoss(

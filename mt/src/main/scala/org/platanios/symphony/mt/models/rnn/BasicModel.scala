@@ -73,11 +73,8 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddingsVariableScope = tf.currentVariableScope.copy(name = s"$name/Embeddings")
-          val embeddings = tf.createWithUpdatedVariableScope(embeddingsVariableScope) {
-            tf.variable(
-              "EncoderEmbeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
-          }
+          val embeddings = variable(
+            "Embeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
           val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
@@ -137,11 +134,8 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddingsVariableScope = tf.currentVariableScope.copy(name = s"$name/Embeddings")
-          val embeddings = tf.createWithUpdatedVariableScope(embeddingsVariableScope) {
-            tf.variable(
-              "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
-          }
+          val embeddings = variable(
+            "Embeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
           val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
@@ -178,11 +172,8 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddingsVariableScope = tf.currentVariableScope.copy(name = s"$name/Embeddings")
-          val embeddings = tf.createWithUpdatedVariableScope(embeddingsVariableScope) {
-            tf.variable(
-              "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
-          }
+          val embeddings = variable(
+            "Embeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
           val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
