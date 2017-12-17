@@ -73,8 +73,9 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "EncoderEmbeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
+          val embeddings = tf.learn.variableScope(s"$name/Embeddings") {
+            variable("EncoderEmbeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
+          }
           val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
@@ -134,8 +135,9 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+          val embeddings = tf.learn.variableScope(s"$name/Embeddings") {
+            variable("DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+          }
           val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
@@ -172,8 +174,9 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+          val embeddings = tf.learn.variableScope(s"$name/Embeddings") {
+            variable("DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+          }
           val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
           trainableVariables += embeddings
 
