@@ -237,7 +237,7 @@ trait Model[S, SS] {
         case _ => (tuple._1.rnnOutput, lengths)
       }
     } else {
-      val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, if (rnnConfig.timeMajor) o.transpose() else o)
+      val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, o)
       val tgtVocabLookupTable = tgtVocabulary.lookupTable()
       val tgtBosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
       val tgtEosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
