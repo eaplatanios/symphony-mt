@@ -34,6 +34,7 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSear
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
 import org.platanios.tensorflow.api.types.DataType
 
+// TODO: Add support for optimizer schedules (e.g., Adam for first 1000 steps and then SGD with a different learning rate.
 // TODO: Customize evaluation metrics, hooks, etc.
 
 /**

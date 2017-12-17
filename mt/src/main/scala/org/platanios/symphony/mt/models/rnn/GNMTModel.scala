@@ -57,7 +57,7 @@ class GNMTModel[S, SS](
     new Layer[(Output, Output), Tuple[Output, Seq[S]]](name) {
       override val layerType: String = "GNMTEncoder"
 
-      override def forward(
+      override protected def forward(
           input: (Output, Output),
           mode: Mode
       ): LayerInstance[(Output, Output), Tuple[Output, Seq[S]]] = {
@@ -127,7 +127,7 @@ class GNMTModel[S, SS](
     new Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](name) {
       override val layerType: String = "BasicTrainDecoder"
 
-      override def forward(
+      override protected def forward(
           input: ((Output, Output, Output), Tuple[Output, Seq[S]]),
           mode: Mode
       ): LayerInstance[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
@@ -163,7 +163,7 @@ class GNMTModel[S, SS](
     new Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](name) {
       override val layerType: String = "BasicInferDecoder"
 
-      override def forward(
+      override protected def forward(
           input: ((Output, Output), Tuple[Output, Seq[S]]),
           mode: Mode
       ): LayerInstance[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {

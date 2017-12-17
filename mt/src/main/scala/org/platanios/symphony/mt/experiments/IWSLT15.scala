@@ -61,7 +61,8 @@ object IWSLT15 extends App {
     decoderAttention = Some(LuongAttention(scaled = true)))
 
   val env = Environment(
-    workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"))
+    workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+    numGPUs = 0)
 
   val modelConfig = RNNConfig(
     timeMajor = true,
@@ -82,7 +83,7 @@ object IWSLT15 extends App {
     learningRateDecayRate = 0.5f,
     learningRateDecaySteps = 12000 * 1 / (3 * 4),
     learningRateDecayStartStep = 12000 * 2 / 3,
-    colocateGradientsWithOps = false) // TODO: This option currently fails on the servers.
+    colocateGradientsWithOps = true)
 
   val inferConfig = InferConfig(
     batchSize = 32,

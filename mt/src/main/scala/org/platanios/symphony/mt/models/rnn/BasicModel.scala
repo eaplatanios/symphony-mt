@@ -58,10 +58,10 @@ class BasicModel[S, SS](
     new Layer[(Output, Output), Tuple[Output, Seq[S]]](name) {
       override val layerType: String = "BasicEncoder"
 
-      override def forward(
+      override protected def forward(
           input: (Output, Output),
           mode: Mode
-      ): LayerInstance[(Output, Output), Tuple[Output, Seq[S]]] = {
+      ): LayerInstance[(Output, Output), Tuple[Output, Seq[S]]] = tf.createWithUpdatedVariableScope(variableScope) {
         val dataType = config.dataType
         val numResLayers = if (config.residual && config.numLayers > 1) config.numLayers - 1 else 0
         tf.createWithNameScope(uniquifiedName) {
@@ -120,7 +120,7 @@ class BasicModel[S, SS](
     new Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](name) {
       override val layerType: String = "BasicTrainDecoder"
 
-      override def forward(
+      override protected def forward(
           input: ((Output, Output, Output), Tuple[Output, Seq[S]]),
           mode: Mode
       ): LayerInstance[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
@@ -156,7 +156,7 @@ class BasicModel[S, SS](
     new Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](name) {
       override val layerType: String = "BasicInferDecoder"
 
-      override def forward(
+      override protected def forward(
           input: ((Output, Output), Tuple[Output, Seq[S]]),
           mode: Mode
       ): LayerInstance[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
