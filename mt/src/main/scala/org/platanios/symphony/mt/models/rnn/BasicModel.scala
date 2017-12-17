@@ -61,57 +61,54 @@ class BasicModel[S, SS](
       override protected def forward(
           input: (Output, Output),
           mode: Mode
-      ): LayerInstance[(Output, Output), Tuple[Output, Seq[S]]] = tf.createWithUpdatedVariableScope(variableScope) {
+      ): LayerInstance[(Output, Output), Tuple[Output, Seq[S]]] = {
         val dataType = config.dataType
         val numResLayers = if (config.residual && config.numLayers > 1) config.numLayers - 1 else 0
-        tf.createWithNameScope(uniquifiedName) {
-          // Keep track of trainable and non-trainable variables
-          var trainableVariables = Set.empty[Variable]
-          var nonTrainableVariables = Set.empty[Variable]
+        // Keep track of trainable and non-trainable variables
+        var trainableVariables = Set.empty[Variable]
+        var nonTrainableVariables = Set.empty[Variable]
 
-          val inputSequence = if (rnnConfig.timeMajor) input._1.transpose() else input._1
+        val inputSequence = if (rnnConfig.timeMajor) input._1.transpose() else input._1
 
-          // Embeddings
-          val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "Embeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
-          trainableVariables += embeddings
+        // Embeddings
+        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+        val embeddings = tf.variable(
+          "Embeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
+        val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
+        trainableVariables += embeddings
 
-          val tuple = config.encoderType match {
-            case BasicModel.UnidirectionalEncoder =>
-              val uniCell = Model.multiCell(
-                config.cell, config.numUnits, dataType, config.numLayers, numResLayers, config.dropout,
-                config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiUniCell")
-              val uniCellInstance = uniCell.createCell(mode, embeddedInput.shape)
-              trainableVariables ++= uniCellInstance.trainableVariables
-              nonTrainableVariables ++= uniCellInstance.nonTrainableVariables
-              tf.dynamicRNN(
-                uniCellInstance.cell, embeddedInput, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
-                rnnConfig.swapMemory, input._2, s"$uniquifiedName/UnidirectionalLayers")
-            case BasicModel.BidirectionalEncoder =>
-              val biCellFw = Model.multiCell(
-                config.cell, config.numUnits, dataType, config.numLayers / 2, numResLayers / 2, config.dropout,
-                config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiBiCellFw")
-              val biCellBw = Model.multiCell(
-                config.cell, config.numUnits, dataType, config.numLayers / 2, numResLayers / 2, config.dropout,
-                config.residualFn, config.numLayers / 2, env.numGPUs, env.randomSeed, s"$name/MultiBiCellBw")
-              val biCellInstanceFw = biCellFw.createCell(mode, embeddedInput.shape)
-              val biCellInstanceBw = biCellBw.createCell(mode, embeddedInput.shape)
-              val unmergedBiTuple = tf.bidirectionalDynamicRNN(
-                biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, rnnConfig.timeMajor,
-                rnnConfig.parallelIterations, rnnConfig.swapMemory, input._2,
-                s"$uniquifiedName/BidirectionalLayers")
-              trainableVariables ++= biCellInstanceFw.trainableVariables ++ biCellInstanceBw.trainableVariables
-              nonTrainableVariables ++= biCellInstanceFw.nonTrainableVariables ++ biCellInstanceBw.nonTrainableVariables
-              Tuple(
-                tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1),
-                unmergedBiTuple._1.state.map(List(_))
-                    .zipAll(unmergedBiTuple._2.state.map(List(_)), Nil, Nil)
-                    .flatMap(Function.tupled(_ ::: _)))
-          }
-          LayerInstance(input, tuple, trainableVariables, nonTrainableVariables)
+        val tuple = config.encoderType match {
+          case BasicModel.UnidirectionalEncoder =>
+            val uniCell = Model.multiCell(
+              config.cell, config.numUnits, dataType, config.numLayers, numResLayers, config.dropout,
+              config.residualFn, 0, env.numGPUs, env.randomSeed, "MultiUniCell")
+            val uniCellInstance = uniCell.createCell(mode, embeddedInput.shape)
+            trainableVariables ++= uniCellInstance.trainableVariables
+            nonTrainableVariables ++= uniCellInstance.nonTrainableVariables
+            tf.dynamicRNN(
+              uniCellInstance.cell, embeddedInput, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
+              rnnConfig.swapMemory, input._2, "UnidirectionalLayers")
+          case BasicModel.BidirectionalEncoder =>
+            val biCellFw = Model.multiCell(
+              config.cell, config.numUnits, dataType, config.numLayers / 2, numResLayers / 2, config.dropout,
+              config.residualFn, 0, env.numGPUs, env.randomSeed, "MultiBiCellFw")
+            val biCellBw = Model.multiCell(
+              config.cell, config.numUnits, dataType, config.numLayers / 2, numResLayers / 2, config.dropout,
+              config.residualFn, config.numLayers / 2, env.numGPUs, env.randomSeed, "MultiBiCellBw")
+            val biCellInstanceFw = biCellFw.createCell(mode, embeddedInput.shape)
+            val biCellInstanceBw = biCellBw.createCell(mode, embeddedInput.shape)
+            val unmergedBiTuple = tf.bidirectionalDynamicRNN(
+              biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, rnnConfig.timeMajor,
+              rnnConfig.parallelIterations, rnnConfig.swapMemory, input._2, "BidirectionalLayers")
+            trainableVariables ++= biCellInstanceFw.trainableVariables ++ biCellInstanceBw.trainableVariables
+            nonTrainableVariables ++= biCellInstanceFw.nonTrainableVariables ++ biCellInstanceBw.nonTrainableVariables
+            Tuple(
+              tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1),
+              unmergedBiTuple._1.state.map(List(_))
+                  .zipAll(unmergedBiTuple._2.state.map(List(_)), Nil, Nil)
+                  .flatMap(Function.tupled(_ ::: _)))
         }
+        LayerInstance(input, tuple, trainableVariables, nonTrainableVariables)
       }
     }
   }
@@ -125,29 +122,27 @@ class BasicModel[S, SS](
           mode: Mode
       ): LayerInstance[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
         val dataType = config.dataType
-        tf.createWithNameScope(uniquifiedName) {
-          // Keep track of trainable and non-trainable variables
-          var trainableVariables = Set.empty[Variable]
-          var nonTrainableVariables = Set.empty[Variable]
+        // Keep track of trainable and non-trainable variables
+        var trainableVariables = Set.empty[Variable]
+        var nonTrainableVariables = Set.empty[Variable]
 
-          val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
+        val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
 
-          // Embeddings
-          val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "Embeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
-          trainableVariables += embeddings
+        // Embeddings
+        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+        val embeddings = tf.variable(
+          "Embeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+        val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
+        trainableVariables += embeddings
 
-          // Decoder
-          val (output, otherTrainableVariables, otherNonTrainableVariables) = createCellAndDecode(
-            input._1._3, input._2.state, embeddings, embeddedInput, input._2.output, variable(_, _, _, _),
-            isTrain = true, mode)
-          trainableVariables ++= otherTrainableVariables
-          nonTrainableVariables ++= otherNonTrainableVariables
+        // Decoder
+        val (output, otherTrainableVariables, otherNonTrainableVariables) = createCellAndDecode(
+          input._1._3, input._2.state, embeddings, embeddedInput, input._2.output, tf.variable(_, _, _, _),
+          isTrain = true, mode)
+        trainableVariables ++= otherTrainableVariables
+        nonTrainableVariables ++= otherNonTrainableVariables
 
-          LayerInstance(input, output, trainableVariables, nonTrainableVariables)
-        }
+        LayerInstance(input, output, trainableVariables, nonTrainableVariables)
       }
     }
   }
@@ -161,31 +156,29 @@ class BasicModel[S, SS](
           mode: Mode
       ): LayerInstance[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
         val dataType = config.dataType
-        tf.createWithNameScope(uniquifiedName) {
-          // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
-          srcVocabulary.lookupTable()
-          // Keep track of trainable and non-trainable variables
-          var trainableVariables = Set.empty[Variable]
-          var nonTrainableVariables = Set.empty[Variable]
+        // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
+        srcVocabulary.lookupTable()
+        // Keep track of trainable and non-trainable variables
+        var trainableVariables = Set.empty[Variable]
+        var nonTrainableVariables = Set.empty[Variable]
 
-          val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
+        val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
 
-          // Embeddings
-          val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "Embeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
-          trainableVariables += embeddings
+        // Embeddings
+        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+        val embeddings = tf.variable(
+          "Embeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+        val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
+        trainableVariables += embeddings
 
-          // Decoder
-          val (output, otherTrainableVariables, otherNonTrainableVariables) = createCellAndDecode(
-            input._1._2, input._2.state, embeddings, embeddedInput, input._2.output, variable(_, _, _, _),
-            isTrain = false, mode)
-          trainableVariables ++= otherTrainableVariables
-          nonTrainableVariables ++= otherNonTrainableVariables
+        // Decoder
+        val (output, otherTrainableVariables, otherNonTrainableVariables) = createCellAndDecode(
+          input._1._2, input._2.state, embeddings, embeddedInput, input._2.output, tf.variable(_, _, _, _),
+          isTrain = false, mode)
+        trainableVariables ++= otherTrainableVariables
+        nonTrainableVariables ++= otherNonTrainableVariables
 
-          LayerInstance(input, output, trainableVariables, nonTrainableVariables)
-        }
+        LayerInstance(input, output, trainableVariables, nonTrainableVariables)
       }
     }
   }
@@ -206,7 +199,7 @@ class BasicModel[S, SS](
       case None =>
         val cellInstance = Model.multiCell(
           config.cell, config.numUnits, dataType, config.numLayers, numResLayers, config.dropout,
-          config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiCell").createCell(mode, embeddedInput.shape)
+          config.residualFn, 0, env.numGPUs, env.randomSeed, "MultiCell").createCell(mode, embeddedInput.shape)
         (decode(
           inputSequenceLengths, inputState, embeddings, embeddedInput, cellInstance, variableFn, isTrain, mode),
             cellInstance.trainableVariables, cellInstance.nonTrainableVariables)
@@ -228,7 +221,7 @@ class BasicModel[S, SS](
           Shape(config.numUnits + memory.shape(-1), config.numUnits), null)
         val cell = Model.multiCell(
           config.cell, config.numUnits, dataType, config.numLayers, numResLayers, config.dropout,
-          config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiCell")
+          config.residualFn, 0, env.numGPUs, env.randomSeed, "MultiCell")
         val cellInstance = cell.createCell(mode, Shape(embeddedInput.shape(-1) + config.numUnits))
         val attentionCell = tf.AttentionWrapperCell(
           cellInstance.cell, Seq(attention), Seq(attentionWeights.value),

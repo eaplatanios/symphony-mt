@@ -54,7 +54,7 @@ class GNMTModel[S, SS](
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Model[S, SS] {
   override protected def encoder: Layer[(Output, Output), cell.Tuple[Output, Seq[S]]] = {
-    new Layer[(Output, Output), Tuple[Output, Seq[S]]](name) {
+    new Layer[(Output, Output), Tuple[Output, Seq[S]]]("Encoder") {
       override val layerType: String = "GNMTEncoder"
 
       override protected def forward(
@@ -62,137 +62,129 @@ class GNMTModel[S, SS](
           mode: Mode
       ): LayerInstance[(Output, Output), Tuple[Output, Seq[S]]] = {
         val dataType = config.dataType
-        tf.createWithNameScope(uniquifiedName) {
-          // Keep track of trainable and non-trainable variables
-          var trainableVariables = Set.empty[Variable]
-          var nonTrainableVariables = Set.empty[Variable]
+        // Keep track of trainable and non-trainable variables
+        var trainableVariables = Set.empty[Variable]
+        var nonTrainableVariables = Set.empty[Variable]
 
-          val inputSequence = if (rnnConfig.timeMajor) input._1.transpose() else input._1
+        val inputSequence = if (rnnConfig.timeMajor) input._1.transpose() else input._1
 
-          // Embeddings
-          val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "EncoderEmbeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
-          trainableVariables += embeddings
+        // Embeddings
+        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+        val embeddings = tf.variable(
+          "Embeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
+        val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
+        trainableVariables += embeddings
 
-          // Bidirectional Layers
-          val (output, state) = {
-            if (config.numBiLayers > 0) {
-              val biCellFw = Model.multiCell(
-                config.cell, config.numUnits, dataType, config.numBiLayers,
-                config.numBiResLayers, config.dropout, config.residualFn, 0, env.numGPUs,
-                env.randomSeed, s"$name/MultiBiCellFw")
-              val biCellBw = Model.multiCell(
-                config.cell, config.numUnits, dataType, config.numBiLayers,
-                config.numBiResLayers, config.dropout, config.residualFn, config.numBiLayers,
-                env.numGPUs, env.randomSeed, s"$name/MultiBiCellBw")
-              val biCellInstanceFw = biCellFw.createCell(mode, embeddedInput.shape)
-              val biCellInstanceBw = biCellBw.createCell(mode, embeddedInput.shape)
-              val unmergedBiTuple = tf.bidirectionalDynamicRNN(
-                biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, rnnConfig.timeMajor,
-                rnnConfig.parallelIterations, rnnConfig.swapMemory, input._2,
-                s"$uniquifiedName/BidirectionalLayers")
-              val mergedBiTuple = Tuple(
-                tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1), unmergedBiTuple._2.state)
-              trainableVariables ++= biCellInstanceFw.trainableVariables ++ biCellInstanceBw.trainableVariables
-              nonTrainableVariables ++= biCellInstanceFw.nonTrainableVariables ++ biCellInstanceBw.nonTrainableVariables
-              (mergedBiTuple.output, mergedBiTuple.state)
-            } else {
-              (embeddedInput, Seq.empty[S])
-            }
+        // Bidirectional Layers
+        val (output, state) = {
+          if (config.numBiLayers > 0) {
+            val biCellFw = Model.multiCell(
+              config.cell, config.numUnits, dataType, config.numBiLayers, config.numBiResLayers, config.dropout,
+              config.residualFn, 0, env.numGPUs, env.randomSeed, "MultiBiCellFw")
+            val biCellBw = Model.multiCell(
+              config.cell, config.numUnits, dataType, config.numBiLayers,
+              config.numBiResLayers, config.dropout, config.residualFn, config.numBiLayers,
+              env.numGPUs, env.randomSeed, "MultiBiCellBw")
+            val biCellInstanceFw = biCellFw.createCell(mode, embeddedInput.shape)
+            val biCellInstanceBw = biCellBw.createCell(mode, embeddedInput.shape)
+            val unmergedBiTuple = tf.bidirectionalDynamicRNN(
+              biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedInput, null, null, rnnConfig.timeMajor,
+              rnnConfig.parallelIterations, rnnConfig.swapMemory, input._2, "BidirectionalLayers")
+            val mergedBiTuple = Tuple(
+              tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1), unmergedBiTuple._2.state)
+            trainableVariables ++= biCellInstanceFw.trainableVariables ++ biCellInstanceBw.trainableVariables
+            nonTrainableVariables ++= biCellInstanceFw.nonTrainableVariables ++ biCellInstanceBw.nonTrainableVariables
+            (mergedBiTuple.output, mergedBiTuple.state)
+          } else {
+            (embeddedInput, Seq.empty[S])
           }
-
-          // Unidirectional Layers
-          val uniCell = Model.multiCell(
-            config.cell, config.numUnits, dataType, config.numUniLayers,
-            config.numUniResLayers, config.dropout, config.residualFn,
-            2 * config.numBiLayers, env.numGPUs, env.randomSeed, s"$name/MultiUniCell")
-          val uniCellInstance = uniCell.createCell(mode, output.shape)
-          val uniTuple = tf.dynamicRNN(
-            uniCellInstance.cell, output, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
-            rnnConfig.swapMemory, input._2, s"$uniquifiedName/UnidirectionalLayers")
-          trainableVariables ++= uniCellInstance.trainableVariables
-          nonTrainableVariables ++= uniCellInstance.nonTrainableVariables
-
-          // Pass all of the encoder's state except for the first bi-directional layer's state, to the decoder.
-          val tuple = Tuple(uniTuple.output, state ++ uniTuple.state)
-          LayerInstance(input, tuple, trainableVariables, nonTrainableVariables)
         }
+
+        // Unidirectional Layers
+        val uniCell = Model.multiCell(
+          config.cell, config.numUnits, dataType, config.numUniLayers,
+          config.numUniResLayers, config.dropout, config.residualFn,
+          2 * config.numBiLayers, env.numGPUs, env.randomSeed, "MultiUniCell")
+        val uniCellInstance = uniCell.createCell(mode, output.shape)
+        val uniTuple = tf.dynamicRNN(
+          uniCellInstance.cell, output, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
+          rnnConfig.swapMemory, input._2, "UnidirectionalLayers")
+        trainableVariables ++= uniCellInstance.trainableVariables
+        nonTrainableVariables ++= uniCellInstance.nonTrainableVariables
+
+        // Pass all of the encoder's state except for the first bi-directional layer's state, to the decoder.
+        val tuple = Tuple(uniTuple.output, state ++ uniTuple.state)
+        LayerInstance(input, tuple, trainableVariables, nonTrainableVariables)
       }
     }
   }
 
   override protected def trainDecoder: Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
-    new Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](name) {
-      override val layerType: String = "BasicTrainDecoder"
+    new Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]("Decoder") {
+      override val layerType: String = "GNMTTrainDecoder"
 
       override protected def forward(
           input: ((Output, Output, Output), Tuple[Output, Seq[S]]),
           mode: Mode
       ): LayerInstance[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
         val dataType = config.dataType
-        tf.createWithNameScope(uniquifiedName) {
-          // Keep track of trainable and non-trainable variables
-          var trainableVariables = Set.empty[Variable]
-          var nonTrainableVariables = Set.empty[Variable]
+        // Keep track of trainable and non-trainable variables
+        var trainableVariables = Set.empty[Variable]
+        var nonTrainableVariables = Set.empty[Variable]
 
-          val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
+        val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
 
-          // Embeddings
-          val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
-          trainableVariables += embeddings
+        // Embeddings
+        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+        val embeddings = tf.variable(
+          "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+        val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
+        trainableVariables += embeddings
 
-          // Decoder
-          val (output, otherTrainableVariables, otherNonTrainableVariables) = createCellAndDecode(
-            input._1._3, input._2.state, embeddings, embeddedInput, input._2.output, variable(_, _, _, _),
-            isTrain = true, mode)
-          trainableVariables ++= otherTrainableVariables
-          nonTrainableVariables ++= otherNonTrainableVariables
+        // Decoder
+        val (output, otherTrainableVariables, otherNonTrainableVariables) = createCellAndDecode(
+          input._1._3, input._2.state, embeddings, embeddedInput, input._2.output, tf.variable(_, _, _, _),
+          isTrain = true, mode)
+        trainableVariables ++= otherTrainableVariables
+        nonTrainableVariables ++= otherNonTrainableVariables
 
-          LayerInstance(input, output, trainableVariables, nonTrainableVariables)
-        }
+        LayerInstance(input, output, trainableVariables, nonTrainableVariables)
       }
     }
   }
 
   override protected def inferDecoder: Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
-    new Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](name) {
-      override val layerType: String = "BasicInferDecoder"
+    new Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]("Decoder") {
+      override val layerType: String = "GNMTInferDecoder"
 
       override protected def forward(
           input: ((Output, Output), Tuple[Output, Seq[S]]),
           mode: Mode
       ): LayerInstance[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
         val dataType = config.dataType
-        tf.createWithNameScope(uniquifiedName) {
-          // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
-          srcVocabulary.lookupTable()
-          // Keep track of trainable and non-trainable variables
-          var trainableVariables = Set.empty[Variable]
-          var nonTrainableVariables = Set.empty[Variable]
+        // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
+        srcVocabulary.lookupTable()
+        // Keep track of trainable and non-trainable variables
+        var trainableVariables = Set.empty[Variable]
+        var nonTrainableVariables = Set.empty[Variable]
 
-          val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
+        val inputSequence = if (rnnConfig.timeMajor) input._1._1.transpose() else input._1._1
 
-          // Embeddings
-          val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = variable(
-            "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
-          val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
-          trainableVariables += embeddings
+        // Embeddings
+        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+        val embeddings = tf.variable(
+          "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
+        val embeddedInput = tf.embeddingLookup(embeddings, inputSequence)
+        trainableVariables += embeddings
 
-          // Decoder
-          val (output, otherTrainableVariables, otherNonTrainableVariables) = createCellAndDecode(
-            input._1._2, input._2.state, embeddings, embeddedInput, input._2.output, variable(_, _, _, _),
-            isTrain = false, mode)
-          trainableVariables ++= otherTrainableVariables
-          nonTrainableVariables ++= otherNonTrainableVariables
+        // Decoder
+        val (output, otherTrainableVariables, otherNonTrainableVariables) = createCellAndDecode(
+          input._1._2, input._2.state, embeddings, embeddedInput, input._2.output, tf.variable(_, _, _, _),
+          isTrain = false, mode)
+        trainableVariables ++= otherTrainableVariables
+        nonTrainableVariables ++= otherNonTrainableVariables
 
-          LayerInstance(input, output, trainableVariables, nonTrainableVariables)
-        }
+        LayerInstance(input, output, trainableVariables, nonTrainableVariables)
       }
     }
   }
@@ -212,7 +204,7 @@ class GNMTModel[S, SS](
       case None =>
         val cellInstance = Model.multiCell(
           config.cell, config.numUnits, dataType, config.numUniLayers, config.numUniResLayers, config.dropout,
-          config.residualFn, 0, env.numGPUs, env.randomSeed, s"$name/MultiCell").createCell(mode, embeddedInput.shape)
+          config.residualFn, 0, env.numGPUs, env.randomSeed, "MultiCell").createCell(mode, embeddedInput.shape)
         (decode(
           inputSequenceLengths, inputState, embeddings, embeddedInput, cellInstance, variableFn, isTrain, mode),
             cellInstance.trainableVariables, cellInstance.nonTrainableVariables)
@@ -220,7 +212,7 @@ class GNMTModel[S, SS](
         val cells = Model.cells(
           config.cell, config.numUnits, dataType, config.numUniLayers,
           config.numUniResLayers, config.dropout, config.residualFn, 0,
-          env.numGPUs, env.randomSeed, s"$name/MultiCell")
+          env.numGPUs, env.randomSeed, "MultiCell")
         ???
         // Ensure memory is batch-major
 //        val memory = if (dataConfig.timeMajor) encoderOutput.transpose(Tensor(1, 0, 2)) else encoderOutput
