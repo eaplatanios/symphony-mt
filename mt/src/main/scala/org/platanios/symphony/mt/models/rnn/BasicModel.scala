@@ -55,7 +55,7 @@ class BasicModel[S, SS](
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Model[S, SS] {
   override protected def encoder: Layer[(Output, Output), cell.Tuple[Output, Seq[S]]] = {
-    new Layer[(Output, Output), Tuple[Output, Seq[S]]](name) {
+    new Layer[(Output, Output), Tuple[Output, Seq[S]]](s"$name/Encoder") {
       override val layerType: String = "BasicEncoder"
 
       override protected def forward(
@@ -117,7 +117,7 @@ class BasicModel[S, SS](
   }
 
   override protected def trainDecoder: Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
-    new Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](name) {
+    new Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](s"$name/Decoder") {
       override val layerType: String = "BasicTrainDecoder"
 
       override protected def forward(
@@ -153,7 +153,7 @@ class BasicModel[S, SS](
   }
 
   override protected def inferDecoder: Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)] = {
-    new Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](name) {
+    new Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)](s"$name/Decoder") {
       override val layerType: String = "BasicInferDecoder"
 
       override protected def forward(
