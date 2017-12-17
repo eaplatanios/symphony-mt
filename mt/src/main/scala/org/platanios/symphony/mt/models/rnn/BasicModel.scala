@@ -73,7 +73,8 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = tf.learn.variableScope(s"$name/Embeddings") {
+          val embeddingsVariableScope = tf.learn.currentVariableScope.copy(name = s"$name/Embeddings")
+          val embeddings = tf.learn.updatedVariableScope(embeddingsVariableScope) {
             tf.variable(
               "EncoderEmbeddings", dataType, Shape(srcVocabulary.size, config.numUnits), embeddingsInitializer)
           }
@@ -136,7 +137,8 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = tf.learn.variableScope(s"$name/Embeddings") {
+          val embeddingsVariableScope = tf.learn.currentVariableScope.copy(name = s"$name/Embeddings")
+          val embeddings = tf.learn.updatedVariableScope(embeddingsVariableScope) {
             tf.variable(
               "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
           }
@@ -176,7 +178,8 @@ class BasicModel[S, SS](
 
           // Embeddings
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = tf.learn.variableScope(s"$name/Embeddings") {
+          val embeddingsVariableScope = tf.learn.currentVariableScope.copy(name = s"$name/Embeddings")
+          val embeddings = tf.learn.updatedVariableScope(embeddingsVariableScope) {
             tf.variable(
               "DecoderEmbeddings", dataType, Shape(tgtVocabulary.size, config.numUnits), embeddingsInitializer)
           }
