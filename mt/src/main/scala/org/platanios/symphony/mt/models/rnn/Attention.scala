@@ -26,7 +26,6 @@ trait Attention {
       memory: Output,
       memoryWeights: Output,
       memorySequenceLengths: Output = null,
-      variableFn: (String, DataType, Shape, tf.VariableInitializer) => Variable,
       name: String = "Attention"
   ): tf.Attention
 }
@@ -40,10 +39,9 @@ case class LuongAttention(
       memory: Output,
       memoryWeights: Output,
       memorySequenceLengths: Output = null,
-      variableFn: (String, DataType, Shape, tf.VariableInitializer) => Variable,
       name: String = "LuongAttention"
   ): tf.Attention = {
-    val scale = if (scaled) variableFn("LuongFactor", memory.dataType, Shape.scalar(), OnesInitializer) else null
+    val scale = if (scaled) tf.variable("LuongFactor", memory.dataType, Shape.scalar(), OnesInitializer) else null
     tf.LuongAttention(memory, memoryWeights, memorySequenceLengths, scale, probabilityFn, scoreMask, name)
   }
 }

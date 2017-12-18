@@ -218,7 +218,7 @@ class BasicModel[S, SS](
           memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, inferConfig.beamWidth)
         }
         val memoryWeights = variableFn("MemoryWeights", dataType, Shape(memory.shape(-1), config.numUnits), null)
-        val attention = a.create(memory, memoryWeights.value, memorySequenceLengths, variableFn, "Attention")
+        val attention = a.create(memory, memoryWeights.value, memorySequenceLengths, "Attention")
         val attentionWeights = variableFn(
           "AttentionWeights", attention.dataType,
           Shape(config.numUnits + memory.shape(-1), config.numUnits), null)
