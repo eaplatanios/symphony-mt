@@ -156,7 +156,7 @@ class Model[S, SS](
           config.encoder.create(input._1._1, input._1._2, mode)
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
-          config.decoder.create(encTuple, input._1._2, input._2._2, input._2._3, mode)
+          config.decoder.create(encTuple, input._1._2, input._2._1, input._2._3, mode)
         }
         (decTuple.sequences, decTuple.sequenceLengths)
       }
