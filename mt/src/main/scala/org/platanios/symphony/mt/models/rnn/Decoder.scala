@@ -152,7 +152,7 @@ class UnidirectionalDecoder[S, SS](
       // Decoder RNN
       if (inferConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
-          cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID),
+          cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0))(tgtBosID),
           tgtEosID, inferConfig.beamWidth, GooglePenalty(inferConfig.lengthPenaltyWeight), outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
@@ -160,7 +160,7 @@ class UnidirectionalDecoder[S, SS](
         Decoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
       } else {
         val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
-          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID)
+          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0))(tgtBosID), tgtEosID)
         val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
