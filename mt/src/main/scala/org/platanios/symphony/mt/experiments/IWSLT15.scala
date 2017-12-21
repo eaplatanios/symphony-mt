@@ -88,7 +88,7 @@ object IWSLT15 extends App {
 
   // Create a translator
   val config = Model.Config(
-    UnidirectionalEncoder(
+    BidirectionalEncoder(
       srcLang, srcVocab, env, rnnConfig,
       cell = LSTM(forgetBias = 1.0f),
       numUnits = 32,
