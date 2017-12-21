@@ -22,7 +22,7 @@ import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.{EVALUATION, INFERENCE, Mode}
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
-import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
+import org.platanios.tensorflow.api.ops.rnn.cell.{RNNCell, Tuple}
 import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSearchDecoder, GooglePenalty}
 
 /**
@@ -75,7 +75,7 @@ class UnidirectionalDecoder[S, SS](
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
       residualFn, 0, env.numGPUs, env.randomSeed, "MultiUniCell")
 
-    // Use attention if necessary
+    // Use attention if necessary and create the decoder RNN
     var initialState = encoderTuple.state
     var memory = {
       if (rnnConfig.timeMajor && mode.isTraining)
@@ -90,18 +90,36 @@ class UnidirectionalDecoder[S, SS](
       memory = BeamSearchDecoder.tileForBeamSearch(memory, inferConfig.beamWidth)
       memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, inferConfig.beamWidth)
     }
-    val (cellInstance, processedInitialState) = attention match {
-      case None => (uniCell.createCell(mode, Shape(numUnits)), encoderTuple.state)
-      case Some(a) => a.create(
-        uniCell, memory, memorySequenceLengths, numUnits, numUnits, initialState, outputAttention, mode)
-    }
 
-    // Output layers
+    attention match {
+      case None =>
+        decode(
+          inputSequenceLengths, targetSequences, targetSequenceLengths, encoderTuple.state,
+          embeddings, uniCell.createCell(mode, Shape(numUnits)), mode)
+      case Some(attentionCreator) =>
+        val (attentionCell, attentionInitialState) = attentionCreator.create(
+          uniCell, memory, memorySequenceLengths, numUnits, numUnits, initialState, outputAttention, mode)
+        decode(
+          inputSequenceLengths, targetSequences, targetSequenceLengths, attentionInitialState,
+          embeddings, attentionCell, mode)
+    }
+  }
+
+  protected def decode[DS, DSS](
+      inputSequenceLengths: Output,
+      targetSequenceLengths: Output,
+      targetSequences: Output,
+      initialState: DS,
+      embeddings: Variable,
+      cell: RNNCell[Output, Shape, DS, DSS],
+      mode: Mode
+  )(implicit
+      evS: WhileLoopVariable.Aux[DS, DSS]
+  ): Decoder.Output = {
     val outputWeights = tf.variable(
-      "OutWeights", dataType, Shape(cellInstance.cell.outputShape(-1), tgtVocabulary.size),
+      "OutWeights", embeddings.dataType, Shape(cell.outputShape(-1), tgtVocabulary.size),
       tf.RandomUniformInitializer(-0.1f, 0.1f))
     val outputLayer = (logits: Output) => tf.linear(logits, outputWeights.value)
-
     if (mode.isTraining) {
       // Time-major transpose
       val transposedSequences = if (rnnConfig.timeMajor) targetSequences.transpose() else targetSequences
@@ -109,7 +127,7 @@ class UnidirectionalDecoder[S, SS](
 
       // Decoder RNN
       val helper = BasicDecoder.TrainingHelper(embeddedSequences, targetSequenceLengths, rnnConfig.timeMajor)
-      val decoder = BasicDecoder(cellInstance.cell, processedInitialState, helper, outputLayer)
+      val decoder = BasicDecoder(cell, initialState, helper, outputLayer)
       val tuple = decoder.decode(
         outputTimeMajor = rnnConfig.timeMajor, parallelIterations = rnnConfig.parallelIterations,
         swapMemory = rnnConfig.swapMemory)
@@ -134,16 +152,16 @@ class UnidirectionalDecoder[S, SS](
       // Decoder RNN
       if (inferConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
-          cellInstance.cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID),
+          cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID),
           tgtEosID, inferConfig.beamWidth, GooglePenalty(inferConfig.lengthPenaltyWeight), outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
           parallelIterations = rnnConfig.parallelIterations, swapMemory = rnnConfig.swapMemory)
         Decoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
       } else {
-        val decHelper = BasicDecoder.GreedyEmbeddingHelper(
+        val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
           embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID)
-        val decoder = BasicDecoder(cellInstance.cell, initialState, decHelper, outputLayer)
+        val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
           parallelIterations = rnnConfig.parallelIterations, swapMemory = rnnConfig.swapMemory)
@@ -170,9 +188,12 @@ object UnidirectionalDecoder {
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
       attention: Option[Attention] = None,
       outputAttention: Boolean = false
+  )(implicit
+      evS: WhileLoopVariable.Aux[S, SS],
+      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): UnidirectionalDecoder[S, SS] = {
     new UnidirectionalDecoder[S, SS](
       tgtLanguage, tgtVocabulary, env, rnnConfig, dataConfig, inferConfig, cell, numUnits, numLayers, dataType,
-      residual, dropout, residualFn, attention, outputAttention)
+      residual, dropout, residualFn, attention, outputAttention)(evS, evSDropout)
   }
 }

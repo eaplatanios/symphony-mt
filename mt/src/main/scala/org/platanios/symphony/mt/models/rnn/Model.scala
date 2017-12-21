@@ -227,11 +227,14 @@ object Model {
       inferConfig: InferConfig = InferConfig(),
       logConfig: LogConfig = LogConfig(),
       name: String = "BasicModel"
+  )(implicit
+      evS: WhileLoopVariable.Aux[S, SS],
+      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): Model[S, SS] = {
     new Model[S, SS](
       config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary,
       srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
-      env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, name)
+      env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, name)(evS, evSDropout)
   }
 
   case class Config[S, SS](encoder: Encoder[S, SS], decoder: Decoder[S, SS])

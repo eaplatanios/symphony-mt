@@ -65,9 +65,9 @@ class UnidirectionalEncoder[S, SS](
     val uniCell = Model.multiCell(
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
       residualFn, 0, env.numGPUs, env.randomSeed, "MultiUniCell")
-    val uniCellInstance = uniCell.createCell(mode, embeddedSequences.shape)
+    val createdCell = uniCell.createCell(mode, embeddedSequences.shape)
     tf.dynamicRNN(
-      uniCellInstance.cell, embeddedSequences, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
+      createdCell, embeddedSequences, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
       rnnConfig.swapMemory, sequenceLengths, "UnidirectionalLayers")
   }
 }
@@ -85,9 +85,13 @@ object UnidirectionalEncoder {
       residual: Boolean = false,
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+  )(implicit
+      evS: WhileLoopVariable.Aux[S, SS],
+      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): UnidirectionalEncoder[S, SS] = {
     new UnidirectionalEncoder[S, SS](
-      srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout, residualFn)
+      srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout,
+      residualFn)(evS, evSDropout)
   }
 }
 
@@ -123,10 +127,10 @@ class BidirectionalEncoder[S, SS](
     val biCellBw = Model.multiCell(
       cell, numUnits, dataType, numLayers / 2, numResLayers / 2, dropout,
       residualFn, numLayers / 2, env.numGPUs, env.randomSeed, "MultiBiCellBw")
-    val biCellInstanceFw = biCellFw.createCell(mode, embeddedSequences.shape)
-    val biCellInstanceBw = biCellBw.createCell(mode, embeddedSequences.shape)
+    val createdCellFw = biCellFw.createCell(mode, embeddedSequences.shape)
+    val createdCellBw = biCellBw.createCell(mode, embeddedSequences.shape)
     val unmergedBiTuple = tf.bidirectionalDynamicRNN(
-      biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedSequences, null, null, rnnConfig.timeMajor,
+      createdCellFw, createdCellBw, embeddedSequences, null, null, rnnConfig.timeMajor,
       rnnConfig.parallelIterations, rnnConfig.swapMemory, sequenceLengths, "BidirectionalLayers")
     Tuple(
       tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1),
@@ -149,8 +153,12 @@ object BidirectionalEncoder {
       residual: Boolean = false,
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+  )(implicit
+      evS: WhileLoopVariable.Aux[S, SS],
+      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): BidirectionalEncoder[S, SS] = {
     new BidirectionalEncoder[S, SS](
-      srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout, residualFn)
+      srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout,
+      residualFn)(evS, evSDropout)
   }
 }
