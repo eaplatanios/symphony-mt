@@ -94,7 +94,7 @@ class UnidirectionalDecoder[S, SS](
     attention match {
       case None =>
         decode(
-          inputSequenceLengths, targetSequences, targetSequenceLengths, encoderTuple.state,
+          inputSequenceLengths, targetSequences, targetSequenceLengths, initialState,
           embeddings, uniCell.createCell(mode, Shape(numUnits)), mode)
       case Some(attentionCreator) =>
         val (attentionCell, attentionInitialState) = attentionCreator.create(
