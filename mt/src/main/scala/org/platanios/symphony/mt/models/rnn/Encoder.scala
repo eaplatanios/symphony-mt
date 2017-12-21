@@ -72,6 +72,25 @@ class UnidirectionalEncoder[S, SS](
   }
 }
 
+object UnidirectionalEncoder {
+  def apply[S, SS](
+      srcLanguage: Language,
+      srcVocabulary: Vocabulary,
+      env: Environment,
+      rnnConfig: RNNConfig,
+      cell: Cell[S, SS],
+      numUnits: Int,
+      numLayers: Int,
+      dataType: DataType = FLOAT32,
+      residual: Boolean = false,
+      dropout: Option[Float] = None,
+      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+  ): UnidirectionalEncoder[S, SS] = {
+    new UnidirectionalEncoder[S, SS](
+      srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout, residualFn)
+  }
+}
+
 class BidirectionalEncoder[S, SS](
     val srcLanguage: Language,
     val srcVocabulary: Vocabulary,
@@ -114,5 +133,24 @@ class BidirectionalEncoder[S, SS](
       unmergedBiTuple._1.state.map(List(_))
           .zipAll(unmergedBiTuple._2.state.map(List(_)), Nil, Nil)
           .flatMap(Function.tupled(_ ::: _)))
+  }
+}
+
+object BidirectionalEncoder {
+  def apply[S, SS](
+      srcLanguage: Language,
+      srcVocabulary: Vocabulary,
+      env: Environment,
+      rnnConfig: RNNConfig,
+      cell: Cell[S, SS],
+      numUnits: Int,
+      numLayers: Int,
+      dataType: DataType = FLOAT32,
+      residual: Boolean = false,
+      dropout: Option[Float] = None,
+      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+  ): BidirectionalEncoder[S, SS] = {
+    new BidirectionalEncoder[S, SS](
+      srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout, residualFn)
   }
 }

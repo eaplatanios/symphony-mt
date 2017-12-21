@@ -152,3 +152,27 @@ class UnidirectionalDecoder[S, SS](
     }
   }
 }
+
+object UnidirectionalDecoder {
+  def apply[S, SS](
+      tgtLanguage: Language,
+      tgtVocabulary: Vocabulary,
+      env: Environment,
+      rnnConfig: RNNConfig,
+      dataConfig: DataConfig,
+      inferConfig: InferConfig,
+      cell: Cell[S, SS],
+      numUnits: Int,
+      numLayers: Int,
+      dataType: DataType = FLOAT32,
+      residual: Boolean = false,
+      dropout: Option[Float] = None,
+      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
+      attention: Option[Attention] = None,
+      outputAttention: Boolean = false
+  ): UnidirectionalDecoder[S, SS] = {
+    new UnidirectionalDecoder[S, SS](
+      tgtLanguage, tgtVocabulary, env, rnnConfig, dataConfig, inferConfig, cell, numUnits, numLayers, dataType,
+      residual, dropout, residualFn, attention, outputAttention)
+  }
+}
