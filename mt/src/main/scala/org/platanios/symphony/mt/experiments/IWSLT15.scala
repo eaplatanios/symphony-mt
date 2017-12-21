@@ -91,14 +91,14 @@ object IWSLT15 extends App {
     BidirectionalEncoder(
       srcLang, srcVocab, env, rnnConfig,
       cell = LSTM(forgetBias = 1.0f),
-      numUnits = 32,
+      numUnits = 512,
       numLayers = 2,
       residual = false,
       dropout = Some(0.2f)),
     UnidirectionalDecoder(
       tgtLang, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
       cell = LSTM(forgetBias = 1.0f),
-      numUnits = 32,
+      numUnits = 512,
       numLayers = 2,
       residual = false,
       dropout = Some(0.2f),
@@ -108,7 +108,7 @@ object IWSLT15 extends App {
   val model = Model(
     config, srcLang, tgtLang, srcVocab, tgtVocab,
     srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
-    env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, "BasicModel")
+    env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, "Model")
 
   model.train(StopCriteria(Some(trainConfig.numSteps)))
 }

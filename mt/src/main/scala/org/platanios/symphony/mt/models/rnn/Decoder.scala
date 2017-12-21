@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.models.InferConfig
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.{EVALUATION, INFERENCE, Mode}
+import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.{RNNCell, Tuple}
@@ -131,11 +131,7 @@ class UnidirectionalDecoder[S, SS](
       val tuple = decoder.decode(
         outputTimeMajor = rnnConfig.timeMajor, parallelIterations = rnnConfig.parallelIterations,
         swapMemory = rnnConfig.swapMemory)
-      val lengths = tuple._3
-      mode match {
-        case INFERENCE | EVALUATION => Decoder.Output(tuple._1.sample, lengths)
-        case _ => Decoder.Output(tuple._1.rnnOutput, lengths)
-      }
+      Decoder.Output(tuple._1.rnnOutput, tuple._3)
     } else {
       // Decoder embeddings
       val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, o)
@@ -152,7 +148,7 @@ class UnidirectionalDecoder[S, SS](
       // Decoder RNN
       if (inferConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
-          cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0))(tgtBosID),
+          cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0).expandDims(0))(tgtBosID),
           tgtEosID, inferConfig.beamWidth, GooglePenalty(inferConfig.lengthPenaltyWeight), outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
@@ -160,7 +156,7 @@ class UnidirectionalDecoder[S, SS](
         Decoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
       } else {
         val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
-          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0))(tgtBosID), tgtEosID)
+          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0).expandDims(0))(tgtBosID), tgtEosID)
         val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
