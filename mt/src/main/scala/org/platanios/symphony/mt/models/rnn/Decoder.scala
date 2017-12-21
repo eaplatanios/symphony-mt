@@ -78,13 +78,13 @@ class UnidirectionalDecoder[S, SS](
     // Use attention if necessary and create the decoder RNN
     var initialState = encoderTuple.state
     var memory = {
-      if (rnnConfig.timeMajor && mode.isTraining)
+      if (rnnConfig.timeMajor)
         encoderTuple.output.transpose(Tensor(1, 0, 2))
       else
         encoderTuple.output
     }
     var memorySequenceLengths = inputSequenceLengths
-    if (inferConfig.beamWidth > 1) {
+    if (inferConfig.beamWidth > 1 && !mode.isTraining) {
       // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
       initialState = BeamSearchDecoder.tileForBeamSearch(initialState, inferConfig.beamWidth)
       memory = BeamSearchDecoder.tileForBeamSearch(memory, inferConfig.beamWidth)

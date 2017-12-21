@@ -118,7 +118,7 @@ class Model[S, SS](
         null
     }
     var hooks = Set[tf.learn.Hook](
-      tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
+      // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainConfig.summarySteps)),
       tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
@@ -171,6 +171,9 @@ class Model[S, SS](
 
       override def forward(input: (Output, Output), mode: Mode): (Output, Output) = {
         tf.createWithNameScope("InferLayer") {
+          // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
+          srcVocabulary.lookupTable()
+
           val encTuple = tf.createWithVariableScope("Encoder") {
             config.encoder.create(input._1, input._2, mode)
           }
