@@ -26,7 +26,7 @@ import org.platanios.tensorflow.api.learn
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.rnn.cell._
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
-import org.platanios.tensorflow.api.learn.layers.{Input, Layer, LayerInstance}
+import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.ops
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -151,14 +151,11 @@ class Model[S, SS](
     new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)](name) {
       override val layerType: String = "TrainLayer"
 
-      override def forward(
-          input: ((Output, Output), (Output, Output, Output)),
-          mode: Mode
-      ): LayerInstance[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
+      override def forward(input: ((Output, Output), (Output, Output, Output)), mode: Mode): (Output, Output) = {
         tf.createWithNameScope("TrainLayer") {
           val encTuple = config.encoder.create(input._1._1, input._1._2, mode)
           val decTuple = config.decoder.create(encTuple, input._1._2, input._2._2, input._2._3, mode)
-          LayerInstance(input, (decTuple.sequences, decTuple.sequenceLengths))
+          (decTuple.sequences, decTuple.sequenceLengths)
         }
       }
     }
@@ -168,7 +165,7 @@ class Model[S, SS](
     new Layer[(Output, Output), (Output, Output)](name) {
       override val layerType: String = "InferLayer"
 
-      override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
+      override def forward(input: (Output, Output), mode: Mode): (Output, Output) = {
         tf.createWithNameScope("InferLayer") {
           val encTuple = config.encoder.create(input._1, input._2, mode)
           val decTuple = config.decoder.create(encTuple, input._2, null, null, mode)
@@ -182,7 +179,7 @@ class Model[S, SS](
             else
               decTuple.sequences
           }
-          LayerInstance(input, (outputSequence, decTuple.sequenceLengths))
+          (outputSequence, decTuple.sequenceLengths)
         }
       }
     }
@@ -195,10 +192,10 @@ class Model[S, SS](
       override def forward(
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
-      ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = tf.createWithNameScope("Loss") {
+      ): Output = tf.createWithNameScope("Loss") {
         val lossValue = loss(input._1._1, input._2._2, input._1._2)
         tf.summary.scalar("Loss", lossValue)
-        LayerInstance(input, lossValue)
+        lossValue
       }
     }
   }

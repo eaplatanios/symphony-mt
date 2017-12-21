@@ -18,20 +18,16 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.Shape
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.learn.layers.rnn.cell.{CellInstance, RNNCell}
+import org.platanios.tensorflow.api.learn.layers.rnn.cell.RNNCell
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
-import org.platanios.tensorflow.api.ops.rnn.attention.AttentionWrapperState
+import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
 import org.platanios.tensorflow.api.ops.variables.OnesInitializer
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 trait Attention {
-  type AttentionCellInstance[S, SS] = CellInstance[
-      Output, Shape, AttentionWrapperState[Seq[S], Seq[SS]], (Seq[SS], Shape, Shape, Seq[Shape], Seq[Shape])]
-  type AttentionInitialState[S, SS] = AttentionWrapperState[Seq[S], Seq[SS]]
-
   def create[S, SS](
       cell: RNNCell[Output, Shape, Seq[S], Seq[SS]],
       memory: Output,
@@ -44,7 +40,7 @@ trait Attention {
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): (AttentionCellInstance[S, SS], AttentionInitialState[S, SS])
+  ): (AttentionWrapperCell[Seq[S], Seq[SS]], AttentionWrapperState[Seq[S], Seq[SS]])
 }
 
 case class LuongAttention(
@@ -64,19 +60,16 @@ case class LuongAttention(
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): (AttentionCellInstance[S, SS], AttentionInitialState[S, SS]) = {
+  ): (AttentionWrapperCell[Seq[S], Seq[SS]], AttentionWrapperState[Seq[S], Seq[SS]]) = {
     val memoryWeights = tf.variable("MemoryWeights", memory.dataType, Shape(memory.shape(-1), numUnits), null)
     val scale = if (scaled) tf.variable("LuongFactor", memory.dataType, Shape.scalar(), OnesInitializer) else null
     val attention = tf.LuongAttention(
       memory, memoryWeights.value, memorySequenceLengths, scale.value, probabilityFn, scoreMask, "Attention")
     val attentionWeights = tf.variable(
       "AttentionWeights", attention.dataType, Shape(numUnits + memory.shape(-1), numUnits), null)
-    val cellInstance = cell.createCell(mode, Shape(inputSequencesLastAxisSize + numUnits))
+    val createdCell = cell.createCell(mode, Shape(inputSequencesLastAxisSize + numUnits))
     val attentionCell = tf.AttentionWrapperCell(
-      cellInstance.cell, Seq(attention), Seq(attentionWeights.value), outputAttention = outputAttention)
-    val attentionCellInstance = CellInstance(
-      cell = attentionCell, trainableVariables = cellInstance.trainableVariables + attentionWeights,
-      nonTrainableVariables = cellInstance.nonTrainableVariables)
-    (attentionCellInstance, attentionCell.initialState(initialState, memory.dataType))
+      createdCell, Seq(attention), Seq(attentionWeights.value), outputAttention = outputAttention)
+    (attentionCell, attentionCell.initialState(initialState, memory.dataType))
   }
 }

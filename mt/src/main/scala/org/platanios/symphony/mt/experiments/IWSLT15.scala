@@ -80,7 +80,7 @@ object IWSLT15 extends App {
 
   val inferConfig = InferConfig(
     batchSize = 32,
-    beamWidth = 5)
+    beamWidth = 10)
 
   val logConfig = LogConfig(
     logLossSteps = 100,
