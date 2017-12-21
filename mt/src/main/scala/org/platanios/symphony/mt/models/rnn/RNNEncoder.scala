@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.symphony.mt.models.Encoder
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api._
@@ -25,18 +26,18 @@ import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Encoder[S, SS]()(implicit
+abstract class RNNEncoder[S, SS]()(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) {
+) extends Encoder[Tuple[Output, Seq[S]]] {
   def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]]
 }
 
-object Encoder {
+object RNNEncoder {
   case class Instance[S](tuple: Tuple[Output, Seq[S]])
 }
 
-class UnidirectionalEncoder[S, SS](
+class UnidirectionalRNNEncoder[S, SS](
     val srcLanguage: Language,
     val srcVocabulary: Vocabulary,
     val env: Environment,
@@ -51,7 +52,7 @@ class UnidirectionalEncoder[S, SS](
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Encoder[S, SS]()(evS, evSDropout) {
+) extends RNNEncoder[S, SS]()(evS, evSDropout) {
   override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]] = {
     // Time-major transpose
     val transposedSequences = if (rnnConfig.timeMajor) inputSequences.transpose() else inputSequences
@@ -72,7 +73,7 @@ class UnidirectionalEncoder[S, SS](
   }
 }
 
-object UnidirectionalEncoder {
+object UnidirectionalRNNEncoder {
   def apply[S, SS](
       srcLanguage: Language,
       srcVocabulary: Vocabulary,
@@ -88,14 +89,14 @@ object UnidirectionalEncoder {
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): UnidirectionalEncoder[S, SS] = {
-    new UnidirectionalEncoder[S, SS](
+  ): UnidirectionalRNNEncoder[S, SS] = {
+    new UnidirectionalRNNEncoder[S, SS](
       srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout,
       residualFn)(evS, evSDropout)
   }
 }
 
-class BidirectionalEncoder[S, SS](
+class BidirectionalRNNEncoder[S, SS](
     val srcLanguage: Language,
     val srcVocabulary: Vocabulary,
     val env: Environment,
@@ -110,7 +111,7 @@ class BidirectionalEncoder[S, SS](
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Encoder[S, SS]()(evS, evSDropout) {
+) extends RNNEncoder[S, SS]()(evS, evSDropout) {
   override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]] = {
     // Time-major transpose
     val transposedSequences = if (rnnConfig.timeMajor) inputSequences.transpose() else inputSequences
@@ -140,7 +141,7 @@ class BidirectionalEncoder[S, SS](
   }
 }
 
-object BidirectionalEncoder {
+object BidirectionalRNNEncoder {
   def apply[S, SS](
       srcLanguage: Language,
       srcVocabulary: Vocabulary,
@@ -156,8 +157,8 @@ object BidirectionalEncoder {
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): BidirectionalEncoder[S, SS] = {
-    new BidirectionalEncoder[S, SS](
+  ): BidirectionalRNNEncoder[S, SS] = {
+    new BidirectionalRNNEncoder[S, SS](
       srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout,
       residualFn)(evS, evSDropout)
   }

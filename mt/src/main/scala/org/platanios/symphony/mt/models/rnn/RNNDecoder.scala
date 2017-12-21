@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.models.InferConfig
+import org.platanios.symphony.mt.models.{Decoder, InferConfig}
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -28,21 +28,21 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSear
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Decoder[S, SS]()(implicit
+abstract class RNNDecoder[S, SS]()(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) {
+) extends Decoder[Tuple[Output, Seq[S]]] {
   def create(
       encoderTuple: Tuple[Output, Seq[S]], inputSequenceLengths: Output,
       targetSequences: Output = null, targetSequenceLengths: Output = null, mode: Mode
-  ): Decoder.Output
+  ): RNNDecoder.Output
 }
 
-object Decoder {
+object RNNDecoder {
   case class Output(sequences: tf.Output, sequenceLengths: tf.Output)
 }
 
-class UnidirectionalDecoder[S, SS](
+class UnidirectionalRNNDecoder[S, SS](
     val tgtLanguage: Language,
     val tgtVocabulary: Vocabulary,
     val env: Environment,
@@ -61,11 +61,11 @@ class UnidirectionalDecoder[S, SS](
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Decoder[S, SS]()(evS, evSDropout) {
+) extends RNNDecoder[S, SS]()(evS, evSDropout) {
   override def create(
       encoderTuple: Tuple[Output, Seq[S]], inputSequenceLengths: Output,
       targetSequences: Output, targetSequenceLengths: Output, mode: Mode
-  ): Decoder.Output = {
+  ): RNNDecoder.Output = {
     // Embeddings
     val embeddings = Model.embeddings(dataType, tgtVocabulary.size, numUnits, "Embeddings")
 
@@ -115,7 +115,7 @@ class UnidirectionalDecoder[S, SS](
       mode: Mode
   )(implicit
       evS: WhileLoopVariable.Aux[DS, DSS]
-  ): Decoder.Output = {
+  ): RNNDecoder.Output = {
     val outputWeights = tf.variable(
       "OutWeights", embeddings.dataType, Shape(cell.outputShape(-1), tgtVocabulary.size),
       tf.RandomUniformInitializer(-0.1f, 0.1f))
@@ -131,7 +131,7 @@ class UnidirectionalDecoder[S, SS](
       val tuple = decoder.decode(
         outputTimeMajor = rnnConfig.timeMajor, parallelIterations = rnnConfig.parallelIterations,
         swapMemory = rnnConfig.swapMemory)
-      Decoder.Output(tuple._1.rnnOutput, tuple._3)
+      RNNDecoder.Output(tuple._1.rnnOutput, tuple._3)
     } else {
       // Decoder embeddings
       val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, o)
@@ -153,7 +153,7 @@ class UnidirectionalDecoder[S, SS](
         val tuple = decoder.decode(
           outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
           parallelIterations = rnnConfig.parallelIterations, swapMemory = rnnConfig.swapMemory)
-        Decoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
+        RNNDecoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
       } else {
         val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
           embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0).expandDims(0))(tgtBosID), tgtEosID)
@@ -161,13 +161,13 @@ class UnidirectionalDecoder[S, SS](
         val tuple = decoder.decode(
           outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
           parallelIterations = rnnConfig.parallelIterations, swapMemory = rnnConfig.swapMemory)
-        Decoder.Output(tuple._1.sample, tuple._3)
+        RNNDecoder.Output(tuple._1.sample, tuple._3)
       }
     }
   }
 }
 
-object UnidirectionalDecoder {
+object UnidirectionalRNNDecoder {
   def apply[S, SS](
       tgtLanguage: Language,
       tgtVocabulary: Vocabulary,
@@ -187,8 +187,8 @@ object UnidirectionalDecoder {
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): UnidirectionalDecoder[S, SS] = {
-    new UnidirectionalDecoder[S, SS](
+  ): UnidirectionalRNNDecoder[S, SS] = {
+    new UnidirectionalRNNDecoder[S, SS](
       tgtLanguage, tgtVocabulary, env, rnnConfig, dataConfig, inferConfig, cell, numUnits, numLayers, dataType,
       residual, dropout, residualFn, attention, outputAttention)(evS, evSDropout)
   }

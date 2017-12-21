@@ -244,7 +244,7 @@ object Model {
       env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, name)(evS, evSDropout)
   }
 
-  case class Config[S, SS](encoder: Encoder[S, SS], decoder: Decoder[S, SS])
+  case class Config[S, SS](encoder: RNNEncoder[S, SS], decoder: RNNDecoder[S, SS])
 
   private[rnn] def embeddings(
       dataType: DataType, srcSize: Int, numUnits: Int, name: String = "Embeddings"): Variable = {
