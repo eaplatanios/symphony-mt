@@ -84,7 +84,7 @@ class Model[S, SS](
     tf.sum(tf.sequenceLoss(
       transposed, targetSequences,
       weights = tf.sequenceMask(sequenceLengths, tf.shape(transposed)(1), dataType = predictedSequences.dataType),
-      averageAcrossTimeSteps = false, averageAcrossBatch = true))
+      averageAcrossTimeSteps = false, averageAcrossBatch = false)) / tf.shape(transposed)(0)
   }
 
   protected def optimizer: tf.train.Optimizer = {
