@@ -20,8 +20,9 @@ import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
-import org.platanios.symphony.mt.models.rnn.{BasicModel, LSTM, LuongAttention, RNNConfig}
+import org.platanios.symphony.mt.models.rnn._
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
@@ -50,21 +51,13 @@ object IWSLT15 extends App {
   val srcTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
   val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.vi").toAbsolutePath.toString)
 
-  // Create a translator
-  val config = BasicModel.Config(
-    cell = LSTM(forgetBias = 1.0f),
-    numUnits = 512,
-    numLayers = 2,
-    residual = false,
-    dropout = Some(0.2f),
-    encoderType = BasicModel.BidirectionalEncoder,
-    decoderAttention = Some(LuongAttention(scaled = true)))
-
+  // Create general configuration settings
   val env = Environment(
     workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
-    numGPUs = 0)
+    numGPUs = 0,
+    randomSeed = Some(10))
 
-  val modelConfig = RNNConfig(
+  val rnnConfig = RNNConfig(
     timeMajor = true,
     parallelIterations = 32,
     swapMemory = true)
@@ -87,16 +80,35 @@ object IWSLT15 extends App {
 
   val inferConfig = InferConfig(
     batchSize = 32,
-    beamWidth = 10)
+    beamWidth = 5)
 
   val logConfig = LogConfig(
     logLossSteps = 100,
     logTrainEvalSteps = -1)
 
-  val model = BasicModel(
+  // Create a translator
+  val config = Model.Config(
+    UnidirectionalEncoder(
+      srcLang, srcVocab, env, rnnConfig,
+      cell = LSTM(forgetBias = 1.0f),
+      numUnits = 32,
+      numLayers = 2,
+      residual = false,
+      dropout = Some(0.2f)),
+    UnidirectionalDecoder(
+      tgtLang, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
+      cell = LSTM(forgetBias = 1.0f),
+      numUnits = 32,
+      numLayers = 2,
+      residual = false,
+      dropout = Some(0.2f),
+      attention = Some(LuongAttention(scaled = true)),
+      outputAttention = false))
+
+  val model = Model(
     config, srcLang, tgtLang, srcVocab, tgtVocab,
     srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
-    env, modelConfig, dataConfig, trainConfig, inferConfig, logConfig, "BasicModel")
+    env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, "BasicModel")
 
-  model.train(tf.learn.StopCriteria(Some(trainConfig.numSteps)))
+  model.train(StopCriteria(Some(trainConfig.numSteps)))
 }

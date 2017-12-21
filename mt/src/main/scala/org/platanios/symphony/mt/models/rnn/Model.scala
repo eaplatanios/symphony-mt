@@ -27,9 +27,9 @@ import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.rnn.cell._
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer, LayerInstance}
+import org.platanios.tensorflow.api.ops
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
-import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
 import org.platanios.tensorflow.api.types.DataType
 
@@ -40,34 +40,32 @@ import org.platanios.tensorflow.api.types.DataType
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Model[S, SS] {
-  val name         : String
-  val srcLanguage  : Language
-  val tgtLanguage  : Language
-  val srcVocabulary: Vocabulary
-  val tgtVocabulary: Vocabulary
-
-  val srcTrainDataset: MTTextLinesDataset
-  val tgtTrainDataset: MTTextLinesDataset
-  val srcDevDataset : MTTextLinesDataset = null
-  val tgtDevDataset : MTTextLinesDataset = null
-  val srcTestDataset: MTTextLinesDataset = null
-  val tgtTestDataset: MTTextLinesDataset = null
-
-  val env        : Environment = Environment()
-  val rnnConfig  : RNNConfig   = RNNConfig()
-  val dataConfig : DataConfig  = DataConfig()
-  val trainConfig: TrainConfig = TrainConfig()
-  val inferConfig: InferConfig = InferConfig()
-  val logConfig  : LogConfig   = LogConfig()
-
+class Model[S, SS](
+    val config: Model.Config[S, SS],
+    val srcLanguage: Language,
+    val tgtLanguage: Language,
+    val srcVocabulary: Vocabulary,
+    val tgtVocabulary: Vocabulary,
+    val srcTrainDataset: MTTextLinesDataset,
+    val tgtTrainDataset: MTTextLinesDataset,
+    val srcDevDataset: MTTextLinesDataset = null,
+    val tgtDevDataset: MTTextLinesDataset = null,
+    val srcTestDataset: MTTextLinesDataset = null,
+    val tgtTestDataset: MTTextLinesDataset = null,
+    val env: Environment = Environment(),
+    val rnnConfig: RNNConfig = RNNConfig(),
+    val dataConfig: DataConfig = DataConfig(),
+    val trainConfig: TrainConfig = TrainConfig(),
+    val inferConfig: InferConfig = InferConfig(),
+    val logConfig: LogConfig = LogConfig(),
+    val name: String = "BasicModel"
+)(implicit
+    evS: WhileLoopVariable.Aux[S, SS],
+    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
+) {
   // Create the input and the train input parts of the model.
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
   protected val trainInput = Input((INT32, INT32, INT32), (Shape(-1, -1), Shape(-1, -1), Shape(-1)))
-
-  protected def encoder: Layer[(Output, Output), Tuple[Output, Seq[S]]]
-  protected def trainDecoder: Layer[(((Output, Output), (Output, Output, Output)), Tuple[Output, Seq[S]]), (Output, Output)]
-  protected def inferDecoder: Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]
 
   protected def createSupervisedDataset(
       srcDataset: MTTextLinesDataset,
@@ -158,12 +156,9 @@ trait Model[S, SS] {
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
         tf.createWithNameScope("TrainLayer") {
-          val encLayerInstance = encoder(input._1, mode)
-          val decLayerInstance = trainDecoder((input, encLayerInstance.output), mode)
-          LayerInstance(
-            input, decLayerInstance.output,
-            encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
-            encLayerInstance.nonTrainableVariables ++ decLayerInstance.nonTrainableVariables)
+          val encTuple = config.encoder.create(input._1._1, input._1._2, mode)
+          val decTuple = config.decoder.create(encTuple, input._1._2, input._2._2, input._2._3, mode)
+          LayerInstance(input, (decTuple.sequences, decTuple.sequenceLengths))
         }
       }
     }
@@ -175,22 +170,19 @@ trait Model[S, SS] {
 
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
         tf.createWithNameScope("InferLayer") {
-          val encLayerInstance = encoder(input, mode)
-          val decLayerInstance = inferDecoder((input, encLayerInstance.output), mode)
+          val encTuple = config.encoder.create(input._1, input._2, mode)
+          val decTuple = config.decoder.create(encTuple, input._2, null, null, mode)
           // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
           // when using beam search.
           val outputSequence = {
             if (rnnConfig.timeMajor)
-              decLayerInstance.output._1.transpose()
-            else if (decLayerInstance.output._1.rank == 3)
-              decLayerInstance.output._1.transpose(Tensor(2, 0, 1))
+              decTuple.sequences.transpose()
+            else if (decTuple.sequences.rank == 3)
+              decTuple.sequences.transpose(Tensor(2, 0, 1))
             else
-              decLayerInstance.output._1
+              decTuple.sequences
           }
-          LayerInstance(
-            input, (outputSequence, decLayerInstance.output._2),
-            encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
-            encLayerInstance.nonTrainableVariables ++ decLayerInstance.nonTrainableVariables)
+          LayerInstance(input, (outputSequence, decTuple.sequenceLengths))
         }
       }
     }
@@ -219,7 +211,36 @@ trait Model[S, SS] {
 }
 
 object Model {
-  def embeddings(dataType: DataType, srcSize: Int, numUnits: Int, name: String = "Embeddings"): Variable = {
+  def apply[S, SS](
+      config: Model.Config[S, SS],
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      srcVocabulary: Vocabulary,
+      tgtVocabulary: Vocabulary,
+      srcTrainDataset: MTTextLinesDataset,
+      tgtTrainDataset: MTTextLinesDataset,
+      srcDevDataset: MTTextLinesDataset = null,
+      tgtDevDataset: MTTextLinesDataset = null,
+      srcTestDataset: MTTextLinesDataset = null,
+      tgtTestDataset: MTTextLinesDataset = null,
+      env: Environment = Environment(),
+      rnnConfig: RNNConfig = RNNConfig(),
+      dataConfig: DataConfig = DataConfig(),
+      trainConfig: TrainConfig = TrainConfig(),
+      inferConfig: InferConfig = InferConfig(),
+      logConfig: LogConfig = LogConfig(),
+      name: String = "BasicModel"
+  ): Model[S, SS] = {
+    new Model[S, SS](
+      config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary,
+      srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
+      env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, name)
+  }
+
+  case class Config[S, SS](encoder: Encoder[S, SS], decoder: Decoder[S, SS])
+
+  private[rnn] def embeddings(
+      dataType: DataType, srcSize: Int, numUnits: Int, name: String = "Embeddings"): Variable = {
     val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
     tf.variable(name, dataType, Shape(srcSize, numUnits), embeddingsInitializer)
   }
