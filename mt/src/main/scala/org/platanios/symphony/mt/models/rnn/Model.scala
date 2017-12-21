@@ -25,15 +25,15 @@ import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.rnn.cell._
-import org.platanios.tensorflow.api.learn.{EVALUATION, INFERENCE, Mode, StopCriteria}
+import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer, LayerInstance}
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
-import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSearchDecoder, GooglePenalty}
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
 import org.platanios.tensorflow.api.types.DataType
 
+// TODO: Move embeddings initializer to the configuration.
 // TODO: Add support for optimizer schedules (e.g., Adam for first 1000 steps and then SGD with a different learning rate.
 // TODO: Customize evaluation metrics, hooks, etc.
 
@@ -66,10 +66,10 @@ trait Model[S, SS] {
   protected val trainInput = Input((INT32, INT32, INT32), (Shape(-1, -1), Shape(-1, -1), Shape(-1)))
 
   protected def encoder: Layer[(Output, Output), Tuple[Output, Seq[S]]]
-  protected def trainDecoder: Layer[((Output, Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]
+  protected def trainDecoder: Layer[(((Output, Output), (Output, Output, Output)), Tuple[Output, Seq[S]]), (Output, Output)]
   protected def inferDecoder: Layer[((Output, Output), Tuple[Output, Seq[S]]), (Output, Output)]
 
-  protected def createTrainDataset(
+  protected def createSupervisedDataset(
       srcDataset: MTTextLinesDataset,
       tgtDataset: MTTextLinesDataset,
       batchSize: Int,
@@ -79,6 +79,23 @@ trait Model[S, SS] {
     Datasets.createTrainDataset(
       srcDataset, tgtDataset, srcVocabulary.lookupTable(), tgtVocabulary.lookupTable(), dataConfig, batchSize, repeat,
       env.randomSeed)
+  }
+
+  protected def loss(predictedSequences: Output, targetSequences: Output, sequenceLengths: Output): Output = {
+    val transposed = if (rnnConfig.timeMajor) predictedSequences.transpose(Tensor(1, 0, 2)) else predictedSequences
+    tf.sum(tf.sequenceLoss(
+      transposed, targetSequences,
+      weights = tf.sequenceMask(sequenceLengths, tf.shape(transposed)(1), dataType = predictedSequences.dataType),
+      averageAcrossTimeSteps = false, averageAcrossBatch = true))
+  }
+
+  protected def optimizer: tf.train.Optimizer = {
+    val decay = ExponentialDecay(
+      trainConfig.learningRateDecayRate,
+      trainConfig.learningRateDecaySteps,
+      staircase = true,
+      trainConfig.learningRateDecayStartStep)
+    trainConfig.optimizer(trainConfig.learningRateInitial, decay)
   }
 
   protected val estimator: tf.learn.Estimator[
@@ -103,7 +120,7 @@ trait Model[S, SS] {
         null
     }
     var hooks = Set[tf.learn.Hook](
-      // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
+      tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainConfig.summarySteps)),
       tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
@@ -112,19 +129,19 @@ trait Model[S, SS] {
     if (logConfig.logTrainEvalSteps > 0 && srcTrainDataset != null && tgtTrainDataset != null)
       hooks += tf.learn.Evaluator(
         log = true, summariesDir,
-        () => createTrainDataset(srcTrainDataset, tgtTrainDataset, logConfig.logEvalBatchSize, repeat = false, 1),
+        () => createSupervisedDataset(srcTrainDataset, tgtTrainDataset, logConfig.logEvalBatchSize, repeat = false, 1),
         Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTrainEvalSteps),
         triggerAtEnd = true, name = "TrainEvaluator")
     if (logConfig.logDevEvalSteps > 0 && srcDevDataset != null && tgtDevDataset != null)
       hooks += tf.learn.Evaluator(
         log = true, summariesDir,
-        () => createTrainDataset(srcDevDataset, tgtDevDataset, logConfig.logEvalBatchSize, repeat = false, 1),
+        () => createSupervisedDataset(srcDevDataset, tgtDevDataset, logConfig.logEvalBatchSize, repeat = false, 1),
         Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logDevEvalSteps),
         triggerAtEnd = true, name = "DevEvaluator")
     if (logConfig.logTestEvalSteps > 0 && srcTestDataset != null && tgtTestDataset != null)
       hooks += tf.learn.Evaluator(
         log = true, summariesDir,
-        () => createTrainDataset(srcTestDataset, tgtTestDataset, logConfig.logEvalBatchSize, repeat = false, 1),
+        () => createSupervisedDataset(srcTestDataset, tgtTestDataset, logConfig.logEvalBatchSize, repeat = false, 1),
         Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTestEvalSteps),
         triggerAtEnd = true, name = "TestEvaluator")
     tf.learn.InMemoryEstimator(
@@ -132,149 +149,81 @@ trait Model[S, SS] {
       StopCriteria(Some(trainConfig.numSteps)), hooks, tensorBoardConfig = tensorBoardConfig)
   }
 
-  protected def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
+  private final def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
     new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)](name) {
-      override val layerType: String = "ModelTrainLayer"
+      override val layerType: String = "TrainLayer"
 
       override def forward(
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
-        val encLayerInstance = encoder(input._1, mode)
-        val decLayerInstance = trainDecoder((input._2, encLayerInstance.output), mode)
-        LayerInstance(
-          input, decLayerInstance.output,
-          encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
-          encLayerInstance.nonTrainableVariables ++ decLayerInstance.nonTrainableVariables)
+        tf.createWithNameScope("TrainLayer") {
+          val encLayerInstance = encoder(input._1, mode)
+          val decLayerInstance = trainDecoder((input, encLayerInstance.output), mode)
+          LayerInstance(
+            input, decLayerInstance.output,
+            encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
+            encLayerInstance.nonTrainableVariables ++ decLayerInstance.nonTrainableVariables)
+        }
       }
     }
   }
 
-  protected def inferLayer: Layer[(Output, Output), (Output, Output)] = {
+  private final def inferLayer: Layer[(Output, Output), (Output, Output)] = {
     new Layer[(Output, Output), (Output, Output)](name) {
-      override val layerType: String = "ModelInferLayer"
+      override val layerType: String = "InferLayer"
 
       override def forward(input: (Output, Output), mode: Mode): LayerInstance[(Output, Output), (Output, Output)] = {
-        val encLayerInstance = encoder(input, mode)
-        val decLayerInstance = inferDecoder((input, encLayerInstance.output), mode)
-        // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time] when using beam search.
-        val outputSequence = {
-          if (rnnConfig.timeMajor)
-            decLayerInstance.output._1.transpose()
-          else if (decLayerInstance.output._1.rank == 3)
-            decLayerInstance.output._1.transpose(Tensor(2, 0, 1))
-          else
-            decLayerInstance.output._1
+        tf.createWithNameScope("InferLayer") {
+          val encLayerInstance = encoder(input, mode)
+          val decLayerInstance = inferDecoder((input, encLayerInstance.output), mode)
+          // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
+          // when using beam search.
+          val outputSequence = {
+            if (rnnConfig.timeMajor)
+              decLayerInstance.output._1.transpose()
+            else if (decLayerInstance.output._1.rank == 3)
+              decLayerInstance.output._1.transpose(Tensor(2, 0, 1))
+            else
+              decLayerInstance.output._1
+          }
+          LayerInstance(
+            input, (outputSequence, decLayerInstance.output._2),
+            encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
+            encLayerInstance.nonTrainableVariables ++ decLayerInstance.nonTrainableVariables)
         }
-        LayerInstance(
-          input, (outputSequence, decLayerInstance.output._2),
-          encLayerInstance.trainableVariables ++ decLayerInstance.trainableVariables,
-          encLayerInstance.nonTrainableVariables ++ decLayerInstance.nonTrainableVariables)
       }
     }
   }
 
-  protected def lossLayer: Layer[((Output, Output), (Output, Output, Output)), Output] = {
+  private final def lossLayer: Layer[((Output, Output), (Output, Output, Output)), Output] = {
     new Layer[((Output, Output), (Output, Output, Output)), Output](name) {
-      override val layerType: String = "ModelLoss"
+      override val layerType: String = "Loss"
 
       override def forward(
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): LayerInstance[((Output, Output), (Output, Output, Output)), Output] = tf.createWithNameScope("Loss") {
-        val predictedSequence = if (rnnConfig.timeMajor) input._1._1.transpose(Tensor(1, 0, 2)) else input._1._1
-        val targetSequence = input._2._2
-        val loss = tf.sum(tf.sequenceLoss(
-          predictedSequence, targetSequence,
-          weights = tf.sequenceMask(input._1._2, tf.shape(predictedSequence)(1), dataType = input._1._1.dataType),
-          averageAcrossTimeSteps = false, averageAcrossBatch = true))
-        tf.summary.scalar("Loss", loss)
-        LayerInstance(input, loss)
+        val lossValue = loss(input._1._1, input._2._2, input._1._2)
+        tf.summary.scalar("Loss", lossValue)
+        LayerInstance(input, lossValue)
       }
     }
-  }
-
-  protected def optimizer: tf.train.Optimizer = {
-    val decay = ExponentialDecay(
-      trainConfig.learningRateDecayRate,
-      trainConfig.learningRateDecaySteps,
-      staircase = true,
-      trainConfig.learningRateDecayStartStep)
-    trainConfig.optimizer(trainConfig.learningRateInitial, decay)
   }
 
   def train(stopCriteria: StopCriteria = StopCriteria(Some(trainConfig.numSteps))): Unit = {
-    val trainDataset = () => createTrainDataset(
+    val trainDataset = () => createSupervisedDataset(
       srcTrainDataset, tgtTrainDataset, trainConfig.batchSize, repeat = true, dataConfig.numBuckets)
     estimator.train(trainDataset, stopCriteria)
-  }
-
-  protected def decode[DS, DSS](
-      inputSequenceLengths: Output,
-      inputState: DS,
-      embeddings: Variable,
-      embeddedInput: Output,
-      cellInstance: CellInstance[Output, Shape, DS, DSS],
-      variableFn: (String, DataType, Shape, tf.VariableInitializer) => Variable,
-      isTrain: Boolean,
-      mode: Mode
-  )(implicit
-      evS: WhileLoopVariable.Aux[DS, DSS]
-  ): (Output, Output) = {
-    val outputWeights = variableFn(
-      "OutWeights", embeddings.dataType, Shape(cellInstance.cell.outputShape(-1), tgtVocabulary.size),
-      tf.RandomUniformInitializer(-0.1f, 0.1f))
-    val outputLayer = (logits: Output) => tf.linear(logits, outputWeights.value)
-    if (isTrain) {
-      val helper = BasicDecoder.TrainingHelper(embeddedInput, inputSequenceLengths, rnnConfig.timeMajor)
-      val decoder = BasicDecoder(cellInstance.cell, inputState, helper, outputLayer)
-      val tuple = decoder.decode(
-        outputTimeMajor = rnnConfig.timeMajor, parallelIterations = rnnConfig.parallelIterations,
-        swapMemory = rnnConfig.swapMemory)
-      val lengths = tuple._3
-      mode match {
-        case INFERENCE | EVALUATION => (tuple._1.sample, lengths)
-        case _ => (tuple._1.rnnOutput, lengths)
-      }
-    } else {
-      val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, o)
-      val tgtVocabLookupTable = tgtVocabulary.lookupTable()
-      val tgtBosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
-      val tgtEosID = tgtVocabLookupTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-      if (inferConfig.beamWidth > 1) {
-        val decoder = BeamSearchDecoder(
-          cellInstance.cell, inputState,
-          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID, inferConfig.beamWidth,
-          GooglePenalty(inferConfig.lengthPenaltyWeight), outputLayer)
-        val tuple = decoder.decode(
-          outputTimeMajor = rnnConfig.timeMajor,
-          maximumIterations = inferMaxLength(tf.max(inputSequenceLengths)),
-          parallelIterations = rnnConfig.parallelIterations, swapMemory = rnnConfig.swapMemory)
-        (tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
-      } else {
-        val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
-          embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths))(tgtBosID), tgtEosID)
-        val decoder = BasicDecoder(cellInstance.cell, inputState, decHelper, outputLayer)
-        val tuple = decoder.decode(
-          outputTimeMajor = rnnConfig.timeMajor,
-          maximumIterations = inferMaxLength(tf.max(inputSequenceLengths)),
-          parallelIterations = rnnConfig.parallelIterations, swapMemory = rnnConfig.swapMemory)
-        (tuple._1.sample, tuple._3)
-      }
-    }
-  }
-
-  /** Returns the maximum sequence length to consider while decoding during inference, given the provided source
-    * sequence length. */
-  protected def inferMaxLength(srcLength: Output): Output = {
-    if (dataConfig.tgtMaxLength != -1)
-      tf.constant(dataConfig.tgtMaxLength)
-    else
-      tf.round(tf.max(srcLength) * inferConfig.decoderMaxLengthFactor).cast(INT32)
   }
 }
 
 object Model {
+  def embeddings(dataType: DataType, srcSize: Int, numUnits: Int, name: String = "Embeddings"): Variable = {
+    val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+    tf.variable(name, dataType, Shape(srcSize, numUnits), embeddingsInitializer)
+  }
+
   private[this] def device(layerIndex: Int, numGPUs: Int = 0): String = {
     if (numGPUs == 0)
       "/device:CPU:0"

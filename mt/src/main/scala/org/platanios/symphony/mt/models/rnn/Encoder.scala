@@ -29,11 +29,11 @@ abstract class Encoder[S, SS]()(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) {
-  def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Encoder.Instance[S]
+  def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]]
 }
 
 object Encoder {
-  case class Instance[S](tuple: Tuple[Output, Seq[S]], trainableVars: Set[Variable], nonTrainableVars: Set[Variable])
+  case class Instance[S](tuple: Tuple[Output, Seq[S]])
 }
 
 class UnidirectionalEncoder[S, SS](
@@ -52,7 +52,7 @@ class UnidirectionalEncoder[S, SS](
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Encoder[S, SS]()(evS, evSDropout) {
-  override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Encoder.Instance[S] = {
+  override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]] = {
     // Time-major transpose
     val transposedSequences = if (rnnConfig.timeMajor) inputSequences.transpose() else inputSequences
 
@@ -66,13 +66,9 @@ class UnidirectionalEncoder[S, SS](
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
       residualFn, 0, env.numGPUs, env.randomSeed, "MultiUniCell")
     val uniCellInstance = uniCell.createCell(mode, embeddedSequences.shape)
-    val uniTuple = tf.dynamicRNN(
+    tf.dynamicRNN(
       uniCellInstance.cell, embeddedSequences, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
       rnnConfig.swapMemory, sequenceLengths, "UnidirectionalLayers")
-    Encoder.Instance(
-      tuple = uniTuple,
-      trainableVars = uniCellInstance.trainableVariables + embeddings,
-      nonTrainableVars = uniCellInstance.nonTrainableVariables)
   }
 }
 
@@ -92,7 +88,7 @@ class BidirectionalEncoder[S, SS](
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Encoder[S, SS]()(evS, evSDropout) {
-  override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Encoder.Instance[S] = {
+  override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]] = {
     // Time-major transpose
     val transposedSequences = if (rnnConfig.timeMajor) inputSequences.transpose() else inputSequences
 
@@ -113,14 +109,10 @@ class BidirectionalEncoder[S, SS](
     val unmergedBiTuple = tf.bidirectionalDynamicRNN(
       biCellInstanceFw.cell, biCellInstanceBw.cell, embeddedSequences, null, null, rnnConfig.timeMajor,
       rnnConfig.parallelIterations, rnnConfig.swapMemory, sequenceLengths, "BidirectionalLayers")
-    val biTuple = Tuple(
+    Tuple(
       tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1),
       unmergedBiTuple._1.state.map(List(_))
           .zipAll(unmergedBiTuple._2.state.map(List(_)), Nil, Nil)
           .flatMap(Function.tupled(_ ::: _)))
-    Encoder.Instance(
-      tuple = biTuple,
-      trainableVars = biCellInstanceFw.trainableVariables ++ biCellInstanceBw.trainableVariables + embeddings,
-      nonTrainableVars = biCellInstanceFw.nonTrainableVariables ++ biCellInstanceBw.nonTrainableVariables)
   }
 }
