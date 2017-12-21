@@ -107,8 +107,8 @@ class UnidirectionalDecoder[S, SS](
 
   protected def decode[DS, DSS](
       inputSequenceLengths: Output,
-      targetSequenceLengths: Output,
       targetSequences: Output,
+      targetSequenceLengths: Output,
       initialState: DS,
       embeddings: Variable,
       cell: RNNCell[Output, Shape, DS, DSS],
