@@ -153,8 +153,12 @@ class Model[S, SS](
 
       override def forward(input: ((Output, Output), (Output, Output, Output)), mode: Mode): (Output, Output) = {
         tf.createWithNameScope("TrainLayer") {
-          val encTuple = config.encoder.create(input._1._1, input._1._2, mode)
-          val decTuple = config.decoder.create(encTuple, input._1._2, input._2._2, input._2._3, mode)
+          val encTuple = tf.createWithVariableScope("Encoder") {
+            config.encoder.create(input._1._1, input._1._2, mode)
+          }
+          val decTuple = tf.createWithVariableScope("Decoder") {
+            config.decoder.create(encTuple, input._1._2, input._2._2, input._2._3, mode)
+          }
           (decTuple.sequences, decTuple.sequenceLengths)
         }
       }
@@ -167,8 +171,12 @@ class Model[S, SS](
 
       override def forward(input: (Output, Output), mode: Mode): (Output, Output) = {
         tf.createWithNameScope("InferLayer") {
-          val encTuple = config.encoder.create(input._1, input._2, mode)
-          val decTuple = config.decoder.create(encTuple, input._2, null, null, mode)
+          val encTuple = tf.createWithVariableScope("Encoder") {
+            config.encoder.create(input._1, input._2, mode)
+          }
+          val decTuple = tf.createWithVariableScope("Decoder") {
+            config.decoder.create(encTuple, input._2, null, null, mode)
+          }
           // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
           // when using beam search.
           val outputSequence = {
@@ -226,7 +234,7 @@ object Model {
       trainConfig: TrainConfig = TrainConfig(),
       inferConfig: InferConfig = InferConfig(),
       logConfig: LogConfig = LogConfig(),
-      name: String = "BasicModel"
+      name: String = "Model"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
