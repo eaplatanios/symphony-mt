@@ -79,11 +79,11 @@ class Model[S, SS](
       env.randomSeed)
   }
 
-  protected def loss(predictedSequences: Output, targetSequences: Output, sequenceLengths: Output): Output = {
+  protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
     val transposed = if (rnnConfig.timeMajor) predictedSequences.transpose(Tensor(1, 0, 2)) else predictedSequences
     tf.sum(tf.sequenceLoss(
       transposed, targetSequences,
-      weights = tf.sequenceMask(sequenceLengths, tf.shape(transposed)(1), dataType = predictedSequences.dataType),
+      weights = tf.sequenceMask(targetSequenceLengths, tf.shape(transposed)(1), dataType = predictedSequences.dataType),
       averageAcrossTimeSteps = false, averageAcrossBatch = false)) / tf.shape(transposed)(0)
   }
 
@@ -200,7 +200,7 @@ class Model[S, SS](
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): Output = tf.createWithNameScope("Loss") {
-        val lossValue = loss(input._1._1, input._2._2, input._1._2)
+        val lossValue = loss(input._1._1, input._2._2, input._2._3)
         tf.summary.scalar("Loss", lossValue)
         lossValue
       }
