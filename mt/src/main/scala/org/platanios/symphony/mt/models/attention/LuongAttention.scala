@@ -13,9 +13,8 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.rnn
+package org.platanios.symphony.mt.models.attention
 
-import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.Shape
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.RNNCell
@@ -23,26 +22,11 @@ import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
 import org.platanios.tensorflow.api.ops.variables.OnesInitializer
+import org.platanios.tensorflow.api.{ops, tf}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Attention {
-  def create[S, SS](
-      cell: RNNCell[Output, Shape, Seq[S], Seq[SS]],
-      memory: Output,
-      memorySequenceLengths: Output,
-      numUnits: Int,
-      inputSequencesLastAxisSize: Int,
-      initialState: Seq[S],
-      outputAttention: Boolean,
-      mode: Mode
-  )(implicit
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): (AttentionWrapperCell[Seq[S], Seq[SS]], AttentionWrapperState[Seq[S], Seq[SS]])
-}
-
 case class LuongAttention(
     scaled: Boolean = false,
     probabilityFn: (Output) => Output = tf.softmax(_, name = "Probability"),

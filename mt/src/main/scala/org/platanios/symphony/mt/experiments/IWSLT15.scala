@@ -20,6 +20,7 @@ import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
+import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.StopCriteria
@@ -88,14 +89,14 @@ object IWSLT15 extends App {
 
   // Create a translator
   val config = Model.Config(
-    BidirectionalEncoder(
+    UnidirectionalRNNEncoder(
       srcLang, srcVocab, env, rnnConfig,
       cell = LSTM(forgetBias = 1.0f),
       numUnits = 512,
       numLayers = 2,
       residual = false,
       dropout = Some(0.2f)),
-    UnidirectionalDecoder(
+    UnidirectionalRNNDecoder(
       tgtLang, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
       cell = LSTM(forgetBias = 1.0f),
       numUnits = 512,

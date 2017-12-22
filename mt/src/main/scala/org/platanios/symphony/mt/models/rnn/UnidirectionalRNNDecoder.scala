@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.models.InferConfig
+import org.platanios.symphony.mt.models.attention.Attention
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
