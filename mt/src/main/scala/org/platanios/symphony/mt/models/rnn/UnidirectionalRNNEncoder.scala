@@ -17,10 +17,10 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
-import org.platanios.tensorflow.api.{DataType, FLOAT32, Output, ops, tf}
 
 /**
   * @author Emmanouil Antonios Platanios

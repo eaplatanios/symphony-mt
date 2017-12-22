@@ -19,12 +19,11 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.models.InferConfig
 import org.platanios.symphony.mt.models.attention.Attention
+import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.{RNNCell, Tuple}
 import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSearchDecoder, GooglePenalty}
-import org.platanios.tensorflow.api.{---, DataType, FLOAT32, INT32, Shape, Tensor, Variable, ops, tf}
 
 /**
   * @author Emmanouil Antonios Platanios
