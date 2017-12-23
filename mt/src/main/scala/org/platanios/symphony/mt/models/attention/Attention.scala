@@ -28,16 +28,16 @@ import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, Att
   */
 trait Attention {
   def create[S, SS](
-      cell: RNNCell[Output, Shape, Seq[S], Seq[SS]],
+      cell: RNNCell[Output, Shape, S, SS],
       memory: Output,
       memorySequenceLengths: Output,
       numUnits: Int,
       inputSequencesLastAxisSize: Int,
-      initialState: Seq[S],
+      initialState: S,
       outputAttention: Boolean,
       mode: Mode
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): (AttentionWrapperCell[Seq[S], Seq[SS]], AttentionWrapperState[Seq[S], Seq[SS]])
+  ): (AttentionWrapperCell[S, SS], AttentionWrapperState[S, SS])
 }
