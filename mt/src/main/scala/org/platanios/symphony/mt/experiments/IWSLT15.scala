@@ -88,26 +88,37 @@ object IWSLT15 extends App {
     logTrainEvalSteps = -1)
 
   // Create a translator
-  val config = Model.Config(
-    UnidirectionalRNNEncoder(
-      srcLang, srcVocab, env, rnnConfig,
-      cell = BasicLSTM(forgetBias = 1.0f),
-      numUnits = 512,
-      numLayers = 2,
-      residual = false,
-      dropout = Some(0.2f)),
-    UnidirectionalRNNDecoder(
-      tgtLang, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
-      cell = BasicLSTM(forgetBias = 1.0f),
-      numUnits = 512,
-      numLayers = 2,
-      residual = false,
-      dropout = Some(0.2f),
-      attention = Some(LuongAttention(scaled = true)),
-      outputAttention = true))
+//  val config = Model.Config(
+//    UnidirectionalRNNEncoder(
+//      srcLang, srcVocab, env, rnnConfig,
+//      cell = BasicLSTM(forgetBias = 1.0f),
+//      numUnits = 512,
+//      numLayers = 2,
+//      residual = false,
+//      dropout = Some(0.2f)),
+//    UnidirectionalRNNDecoder(
+//      tgtLang, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
+//      cell = BasicLSTM(forgetBias = 1.0f),
+//      numUnits = 512,
+//      numLayers = 2,
+//      residual = false,
+//      dropout = Some(0.2f),
+//      attention = Some(LuongAttention(scaled = true)),
+//      outputAttention = true))
+
+  val gnmtConfig = GNMTConfig(
+    srcLang, tgtLang, srcVocab, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
+    cell = BasicLSTM(forgetBias = 1.0f),
+    numUnits = 512,
+    numBiLayers = 1,
+    numUniLayers = 2,
+    numUniResLayers = 1,
+    dropout = Some(0.2f),
+    attention = LuongAttention(scaled = true),
+    useNewAttention = false)
 
   val model = Model(
-    config, srcLang, tgtLang, srcVocab, tgtVocab,
+    gnmtConfig, srcLang, tgtLang, srcVocab, tgtVocab,
     srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
     env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, "Model")
 

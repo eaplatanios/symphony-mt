@@ -278,7 +278,7 @@ object Model {
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): tf.learn.RNNCell[Output, Shape, S, SS] = tf.learn.nameScope(name) {
+  ): tf.learn.RNNCell[Output, Shape, S, SS] = tf.learn.variableScope(name) {
     var createdCell = cellCreator.create(name, numUnits, dataType)
     createdCell = dropout.map(p => DropoutWrapper("Dropout", createdCell, 1.0f - p, seed = seed)).getOrElse(createdCell)
     createdCell = residualFn.map(ResidualWrapper("Residual", createdCell, _)).getOrElse(createdCell)
@@ -301,7 +301,7 @@ object Model {
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): Seq[tf.learn.RNNCell[Output, Shape, S, SS]] = tf.learn.nameScope(name) {
+  ): Seq[tf.learn.RNNCell[Output, Shape, S, SS]] = tf.learn.variableScope(name) {
     (0 until numLayers).map(i => {
       cell(
         cellCreator, numUnits, dataType, dropout, if (i >= numLayers - numResidualLayers) residualFn else None,
@@ -320,12 +320,12 @@ object Model {
       baseGPU: Int = 0,
       numGPUs: Int = 0,
       seed: Option[Int] = None,
-      name: String,
+      name: String
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.learn.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {
-    MultiRNNCell(name, cells(
+    MultiCell(name, cells(
       cellCreator, numUnits, dataType, numLayers, numResidualLayers, dropout,
       residualFn, baseGPU, numGPUs, seed, name))
   }
