@@ -43,7 +43,7 @@ class UnidirectionalRNNDecoder[S, SS](
     val dropout: Option[Float] = None,
     val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
     val attention: Option[Attention] = None,
-    val outputAttention: Boolean = false
+    val outputAttention: Boolean = true
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -55,7 +55,7 @@ class UnidirectionalRNNDecoder[S, SS](
     // Embeddings
     val embeddings = Model.embeddings(dataType, tgtVocabulary.size, numUnits, "Embeddings")
 
-    // Decoder RNN cell
+    // RNN cell
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = Model.multiCell(
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
@@ -84,7 +84,8 @@ class UnidirectionalRNNDecoder[S, SS](
           embeddings, uniCell.createCell(mode, Shape(numUnits)), mode)
       case Some(attentionCreator) =>
         val (attentionCell, attentionInitialState) = attentionCreator.create(
-          uniCell, memory, memorySequenceLengths, numUnits, numUnits, initialState, outputAttention, mode)
+          uniCell, memory, memorySequenceLengths, numUnits, numUnits, initialState, useAttentionLayer = true,
+          outputAttention = outputAttention, mode)
         decode(
           inputSequenceLengths, targetSequences, targetSequenceLengths, attentionInitialState,
           embeddings, attentionCell, mode)
