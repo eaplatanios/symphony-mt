@@ -80,11 +80,12 @@ class Model[S, SS](
   }
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
-    val transposed = if (rnnConfig.timeMajor) predictedSequences.transpose(Tensor(1, 0, 2)) else predictedSequences
-    tf.sum(tf.sequenceLoss(
-      transposed, targetSequences,
-      weights = tf.sequenceMask(targetSequenceLengths, tf.shape(transposed)(1), dataType = predictedSequences.dataType),
-      averageAcrossTimeSteps = false, averageAcrossBatch = false)) / tf.shape(transposed)(0)
+    val maxTime = tf.shape(targetSequences)(1)
+    val transposedTargetSequences = if (rnnConfig.timeMajor) targetSequences.transpose() else targetSequences
+    val crossEntropy = tf.sparseSoftmaxCrossEntropy(predictedSequences, transposedTargetSequences)
+    val weights = tf.sequenceMask(targetSequenceLengths, maxTime, predictedSequences.dataType)
+    val transposedWeights = if (rnnConfig.timeMajor) weights.transpose() else weights
+    tf.sum(crossEntropy * transposedWeights) / tf.size(targetSequenceLengths).cast(FLOAT32)
   }
 
   protected def optimizer: tf.train.Optimizer = {
