@@ -104,7 +104,7 @@ object IWSLT15 extends App {
       residual = false,
       dropout = Some(0.2f),
       attention = Some(LuongAttention(scaled = true)),
-      outputAttention = false))
+      outputAttention = true))
 
   val model = Model(
     config, srcLang, tgtLang, srcVocab, tgtVocab,
