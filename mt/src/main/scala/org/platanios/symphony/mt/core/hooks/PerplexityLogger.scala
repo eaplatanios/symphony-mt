@@ -34,8 +34,8 @@ import java.nio.file.Path
   *                      `true`, then `tensors` must be computable without using a feed map for the `Session.run()`
   *                      call.
   * @param  formatter    Function used to format the message that is being logged. It takes the time taken since the
-  *                      last logged message, the current step, and the current loss value, as input, and returns a
-  *                      string to log.
+  *                      last logged message, the current step, the current gradients norm, the current perplexity
+  *                      value, as input, and returns a string to log.
   *
   * @author Emmanouil Antonios Platanios
   */
@@ -45,7 +45,7 @@ case class PerplexityLogger(
     trigger: HookTrigger = StepHookTrigger(1),
     triggerAtEnd: Boolean = true,
     average: Boolean = true,
-    formatter: (Option[Double], Long, Float, Option[Double]) => String = null,
+    formatter: (Option[Double], Long, Float, Float, Option[Double]) => String = null,
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
     (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
@@ -55,23 +55,26 @@ case class PerplexityLogger(
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 
-  private[this] var step        : Variable = _
-  private[this] var loss        : Output   = _
-  private[this] var srcWordCount: Output   = _
-  private[this] var tgtWordCount: Output   = _
+  private[this] var step         : Variable = _
+  private[this] var gradientsNorm: Output   = _
+  private[this] var loss         : Output   = _
+  private[this] var srcWordCount : Output   = _
+  private[this] var tgtWordCount : Output   = _
 
-  private[this] val internalTrigger  : HookTrigger = trigger.copy()
-  private[this] var lastStep         : Long        = 0L
-  private[this] var shouldTrigger    : Boolean     = false
-  private[this] var totalLoss        : Float       = 0.0f
-  private[this] var totalSrcWordCount: Long        = 0L
-  private[this] var totalTgtWordCount: Long        = 0L
+  private[this] val internalTrigger   : HookTrigger = trigger.copy()
+  private[this] var lastStep          : Long        = 0L
+  private[this] var shouldTrigger     : Boolean     = false
+  private[this] var totalGradientsNorm: Float       = 0.0f
+  private[this] var totalLoss         : Float       = 0.0f
+  private[this] var totalSrcWordCount : Long        = 0L
+  private[this] var totalTgtWordCount : Long        = 0L
 
   override protected def begin(): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
       s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'PerplexityLogger'."))
     internalTrigger.reset()
     shouldTrigger = false
+    gradientsNorm = modelInstance.gradientsAndVariables.map(g => tf.globalNorm(g.map(_._1))).orNull
     loss = modelInstance.loss.map(_.cast(FLOAT32))
         .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._3))).orNull
     srcWordCount = modelInstance.trainInput.map(o => tf.sum(o._1._2)).orNull
@@ -89,9 +92,9 @@ case class PerplexityLogger(
       executableEv: Executable[E],
       fetchableEv: Fetchable.Aux[F, R]
   ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor]]] = {
-    shouldTrigger = loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
+    shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
     if (average || shouldTrigger)
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value, loss, srcWordCount, tgtWordCount)))
+      Some(Hook.SessionRunArgs(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
     else
       Some(Hook.SessionRunArgs(fetches = Seq(step.value)))
   }
@@ -109,35 +112,48 @@ case class PerplexityLogger(
   override protected def end(session: Session): Unit = {
     if (triggerAtEnd && lastStep.toInt != internalTrigger.lastTriggerStep().getOrElse(-1)) {
       shouldTrigger = true
-      processFetches(session.run(fetches = Seq(step.value, loss, srcWordCount, tgtWordCount)))
+      processFetches(session.run(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
     }
   }
 
   private[this] def processFetches(fetches: Seq[Tensor]): Unit = {
     lastStep = fetches.head.scalar.asInstanceOf[Long]
     if (average || shouldTrigger) {
-      totalLoss += fetches(1).scalar.asInstanceOf[Float]
-      totalSrcWordCount += fetches(2).scalar.asInstanceOf[Int]
-      totalTgtWordCount += fetches(3).scalar.asInstanceOf[Int]
+      totalGradientsNorm += fetches(1).scalar.asInstanceOf[Float]
+      totalLoss += fetches(2).scalar.asInstanceOf[Float]
+      totalSrcWordCount += fetches(3).scalar.asInstanceOf[Int]
+      totalTgtWordCount += fetches(4).scalar.asInstanceOf[Int]
       if (shouldTrigger) {
+        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1)
+        val elapsedTime = elapsed.map(_._1)
         val totalWordCount = totalSrcWordCount + totalTgtWordCount
+        val meanGradientsNorm = totalGradientsNorm / elapsed.map(_._2).getOrElse(1)
         val meanPerplexity = Math.exp(totalLoss / totalTgtWordCount).toFloat
-        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1).map(_._1)
         val message = {
           if (formatter != null) {
-            formatter(elapsed, lastStep, meanPerplexity, elapsed.map(s => totalWordCount / (1000 * s)))
+            formatter(
+              elapsedTime, lastStep, meanGradientsNorm, meanPerplexity,
+              elapsedTime.map(s => totalWordCount / (1000 * s)))
           } else {
-            elapsed match {
+            elapsedTime match {
               case Some(s) =>
                 val wps = totalWordCount / (1000 * s)
-                f"($s%9.3f s / $wps%5.2fk words/s ) Step: $lastStep%6d, Perplexity: $meanPerplexity%.4f"
-              case None => f"(    timing not available yet ) Step: $lastStep%6d, Perplexity: $meanPerplexity%.4f"
+                f"($s%9.3f s / $wps%5.2fk words/s ) " +
+                    f"Step: $lastStep%6d, " +
+                    f"Perplexity: $meanPerplexity%12.4f, " +
+                    f"Gradients Norm: $meanGradientsNorm%12.4f"
+              case None =>
+                f"(    timing not available yet ) " +
+                    f"Step: $lastStep%6d, " +
+                    f"Perplexity: $meanPerplexity%12.4f, " +
+                    f"Gradients Norm: $meanGradientsNorm%12.4f"
             }
           }
         }
         if (log)
           PerplexityLogger.logger.info(message)
         writeSummary(lastStep, summaryTag, meanPerplexity)
+        totalGradientsNorm = 0.0f
         totalLoss = 0.0f
         totalSrcWordCount = 0L
         totalTgtWordCount = 0L
