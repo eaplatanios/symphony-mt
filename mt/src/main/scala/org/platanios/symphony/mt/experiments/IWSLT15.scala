@@ -91,14 +91,14 @@ object IWSLT15 extends App {
   val config = Model.Config(
     UnidirectionalRNNEncoder(
       srcLang, srcVocab, env, rnnConfig,
-      cell = LSTM(forgetBias = 1.0f),
+      cell = BasicLSTM(forgetBias = 1.0f),
       numUnits = 512,
       numLayers = 2,
       residual = false,
       dropout = Some(0.2f)),
     UnidirectionalRNNDecoder(
       tgtLang, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
-      cell = LSTM(forgetBias = 1.0f),
+      cell = BasicLSTM(forgetBias = 1.0f),
       numUnits = 512,
       numLayers = 2,
       residual = false,

@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.tensorflow.api.core.Shape
-import org.platanios.tensorflow.api.learn.layers.rnn.cell.{GRUCell, LSTMCell, RNNCell}
+import org.platanios.tensorflow.api.learn.layers.rnn.cell.{BasicLSTMCell, GRUCell, LSTMCell, RNNCell}
 import org.platanios.tensorflow.api.ops.rnn.cell.LSTMState
 import org.platanios.tensorflow.api.ops.{Math, Output}
 import org.platanios.tensorflow.api.types.DataType
@@ -31,6 +31,13 @@ trait Cell[S, SS] {
 case class GRU(activation: Output => Output = Math.tanh(_)) extends Cell[Output, Shape] {
   override def create(name: String, numUnits: Int, dataType: DataType): RNNCell[Output, Shape, Output, Shape] = {
     GRUCell(name, numUnits, dataType, activation)
+  }
+}
+
+case class BasicLSTM(forgetBias: Float = 1.0f, activation: Output => Output = Math.tanh(_))
+    extends Cell[LSTMState, (Shape, Shape)] {
+  override def create(name: String, numUnits: Int, dataType: DataType): BasicLSTMCell = {
+    BasicLSTMCell(name, numUnits, dataType, forgetBias, activation)
   }
 }
 
