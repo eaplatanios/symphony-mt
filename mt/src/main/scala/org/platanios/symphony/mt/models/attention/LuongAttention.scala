@@ -39,6 +39,7 @@ case class LuongAttention(
       numUnits: Int,
       inputSequencesLastAxisSize: Int,
       initialState: S,
+      useAttentionLayer: Boolean,
       outputAttention: Boolean,
       mode: Mode
   )(implicit
@@ -49,11 +50,16 @@ case class LuongAttention(
     val scale = if (scaled) tf.variable("LuongFactor", memory.dataType, Shape.scalar(), OnesInitializer) else null
     val attention = tf.LuongAttention(
       memory, memoryWeights.value, memorySequenceLengths, scale.value, probabilityFn, scoreMask, "Attention")
-    val attentionWeights = tf.variable(
-      "AttentionWeights", attention.dataType, Shape(numUnits + memory.shape(-1), numUnits), null)
+    val attentionWeights = {
+      if (useAttentionLayer)
+        Seq(tf.variable(
+          "AttentionWeights", attention.dataType, Shape(numUnits + memory.shape(-1), numUnits), null).value)
+      else
+        null
+    }
     val createdCell = cell.createCell(mode, Shape(inputSequencesLastAxisSize + numUnits))
     val attentionCell = tf.AttentionWrapperCell(
-      createdCell, Seq(attention), Seq(attentionWeights.value), outputAttention = outputAttention)
+      createdCell, Seq(attention), attentionWeights, outputAttention = outputAttention)
     (attentionCell, attentionCell.initialState(initialState, memory.dataType))
   }
 }

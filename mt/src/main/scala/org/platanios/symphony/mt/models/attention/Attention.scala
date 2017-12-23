@@ -34,6 +34,7 @@ trait Attention {
       numUnits: Int,
       inputSequencesLastAxisSize: Int,
       initialState: S,
+      useAttentionLayer: Boolean,
       outputAttention: Boolean,
       mode: Mode
   )(implicit
