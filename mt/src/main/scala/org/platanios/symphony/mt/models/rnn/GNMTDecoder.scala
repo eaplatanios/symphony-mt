@@ -43,7 +43,7 @@ class GNMTDecoder[S, SS](
     val dataType: DataType = FLOAT32,
     val dropout: Option[Float] = None,
     val attention: Attention = LuongAttention(scaled = true),
-    val useNewAttention: Boolean = false
+    val useNewAttention: Boolean = true
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -163,7 +163,7 @@ object GNMTDecoder {
       dataType: DataType = FLOAT32,
       dropout: Option[Float] = None,
       attention: Attention = LuongAttention(scaled = true),
-      useNewAttention: Boolean = false
+      useNewAttention: Boolean = true
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]

@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
-import org.platanios.symphony.mt.models.attention.LuongAttention
+import org.platanios.symphony.mt.models.attention.{BahdanauAttention, LuongAttention}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.StopCriteria
@@ -114,7 +114,7 @@ object IWSLT15 extends App {
     numUniLayers = 2,
     numUniResLayers = 1,
     dropout = Some(0.2f),
-    attention = LuongAttention(scaled = true),
+    attention = BahdanauAttention(normalized = true),
     useNewAttention = false)
 
   val model = Model(
