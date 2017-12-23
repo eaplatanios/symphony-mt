@@ -102,6 +102,7 @@ class Model[S, SS](
       ((Tensor, Tensor), (Tensor, Tensor, Tensor)), ((Output, Output), (Output, Output, Output)),
       ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape)),
       ((Output, Output), (Output, Output, Output))] = tf.createWithNameScope(name) {
+    tf.setGlobalDefaultInitializer(tf.RandomUniformInitializer(-0.1f, 0.1f))
     val model = learn.Model(
       input = input,
       layer = inferLayer,
@@ -249,8 +250,7 @@ object Model {
 
   private[rnn] def embeddings(
       dataType: DataType, srcSize: Int, numUnits: Int, name: String = "Embeddings"): Variable = {
-    val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-    tf.variable(name, dataType, Shape(srcSize, numUnits), embeddingsInitializer)
+    tf.variable(name, dataType, Shape(srcSize, numUnits))
   }
 
   private[this] def device(layerIndex: Int, numGPUs: Int = 0): String = {
