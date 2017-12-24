@@ -23,4 +23,6 @@ import java.nio.file.{Path, Paths}
 case class Environment(
     workingDir: Path = Paths.get("temp"),
     numGPUs: Int = 0,
+    parallelIterations: Int = 32,
+    swapMemory: Boolean = true,
     randomSeed: Option[Int] = None)

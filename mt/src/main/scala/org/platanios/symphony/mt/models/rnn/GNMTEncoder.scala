@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -29,7 +30,6 @@ class GNMTEncoder[S, SS](
     val srcLanguage: Language,
     val srcVocabulary: Vocabulary,
     val env: Environment,
-    val rnnConfig: RNNConfig,
     val cell: Cell[S, SS],
     val numUnits: Int,
     val numBiLayers: Int,
@@ -37,14 +37,15 @@ class GNMTEncoder[S, SS](
     val numUniResLayers: Int,
     val dataType: DataType = FLOAT32,
     val dropout: Option[Float] = None,
-    val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+    val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
+    val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends RNNEncoder[S, SS]()(evS, evSDropout) {
   override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]] = {
     // Time-major transpose
-    val transposedSequences = if (rnnConfig.timeMajor) inputSequences.transpose() else inputSequences
+    val transposedSequences = if (timeMajor) inputSequences.transpose() else inputSequences
 
     // Embeddings
     val embeddings = Model.embeddings(dataType, srcVocabulary.size, numUnits, "Embeddings")
@@ -62,8 +63,8 @@ class GNMTEncoder[S, SS](
         val createdCellFw = biCellFw.createCell(mode, embeddedSequences.shape)
         val createdCellBw = biCellBw.createCell(mode, embeddedSequences.shape)
         val unmergedBiTuple = tf.bidirectionalDynamicRNN(
-          createdCellFw, createdCellBw, embeddedSequences, null, null, rnnConfig.timeMajor,
-          rnnConfig.parallelIterations, rnnConfig.swapMemory, sequenceLengths, "BidirectionalLayers")
+          createdCellFw, createdCellBw, embeddedSequences, null, null, timeMajor, env.parallelIterations,
+          env.swapMemory, sequenceLengths, "BidirectionalLayers")
         Tuple(
           tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1), unmergedBiTuple._2.state)
       } else {
@@ -77,8 +78,8 @@ class GNMTEncoder[S, SS](
       2 * numBiLayers, env.numGPUs, env.randomSeed, "MultiUniCell")
     val uniCellInstance = uniCell.createCell(mode, biTuple.output.shape)
     val uniTuple = tf.dynamicRNN(
-      uniCellInstance, biTuple.output, null, rnnConfig.timeMajor, rnnConfig.parallelIterations,
-      rnnConfig.swapMemory, sequenceLengths, "UnidirectionalLayers")
+      uniCellInstance, biTuple.output, null, timeMajor, env.parallelIterations, env.swapMemory, sequenceLengths,
+      "UnidirectionalLayers")
 
     // Pass all of the encoder's state except for the first bi-directional layer's state, to the decoder.
     Tuple(uniTuple.output, biTuple.state ++ uniTuple.state)
@@ -90,7 +91,6 @@ object GNMTEncoder {
       srcLanguage: Language,
       srcVocabulary: Vocabulary,
       env: Environment,
-      rnnConfig: RNNConfig,
       cell: Cell[S, SS],
       numUnits: Int,
       numBiLayers: Int,
@@ -98,13 +98,14 @@ object GNMTEncoder {
       numUniResLayers: Int,
       dataType: DataType = FLOAT32,
       dropout: Option[Float] = None,
-      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
+      timeMajor: Boolean = false
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): GNMTEncoder[S, SS] = {
     new GNMTEncoder[S, SS](
-      srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numBiLayers, numUniLayers, numUniResLayers, dataType,
-      dropout)(evS, evSDropout)
+      srcLanguage, srcVocabulary, env, cell, numUnits, numBiLayers, numUniLayers, numUniResLayers, dataType, dropout,
+      residualFn, timeMajor)(evS, evSDropout)
   }
 }

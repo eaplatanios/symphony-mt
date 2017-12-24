@@ -77,8 +77,7 @@ object Datasets {
       tgtVocabularyTable: tf.LookupTable,
       dataConfig: DataConfig,
       batchSize: Int,
-      repeat: Boolean = true,
-      randomSeed: Option[Int] = None
+      repeat: Boolean = true
   ): MTTrainDataset = {
     val actualBufferSize = if (dataConfig.bufferSize == -1L) 1000 * batchSize else dataConfig.bufferSize
     val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
@@ -107,7 +106,7 @@ object Datasets {
             else
               d
           })
-          .shuffle(actualBufferSize, randomSeed)
+          .shuffle(actualBufferSize)
           // Tokenize by splitting on white spaces.
           .map(
             d => (tf.stringSplit(d._1(NewAxis)).values, tf.stringSplit(d._2(NewAxis)).values),

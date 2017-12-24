@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
-import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
+import org.platanios.symphony.mt.models.{InferConfig, Model, TrainConfig}
 import org.platanios.symphony.mt.models.attention.{BahdanauAttention, LuongAttention}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.tensorflow.api._
@@ -55,13 +55,10 @@ object IWSLT15 extends App {
   // Create general configuration settings
   val env = Environment(
     workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
-    numGPUs = 0,
-    randomSeed = Some(10))
-
-  val rnnConfig = RNNConfig(
-    timeMajor = true,
+    numGPUs = 4,
     parallelIterations = 32,
-    swapMemory = true)
+    swapMemory = true,
+    randomSeed = Some(10))
 
   val dataConfig = DataConfig(
     numBuckets = 5,
@@ -88,26 +85,29 @@ object IWSLT15 extends App {
     logTrainEvalSteps = -1)
 
   // Create a translator
-//  val config = Model.Config(
-//    UnidirectionalRNNEncoder(
-//      srcLang, srcVocab, env, rnnConfig,
-//      cell = BasicLSTM(forgetBias = 1.0f),
-//      numUnits = 512,
-//      numLayers = 2,
-//      residual = false,
-//      dropout = Some(0.2f)),
-//    UnidirectionalRNNDecoder(
-//      tgtLang, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
-//      cell = BasicLSTM(forgetBias = 1.0f),
-//      numUnits = 512,
-//      numLayers = 2,
-//      residual = false,
-//      dropout = Some(0.2f),
-//      attention = Some(LuongAttention(scaled = true)),
-//      outputAttention = true))
+  //  val config = Model.Config(
+  //    UnidirectionalRNNEncoder(
+  //      srcLang, srcVocab, env,
+  //      cell = BasicLSTM(forgetBias = 1.0f),
+  //      numUnits = 512,
+  //      numLayers = 2,
+  //      residual = false,
+  //      dropout = Some(0.2f),
+  //      timeMajor = true),
+  //    UnidirectionalRNNDecoder(
+  //      tgtLang, tgtVocab, env, dataConfig, inferConfig,
+  //      cell = BasicLSTM(forgetBias = 1.0f),
+  //      numUnits = 512,
+  //      numLayers = 2,
+  //      residual = false,
+  //      dropout = Some(0.2f),
+  //      attention = Some(LuongAttention(scaled = true)),
+  //      outputAttention = true,
+  //      timeMajor = true),
+  //    timeMajor = true)
 
   val gnmtConfig = GNMTConfig(
-    srcLang, tgtLang, srcVocab, tgtVocab, env, rnnConfig, dataConfig, inferConfig,
+    srcLang, tgtLang, srcVocab, tgtVocab, env, dataConfig, inferConfig,
     cell = BasicLSTM(forgetBias = 1.0f),
     numUnits = 512,
     numBiLayers = 1,
@@ -115,12 +115,13 @@ object IWSLT15 extends App {
     numUniResLayers = 1,
     dropout = Some(0.2f),
     attention = BahdanauAttention(normalized = true),
-    useNewAttention = false)
+    useNewAttention = false,
+    timeMajor = true)
 
   val model = Model(
     gnmtConfig, srcLang, tgtLang, srcVocab, tgtVocab,
     srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
-    env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, "Model")
+    env, dataConfig, trainConfig, inferConfig, logConfig, "Model")
 
   model.train(StopCriteria(Some(trainConfig.numSteps)))
 }

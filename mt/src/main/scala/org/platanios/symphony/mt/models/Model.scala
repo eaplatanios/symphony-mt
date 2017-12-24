@@ -13,21 +13,19 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.rnn
+package org.platanios.symphony.mt.models
 
-import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.core.hooks.PerplexityLogger
-import org.platanios.symphony.mt.data.{DataConfig, Datasets, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
+import org.platanios.symphony.mt.data.{DataConfig, Datasets, Vocabulary}
 import org.platanios.symphony.mt.metrics.BLEUTensorFlow
-import org.platanios.symphony.mt.models.{InferConfig, TrainConfig}
-import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn
+import org.platanios.symphony.mt.models.rnn._
+import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.rnn.cell._
-import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
-import org.platanios.tensorflow.api.ops
+import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
+import org.platanios.tensorflow.api.{learn, ops, _}
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
@@ -53,7 +51,6 @@ class Model[S, SS](
     val srcTestDataset: MTTextLinesDataset = null,
     val tgtTestDataset: MTTextLinesDataset = null,
     val env: Environment = Environment(),
-    val rnnConfig: RNNConfig = RNNConfig(),
     val dataConfig: DataConfig = DataConfig(),
     val trainConfig: TrainConfig = TrainConfig(),
     val inferConfig: InferConfig = InferConfig(),
@@ -75,16 +72,15 @@ class Model[S, SS](
       numBuckets: Int
   ): MTTrainDataset = {
     Datasets.createTrainDataset(
-      srcDataset, tgtDataset, srcVocabulary.lookupTable(), tgtVocabulary.lookupTable(), dataConfig, batchSize, repeat,
-      env.randomSeed)
+      srcDataset, tgtDataset, srcVocabulary.lookupTable(), tgtVocabulary.lookupTable(), dataConfig, batchSize, repeat)
   }
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
     val maxTime = tf.shape(targetSequences)(1)
-    val transposedTargetSequences = if (rnnConfig.timeMajor) targetSequences.transpose() else targetSequences
+    val transposedTargetSequences = if (config.timeMajor) targetSequences.transpose() else targetSequences
     val crossEntropy = tf.sparseSoftmaxCrossEntropy(predictedSequences, transposedTargetSequences)
     val weights = tf.sequenceMask(targetSequenceLengths, maxTime, predictedSequences.dataType)
-    val transposedWeights = if (rnnConfig.timeMajor) weights.transpose() else weights
+    val transposedWeights = if (config.timeMajor) weights.transpose() else weights
     tf.sum(crossEntropy * transposedWeights) / tf.size(targetSequenceLengths).cast(FLOAT32)
   }
 
@@ -181,7 +177,7 @@ class Model[S, SS](
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
         // when using beam search.
         val outputSequence = {
-          if (rnnConfig.timeMajor)
+          if (config.timeMajor)
             decTuple.sequences.transpose()
           else if (decTuple.sequences.rank == 3)
             decTuple.sequences.transpose(Tensor(2, 0, 1))
@@ -229,7 +225,6 @@ object Model {
       srcTestDataset: MTTextLinesDataset = null,
       tgtTestDataset: MTTextLinesDataset = null,
       env: Environment = Environment(),
-      rnnConfig: RNNConfig = RNNConfig(),
       dataConfig: DataConfig = DataConfig(),
       trainConfig: TrainConfig = TrainConfig(),
       inferConfig: InferConfig = InferConfig(),
@@ -242,18 +237,25 @@ object Model {
     new Model[S, SS](
       config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary,
       srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
-      env, rnnConfig, dataConfig, trainConfig, inferConfig, logConfig, name)(evS, evSDropout)
+      env, dataConfig, trainConfig, inferConfig, logConfig, name)(evS, evSDropout)
   }
 
-  class Config[S, SS](val encoder: RNNEncoder[S, SS], val decoder: RNNDecoder[S, SS])
+  class Config[S, SS](
+      val encoder: RNNEncoder[S, SS],
+      val decoder: RNNDecoder[S, SS],
+      val timeMajor: Boolean = false)
 
   object Config {
-    def apply[S, SS](encoder: RNNEncoder[S, SS], decoder: RNNDecoder[S, SS]): Config[S, SS] = {
-      new Config[S, SS](encoder, decoder)
+    def apply[S, SS](
+        encoder: RNNEncoder[S, SS],
+        decoder: RNNDecoder[S, SS],
+        timeMajor: Boolean = false
+    ): Config[S, SS] = {
+      new Config[S, SS](encoder, decoder, timeMajor)
     }
   }
 
-  private[rnn] def embeddings(
+  private[models] def embeddings(
       dataType: DataType, srcSize: Int, numUnits: Int, name: String = "Embeddings"): Variable = {
     val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
     tf.variable(name, dataType, Shape(srcSize, numUnits), embeddingsInitializer)
@@ -266,7 +268,7 @@ object Model {
       s"/device:GPU:${layerIndex % numGPUs}"
   }
 
-  private[rnn] def cell[S, SS](
+  private[models] def cell[S, SS](
       cellCreator: Cell[S, SS],
       numUnits: Int,
       dataType: DataType,
@@ -286,7 +288,7 @@ object Model {
     createdCell
   }
 
-  private[rnn] def cells[S, SS](
+  private[models] def cells[S, SS](
       cellCreator: Cell[S, SS],
       numUnits: Int,
       dataType: DataType,
@@ -309,7 +311,7 @@ object Model {
     })
   }
 
-  private[rnn] def multiCell[S, SS](
+  private[models] def multiCell[S, SS](
       cellCreator: Cell[S, SS],
       numUnits: Int,
       dataType: DataType,

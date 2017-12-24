@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.models.InferConfig
+import org.platanios.symphony.mt.models.{InferConfig, Model}
 import org.platanios.symphony.mt.models.attention.Attention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -32,7 +32,6 @@ class UnidirectionalRNNDecoder[S, SS](
     override val tgtLanguage: Language,
     override val tgtVocabulary: Vocabulary,
     override val env: Environment,
-    override val rnnConfig: RNNConfig,
     override val dataConfig: DataConfig,
     override val inferConfig: InferConfig,
     val cell: Cell[S, SS],
@@ -43,11 +42,12 @@ class UnidirectionalRNNDecoder[S, SS](
     val dropout: Option[Float] = None,
     val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
     val attention: Option[Attention] = None,
-    val outputAttention: Boolean = true
+    val outputAttention: Boolean = true,
+    override val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends RNNDecoder[S, SS](tgtLanguage, tgtVocabulary, env, rnnConfig, dataConfig, inferConfig)(evS, evSDropout) {
+) extends RNNDecoder[S, SS](tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, timeMajor)(evS, evSDropout) {
   override def create(
       encoderTuple: Tuple[Output, Seq[S]], inputSequenceLengths: Output,
       targetSequences: Output, targetSequenceLengths: Output, mode: Mode
@@ -63,12 +63,7 @@ class UnidirectionalRNNDecoder[S, SS](
 
     // Use attention if necessary and create the decoder RNN
     var initialState = encoderTuple.state
-    var memory = {
-      if (rnnConfig.timeMajor)
-        encoderTuple.output.transpose(Tensor(1, 0, 2))
-      else
-        encoderTuple.output
-    }
+    var memory = if (timeMajor) encoderTuple.output.transpose(Tensor(1, 0, 2)) else encoderTuple.output
     var memorySequenceLengths = inputSequenceLengths
     if (inferConfig.beamWidth > 1 && !mode.isTraining) {
       // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
@@ -98,7 +93,6 @@ object UnidirectionalRNNDecoder {
       tgtLanguage: Language,
       tgtVocabulary: Vocabulary,
       env: Environment,
-      rnnConfig: RNNConfig,
       dataConfig: DataConfig,
       inferConfig: InferConfig,
       cell: Cell[S, SS],
@@ -109,13 +103,14 @@ object UnidirectionalRNNDecoder {
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
       attention: Option[Attention] = None,
-      outputAttention: Boolean = false
+      outputAttention: Boolean = false,
+      timeMajor: Boolean = false
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): UnidirectionalRNNDecoder[S, SS] = {
     new UnidirectionalRNNDecoder[S, SS](
-      tgtLanguage, tgtVocabulary, env, rnnConfig, dataConfig, inferConfig, cell, numUnits, numLayers, dataType,
-      residual, dropout, residualFn, attention, outputAttention)(evS, evSDropout)
+      tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, cell, numUnits, numLayers, dataType, residual, dropout,
+      residualFn, attention, outputAttention, timeMajor)(evS, evSDropout)
   }
 }

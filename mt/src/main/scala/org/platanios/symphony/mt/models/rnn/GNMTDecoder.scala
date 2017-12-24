@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.models.InferConfig
+import org.platanios.symphony.mt.models.{InferConfig, Model}
 import org.platanios.symphony.mt.models.attention.{Attention, LuongAttention}
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
@@ -33,7 +33,6 @@ class GNMTDecoder[S, SS](
     override val tgtLanguage: Language,
     override val tgtVocabulary: Vocabulary,
     override val env: Environment,
-    override val rnnConfig: RNNConfig,
     override val dataConfig: DataConfig,
     override val inferConfig: InferConfig,
     val cell: Cell[S, SS],
@@ -43,11 +42,12 @@ class GNMTDecoder[S, SS](
     val dataType: DataType = FLOAT32,
     val dropout: Option[Float] = None,
     val attention: Attention = LuongAttention(scaled = true),
-    val useNewAttention: Boolean = true
+    val useNewAttention: Boolean = true,
+    override val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends RNNDecoder[S, SS](tgtLanguage, tgtVocabulary, env, rnnConfig, dataConfig, inferConfig)(evS, evSDropout) {
+) extends RNNDecoder[S, SS](tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, timeMajor)(evS, evSDropout) {
   override def create(
       encoderTuple: Tuple[Output, Seq[S]], inputSequenceLengths: Output,
       targetSequences: Output, targetSequenceLengths: Output, mode: Mode
@@ -63,12 +63,7 @@ class GNMTDecoder[S, SS](
     // Attention
     val bottomCell = cells.head
     var initialState = encoderTuple.state
-    var memory = {
-      if (rnnConfig.timeMajor)
-        encoderTuple.output.transpose(Tensor(1, 0, 2))
-      else
-        encoderTuple.output
-    }
+    var memory = if (timeMajor) encoderTuple.output.transpose(Tensor(1, 0, 2)) else encoderTuple.output
     var memorySequenceLengths = inputSequenceLengths
     if (inferConfig.beamWidth > 1 && !mode.isTraining) {
       // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
@@ -92,7 +87,6 @@ object GNMTDecoder {
       tgtLanguage: Language,
       tgtVocabulary: Vocabulary,
       env: Environment,
-      rnnConfig: RNNConfig,
       dataConfig: DataConfig,
       inferConfig: InferConfig,
       cell: Cell[S, SS],
@@ -102,14 +96,15 @@ object GNMTDecoder {
       dataType: DataType = FLOAT32,
       dropout: Option[Float] = None,
       attention: Attention = LuongAttention(scaled = true),
-      useNewAttention: Boolean = true
+      useNewAttention: Boolean = true,
+      timeMajor: Boolean = false
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): GNMTDecoder[S, SS] = {
     new GNMTDecoder[S, SS](
-      tgtLanguage, tgtVocabulary, env, rnnConfig, dataConfig, inferConfig, cell, numUnits, numLayers, numResLayers,
-      dataType, dropout, attention, useNewAttention)(evS, evSDropout)
+      tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, cell, numUnits, numLayers, numResLayers, dataType,
+      dropout, attention, useNewAttention, timeMajor)(evS, evSDropout)
   }
 
   /** GNMT model residual function that handles inputs and outputs with different sizes (due to attention). */

@@ -17,6 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.Vocabulary
+import org.platanios.symphony.mt.models.Model
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -29,21 +30,21 @@ class BidirectionalRNNEncoder[S, SS](
     val srcLanguage: Language,
     val srcVocabulary: Vocabulary,
     val env: Environment,
-    val rnnConfig: RNNConfig,
     val cell: Cell[S, SS],
     val numUnits: Int,
     val numLayers: Int,
     val dataType: DataType = FLOAT32,
     val residual: Boolean = false,
     val dropout: Option[Float] = None,
-    val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+    val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
+    val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends RNNEncoder[S, SS]()(evS, evSDropout) {
   override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]] = {
     // Time-major transpose
-    val transposedSequences = if (rnnConfig.timeMajor) inputSequences.transpose() else inputSequences
+    val transposedSequences = if (timeMajor) inputSequences.transpose() else inputSequences
 
     // Embeddings
     val embeddings = Model.embeddings(dataType, srcVocabulary.size, numUnits, "Embeddings")
@@ -60,8 +61,8 @@ class BidirectionalRNNEncoder[S, SS](
     val createdCellFw = biCellFw.createCell(mode, embeddedSequences.shape)
     val createdCellBw = biCellBw.createCell(mode, embeddedSequences.shape)
     val unmergedBiTuple = tf.bidirectionalDynamicRNN(
-      createdCellFw, createdCellBw, embeddedSequences, null, null, rnnConfig.timeMajor,
-      rnnConfig.parallelIterations, rnnConfig.swapMemory, sequenceLengths, "BidirectionalLayers")
+      createdCellFw, createdCellBw, embeddedSequences, null, null, timeMajor,
+      env.parallelIterations, env.swapMemory, sequenceLengths, "BidirectionalLayers")
     Tuple(
       tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1),
       unmergedBiTuple._1.state.map(List(_))
@@ -75,20 +76,20 @@ object BidirectionalRNNEncoder {
       srcLanguage: Language,
       srcVocabulary: Vocabulary,
       env: Environment,
-      rnnConfig: RNNConfig,
       cell: Cell[S, SS],
       numUnits: Int,
       numLayers: Int,
       dataType: DataType = FLOAT32,
       residual: Boolean = false,
       dropout: Option[Float] = None,
-      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
+      timeMajor: Boolean = false
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): BidirectionalRNNEncoder[S, SS] = {
     new BidirectionalRNNEncoder[S, SS](
-      srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numLayers, dataType, residual, dropout,
-      residualFn)(evS, evSDropout)
+      srcLanguage, srcVocabulary, env, cell, numUnits, numLayers, dataType, residual, dropout, residualFn,
+      timeMajor)(evS, evSDropout)
   }
 }

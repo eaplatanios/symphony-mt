@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.models.InferConfig
+import org.platanios.symphony.mt.models.{InferConfig, Model}
 import org.platanios.symphony.mt.models.attention.{Attention, LuongAttention}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -31,7 +31,6 @@ case class GNMTConfig[S, SS](
     srcVocabulary: Vocabulary,
     tgtVocabulary: Vocabulary,
     env: Environment,
-    rnnConfig: RNNConfig,
     dataConfig: DataConfig,
     inferConfig: InferConfig,
     cell: Cell[S, SS],
@@ -43,14 +42,16 @@ case class GNMTConfig[S, SS](
     dropout: Option[Float] = None,
     encoderResidualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
     attention: Attention = LuongAttention(scaled = true),
-    useNewAttention: Boolean = false
+    useNewAttention: Boolean = false,
+    override val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Model.Config[S, SS](
   GNMTEncoder[S, SS](
-    srcLanguage, srcVocabulary, env, rnnConfig, cell, numUnits, numBiLayers, numUniLayers, numUniResLayers,
+    srcLanguage, srcVocabulary, env, cell, numUnits, numBiLayers, numUniLayers, numUniResLayers,
     dataType, dropout, encoderResidualFn)(evS, evSDropout),
   GNMTDecoder[S, SS](
-    tgtLanguage, tgtVocabulary, env, rnnConfig, dataConfig, inferConfig, cell, numUnits, numUniLayers + numBiLayers,
-    numUniResLayers, dataType, dropout, attention, useNewAttention)(evS, evSDropout))
+    tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, cell, numUnits, numUniLayers + numBiLayers,
+    numUniResLayers, dataType, dropout, attention, useNewAttention)(evS, evSDropout),
+  timeMajor)

@@ -32,9 +32,9 @@ abstract class RNNDecoder[S, SS](
     val tgtLanguage: Language,
     val tgtVocabulary: Vocabulary,
     val env: Environment,
-    val rnnConfig: RNNConfig,
     val dataConfig: DataConfig,
-    val inferConfig: InferConfig
+    val inferConfig: InferConfig,
+    val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -61,15 +61,15 @@ abstract class RNNDecoder[S, SS](
     val outputLayer = (logits: Output) => tf.linear(logits, outputWeights.value)
     if (mode.isTraining) {
       // Time-major transpose
-      val transposedSequences = if (rnnConfig.timeMajor) targetSequences.transpose() else targetSequences
+      val transposedSequences = if (timeMajor) targetSequences.transpose() else targetSequences
       val embeddedSequences = tf.embeddingLookup(embeddings, transposedSequences)
 
       // Decoder RNN
-      val helper = BasicDecoder.TrainingHelper(embeddedSequences, targetSequenceLengths, rnnConfig.timeMajor)
+      val helper = BasicDecoder.TrainingHelper(embeddedSequences, targetSequenceLengths, timeMajor)
       val decoder = BasicDecoder(cell, initialState, helper, outputLayer)
       val tuple = decoder.decode(
-        outputTimeMajor = rnnConfig.timeMajor, parallelIterations = rnnConfig.parallelIterations,
-        swapMemory = rnnConfig.swapMemory)
+        outputTimeMajor = timeMajor, parallelIterations = env.parallelIterations,
+        swapMemory = env.swapMemory)
       RNNDecoder.Output(tuple._1.rnnOutput, tuple._3)
     } else {
       // Decoder embeddings
@@ -90,16 +90,16 @@ abstract class RNNDecoder[S, SS](
           cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0).expandDims(0))(tgtBosID),
           tgtEosID, inferConfig.beamWidth, GooglePenalty(inferConfig.lengthPenaltyWeight), outputLayer)
         val tuple = decoder.decode(
-          outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
-          parallelIterations = rnnConfig.parallelIterations, swapMemory = rnnConfig.swapMemory)
+          outputTimeMajor = timeMajor, maximumIterations = maxDecodingLength,
+          parallelIterations = env.parallelIterations, swapMemory = env.swapMemory)
         RNNDecoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
       } else {
         val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
           embeddingFn, tf.fill(INT32, tf.shape(inputSequenceLengths)(0).expandDims(0))(tgtBosID), tgtEosID)
         val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer)
         val tuple = decoder.decode(
-          outputTimeMajor = rnnConfig.timeMajor, maximumIterations = maxDecodingLength,
-          parallelIterations = rnnConfig.parallelIterations, swapMemory = rnnConfig.swapMemory)
+          outputTimeMajor = timeMajor, maximumIterations = maxDecodingLength,
+          parallelIterations = env.parallelIterations, swapMemory = env.swapMemory)
         RNNDecoder.Output(tuple._1.sample, tuple._3)
       }
     }
