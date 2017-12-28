@@ -25,11 +25,9 @@ import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.{DeviceWrapper, DropoutWrapper, MultiCell, ResidualWrapper}
-import org.platanios.tensorflow.api.ops.Output
+import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
-import org.platanios.tensorflow.api.{FLOAT32, INT32, Shape, Tensor, Variable, learn, ops, tf}
-import org.platanios.tensorflow.api.types.DataType
 
 /**
   * @author Emmanouil Antonios Platanios

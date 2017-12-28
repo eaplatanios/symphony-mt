@@ -13,19 +13,20 @@
  * the License.
  */
 
-package org.platanios.symphony.data
+package org.platanios.symphony.mt.data.managers
+
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
 import java.io.IOException
 import java.net.URL
 import java.nio.file.{Files, Path}
 
-import com.typesafe.scalalogging.Logger
-
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Manager {
-  protected val logger: Logger
+object Manager {
+  private[Manager] val logger = Logger(LoggerFactory.getLogger("Data Manager"))
 
   def maybeDownload(path: Path, url: String, bufferSize: Int = 8192): Boolean = {
     if (Files.exists(path)) {

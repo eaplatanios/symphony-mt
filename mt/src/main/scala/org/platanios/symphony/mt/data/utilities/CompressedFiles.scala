@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.data.utilities
+package org.platanios.symphony.mt.data.utilities
 
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.utils.IOUtils

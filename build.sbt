@@ -85,8 +85,8 @@ lazy val tensorFlowSettings = Seq(
   libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "darwin-cpu-x86_64"
 )
 
-lazy val data = (project in file("./data"))
-    .settings(moduleName := "symphony-data", name := "Symphony Data")
+lazy val mt = (project in file("./mt"))
+    .settings(moduleName := "symphony-mt", name := "Symphony Machine Translation")
     .settings(commonSettings)
     .settings(testSettings)
     .settings(tensorFlowSettings)
@@ -96,14 +96,6 @@ lazy val data = (project in file("./data"))
         "org.apache.commons" % "commons-compress" % "1.15",
         "org.eclipse.jgit" % "org.eclipse.jgit" % "4.9.2.201712150930-r")
     )
-
-lazy val mt = (project in file("./mt"))
-    .dependsOn(data)
-    .settings(moduleName := "symphony-mt", name := "Symphony Machine Translation")
-    .settings(commonSettings)
-    .settings(testSettings)
-    .settings(tensorFlowSettings)
-    .settings(publishSettings)
 
 lazy val noPublishSettings = Seq(
   publish := Unit,

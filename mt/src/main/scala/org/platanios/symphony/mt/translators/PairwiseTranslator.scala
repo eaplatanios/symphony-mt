@@ -16,16 +16,14 @@
 //package org.platanios.symphony.mt.translators
 //
 //import org.platanios.symphony.mt.Language
-//import org.platanios.symphony.mt.core.{Configuration, Translator}
 //import org.platanios.symphony.mt.data.Datasets
 //import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
 //import org.platanios.symphony.mt.metrics.{BLEUTensorFlow, Perplexity}
-//import org.platanios.symphony.mt.models.hooks.PerplexityLogger
+//import org.platanios.symphony.mt.models.Model
 //import org.platanios.symphony.mt.translators.PairwiseTranslator._
 //import org.platanios.tensorflow.api._
 //import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 //import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
-//import org.platanios.tensorflow.api.learn.layers.LayerInstance
 //import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
 //
 //import scala.collection.mutable
@@ -34,21 +32,15 @@
 //  * @author Emmanouil Antonios Platanios
 //  */
 //abstract class PairwiseTranslator(
-//    override val configuration: Configuration = Configuration()
-//) extends Translator(configuration) {
-//  private[this] val estimators: mutable.Map[(Int, Int), MTPairwiseEstimator] = mutable.Map.empty
-//
-//  // Create the input and the train input parts of the model.
-//  private[this] val seqShape   = Shape(-1, -1)
-//  private[this] val lenShape   = Shape(-1)
-//  private[this] val input      = tf.learn.Input((INT32, INT32), (seqShape, lenShape))
-//  private[this] val trainInput = tf.learn.Input((INT32, INT32, INT32), (seqShape, seqShape, lenShape))
+//    override val model: Model,
+//) extends Translator(model) {
+//  private[this] val estimators: mutable.Map[(Language, Language), MTPairwiseEstimator] = mutable.Map.empty
 //
 //  override def train(
 //      trainDatasets: Seq[Translator.DatasetPair],
 //      devDatasets: Seq[Translator.DatasetPair] = null,
 //      testDatasets: Seq[Translator.DatasetPair] = null,
-//      stopCriteria: StopCriteria = StopCriteria(Some(configuration.trainNumSteps))
+//      stopCriteria: StopCriteria = StopCriteria(Some(model.trainConfig.numSteps))
 //  ): Unit = {
 //    val groupedTrainDatasets = groupAndJoinDatasets(trainDatasets)
 //    val groupedDevDatasets = groupAndJoinDatasets(devDatasets)
@@ -67,10 +59,7 @@
 //      val tgtDevDataset = groupedDevDatasets(pair)._2
 //      val srcTestDataset = groupedTestDatasets(pair)._1
 //      val tgtTestDataset = groupedTestDatasets(pair)._2
-//      val trainDataset = () => createTrainDataset(
-//        srcTrainDataset, tgtTrainDataset, srcVocab, tgtVocab, configuration.trainBatchSize, repeat = true,
-//        configuration.dataNumBuckets)
-//      val estimator = estimators.getOrElse((pair._1.id, pair._2.id), {
+//      val estimator = estimators.getOrElse((pair._1, pair._2), {
 //        val tLayer = trainLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
 //        val iLayer = inferLayer(srcVocabSize, tgtVocabSize, srcVocab, tgtVocab)
 //        val model = tf.learn.Model(
@@ -131,7 +120,7 @@
 //      Map.empty.withDefault(_ => (null, null))
 //    } else {
 //      datasets
-//          .groupBy(p => (p.srcLanguage.id, p.tgtLanguage.id)).values
+//          .groupBy(p => (p.srcLanguage, p.tgtLanguage)).values
 //          .map(p => (
 //              (p.head.srcLanguage, p.head.tgtLanguage),
 //              (Datasets.joinDatasets(p.map(_.srcDataset)), Datasets.joinDatasets(p.map(_.tgtDataset)))))

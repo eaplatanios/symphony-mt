@@ -15,15 +15,34 @@
 
 package org.platanios.symphony.mt
 
-import java.util.concurrent.atomic.AtomicInteger
-
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class Language(name: String, abbreviation: String) {
-  val id: Int = Language.currentId.getAndIncrement()
-}
+class Language(val name: String, val abbreviation: String)
 
 object Language {
-  private[Language] val currentId: AtomicInteger = new AtomicInteger(0)
+  case object Bulgarian extends Language("Bulgarian", "bg")
+  case object Czech extends Language("Czech", "cs")
+  case object Danish extends Language("Danish", "da")
+  case object Dutch extends Language("Dutch", "nl")
+  case object English extends Language("English", "en")
+  case object Estonian extends Language("Estonian", "et")
+  case object Finnish extends Language("Finnish", "fi")
+  case object French extends Language("French", "fr")
+  case object German extends Language("German", "de")
+  case object Greek extends Language("Greek", "el")
+  case object Hungarian extends Language("Hungarian", "hu")
+  case object Italian extends Language("Italian", "it")
+  case object Lithuanian extends Language("Lithuanian", "lt")
+  case object Latvian extends Language("Latvian", "lv")
+  case object Polish extends Language("Polish", "pl")
+  case object Portuguese extends Language("Portuguese", "pt")
+  case object Romanian extends Language("Romanian", "ro")
+  case object Russian extends Language("Russian", "ru")
+  case object Slovak extends Language("Slovak", "sk")
+  case object Slovenian extends Language("Slovenian", "sl")
+  case object Spanish extends Language("Spanish", "es")
+  case object Swedish extends Language("Swedish", "sv")
+  case object Turkish extends Language("Turkish", "tr")
+  case object Vietnamese extends Language("Vietnamese", "vi")
 }

@@ -15,10 +15,11 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.data.mt.IWSLT15Manager
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
+import org.platanios.symphony.mt.Language.{English, Vietnamese}
+import org.platanios.symphony.mt.data.{DataConfig, ParallelDataset, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
-import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
+import org.platanios.symphony.mt.data.managers.IWSLT15Manager
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
 import org.platanios.symphony.mt.models.attention.{BahdanauAttention, LuongAttention}
 import org.platanios.symphony.mt.models.rnn._
@@ -34,23 +35,22 @@ import java.nio.file.{Path, Paths}
   */
 object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
-  val dataDir   : Path = workingDir.resolve("data").resolve("iwslt15.en-vi")
 
-  IWSLT15Manager.download(workingDir.resolve("data"), IWSLT15Manager.EnglishVietnamese)
+  // Create the languages.
+  val srcLang: Language = English
+  val tgtLang: Language = Vietnamese
 
-  // Create the languages and their corresponding vocabularies
-  val srcLang : Language   = Language("English", "en")
-  val tgtLang : Language   = Language("Vietnamese", "vi")
-  val srcVocab: Vocabulary = Vocabulary(dataDir.resolve("vocab.en"))
-  val tgtVocab: Vocabulary = Vocabulary(dataDir.resolve("vocab.vi"))
+  val parallelDataset: ParallelDataset = IWSLT15Manager(srcLang, tgtLang).download(workingDir.resolve("data"))
 
-  // Create the datasets
-  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.en").toAbsolutePath.toString)
-  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(dataDir.resolve("train.vi").toAbsolutePath.toString)
-  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.en").toAbsolutePath.toString)
-  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2012.vi").toAbsolutePath.toString)
-  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.en").toAbsolutePath.toString)
-  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(dataDir.resolve("tst2013.vi").toAbsolutePath.toString)
+  // Create the vocabularies and the datasets
+  val srcVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabularies(0).head)
+  val tgtVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabularies(1).head)
+  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(parallelDataset.trainCorpora(0).head.toAbsolutePath.toString)
+  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(parallelDataset.trainCorpora(1).head.toAbsolutePath.toString)
+  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(parallelDataset.devCorpora(0).head.toAbsolutePath.toString)
+  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(parallelDataset.devCorpora(1).head.toAbsolutePath.toString)
+  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(parallelDataset.testCorpora(0).head.toAbsolutePath.toString)
+  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(parallelDataset.testCorpora(1).head.toAbsolutePath.toString)
 
   // Create general configuration settings
   val env = Environment(

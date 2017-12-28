@@ -13,9 +13,10 @@
  * the License.
  */
 
-package org.platanios.symphony.data.mt
+package org.platanios.symphony.mt.data
 
 import org.eclipse.jgit.api.Git
+import org.platanios.symphony.mt.Language
 
 import java.io.{BufferedWriter, File, PrintWriter}
 import java.nio.charset.StandardCharsets
@@ -53,22 +54,38 @@ object Utilities {
           .call()
     }
 
-    def tokenizerScript: Path = {
-      path.resolve("scripts").resolve("tokenizer").resolve("tokenizer.perl")
+    def sgmToText(sgmFile: Path, textFile: Path): Unit = {
+      (path
+          .resolve("scripts")
+          .resolve("ems")
+          .resolve("support")
+          .resolve("input-from-sgm.perl")
+          .toAbsolutePath.toString #< sgmFile.toFile #> textFile.toFile).!
     }
 
-    def cleanCorpusScript: Path = {
-      path.resolve("scripts").resolve("training").resolve("clean-corpus-n.perl")
-    }
-
-    def inputFromSGMScript: Path = {
-      path.resolve("scripts").resolve("ems").resolve("support").resolve("input-from-sgm.perl")
-    }
-
-    def tokenize(textFile: Path, vocabFile: Path, language: String, numThreads: Int = 8): Unit = {
-      Seq(tokenizerScript.toAbsolutePath.toString, "-q", "-l", language, "-threads", numThreads.toString) #<
+    def tokenize(textFile: Path, vocabFile: Path, language: Language, numThreads: Int = 8): Unit = {
+      val tokenizer = path.resolve("scripts").resolve("tokenizer").resolve("tokenizer.perl").toAbsolutePath.toString
+      (Seq(tokenizer, "-q", "-l", language.abbreviation, "-threads", numThreads.toString) #<
           textFile.toFile #>
-          vocabFile.toFile
+          vocabFile.toFile).!
+    }
+
+    def cleanCorpus(
+        corpus: String,
+        cleanCorpus: String,
+        srcLanguage: Language,
+        tgtLanguage: Language,
+        minLength: Int,
+        maxLength: Int
+    ): Unit = {
+      val corpusCleaner = path
+          .resolve("scripts")
+          .resolve("training")
+          .resolve("clean-corpus-n.perl")
+          .toAbsolutePath.toString
+      Seq(
+        corpusCleaner, corpus, srcLanguage.abbreviation, tgtLanguage.abbreviation,
+        cleanCorpus, minLength.toString, maxLength.toString).!
     }
   }
 }
