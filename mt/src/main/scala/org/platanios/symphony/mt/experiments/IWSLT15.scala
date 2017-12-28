@@ -123,5 +123,5 @@ object IWSLT15 extends App {
     srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
     env, dataConfig, trainConfig, inferConfig, logConfig, "Model")
 
-  model.train(StopCriteria(Some(trainConfig.numSteps)))
+  model.train(srcTrainDataset, tgtTrainDataset, StopCriteria(Some(trainConfig.numSteps)))
 }

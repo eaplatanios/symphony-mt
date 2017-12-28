@@ -44,8 +44,8 @@ class Model[S, SS](
     val tgtLanguage: Language,
     val srcVocabulary: Vocabulary,
     val tgtVocabulary: Vocabulary,
-    val srcTrainDataset: MTTextLinesDataset,
-    val tgtTrainDataset: MTTextLinesDataset,
+    val srcTrainDataset: MTTextLinesDataset = null,
+    val tgtTrainDataset: MTTextLinesDataset = null,
     val srcDevDataset: MTTextLinesDataset = null,
     val tgtDevDataset: MTTextLinesDataset = null,
     val srcTestDataset: MTTextLinesDataset = null,
@@ -114,11 +114,15 @@ class Model[S, SS](
       else
         null
     }
+
+    // Create estimator hooks
     var hooks = Set[tf.learn.Hook](
       // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainConfig.summarySteps)),
       tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
+
+    // Add logging hooks
     if (logConfig.logLossSteps > 0)
       hooks += PerplexityLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
     if (logConfig.logTrainEvalSteps > 0 && srcTrainDataset != null && tgtTrainDataset != null)
@@ -139,6 +143,8 @@ class Model[S, SS](
         () => createSupervisedDataset(srcTestDataset, tgtTestDataset, logConfig.logEvalBatchSize, repeat = false, 1),
         Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTestEvalSteps),
         triggerAtEnd = true, name = "TestEvaluator")
+
+    // Create estimator
     tf.learn.InMemoryEstimator(
       model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),
       StopCriteria(Some(trainConfig.numSteps)), hooks, tensorBoardConfig = tensorBoardConfig)
@@ -148,7 +154,10 @@ class Model[S, SS](
     new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)](name) {
       override val layerType: String = "TrainLayer"
 
-      override def forward(input: ((Output, Output), (Output, Output, Output)), mode: Mode): (Output, Output) = {
+      override protected def _forward(
+          input: ((Output, Output), (Output, Output, Output)),
+          mode: Mode
+      ): (Output, Output) = {
         val encTuple = tf.createWithVariableScope("Encoder") {
           config.encoder.create(input._1._1, input._1._2, mode)
         }
@@ -164,7 +173,7 @@ class Model[S, SS](
     new Layer[(Output, Output), (Output, Output)](name) {
       override val layerType: String = "InferLayer"
 
-      override def forward(input: (Output, Output), mode: Mode): (Output, Output) = {
+      override protected def _forward(input: (Output, Output), mode: Mode): (Output, Output) = {
         // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
         srcVocabulary.lookupTable()
 
@@ -193,7 +202,7 @@ class Model[S, SS](
     new Layer[((Output, Output), (Output, Output, Output)), Output](name) {
       override val layerType: String = "Loss"
 
-      override def forward(
+      override protected def _forward(
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): Output = tf.createWithNameScope("Loss") {
@@ -204,7 +213,11 @@ class Model[S, SS](
     }
   }
 
-  def train(stopCriteria: StopCriteria = StopCriteria(Some(trainConfig.numSteps))): Unit = {
+  def train(
+      srcTrainDataset: MTTextLinesDataset,
+      tgtTrainDataset: MTTextLinesDataset,
+      stopCriteria: StopCriteria = StopCriteria(Some(trainConfig.numSteps))
+  ): Unit = {
     val trainDataset = () => createSupervisedDataset(
       srcTrainDataset, tgtTrainDataset, trainConfig.batchSize, repeat = true, dataConfig.numBuckets)
     estimator.train(trainDataset, stopCriteria)
