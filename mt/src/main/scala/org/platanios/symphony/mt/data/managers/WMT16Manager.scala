@@ -50,9 +50,10 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
     val trainPath = path.resolve("train")
     val devPath = path.resolve("dev")
     val testPath = path.resolve("test")
-    downloadUpdatedArchives(
-      WMT16Manager.newsCommentaryParallelArchive, trainPath,
-      Seq(WMT16Manager.newsCommentaryParallelArchive), bufferSize)
+
+    val newsCommentaryV11Manager = NewsCommentaryV11Manager(srcLanguage, tgtLanguage)
+    val newsCommentaryV11Dataset = newsCommentaryV11Manager.download(path, bufferSize)
+
     downloadUpdatedArchives("dev", devPath, WMT16Manager.devArchives, bufferSize)
     downloadUpdatedArchives("test", testPath, WMT16Manager.testArchives, bufferSize)
 
@@ -83,12 +84,10 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
     srcTestCorporaSGM.zip(srcTestCorpora).foreach(p => mosesDecoder.sgmToText(p._1, p._2))
     tgtTestCorporaSGM.zip(tgtTestCorpora).foreach(p => mosesDecoder.sgmToText(p._1, p._2))
 
-    ParallelDataset(Seq(srcLanguage, tgtLanguage))(
-      trainCorpora = Seq(
-        Seq(trainPath.resolve(s"$corpusFilenamePrefix.$src")),
-        Seq(trainPath.resolve(s"$corpusFilenamePrefix.$tgt"))),
-      devCorpora = Seq(srcDevCorpora, tgtDevCorpora),
-      testCorpora = Seq(srcTestCorpora, tgtTestCorpora))
+    ParallelDataset(
+      trainCorpora = newsCommentaryV11Dataset.trainCorpora,
+      devCorpora = Map(srcLanguage -> srcDevCorpora, tgtLanguage -> tgtDevCorpora),
+      testCorpora = Map(srcLanguage -> srcTestCorpora, tgtLanguage -> tgtTestCorpora))
   }
 
   protected def downloadUpdatedArchives(
@@ -110,8 +109,8 @@ object WMT16Manager {
 
   val newsCommentaryUrl            : String      = "http://data.statmt.org/wmt16/translation-task"
   val newsCommentaryParallelArchive: String      = "training-parallel-nc-v11"
-  val devArchives                  : Seq[String] = Seq("dev.tgz", "dev-romanian-updated.tgz")
-  val testArchives                 : Seq[String] = Seq("test.tgz")
+  val devArchives                  : Seq[String] = Seq("dev", "dev-romanian-updated")
+  val testArchives                 : Seq[String] = Seq("test")
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
     (Czech, English), (Finnish, English), (German, English),

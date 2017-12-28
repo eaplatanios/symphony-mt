@@ -60,7 +60,7 @@ case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language
       CompressedFiles.decompressTGZ(archivePath, archivePathPrefix, bufferSize)
     }
 
-    ParallelDataset(Seq(srcLanguage, tgtLanguage))(trainCorpora = Seq(Seq(srcTrainCorpus), Seq(tgtTrainCorpus)))
+    ParallelDataset(trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 }
 

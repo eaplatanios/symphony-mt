@@ -75,11 +75,11 @@ case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) {
       Manager.maybeDownload(
         tgtVocab, s"${IWSLT15Manager.url}/$directoryName/${IWSLT15Manager.vocabPrefix}.$tgt", bufferSize)
 
-    ParallelDataset(Seq(srcLanguage, tgtLanguage))(
-      trainCorpora = Seq(Seq(srcTrainCorpus), Seq(tgtTrainCorpus)),
-      devCorpora = Seq(Seq(srcDevCorpus), Seq(tgtDevCorpus)),
-      testCorpora = Seq(Seq(srcTestCorpus), Seq(tgtTestCorpus)),
-      vocabularies = Seq(Seq(srcVocab), Seq(tgtVocab)))
+    ParallelDataset(
+      trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)),
+      devCorpora = Map(srcLanguage -> Seq(srcDevCorpus), tgtLanguage -> Seq(tgtDevCorpus)),
+      testCorpora = Map(srcLanguage -> Seq(srcTestCorpus), tgtLanguage -> Seq(tgtTestCorpus)),
+      vocabularies = Map(srcLanguage -> Seq(srcVocab), tgtLanguage -> Seq(tgtVocab)))
   }
 }
 

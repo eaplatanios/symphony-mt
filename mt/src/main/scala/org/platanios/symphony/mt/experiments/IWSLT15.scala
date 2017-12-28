@@ -16,10 +16,10 @@
 package org.platanios.symphony.mt.experiments
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.Language.{English, Vietnamese}
+import org.platanios.symphony.mt.Language.{English, German, Vietnamese}
 import org.platanios.symphony.mt.data.{DataConfig, ParallelDataset, Vocabulary}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
-import org.platanios.symphony.mt.data.managers.IWSLT15Manager
+import org.platanios.symphony.mt.data.managers.{EuroparlV7Manager, IWSLT15Manager, WMT16Manager}
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
 import org.platanios.symphony.mt.models.attention.{BahdanauAttention, LuongAttention}
 import org.platanios.symphony.mt.models.rnn._
@@ -43,14 +43,14 @@ object IWSLT15 extends App {
   val parallelDataset: ParallelDataset = IWSLT15Manager(srcLang, tgtLang).download(workingDir.resolve("data"))
 
   // Create the vocabularies and the datasets
-  val srcVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabularies(0).head)
-  val tgtVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabularies(1).head)
-  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(parallelDataset.trainCorpora(0).head.toAbsolutePath.toString)
-  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(parallelDataset.trainCorpora(1).head.toAbsolutePath.toString)
-  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(parallelDataset.devCorpora(0).head.toAbsolutePath.toString)
-  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(parallelDataset.devCorpora(1).head.toAbsolutePath.toString)
-  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(parallelDataset.testCorpora(0).head.toAbsolutePath.toString)
-  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(parallelDataset.testCorpora(1).head.toAbsolutePath.toString)
+  val srcVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabulary()(srcLang))
+  val tgtVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabulary()(tgtLang))
+  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(parallelDataset.trainCorpus()(srcLang).toAbsolutePath.toString)
+  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(parallelDataset.trainCorpus()(tgtLang).toAbsolutePath.toString)
+  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(parallelDataset.devCorpus()(srcLang).toAbsolutePath.toString)
+  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(parallelDataset.devCorpus()(tgtLang).toAbsolutePath.toString)
+  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(parallelDataset.testCorpus()(srcLang).toAbsolutePath.toString)
+  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(parallelDataset.testCorpus()(tgtLang).toAbsolutePath.toString)
 
   // Create general configuration settings
   val env = Environment(

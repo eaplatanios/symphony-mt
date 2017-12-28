@@ -57,7 +57,7 @@ case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) {
     }
 
     downloadUpdatedArchives(corpusArchiveFile, processedPath, Seq(corpusArchiveFile), bufferSize)
-    ParallelDataset(Seq(srcLanguage, tgtLanguage))(trainCorpora = Seq(Seq(srcTrainCorpus), Seq(tgtTrainCorpus)))
+    ParallelDataset(trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 
   protected def downloadUpdatedArchives(

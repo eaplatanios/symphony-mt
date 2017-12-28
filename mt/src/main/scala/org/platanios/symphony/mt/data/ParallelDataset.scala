@@ -24,26 +24,54 @@ import scala.sys.process._
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class ParallelDataset(languages: Seq[Language])(
-    val trainCorpora: Seq[Seq[Path]] = Seq.fill(languages.size)(Seq.empty),
-    val devCorpora: Seq[Seq[Path]] = Seq.fill(languages.size)(Seq.empty),
-    val testCorpora: Seq[Seq[Path]] = Seq.fill(languages.size)(Seq.empty),
-    val vocabularies: Seq[Seq[Path]] = Seq.fill(languages.size)(Seq.empty)) {
-  private[this] def defaultPaths(prefix: String): Seq[Path] = {
-    languages.zip(trainCorpora).map(p => p._2.headOption.map(_.resolveSibling(s"$prefix.${p._1.abbreviation}")).orNull)
+case class ParallelDataset(
+    private[data] val trainCorpora: Map[Language, Seq[Path]] = Map.empty,
+    private[data] val devCorpora: Map[Language, Seq[Path]] = Map.empty,
+    private[data] val testCorpora: Map[Language, Seq[Path]] = Map.empty,
+    private[data] val vocabularies: Map[Language, Seq[Path]] = Map.empty
+) {
+  def trainCorpus(path: Path = null): Map[Language, Path] = trainCorpora.map {
+    case (language, paths) =>
+      val processedPath = {
+        if (path == null)
+          paths.head.resolveSibling(s"train.${language.abbreviation}")
+        else
+          path.resolve(s"train.${language.abbreviation}")
+      }
+      (language, ParallelDataset.joinDatasets(paths, processedPath))
   }
 
-  def join(
-      trainPaths: Seq[Path] = defaultPaths("train"),
-      devPaths: Seq[Path] = defaultPaths("dev"),
-      testPaths: Seq[Path] = defaultPaths("test"),
-      vocabularyPaths: Seq[Path] = defaultPaths("vocab")
-  ): ParallelDataset = {
-    ParallelDataset(languages)(
-      trainCorpora.zip(trainPaths).map(p => Seq(ParallelDataset.joinDatasets(p._1, p._2))),
-      devCorpora.zip(devPaths).map(p => Seq(ParallelDataset.joinDatasets(p._1, p._2))),
-      testCorpora.zip(testPaths).map(p => Seq(ParallelDataset.joinDatasets(p._1, p._2))),
-      vocabularies.zip(vocabularyPaths).map(p => Seq(ParallelDataset.joinDatasets(p._1, p._2))))
+  def devCorpus(path: Path = null): Map[Language, Path] = devCorpora.map {
+    case (language, paths) =>
+      val processedPath = {
+        if (path == null)
+          paths.head.resolveSibling(s"dev.${language.abbreviation}")
+        else
+          path.resolve(s"dev.${language.abbreviation}")
+      }
+      (language, ParallelDataset.joinDatasets(paths, processedPath))
+  }
+
+  def testCorpus(path: Path = null): Map[Language, Path] = testCorpora.map {
+    case (language, paths) =>
+      val processedPath = {
+        if (path == null)
+          paths.head.resolveSibling(s"test.${language.abbreviation}")
+        else
+          path.resolve(s"test.${language.abbreviation}")
+      }
+      (language, ParallelDataset.joinDatasets(paths, processedPath))
+  }
+
+  def vocabulary(path: Path = null): Map[Language, Path] = vocabularies.map {
+    case (language, paths) =>
+      val processedPath = {
+        if (path == null)
+          paths.head.resolveSibling(s"vocab.${language.abbreviation}")
+        else
+          path.resolve(s"vocab.${language.abbreviation}")
+      }
+      (language, ParallelDataset.joinDatasets(paths, processedPath))
   }
 }
 
