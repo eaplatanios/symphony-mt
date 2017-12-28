@@ -28,13 +28,13 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class EuroparlManager(srcLanguage: Language, tgtLanguage: Language) {
+case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) {
   val src: String = srcLanguage.abbreviation
   val tgt: String = tgtLanguage.abbreviation
 
   val name: String = s"$src-$tgt"
 
-  private[this] val reversed: Boolean = EuroparlManager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  private[this] val reversed: Boolean = EuroparlV7Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
 
   private[this] val corpusArchiveFile: String = if (reversed) s"$tgt-$src" else s"$src-$tgt"
 
@@ -43,17 +43,20 @@ case class EuroparlManager(srcLanguage: Language, tgtLanguage: Language) {
   }
 
   def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
-    // Download and decompress the data, if necessary.
-    val archivePath = path.resolve(s"$corpusArchiveFile.tgz")
-    val srcTrainCorpus = path.resolve(corpusArchiveFile).resolve(s"$corpusFilenamePrefix.$src")
-    val tgtTrainCorpus = path.resolve(corpusArchiveFile).resolve(s"$corpusFilenamePrefix.$tgt")
+    val processedPath = path.resolve("europarl-v7")
 
-    if (!Files.exists(archivePath)) {
-      Manager.maybeDownload(archivePath, s"${EuroparlManager.url}/$corpusArchiveFile.tgz", bufferSize)
-      CompressedFiles.decompressTGZ(archivePath, path.resolve(corpusArchiveFile), bufferSize)
+    // Download and decompress the data, if necessary.
+    val archivePathPrefix = processedPath.resolve(corpusArchiveFile)
+    val archivePath = processedPath.resolve(s"$corpusArchiveFile.tgz")
+    val srcTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$src")
+    val tgtTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$tgt")
+
+    if (!Files.exists(archivePathPrefix)) {
+      Manager.maybeDownload(archivePath, s"${EuroparlV7Manager.url}/$corpusArchiveFile.tgz", bufferSize)
+      CompressedFiles.decompressTGZ(archivePath, archivePathPrefix, bufferSize)
     }
 
-    downloadUpdatedArchives(corpusArchiveFile, path, Seq(corpusArchiveFile), bufferSize)
+    downloadUpdatedArchives(corpusArchiveFile, processedPath, Seq(corpusArchiveFile), bufferSize)
     ParallelDataset(Seq(srcLanguage, tgtLanguage))(trainCorpora = Seq(Seq(srcTrainCorpus), Seq(tgtTrainCorpus)))
   }
 
@@ -64,7 +67,7 @@ case class EuroparlManager(srcLanguage: Language, tgtLanguage: Language) {
     if (!Files.exists(archivePath)) {
       archives.foreach(archive => {
         val currentPath = path.resolve(s"$archive.tgz")
-        Manager.maybeDownload(currentPath, s"${EuroparlManager.url}/$archive.tgz", bufferSize)
+        Manager.maybeDownload(currentPath, s"${EuroparlV7Manager.url}/$archive.tgz", bufferSize)
         CompressedFiles.decompressTGZ(currentPath, archivePath)
       })
     }
@@ -102,8 +105,8 @@ case class EuroparlManager(srcLanguage: Language, tgtLanguage: Language) {
 //  }
 }
 
-object EuroparlManager {
-  private[EuroparlManager] val logger = Logger(LoggerFactory.getLogger("Europarl Data Manager"))
+object EuroparlV7Manager {
+  private[EuroparlV7Manager] val logger = Logger(LoggerFactory.getLogger("Europarl Data Manager"))
 
   val url: String = "http://www.statmt.org/europarl/v7"
 

@@ -33,20 +33,22 @@ case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) {
 
   val name: String = s"$src-$tgt"
 
-  private[this] val reversed: Boolean = EuroparlManager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  private[this] val reversed: Boolean = EuroparlV7Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
 
   private[this] val directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
   def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
+    val processedPath = path.resolve("iwslt-15")
+
     // Download the data, if necessary.
-    val srcTrainCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.trainPrefix}.$src")
-    val tgtTrainCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.trainPrefix}.$tgt")
-    val srcDevCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.devPrefix}.$src")
-    val tgtDevCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.devPrefix}.$tgt")
-    val srcTestCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.testPrefix}.$src")
-    val tgtTestCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.testPrefix}.$tgt")
-    val srcVocab = path.resolve(directoryName).resolve(s"${IWSLT15Manager.vocabPrefix}.$src")
-    val tgtVocab = path.resolve(directoryName).resolve(s"${IWSLT15Manager.vocabPrefix}.$tgt")
+    val srcTrainCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.trainPrefix}.$src")
+    val tgtTrainCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.trainPrefix}.$tgt")
+    val srcDevCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.devPrefix}.$src")
+    val tgtDevCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.devPrefix}.$tgt")
+    val srcTestCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.testPrefix}.$src")
+    val tgtTestCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.testPrefix}.$tgt")
+    val srcVocab = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.vocabPrefix}.$src")
+    val tgtVocab = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.vocabPrefix}.$tgt")
 
     if (!Files.exists(srcTrainCorpus))
       Manager.maybeDownload(
