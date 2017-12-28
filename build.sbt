@@ -81,17 +81,29 @@ lazy val testSettings = Seq(
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF")
 )
 
-lazy val mt = (project in file("./mt"))
-    .settings(moduleName := "symphony-mt", name := "Symphony Machine Translation")
+lazy val tensorFlowSettings = Seq(
+  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "darwin-cpu-x86_64"
+)
+
+lazy val data = (project in file("./data"))
+    .settings(moduleName := "symphony-data", name := "Symphony Data")
     .settings(commonSettings)
-    .settings(publishSettings)
     .settings(testSettings)
+    .settings(tensorFlowSettings)
+    .settings(publishSettings)
     .settings(
       libraryDependencies ++= Seq(
-        "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "darwin-cpu-x86_64"
-        "org.platanios" %% "tensorflow-data" % tensorFlowForScalaVersion
-      )
+        "org.apache.commons" % "commons-compress" % "1.15",
+        "org.eclipse.jgit" % "org.eclipse.jgit" % "4.9.2.201712150930-r")
     )
+
+lazy val mt = (project in file("./mt"))
+    .dependsOn(data)
+    .settings(moduleName := "symphony-mt", name := "Symphony Machine Translation")
+    .settings(commonSettings)
+    .settings(testSettings)
+    .settings(tensorFlowSettings)
+    .settings(publishSettings)
 
 lazy val noPublishSettings = Seq(
   publish := Unit,

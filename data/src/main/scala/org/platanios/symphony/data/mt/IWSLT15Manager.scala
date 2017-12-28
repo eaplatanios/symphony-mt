@@ -13,22 +13,22 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data.loaders
+package org.platanios.symphony.data.mt
 
-import org.platanios.tensorflow.data.Loader
+import org.platanios.symphony.data.Manager
 
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-object IWSLT15Loader extends Loader {
-  val url: String = "https://nlp.stanford.edu/projects/nmt/data/"
+object IWSLT15Manager extends Manager {
+  val url: String = "https://nlp.stanford.edu/projects/nmt/data"
 
-  override protected val logger = Logger(LoggerFactory.getLogger("IWSLT-15 Data Loader"))
+  override protected val logger = Logger(LoggerFactory.getLogger("IWSLT-15 Data Manager"))
 
   sealed trait DatasetType {
     val directoryName        : String
@@ -43,7 +43,7 @@ object IWSLT15Loader extends Loader {
         directoryName + devDatasetFilenames._1, directoryName + devDatasetFilenames._2,
         directoryName + testDatasetFilenames._1, directoryName + testDatasetFilenames._2,
         directoryName + vocabularyFilenames._1, directoryName + vocabularyFilenames._2)
-      val urls = filePaths.map(url + _)
+      val urls = filePaths.map(f => s"$url/f")
       filePaths.zip(urls)
     }
   }
@@ -56,12 +56,15 @@ object IWSLT15Loader extends Loader {
     override val vocabularyFilenames  : (String, String) = ("vocab.en", "vocab.vi")
   }
 
-  def download(path: Path, datasetType: DatasetType = EnglishVietnamese, bufferSize: Int = 8192): Unit = {
+  def download(path: Path, datasetType: DatasetType = EnglishVietnamese, bufferSize: Int = 8192): TranslationDataset = {
     // Download the data, if necessary.
-    datasetType.files.map(f => maybeDownload(path.resolve(f._1), f._2, bufferSize))
-  }
-
-  def main(args: Array[String]): Unit = {
-    download(Paths.get(args(0)))
+    val files = datasetType.files
+        .filter(f => !Files.exists(path.resolve(f._1)))
+        .map(f => {
+          val file = path.resolve(f._1)
+          maybeDownload(file, f._2, bufferSize)
+          file
+        })
+    TranslationDataset(files(6), files(7), files(0), files(1), files(2), files(3), files(4), files(5))
   }
 }
