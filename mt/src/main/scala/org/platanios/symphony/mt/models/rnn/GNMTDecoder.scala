@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.models.{InferConfig, Model}
+import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.{Attention, LuongAttention}
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
@@ -53,10 +53,10 @@ class GNMTDecoder[S, SS](
       targetSequences: Output, targetSequenceLengths: Output, mode: Mode
   ): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = Model.embeddings(dataType, tgtVocabulary.size, numUnits, "Embeddings")
+    val embeddings = StateBasedModel.embeddings(dataType, tgtVocabulary.size, numUnits, "Embeddings")
 
     // RNN cells
-    val cells = Model.cells(
+    val cells = StateBasedModel.cells(
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
       Some(GNMTDecoder.residualFn[Output, Shape]), 0, env.numGPUs, env.randomSeed, "Cells")
 

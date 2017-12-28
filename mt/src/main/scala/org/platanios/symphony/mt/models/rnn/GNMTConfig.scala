@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.models.{InferConfig, Model}
+import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.{Attention, LuongAttention}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -47,7 +47,7 @@ case class GNMTConfig[S, SS](
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Model.Config[S, SS](
+) extends StateBasedModel.Config[S, SS](
   GNMTEncoder[S, SS](
     srcLanguage, srcVocabulary, env, cell, numUnits, numBiLayers, numUniLayers, numUniResLayers,
     dataType, dropout, encoderResidualFn)(evS, evSDropout),

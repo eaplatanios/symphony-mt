@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.core.hooks
+package org.platanios.symphony.mt.models.hooks
 
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.client.{Executable, Fetchable}
@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory
 
 import java.nio.file.Path
 
-/** Hooks that logs the perplexity value.
+/** Hooks that logs the training speed, the perplexity value, and the gradient norm while training.
   *
   * @param  trigger      Hook trigger specifying when this hook is triggered (i.e., when it executes). If you only want
   *                      to log the tensor values at the end of a run and not during, then you should set `trigger` to
@@ -39,7 +39,7 @@ import java.nio.file.Path
   *
   * @author Emmanouil Antonios Platanios
   */
-case class PerplexityLogger(
+case class TrainingLogger(
     log: Boolean = true,
     summaryDir: Path = null,
     trigger: HookTrigger = StepHookTrigger(1),
@@ -71,7 +71,7 @@ case class PerplexityLogger(
 
   override protected def begin(): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
-      s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'PerplexityLogger'."))
+      s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'TrainingLogger'."))
     internalTrigger.reset()
     shouldTrigger = false
     gradientsNorm = modelInstance.gradientsAndVariables.map(g => tf.globalNorm(g.map(_._1))).orNull
@@ -151,7 +151,7 @@ case class PerplexityLogger(
           }
         }
         if (log)
-          PerplexityLogger.logger.info(message)
+          TrainingLogger.logger.info(message)
         writeSummary(lastStep, summaryTag, meanPerplexity)
         totalGradientsNorm = 0.0f
         totalLoss = 0.0f
@@ -162,6 +162,6 @@ case class PerplexityLogger(
   }
 }
 
-object PerplexityLogger {
-  private[PerplexityLogger] val logger = Logger(LoggerFactory.getLogger("Learn / Hooks / Perplexity Logger"))
+object TrainingLogger {
+  private[TrainingLogger] val logger = Logger(LoggerFactory.getLogger("Learn / Hooks / Training Logger"))
 }

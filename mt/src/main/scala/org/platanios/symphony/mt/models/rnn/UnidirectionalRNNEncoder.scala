@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.Vocabulary
-import org.platanios.symphony.mt.models.Model
+import org.platanios.symphony.mt.models.StateBasedModel
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -47,12 +47,12 @@ class UnidirectionalRNNEncoder[S, SS](
     val transposedSequences = if (timeMajor) inputSequences.transpose() else inputSequences
 
     // Embeddings
-    val embeddings = Model.embeddings(dataType, srcVocabulary.size, numUnits, "Embeddings")
+    val embeddings = StateBasedModel.embeddings(dataType, srcVocabulary.size, numUnits, "Embeddings")
     val embeddedSequences = tf.embeddingLookup(embeddings, transposedSequences)
 
     // RNN
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
-    val uniCell = Model.multiCell(
+    val uniCell = StateBasedModel.multiCell(
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
       residualFn, 0, env.numGPUs, env.randomSeed, "MultiUniCell")
     val createdCell = uniCell.createCell(mode, embeddedSequences.shape)

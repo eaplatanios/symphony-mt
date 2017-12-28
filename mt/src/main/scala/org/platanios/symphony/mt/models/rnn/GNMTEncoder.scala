@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.data.Vocabulary
-import org.platanios.symphony.mt.models.Model
+import org.platanios.symphony.mt.models.StateBasedModel
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -48,16 +48,16 @@ class GNMTEncoder[S, SS](
     val transposedSequences = if (timeMajor) inputSequences.transpose() else inputSequences
 
     // Embeddings
-    val embeddings = Model.embeddings(dataType, srcVocabulary.size, numUnits, "Embeddings")
+    val embeddings = StateBasedModel.embeddings(dataType, srcVocabulary.size, numUnits, "Embeddings")
     val embeddedSequences = tf.embeddingLookup(embeddings, transposedSequences)
 
     // Bidirectional RNN layers
     val biTuple = {
       if (numBiLayers > 0) {
-        val biCellFw = Model.multiCell(
+        val biCellFw = StateBasedModel.multiCell(
           cell, numUnits, dataType, numBiLayers, 0, dropout,
           residualFn, 0, env.numGPUs, env.randomSeed, "MultiBiCellFw")
-        val biCellBw = Model.multiCell(
+        val biCellBw = StateBasedModel.multiCell(
           cell, numUnits, dataType, numBiLayers, 0, dropout,
           residualFn, numBiLayers, env.numGPUs, env.randomSeed, "MultiBiCellBw")
         val createdCellFw = biCellFw.createCell(mode, embeddedSequences.shape)
@@ -73,7 +73,7 @@ class GNMTEncoder[S, SS](
     }
 
     // Unidirectional RNN layers
-    val uniCell = Model.multiCell(
+    val uniCell = StateBasedModel.multiCell(
       cell, numUnits, dataType, numUniLayers, numUniResLayers, dropout, residualFn,
       2 * numBiLayers, env.numGPUs, env.randomSeed, "MultiUniCell")
     val uniCellInstance = uniCell.createCell(mode, biTuple.output.shape)

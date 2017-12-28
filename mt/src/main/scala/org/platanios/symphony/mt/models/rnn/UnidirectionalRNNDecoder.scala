@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.models.{InferConfig, Model}
+import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.Attention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -53,11 +53,11 @@ class UnidirectionalRNNDecoder[S, SS](
       targetSequences: Output, targetSequenceLengths: Output, mode: Mode
   ): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = Model.embeddings(dataType, tgtVocabulary.size, numUnits, "Embeddings")
+    val embeddings = StateBasedModel.embeddings(dataType, tgtVocabulary.size, numUnits, "Embeddings")
 
     // RNN cell
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
-    val uniCell = Model.multiCell(
+    val uniCell = StateBasedModel.multiCell(
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
       residualFn, 0, env.numGPUs, env.randomSeed, "MultiUniCell")
 

@@ -15,11 +15,11 @@
 
 package org.platanios.symphony.mt.experiments
 
+import org.platanios.symphony.data.mt.IWSLT15Manager
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
-import org.platanios.symphony.mt.models.{InferConfig, Model, TrainConfig}
+import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
 import org.platanios.symphony.mt.models.attention.{BahdanauAttention, LuongAttention}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.tensorflow.api._
@@ -36,7 +36,7 @@ object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
   val dataDir   : Path = workingDir.resolve("data").resolve("iwslt15.en-vi")
 
-  IWSLT15Loader.download(workingDir.resolve("data"), IWSLT15Loader.EnglishVietnamese)
+  IWSLT15Manager.download(workingDir.resolve("data"), IWSLT15Manager.EnglishVietnamese)
 
   // Create the languages and their corresponding vocabularies
   val srcLang : Language   = Language("English", "en")
@@ -118,7 +118,7 @@ object IWSLT15 extends App {
     useNewAttention = false,
     timeMajor = true)
 
-  val model = Model(
+  val model = StateBasedModel(
     gnmtConfig, srcLang, tgtLang, srcVocab, tgtVocab,
     srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
     env, dataConfig, trainConfig, inferConfig, logConfig, "Model")

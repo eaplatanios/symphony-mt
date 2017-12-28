@@ -17,10 +17,10 @@
 //
 //import org.platanios.symphony.mt.Language
 //import org.platanios.symphony.mt.core.{Configuration, Translator}
-//import org.platanios.symphony.mt.core.hooks.PerplexityLogger
 //import org.platanios.symphony.mt.data.Datasets
 //import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
 //import org.platanios.symphony.mt.metrics.{BLEUTensorFlow, Perplexity}
+//import org.platanios.symphony.mt.models.hooks.PerplexityLogger
 //import org.platanios.symphony.mt.translators.PairwiseTranslator._
 //import org.platanios.tensorflow.api._
 //import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
