@@ -28,11 +28,11 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class CommonCrawlManager(srcLanguage: Language, tgtLanguage: Language) {
   require(
-    NewsCommentaryV11Manager.supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
-        NewsCommentaryV11Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage)),
-    "The provided language pair is not supported by the News Commentary v11 data manager.")
+    CommonCrawlManager.supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
+        CommonCrawlManager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage)),
+    "The provided language pair is not supported by the Common Crawl data manager.")
 
   val src: String = srcLanguage.abbreviation
   val tgt: String = tgtLanguage.abbreviation
@@ -40,25 +40,25 @@ case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language
   val name: String = s"$src-$tgt"
 
   private[this] val reversed: Boolean = {
-    NewsCommentaryV11Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+    CommonCrawlManager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
   private[this] val corpusFilenamePrefix: String = {
-    s"news-commentary-v11.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
+    s"commoncrawl.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
   def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
-    val processedPath = path.resolve("nc-v11")
+    val processedPath = path.resolve("commoncrawl")
 
     // Download and decompress the data, if necessary.
-    val archivePathPrefix = processedPath.resolve(s"${NewsCommentaryV11Manager.archivePrefix}")
-    val archivePath = processedPath.resolve(s"${NewsCommentaryV11Manager.archivePrefix}.tgz")
+    val archivePathPrefix = processedPath.resolve(s"${CommonCrawlManager.archivePrefix}")
+    val archivePath = processedPath.resolve(s"${CommonCrawlManager.archivePrefix}.tgz")
     val srcTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$src")
     val tgtTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$tgt")
 
     if (!Files.exists(archivePathPrefix)) {
       Manager.maybeDownload(
-        archivePath, s"${NewsCommentaryV11Manager.url}/${NewsCommentaryV11Manager.archivePrefix}.tgz", bufferSize)
+        archivePath, s"${CommonCrawlManager.url}/${CommonCrawlManager.archivePrefix}.tgz", bufferSize)
       CompressedFiles.decompressTGZ(archivePath, archivePathPrefix, bufferSize)
     }
 
@@ -66,11 +66,12 @@ case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language
   }
 }
 
-object NewsCommentaryV11Manager {
-  private[NewsCommentaryV11Manager] val logger = Logger(LoggerFactory.getLogger("News Commentary v11 Data Manager"))
+object CommonCrawlManager {
+  private[CommonCrawlManager] val logger = Logger(LoggerFactory.getLogger("Common Crawl Data Manager"))
 
-  val url          : String = "http://data.statmt.org/wmt16/translation-task"
-  val archivePrefix: String = "training-parallel-nc-v11"
+  val url          : String = "http://www.statmt.org/wmt13"
+  val archivePrefix: String = "training-parallel-commoncrawl"
 
-  val supportedLanguagePairs: Set[(Language, Language)] = Set((Czech, English), (German, English), (Russian, English))
+  val supportedLanguagePairs: Set[(Language, Language)] = Set(
+    (Czech, English), (French, English), (German, English), (Russian, English), (Spanish, English))
 }
