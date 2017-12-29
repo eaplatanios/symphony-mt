@@ -27,13 +27,19 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
+  require(
+    isLanguagePairSupported(srcLanguage, tgtLanguage),
+    "The provided language pair is not supported by the IWSLT-15 data manager.")
+
   val src: String = srcLanguage.abbreviation
   val tgt: String = tgtLanguage.abbreviation
 
   val name: String = s"$src-$tgt"
 
-  private[this] val reversed: Boolean = EuroparlV7Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  override val supportedLanguagePairs: Set[(Language, Language)] = Set((Vietnamese, English))
+
+  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
 
   private[this] val directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
@@ -91,6 +97,4 @@ object IWSLT15Manager {
   val devPrefix  : String = "tst2012"
   val testPrefix : String = "tst2013"
   val vocabPrefix: String = "vocab"
-
-  val supportedLanguagePairs: Set[(Language, Language)] = Set((Vietnamese, English))
 }

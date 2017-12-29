@@ -28,10 +28,9 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
   require(
-    WMT16Manager.supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
-        WMT16Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage)),
+    isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the WMT16 data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -39,7 +38,11 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
 
   val name: String = s"$src-$tgt"
 
-  private[this] val reversed: Boolean = WMT16Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  override val supportedLanguagePairs: Set[(Language, Language)] = Set(
+    (Czech, English), (Finnish, English), (German, English),
+    (Romanian, English), (Russian, English), (Turkish, English))
+
+  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
 
   private[this] val corpusFilenamePrefix: String = {
     s"news-commentary-v11.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
@@ -111,8 +114,4 @@ object WMT16Manager {
   val newsCommentaryParallelArchive: String      = "training-parallel-nc-v11"
   val devArchives                  : Seq[String] = Seq("dev", "dev-romanian-updated")
   val testArchives                 : Seq[String] = Seq("test")
-
-  val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (Czech, English), (Finnish, English), (German, English),
-    (Romanian, English), (Russian, English), (Turkish, English))
 }

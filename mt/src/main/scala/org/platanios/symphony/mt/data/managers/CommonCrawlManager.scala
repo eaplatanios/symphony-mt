@@ -28,10 +28,9 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class CommonCrawlManager(srcLanguage: Language, tgtLanguage: Language) {
+case class CommonCrawlManager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
   require(
-    CommonCrawlManager.supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
-        CommonCrawlManager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage)),
+    isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Common Crawl data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -39,9 +38,10 @@ case class CommonCrawlManager(srcLanguage: Language, tgtLanguage: Language) {
 
   val name: String = s"$src-$tgt"
 
-  private[this] val reversed: Boolean = {
-    CommonCrawlManager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
-  }
+  override val supportedLanguagePairs: Set[(Language, Language)] = Set(
+    (Czech, English), (French, English), (German, English), (Russian, English), (Spanish, English))
+
+  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
 
   private[this] val corpusFilenamePrefix: String = {
     s"commoncrawl.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
@@ -71,7 +71,4 @@ object CommonCrawlManager {
 
   val url          : String = "http://www.statmt.org/wmt13"
   val archivePrefix: String = "training-parallel-commoncrawl"
-
-  val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (Czech, English), (French, English), (German, English), (Russian, English), (Spanish, English))
 }

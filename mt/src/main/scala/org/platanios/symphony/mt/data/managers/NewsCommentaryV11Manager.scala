@@ -28,10 +28,9 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
   require(
-    NewsCommentaryV11Manager.supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
-        NewsCommentaryV11Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage)),
+    isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the News Commentary v11 data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -39,9 +38,11 @@ case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language
 
   val name: String = s"$src-$tgt"
 
-  private[this] val reversed: Boolean = {
-    NewsCommentaryV11Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  override val supportedLanguagePairs: Set[(Language, Language)] = {
+    Set((Czech, English), (German, English), (Russian, English))
   }
+
+  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
 
   private[this] val corpusFilenamePrefix: String = {
     s"news-commentary-v11.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
@@ -71,6 +72,4 @@ object NewsCommentaryV11Manager {
 
   val url          : String = "http://data.statmt.org/wmt16/translation-task"
   val archivePrefix: String = "training-parallel-nc-v11"
-
-  val supportedLanguagePairs: Set[(Language, Language)] = Set((Czech, English), (German, English), (Russian, English))
 }

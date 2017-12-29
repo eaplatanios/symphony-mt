@@ -28,13 +28,23 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
+  require(
+    isLanguagePairSupported(srcLanguage, tgtLanguage),
+    "The provided language pair is not supported by the Europarl v7 data manager.")
+
   val src: String = srcLanguage.abbreviation
   val tgt: String = tgtLanguage.abbreviation
 
   val name: String = s"$src-$tgt"
 
-  private[this] val reversed: Boolean = EuroparlV7Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  override val supportedLanguagePairs: Set[(Language, Language)] = Set(
+    (Bulgarian, English), (Czech, English), (Danish, English), (Dutch, English), (Estonian, English),
+    (Finnish, English), (French, English), (German, English), (Greek, English), (Hungarian, English),
+    (Italian, English), (Lithuanian, English), (Latvian, English), (Polish, English), (Portuguese, English),
+    (Romanian, English), (Slovak, English), (Slovenian, English), (Spanish, English), (Swedish, English))
+
+  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
 
   private[this] val corpusArchiveFile: String = if (reversed) s"$tgt-$src" else s"$src-$tgt"
 
@@ -109,10 +119,4 @@ object EuroparlV7Manager {
   private[EuroparlV7Manager] val logger = Logger(LoggerFactory.getLogger("Europarl Data Manager"))
 
   val url: String = "http://www.statmt.org/europarl/v7"
-
-  val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (Bulgarian, English), (Czech, English), (Danish, English), (Dutch, English), (Estonian, English),
-    (Finnish, English), (French, English), (German, English), (Greek, English), (Hungarian, English),
-    (Italian, English), (Lithuanian, English), (Latvian, English), (Polish, English), (Portuguese, English),
-    (Romanian, English), (Slovak, English), (Slovenian, English), (Spanish, English), (Swedish, English))
 }
