@@ -116,7 +116,7 @@ case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) exten
 }
 
 object EuroparlV7Manager {
-  private[EuroparlV7Manager] val logger = Logger(LoggerFactory.getLogger("Europarl Data Manager"))
+  private[EuroparlV7Manager] val logger = Logger(LoggerFactory.getLogger("Europarl v7 Data Manager"))
 
   val url: String = "http://www.statmt.org/europarl/v7"
 }
