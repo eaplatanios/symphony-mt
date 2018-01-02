@@ -91,12 +91,10 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
       mosesDecoder.cloneRepository()
 
     // Download, decompress, and collect the dev and the test files, if necessary.
-    val devPath = path.resolve("dev")
-    val testPath = path.resolve("test")
-    downloadUpdatedArchives("dev", devPath, WMT16Manager.devArchives, bufferSize)
-    downloadUpdatedArchives("test", testPath, WMT16Manager.testArchives, bufferSize)
-    val (srcDevCorpora, tgtDevCorpora) = collectDevCorpora(devPath, mosesDecoder)
-    val (srcTestCorpora, tgtTestCorpora) = collectDevCorpora(testPath, mosesDecoder)
+    downloadUpdatedArchives("dev", processedPath, WMT16Manager.devArchives, bufferSize)
+    downloadUpdatedArchives("test", processedPath, WMT16Manager.testArchives, bufferSize)
+    val (srcDevCorpora, tgtDevCorpora) = collectDevCorpora(processedPath.resolve("dev"), mosesDecoder)
+    val (srcTestCorpora, tgtTestCorpora) = collectDevCorpora(processedPath.resolve("test"), mosesDecoder)
 
     ParallelDataset(
       workingDir = processedPath,
