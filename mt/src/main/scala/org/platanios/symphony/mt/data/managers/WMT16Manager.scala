@@ -27,13 +27,19 @@ import java.nio.file.{Files, Path}
 
 import scala.collection.mutable.ListBuffer
 
+// TODO: Make sure to avoid re-doing work if this path exists and contains the joined dataset.
+
 /**
   *
   * More information on this dataset can be found [here](http://www.statmt.org/wmt16/translation-task.html).
   *
   * @author Emmanouil Antonios Platanios
   */
-case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class WMT16Manager(
+    workingDir: Path,
+    srcLanguage: Language,
+    tgtLanguage: Language
+) extends Manager(workingDir.resolve("wmt-16")) {
   require(
     WMT16Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the WMT16 data manager.")
@@ -47,38 +53,35 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
     WMT16Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
-  def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
-    // TODO: Make sure to avoid re-doing work if this path exists and contains the joined dataset.
-    val processedPath = path.resolve("wmt16")
-
+  override def download(bufferSize: Int = 8192): ParallelDataset = {
     // Download and decompress the train data, if necessary.
     val srcTrainCorpora = ListBuffer.empty[Path]
     val tgtTrainCorpora = ListBuffer.empty[Path]
 
     if (EuroparlV7Manager.isLanguagePairSupported(srcLanguage, tgtLanguage)) {
-      val europarlV7Manager = EuroparlV7Manager(srcLanguage, tgtLanguage)
-      val europarlV7Dataset = europarlV7Manager.download(path, bufferSize)
+      val europarlV7Manager = EuroparlV7Manager(workingDir, srcLanguage, tgtLanguage)
+      val europarlV7Dataset = europarlV7Manager.download(bufferSize)
       srcTrainCorpora ++= europarlV7Dataset.trainCorpora(srcLanguage)
       tgtTrainCorpora ++= europarlV7Dataset.trainCorpora(tgtLanguage)
     }
 
     if (EuroparlV8Manager.isLanguagePairSupported(srcLanguage, tgtLanguage)) {
-      val europarlV8Manager = EuroparlV8Manager(srcLanguage, tgtLanguage)
-      val europarlV8Dataset = europarlV8Manager.download(path, bufferSize)
+      val europarlV8Manager = EuroparlV8Manager(workingDir, srcLanguage, tgtLanguage)
+      val europarlV8Dataset = europarlV8Manager.download(bufferSize)
       srcTrainCorpora ++= europarlV8Dataset.trainCorpora(srcLanguage)
       tgtTrainCorpora ++= europarlV8Dataset.trainCorpora(tgtLanguage)
     }
 
     if (CommonCrawlManager.isLanguagePairSupported(srcLanguage, tgtLanguage)) {
-      val commonCrawlManager = CommonCrawlManager(srcLanguage, tgtLanguage)
-      val commonCrawlDataset = commonCrawlManager.download(path, bufferSize)
+      val commonCrawlManager = CommonCrawlManager(workingDir, srcLanguage, tgtLanguage)
+      val commonCrawlDataset = commonCrawlManager.download(bufferSize)
       srcTrainCorpora ++= commonCrawlDataset.trainCorpora(srcLanguage)
       tgtTrainCorpora ++= commonCrawlDataset.trainCorpora(tgtLanguage)
     }
 
     if (NewsCommentaryV11Manager.isLanguagePairSupported(srcLanguage, tgtLanguage)) {
-      val newsCommentaryV11Manager = NewsCommentaryV11Manager(srcLanguage, tgtLanguage)
-      val newsCommentaryV11Dataset = newsCommentaryV11Manager.download(path, bufferSize)
+      val newsCommentaryV11Manager = NewsCommentaryV11Manager(workingDir, srcLanguage, tgtLanguage)
+      val newsCommentaryV11Dataset = newsCommentaryV11Manager.download(bufferSize)
       srcTrainCorpora ++= newsCommentaryV11Dataset.trainCorpora(srcLanguage)
       tgtTrainCorpora ++= newsCommentaryV11Dataset.trainCorpora(tgtLanguage)
     }
@@ -94,15 +97,15 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
       mosesDecoder.cloneRepository()
 
     // Download, decompress, and collect the dev and the test files, if necessary.
-    downloadUpdatedArchives("dev", processedPath, WMT16Manager.devArchives, bufferSize)
-    downloadUpdatedArchives("test", processedPath, WMT16Manager.testArchives, bufferSize)
-    val devPath = processedPath.resolve("dev").resolve("dev")
-    val testPath = processedPath.resolve("test").resolve("test")
+    downloadUpdatedArchives("dev", path, WMT16Manager.devArchives, bufferSize)
+    downloadUpdatedArchives("test", path, WMT16Manager.testArchives, bufferSize)
+    val devPath = path.resolve("dev").resolve("dev")
+    val testPath = path.resolve("test").resolve("test")
     val (srcDevCorpora, tgtDevCorpora) = collectDevCorpora(devPath, mosesDecoder)
     val (srcTestCorpora, tgtTestCorpora) = collectTestCorpora(testPath, mosesDecoder)
 
     ParallelDataset(
-      workingDir = processedPath,
+      workingDir = path,
       trainCorpora = Map(srcLanguage -> srcTrainCorpora, tgtLanguage -> tgtTrainCorpora),
       devCorpora = Map(srcLanguage -> srcDevCorpora, tgtLanguage -> tgtDevCorpora),
       testCorpora = Map(srcLanguage -> srcTestCorpora, tgtLanguage -> tgtTestCorpora))

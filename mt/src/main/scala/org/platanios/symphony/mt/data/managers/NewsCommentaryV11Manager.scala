@@ -28,7 +28,11 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class NewsCommentaryV11Manager(
+    workingDir: Path,
+    srcLanguage: Language,
+    tgtLanguage: Language
+) extends Manager(workingDir.resolve("nc-v11")) {
   require(
     NewsCommentaryV11Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the News Commentary v11 data manager.")
@@ -46,12 +50,10 @@ case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language
     s"news-commentary-v11.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
-  def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
-    val processedPath = path.resolve("nc-v11")
-
+  override def download(bufferSize: Int = 8192): ParallelDataset = {
     // Download and decompress the data, if necessary.
-    val archivePathPrefix = processedPath.resolve(s"${NewsCommentaryV11Manager.archivePrefix}")
-    val archivePath = processedPath.resolve(s"${NewsCommentaryV11Manager.archivePrefix}.tgz")
+    val archivePathPrefix = path.resolve(s"${NewsCommentaryV11Manager.archivePrefix}")
+    val archivePath = path.resolve(s"${NewsCommentaryV11Manager.archivePrefix}.tgz")
     val srcTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$src")
     val tgtTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$tgt")
 
@@ -62,7 +64,7 @@ case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language
     }
 
     ParallelDataset(
-      workingDir = processedPath,
+      workingDir = path,
       trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 }

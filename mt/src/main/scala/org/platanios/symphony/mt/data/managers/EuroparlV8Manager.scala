@@ -28,7 +28,11 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class EuroparlV8Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class EuroparlV8Manager(
+    workingDir: Path,
+    srcLanguage: Language,
+    tgtLanguage: Language
+) extends Manager(workingDir.resolve("europarl-v8")) {
   require(
     EuroparlV8Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v8 data manager.")
@@ -46,12 +50,10 @@ case class EuroparlV8Manager(srcLanguage: Language, tgtLanguage: Language) {
     s"europarl-v8.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
-  def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
-    val processedPath = path.resolve("europarl-v8")
-
+  override def download(bufferSize: Int = 8192): ParallelDataset = {
     // Download and decompress the data, if necessary.
-    val archivePathPrefix = processedPath.resolve(s"${CommonCrawlManager.archivePrefix}")
-    val archivePath = processedPath.resolve(s"${CommonCrawlManager.archivePrefix}.tgz")
+    val archivePathPrefix = path.resolve(s"${CommonCrawlManager.archivePrefix}")
+    val archivePath = path.resolve(s"${CommonCrawlManager.archivePrefix}.tgz")
     val srcTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$src")
     val tgtTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$tgt")
 
@@ -62,7 +64,7 @@ case class EuroparlV8Manager(srcLanguage: Language, tgtLanguage: Language) {
     }
 
     ParallelDataset(
-      workingDir = processedPath,
+      workingDir = path,
       trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 }

@@ -27,7 +27,11 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class IWSLT15Manager(
+    workingDir: Path,
+    srcLanguage: Language,
+    tgtLanguage: Language
+) extends Manager(workingDir.resolve("iwslt-15")) {
   require(
     IWSLT15Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the IWSLT-15 data manager.")
@@ -43,18 +47,16 @@ case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) {
 
   private[this] val directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
-  def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
-    val processedPath = path.resolve("iwslt-15")
-
+  override def download(bufferSize: Int = 8192): ParallelDataset = {
     // Download the data, if necessary.
-    val srcTrainCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.trainPrefix}.$src")
-    val tgtTrainCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.trainPrefix}.$tgt")
-    val srcDevCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.devPrefix}.$src")
-    val tgtDevCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.devPrefix}.$tgt")
-    val srcTestCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.testPrefix}.$src")
-    val tgtTestCorpus = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.testPrefix}.$tgt")
-    val srcVocab = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.vocabPrefix}.$src")
-    val tgtVocab = processedPath.resolve(directoryName).resolve(s"${IWSLT15Manager.vocabPrefix}.$tgt")
+    val srcTrainCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.trainPrefix}.$src")
+    val tgtTrainCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.trainPrefix}.$tgt")
+    val srcDevCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.devPrefix}.$src")
+    val tgtDevCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.devPrefix}.$tgt")
+    val srcTestCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.testPrefix}.$src")
+    val tgtTestCorpus = path.resolve(directoryName).resolve(s"${IWSLT15Manager.testPrefix}.$tgt")
+    val srcVocab = path.resolve(directoryName).resolve(s"${IWSLT15Manager.vocabPrefix}.$src")
+    val tgtVocab = path.resolve(directoryName).resolve(s"${IWSLT15Manager.vocabPrefix}.$tgt")
 
     if (!Files.exists(srcTrainCorpus))
       Manager.maybeDownload(
@@ -82,7 +84,7 @@ case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) {
         tgtVocab, s"${IWSLT15Manager.url}/$directoryName/${IWSLT15Manager.vocabPrefix}.$tgt", bufferSize)
 
     ParallelDataset(
-      workingDir = processedPath,
+      workingDir = path,
       trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)),
       devCorpora = Map(srcLanguage -> Seq(srcDevCorpus), tgtLanguage -> Seq(tgtDevCorpus)),
       testCorpora = Map(srcLanguage -> Seq(srcTestCorpus), tgtLanguage -> Seq(tgtTestCorpus)),

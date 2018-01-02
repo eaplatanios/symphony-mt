@@ -15,6 +15,8 @@
 
 package org.platanios.symphony.mt.data.managers
 
+import org.platanios.symphony.mt.data.ParallelDataset
+
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
@@ -25,6 +27,10 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
+abstract class Manager(val path: Path) {
+  def download(bufferSize: Int = 8192): ParallelDataset
+}
+
 object Manager {
   private[Manager] val logger = Logger(LoggerFactory.getLogger("Data Manager"))
 

@@ -28,7 +28,11 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) {
+case class EuroparlV7Manager(
+    workingDir: Path,
+    srcLanguage: Language,
+    tgtLanguage: Language
+) extends Manager(workingDir.resolve("europarl-v7")) {
   require(
     EuroparlV7Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v7 data manager.")
@@ -48,12 +52,10 @@ case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) {
     s"europarl-v7.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
-  def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
-    val processedPath = path.resolve("europarl-v7")
-
+  override def download(bufferSize: Int = 8192): ParallelDataset = {
     // Download and decompress the data, if necessary.
-    val archivePathPrefix = processedPath.resolve(corpusArchiveFile)
-    val archivePath = processedPath.resolve(s"$corpusArchiveFile.tgz")
+    val archivePathPrefix = path.resolve(corpusArchiveFile)
+    val archivePath = path.resolve(s"$corpusArchiveFile.tgz")
     val srcTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$src")
     val tgtTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$tgt")
 
@@ -62,9 +64,9 @@ case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) {
       CompressedFiles.decompressTGZ(archivePath, archivePathPrefix, bufferSize)
     }
 
-    downloadUpdatedArchives(corpusArchiveFile, processedPath, Seq(corpusArchiveFile), bufferSize)
+    downloadUpdatedArchives(corpusArchiveFile, path, Seq(corpusArchiveFile), bufferSize)
     ParallelDataset(
-      workingDir = processedPath,
+      workingDir = path,
       trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 
