@@ -15,14 +15,14 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.Language.{English, Vietnamese}
-import org.platanios.symphony.mt.data.{DataConfig, ParallelDataset, Vocabulary}
+import org.platanios.symphony.mt.Language.{English, German}
 import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
-import org.platanios.symphony.mt.data.managers.IWSLT15Manager
-import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
-import org.platanios.symphony.mt.models.attention.LuongAttention
+import org.platanios.symphony.mt.data.managers.WMT16Manager
+import org.platanios.symphony.mt.data.{DataConfig, ParallelDataset, Vocabulary}
+import org.platanios.symphony.mt.models.attention.BahdanauAttention
 import org.platanios.symphony.mt.models.rnn._
+import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
+import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
@@ -33,14 +33,14 @@ import java.nio.file.{Path, Paths}
 /**
   * @author Emmanouil Antonios Platanios
   */
-object IWSLT15 extends App {
+object WMT16 extends App {
   val workingDir: Path = Paths.get("temp")
 
   // Create the languages.
-  val srcLang: Language = English
-  val tgtLang: Language = Vietnamese
+  val srcLang: Language = German
+  val tgtLang: Language = English
 
-  val parallelDataset: ParallelDataset = IWSLT15Manager(srcLang, tgtLang).download(workingDir.resolve("data"))
+  val parallelDataset: ParallelDataset = WMT16Manager(srcLang, tgtLang).download(workingDir.resolve("data"))
 
   // Create the vocabularies and the datasets
   val srcVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabulary()(srcLang))
@@ -85,25 +85,16 @@ object IWSLT15 extends App {
     logTrainEvalSteps = -1)
 
   // Create a translator
-  val config = StateBasedModel.Config(
-    UnidirectionalRNNEncoder(
-      srcLang, srcVocab, env,
-      cell = BasicLSTM(forgetBias = 1.0f),
-      numUnits = 512,
-      numLayers = 2,
-      residual = false,
-      dropout = Some(0.2f),
-      timeMajor = true),
-    UnidirectionalRNNDecoder(
-      tgtLang, tgtVocab, env, dataConfig, inferConfig,
-      cell = BasicLSTM(forgetBias = 1.0f),
-      numUnits = 512,
-      numLayers = 2,
-      residual = false,
-      dropout = Some(0.2f),
-      attention = Some(LuongAttention(scaled = true)),
-      outputAttention = true,
-      timeMajor = true),
+  val config = GNMTConfig(
+    srcLang, tgtLang, srcVocab, tgtVocab, env, dataConfig, inferConfig,
+    cell = BasicLSTM(forgetBias = 1.0f),
+    numUnits = 512,
+    numBiLayers = 1,
+    numUniLayers = 3,
+    numUniResLayers = 2,
+    dropout = Some(0.2f),
+    attention = BahdanauAttention(normalized = true),
+    useNewAttention = false,
     timeMajor = true)
 
   val model = StateBasedModel(
