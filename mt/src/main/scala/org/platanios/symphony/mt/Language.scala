@@ -31,6 +31,7 @@ object Language {
   case object French extends Language("French", "fr")
   case object German extends Language("German", "de")
   case object Greek extends Language("Greek", "el")
+  case object Hindi extends Language("Hindi", "hi")
   case object Hungarian extends Language("Hungarian", "hu")
   case object Italian extends Language("Italian", "it")
   case object Lithuanian extends Language("Lithuanian", "lt")

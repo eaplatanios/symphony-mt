@@ -25,12 +25,14 @@ import org.slf4j.LoggerFactory
 
 import java.nio.file.{Files, Path}
 
+import scala.collection.mutable.ListBuffer
+
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
+case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
   require(
-    isLanguagePairSupported(srcLanguage, tgtLanguage),
+    WMT16Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the WMT16 data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -38,57 +40,63 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) extends Ma
 
   val name: String = s"$src-$tgt"
 
-  override val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (Czech, English), (Finnish, English), (German, English),
-    (Romanian, English), (Russian, English), (Turkish, English))
-
-  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
-
-  private[this] val corpusFilenamePrefix: String = {
-    s"news-commentary-v11.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
+  private[this] val reversed: Boolean = {
+    WMT16Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
   def download(path: Path, bufferSize: Int = 8192): ParallelDataset = {
-    // Download and decompress the data, if necessary.
-    val trainPath = path.resolve("train")
-    val devPath = path.resolve("dev")
-    val testPath = path.resolve("test")
+    // TODO: Make sure to avoid re-doing work if this path exists and contains the joined dataset.
+    val processedPath = path.resolve("wmt16")
 
-    val newsCommentaryV11Manager = NewsCommentaryV11Manager(srcLanguage, tgtLanguage)
-    val newsCommentaryV11Dataset = newsCommentaryV11Manager.download(path, bufferSize)
+    // Download and decompress the train data, if necessary.
+    val srcTrainCorpora = ListBuffer.empty[Path]
+    val tgtTrainCorpora = ListBuffer.empty[Path]
 
-    downloadUpdatedArchives("dev", devPath, WMT16Manager.devArchives, bufferSize)
-    downloadUpdatedArchives("test", testPath, WMT16Manager.testArchives, bufferSize)
+    if (EuroparlV7Manager.isLanguagePairSupported(srcLanguage, tgtLanguage)) {
+      val europarlV7Manager = EuroparlV7Manager(srcLanguage, tgtLanguage)
+      val europarlV7Dataset = europarlV7Manager.download(path, bufferSize)
+      srcTrainCorpora ++= europarlV7Dataset.trainCorpora(srcLanguage)
+      tgtTrainCorpora ++= europarlV7Dataset.trainCorpora(tgtLanguage)
+    }
+
+    if (EuroparlV8Manager.isLanguagePairSupported(srcLanguage, tgtLanguage)) {
+      val europarlV8Manager = EuroparlV8Manager(srcLanguage, tgtLanguage)
+      val europarlV8Dataset = europarlV8Manager.download(path, bufferSize)
+      srcTrainCorpora ++= europarlV8Dataset.trainCorpora(srcLanguage)
+      tgtTrainCorpora ++= europarlV8Dataset.trainCorpora(tgtLanguage)
+    }
+
+    if (CommonCrawlManager.isLanguagePairSupported(srcLanguage, tgtLanguage)) {
+      val commonCrawlManager = CommonCrawlManager(srcLanguage, tgtLanguage)
+      val commonCrawlDataset = commonCrawlManager.download(path, bufferSize)
+      srcTrainCorpora ++= commonCrawlDataset.trainCorpora(srcLanguage)
+      tgtTrainCorpora ++= commonCrawlDataset.trainCorpora(tgtLanguage)
+    }
+
+    if (NewsCommentaryV11Manager.isLanguagePairSupported(srcLanguage, tgtLanguage)) {
+      val newsCommentaryV11Manager = NewsCommentaryV11Manager(srcLanguage, tgtLanguage)
+      val newsCommentaryV11Dataset = newsCommentaryV11Manager.download(path, bufferSize)
+      srcTrainCorpora ++= newsCommentaryV11Dataset.trainCorpora(srcLanguage)
+      tgtTrainCorpora ++= newsCommentaryV11Dataset.trainCorpora(tgtLanguage)
+    }
+
+    // TODO: Add support for the "CzEng 1.6pre" dataset.
+    // TODO: Add support for the "Yandex Corpus" dataset.
+    // TODO: Add support for the "Wiki Headlines" dataset.
+    // TODO: Add support for the "SETIMES2" dataset.
 
     // Clone the Moses repository, if necessary.
     val mosesDecoder = Utilities.MosesDecoder(path.resolve("moses"))
     if (!mosesDecoder.exists)
       mosesDecoder.cloneRepository()
 
-    // Convert the SGM files to simple text files.
-    val srcDevCorporaSGM = Seq(
-      devPath.resolve(s"newstest2014-$src$tgt-src.$src.sgm"),
-      devPath.resolve(s"newstest2015-$src$tgt-src.$src.sgm"))
-    val srcDevCorpora = Seq(
-      devPath.resolve(s"newstest2014-$src$tgt-src.$src"),
-      devPath.resolve(s"newstest2015-$src$tgt-src.$src"))
-    val tgtDevCorporaSGM = Seq(
-      devPath.resolve(s"newstest2014-$src$tgt-src.$tgt.sgm"),
-      devPath.resolve(s"newstest2015-$src$tgt-src.$tgt.sgm"))
-    val tgtDevCorpora = Seq(
-      devPath.resolve(s"newstest2014-$src$tgt-src.$tgt"),
-      devPath.resolve(s"newstest2015-$src$tgt-src.$tgt"))
-    val srcTestCorporaSGM = Seq(testPath.resolve(s"newstest2016-$src$tgt-src.$src.sgm"))
-    val srcTestCorpora = Seq(testPath.resolve(s"newstest2016-$src$tgt-src.$src"))
-    val tgtTestCorporaSGM = Seq(testPath.resolve(s"newstest2016-$src$tgt-src.$tgt.sgm"))
-    val tgtTestCorpora = Seq(testPath.resolve(s"newstest2016-$src$tgt-src.$tgt"))
-    srcDevCorporaSGM.zip(srcDevCorpora).foreach(p => mosesDecoder.sgmToText(p._1, p._2))
-    tgtDevCorporaSGM.zip(tgtDevCorpora).foreach(p => mosesDecoder.sgmToText(p._1, p._2))
-    srcTestCorporaSGM.zip(srcTestCorpora).foreach(p => mosesDecoder.sgmToText(p._1, p._2))
-    tgtTestCorporaSGM.zip(tgtTestCorpora).foreach(p => mosesDecoder.sgmToText(p._1, p._2))
+    // Download, decompress, and collect the dev and the test files, if necessary.
+    val (srcDevCorpora, tgtDevCorpora) = collectDevCorpora(path.resolve("dev"), mosesDecoder)
+    val (srcTestCorpora, tgtTestCorpora) = collectDevCorpora(path.resolve("test"), mosesDecoder)
 
     ParallelDataset(
-      trainCorpora = newsCommentaryV11Dataset.trainCorpora,
+      workingDir = processedPath,
+      trainCorpora = Map(srcLanguage -> srcTrainCorpora, tgtLanguage -> tgtTrainCorpora),
       devCorpora = Map(srcLanguage -> srcDevCorpora, tgtLanguage -> tgtDevCorpora),
       testCorpora = Map(srcLanguage -> srcTestCorpora, tgtLanguage -> tgtTestCorpora))
   }
@@ -105,6 +113,120 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) extends Ma
       })
     }
   }
+
+  protected def collectDevCorpora(path: Path, mosesDecoder: Utilities.MosesDecoder): (Seq[Path], Seq[Path]) = {
+    var srcPaths = ListBuffer.empty[Path]
+    var tgtPaths = ListBuffer.empty[Path]
+
+    // 2008 Data
+    val supported2008Languages = Set[Language](Czech, English, French, German, Hungarian, Spanish)
+    if (supported2008Languages.contains(srcLanguage) && supported2008Languages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"news-test2008-src.$src")
+      val tgtPath = path.resolve(s"news-test2008-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"news-test2008-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"news-test2008-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    // 2009 Data
+    val supported2009Languages = Set[Language](Czech, English, French, German, Hungarian, Italian, Spanish)
+    if (supported2009Languages.contains(srcLanguage) && supported2009Languages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newstest2009-src.$src")
+      val tgtPath = path.resolve(s"newstest2009-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newstest2009-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newstest2009-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    // 2010 Data
+    val supported2010Languages = Set[Language](Czech, English, French, German, Spanish)
+    if (supported2010Languages.contains(srcLanguage) && supported2010Languages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newstest2010-src.$src")
+      val tgtPath = path.resolve(s"newstest2010-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newstest2010-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newstest2010-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    // 2011 Data
+    val supported2011Languages = Set[Language](Czech, English, French, German, Spanish)
+    if (supported2011Languages.contains(srcLanguage) && supported2011Languages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newstest2011-src.$src")
+      val tgtPath = path.resolve(s"newstest2011-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newstest2011-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newstest2011-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    // 2012 Data
+    val supported2012Languages = Set[Language](Czech, English, French, German, Russian, Spanish)
+    if (supported2012Languages.contains(srcLanguage) && supported2012Languages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newstest2012-src.$src")
+      val tgtPath = path.resolve(s"newstest2012-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newstest2012-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newstest2012-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    // 2013 Data
+    val supported2013Languages = Set[Language](Czech, English, French, German, Russian, Spanish)
+    if (supported2013Languages.contains(srcLanguage) && supported2013Languages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newstest2013-src.$src")
+      val tgtPath = path.resolve(s"newstest2013-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newstest2013-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newstest2013-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    // 2014 Data
+    val supported2014Languages = Set[Language](Czech, English, French, German, Hindi, Russian)
+    if (supported2014Languages.contains(srcLanguage) && supported2014Languages.contains(tgtLanguage)) {
+      val pair = if (reversed) s"$tgt$src" else s"$src$tgt"
+      val srcPath = path.resolve(s"newstest2014-$pair-src.$src")
+      val tgtPath = path.resolve(s"newstest2014-$pair-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newstest2014-$pair-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newstest2014-$pair-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    // 2015 Data
+    val supported2015Languages = Set[Language](Czech, English, Finnish, German, Russian)
+    if (supported2015Languages.contains(srcLanguage) && supported2015Languages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newstest2015-$src$tgt-src.$src")
+      val tgtPath = path.resolve(s"newstest2015-$src$tgt-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newstest2015-$src$tgt-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newstest2015-$src$tgt-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    (srcPaths, tgtPaths)
+  }
+
+  protected def collectTestCorpora(path: Path, mosesDecoder: Utilities.MosesDecoder): (Seq[Path], Seq[Path]) = {
+    var srcPaths = ListBuffer.empty[Path]
+    var tgtPaths = ListBuffer.empty[Path]
+
+    // 2016 Data
+    val supported2016Languages = Set[Language](Czech, English, Finnish, German, Romanian, Russian, Turkish)
+    if (supported2016Languages.contains(srcLanguage) && supported2016Languages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newstest2016-$src$tgt-src.$src")
+      val tgtPath = path.resolve(s"newstest2016-$src$tgt-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newstest2016-$src$tgt-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newstest2016-$src$tgt-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    (srcPaths, tgtPaths)
+  }
 }
 
 object WMT16Manager {
@@ -114,4 +236,13 @@ object WMT16Manager {
   val newsCommentaryParallelArchive: String      = "training-parallel-nc-v11"
   val devArchives                  : Seq[String] = Seq("dev", "dev-romanian-updated")
   val testArchives                 : Seq[String] = Seq("test")
+
+  val supportedLanguagePairs: Set[(Language, Language)] = Set(
+    (Czech, English), (Finnish, English), (German, English),
+    (Romanian, English), (Russian, English), (Turkish, English))
+
+  def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
+    supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
+        supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 }
