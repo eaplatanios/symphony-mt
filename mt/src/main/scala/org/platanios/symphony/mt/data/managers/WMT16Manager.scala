@@ -140,6 +140,16 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
       tgtPaths += tgtPath
     }
 
+    val supported2009SysCombLanguages = Set[Language](Czech, English, French, German, Hungarian, Italian, Spanish)
+    if (supported2009SysCombLanguages.contains(srcLanguage) && supported2009SysCombLanguages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newssyscomb2009-src.$src")
+      val tgtPath = path.resolve(s"newssyscomb2009-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newssyscomb2009-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newssyscomb2009-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
     // 2010 Data
     val supported2010Languages = Set[Language](Czech, English, French, German, Spanish)
     if (supported2010Languages.contains(srcLanguage) && supported2010Languages.contains(tgtLanguage)) {
@@ -196,6 +206,16 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
       tgtPaths += tgtPath
     }
 
+    val supported2014DevLanguages = Set[Language](English, Hindi)
+    if (supported2014DevLanguages.contains(srcLanguage) && supported2014DevLanguages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newsdev2014-src.$src")
+      val tgtPath = path.resolve(s"newsdev2014-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newsdev2014-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newsdev2014-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
     // 2015 Data
     val supported2015Languages = Set[Language](Czech, English, Finnish, German, Russian)
     if (supported2015Languages.contains(srcLanguage) && supported2015Languages.contains(tgtLanguage)) {
@@ -203,6 +223,49 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
       val tgtPath = path.resolve(s"newstest2015-$src$tgt-ref.$tgt")
       mosesDecoder.sgmToText(path.resolve(s"newstest2015-$src$tgt-src.$src.sgm"), srcPath)
       mosesDecoder.sgmToText(path.resolve(s"newstest2015-$src$tgt-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    val supported2015DevLanguages = Set[Language](English, Finnish)
+    if (supported2015DevLanguages.contains(srcLanguage) && supported2015DevLanguages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newsdev2015-$src$tgt-src.$src")
+      val tgtPath = path.resolve(s"newsdev2015-$src$tgt-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newsdev2015-$src$tgt-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newsdev2015-$src$tgt-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    val supported2015DiscussDevLanguages = Set[Language](English, French)
+    if (supported2015DiscussDevLanguages.contains(srcLanguage) &&
+        supported2015DiscussDevLanguages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newsdiscussdev2015-$src$tgt-src.$src")
+      val tgtPath = path.resolve(s"newsdiscussdev2015-$src$tgt-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newsdiscussdev2015-$src$tgt-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newsdiscussdev2015-$src$tgt-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    val supported2015DiscussTestLanguages = Set[Language](English, French)
+    if (supported2015DiscussTestLanguages.contains(srcLanguage) &&
+        supported2015DiscussTestLanguages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newsdiscusstest2015-$src$tgt-src.$src")
+      val tgtPath = path.resolve(s"newsdiscusstest2015-$src$tgt-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newsdiscusstest2015-$src$tgt-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newsdiscusstest2015-$src$tgt-ref.$tgt.sgm"), tgtPath)
+      srcPaths += srcPath
+      tgtPaths += tgtPath
+    }
+
+    // 2016 Data
+    val supported2016DevLanguages = Set[Language](English, Romanian, Turkish)
+    if (supported2016DevLanguages.contains(srcLanguage) && supported2016DevLanguages.contains(tgtLanguage)) {
+      val srcPath = path.resolve(s"newsdev2016-$src$tgt-src.$src")
+      val tgtPath = path.resolve(s"newsdev2016-$src$tgt-ref.$tgt")
+      mosesDecoder.sgmToText(path.resolve(s"newsdev2016-$src$tgt-src.$src.sgm"), srcPath)
+      mosesDecoder.sgmToText(path.resolve(s"newsdev2016-$src$tgt-ref.$tgt.sgm"), tgtPath)
       srcPaths += srcPath
       tgtPaths += tgtPath
     }
