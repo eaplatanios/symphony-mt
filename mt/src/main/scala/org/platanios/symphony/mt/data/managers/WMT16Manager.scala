@@ -99,7 +99,7 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
     val devPath = processedPath.resolve("dev").resolve("dev")
     val testPath = processedPath.resolve("test").resolve("test")
     val (srcDevCorpora, tgtDevCorpora) = collectDevCorpora(devPath, mosesDecoder)
-    val (srcTestCorpora, tgtTestCorpora) = collectDevCorpora(testPath, mosesDecoder)
+    val (srcTestCorpora, tgtTestCorpora) = collectTestCorpora(testPath, mosesDecoder)
 
     ParallelDataset(
       workingDir = processedPath,
