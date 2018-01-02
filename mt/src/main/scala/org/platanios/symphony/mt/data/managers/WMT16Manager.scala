@@ -28,6 +28,9 @@ import java.nio.file.{Files, Path}
 import scala.collection.mutable.ListBuffer
 
 /**
+  *
+  * More information on this dataset can be found [here](http://www.statmt.org/wmt16/translation-task.html).
+  *
   * @author Emmanouil Antonios Platanios
   */
 case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
@@ -93,8 +96,10 @@ case class WMT16Manager(srcLanguage: Language, tgtLanguage: Language) {
     // Download, decompress, and collect the dev and the test files, if necessary.
     downloadUpdatedArchives("dev", processedPath, WMT16Manager.devArchives, bufferSize)
     downloadUpdatedArchives("test", processedPath, WMT16Manager.testArchives, bufferSize)
-    val (srcDevCorpora, tgtDevCorpora) = collectDevCorpora(processedPath.resolve("dev"), mosesDecoder)
-    val (srcTestCorpora, tgtTestCorpora) = collectDevCorpora(processedPath.resolve("test"), mosesDecoder)
+    val devPath = processedPath.resolve("dev").resolve("dev")
+    val testPath = processedPath.resolve("test").resolve("test")
+    val (srcDevCorpora, tgtDevCorpora) = collectDevCorpora(devPath, mosesDecoder)
+    val (srcTestCorpora, tgtTestCorpora) = collectDevCorpora(testPath, mosesDecoder)
 
     ParallelDataset(
       workingDir = processedPath,
