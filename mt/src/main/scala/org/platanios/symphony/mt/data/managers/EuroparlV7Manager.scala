@@ -28,9 +28,9 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
+case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) {
   require(
-    isLanguagePairSupported(srcLanguage, tgtLanguage),
+    EuroparlV7Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v7 data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -38,13 +38,9 @@ case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) exten
 
   val name: String = s"$src-$tgt"
 
-  override val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (Bulgarian, English), (Czech, English), (Danish, English), (Dutch, English), (Estonian, English),
-    (Finnish, English), (French, English), (German, English), (Greek, English), (Hungarian, English),
-    (Italian, English), (Lithuanian, English), (Latvian, English), (Polish, English), (Portuguese, English),
-    (Romanian, English), (Slovak, English), (Slovenian, English), (Spanish, English), (Swedish, English))
-
-  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  private[this] val reversed: Boolean = {
+    EuroparlV7Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 
   private[this] val corpusArchiveFile: String = if (reversed) s"$tgt-$src" else s"$src-$tgt"
 
@@ -67,7 +63,9 @@ case class EuroparlV7Manager(srcLanguage: Language, tgtLanguage: Language) exten
     }
 
     downloadUpdatedArchives(corpusArchiveFile, processedPath, Seq(corpusArchiveFile), bufferSize)
-    ParallelDataset(trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
+    ParallelDataset(
+      workingDir = processedPath,
+      trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 
   protected def downloadUpdatedArchives(
@@ -119,4 +117,15 @@ object EuroparlV7Manager {
   private[EuroparlV7Manager] val logger = Logger(LoggerFactory.getLogger("Europarl v7 Data Manager"))
 
   val url: String = "http://www.statmt.org/europarl/v7"
+
+  val supportedLanguagePairs: Set[(Language, Language)] = Set(
+    (Bulgarian, English), (Czech, English), (Danish, English), (Dutch, English), (Estonian, English),
+    (Finnish, English), (French, English), (German, English), (Greek, English), (Hungarian, English),
+    (Italian, English), (Lithuanian, English), (Latvian, English), (Polish, English), (Portuguese, English),
+    (Romanian, English), (Slovak, English), (Slovenian, English), (Spanish, English), (Swedish, English))
+
+  def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
+    supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
+        supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 }

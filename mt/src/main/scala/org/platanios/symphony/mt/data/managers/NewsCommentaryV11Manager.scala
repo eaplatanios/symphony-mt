@@ -28,9 +28,9 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
+case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language) {
   require(
-    isLanguagePairSupported(srcLanguage, tgtLanguage),
+    NewsCommentaryV11Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the News Commentary v11 data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -38,11 +38,9 @@ case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language
 
   val name: String = s"$src-$tgt"
 
-  override val supportedLanguagePairs: Set[(Language, Language)] = {
-    Set((Czech, English), (German, English), (Russian, English))
+  private[this] val reversed: Boolean = {
+    NewsCommentaryV11Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
-
-  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
 
   private[this] val corpusFilenamePrefix: String = {
     s"news-commentary-v11.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
@@ -63,7 +61,9 @@ case class NewsCommentaryV11Manager(srcLanguage: Language, tgtLanguage: Language
       CompressedFiles.decompressTGZ(archivePath, archivePathPrefix, bufferSize)
     }
 
-    ParallelDataset(trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
+    ParallelDataset(
+      workingDir = processedPath,
+      trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 }
 
@@ -72,4 +72,13 @@ object NewsCommentaryV11Manager {
 
   val url          : String = "http://data.statmt.org/wmt16/translation-task"
   val archivePrefix: String = "training-parallel-nc-v11"
+
+  val supportedLanguagePairs: Set[(Language, Language)] = {
+    Set((Czech, English), (German, English), (Russian, English))
+  }
+
+  def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
+    supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
+        supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 }

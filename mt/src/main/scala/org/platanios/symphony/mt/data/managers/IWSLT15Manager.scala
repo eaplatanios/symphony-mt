@@ -27,9 +27,9 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
+case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) {
   require(
-    isLanguagePairSupported(srcLanguage, tgtLanguage),
+    IWSLT15Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the IWSLT-15 data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -37,9 +37,9 @@ case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) extends 
 
   val name: String = s"$src-$tgt"
 
-  override val supportedLanguagePairs: Set[(Language, Language)] = Set((Vietnamese, English))
-
-  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  private[this] val reversed: Boolean = {
+    IWSLT15Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 
   private[this] val directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
@@ -82,6 +82,7 @@ case class IWSLT15Manager(srcLanguage: Language, tgtLanguage: Language) extends 
         tgtVocab, s"${IWSLT15Manager.url}/$directoryName/${IWSLT15Manager.vocabPrefix}.$tgt", bufferSize)
 
     ParallelDataset(
+      workingDir = processedPath,
       trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)),
       devCorpora = Map(srcLanguage -> Seq(srcDevCorpus), tgtLanguage -> Seq(tgtDevCorpus)),
       testCorpora = Map(srcLanguage -> Seq(srcTestCorpus), tgtLanguage -> Seq(tgtTestCorpus)),
@@ -97,4 +98,11 @@ object IWSLT15Manager {
   val devPrefix  : String = "tst2012"
   val testPrefix : String = "tst2013"
   val vocabPrefix: String = "vocab"
+
+  val supportedLanguagePairs: Set[(Language, Language)] = Set((Vietnamese, English))
+
+  def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
+    supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
+        supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 }

@@ -28,9 +28,9 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class CommonCrawlManager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
+case class CommonCrawlManager(srcLanguage: Language, tgtLanguage: Language) {
   require(
-    isLanguagePairSupported(srcLanguage, tgtLanguage),
+    CommonCrawlManager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Common Crawl data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -38,10 +38,9 @@ case class CommonCrawlManager(srcLanguage: Language, tgtLanguage: Language) exte
 
   val name: String = s"$src-$tgt"
 
-  override val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (Czech, English), (French, English), (German, English), (Russian, English), (Spanish, English))
-
-  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  private[this] val reversed: Boolean = {
+    CommonCrawlManager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 
   private[this] val corpusFilenamePrefix: String = {
     s"commoncrawl.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
@@ -62,7 +61,9 @@ case class CommonCrawlManager(srcLanguage: Language, tgtLanguage: Language) exte
       CompressedFiles.decompressTGZ(archivePath, archivePathPrefix, bufferSize)
     }
 
-    ParallelDataset(trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
+    ParallelDataset(
+      workingDir = processedPath,
+      trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 }
 
@@ -71,4 +72,12 @@ object CommonCrawlManager {
 
   val url          : String = "http://www.statmt.org/wmt13"
   val archivePrefix: String = "training-parallel-commoncrawl"
+
+  val supportedLanguagePairs: Set[(Language, Language)] = Set(
+    (Czech, English), (French, English), (German, English), (Russian, English), (Spanish, English))
+
+  def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
+    supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
+        supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 }

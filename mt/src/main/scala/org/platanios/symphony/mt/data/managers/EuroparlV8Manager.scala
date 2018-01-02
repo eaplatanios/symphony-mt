@@ -28,9 +28,9 @@ import java.nio.file.{Files, Path}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class EuroparlV8Manager(srcLanguage: Language, tgtLanguage: Language) extends Manager {
+case class EuroparlV8Manager(srcLanguage: Language, tgtLanguage: Language) {
   require(
-    isLanguagePairSupported(srcLanguage, tgtLanguage),
+    EuroparlV8Manager.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v8 data manager.")
 
   val src: String = srcLanguage.abbreviation
@@ -38,9 +38,9 @@ case class EuroparlV8Manager(srcLanguage: Language, tgtLanguage: Language) exten
 
   val name: String = s"$src-$tgt"
 
-  override val supportedLanguagePairs: Set[(Language, Language)] = Set((Finnish, English), (Romanian, English))
-
-  private[this] val reversed: Boolean = supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  private[this] val reversed: Boolean = {
+    EuroparlV8Manager.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 
   private[this] val corpusFilenamePrefix: String = {
     s"europarl-v8.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
@@ -61,7 +61,9 @@ case class EuroparlV8Manager(srcLanguage: Language, tgtLanguage: Language) exten
       CompressedFiles.decompressTGZ(archivePath, archivePathPrefix, bufferSize)
     }
 
-    ParallelDataset(trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
+    ParallelDataset(
+      workingDir = processedPath,
+      trainCorpora = Map(srcLanguage -> Seq(srcTrainCorpus), tgtLanguage -> Seq(tgtTrainCorpus)))
   }
 }
 
@@ -70,4 +72,11 @@ object EuroparlV8Manager {
 
   val url          : String = "http://data.statmt.org/wmt16/translation-task"
   val archivePrefix: String = "training-parallel-ep-v8"
+
+  val supportedLanguagePairs: Set[(Language, Language)] = Set((Finnish, English), (Romanian, English))
+
+  def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
+    supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
+        supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
 }
