@@ -40,7 +40,7 @@ object WMT16 extends App {
   val srcLang: Language = German
   val tgtLang: Language = English
 
-  val parallelDataset: ParallelDataset = WMT16Manager(srcLang, tgtLang).download(workingDir.resolve("data"))
+  val parallelDataset: ParallelDataset = WMT16Manager(workingDir.resolve("data"), srcLang, tgtLang).download()
 
   // Create the vocabularies and the datasets
   val srcVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabulary()(srcLang))

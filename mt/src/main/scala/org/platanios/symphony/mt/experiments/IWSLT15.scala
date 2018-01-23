@@ -40,7 +40,7 @@ object IWSLT15 extends App {
   val srcLang: Language = English
   val tgtLang: Language = Vietnamese
 
-  val parallelDataset: ParallelDataset = IWSLT15Manager(srcLang, tgtLang).download(workingDir.resolve("data"))
+  val parallelDataset: ParallelDataset = IWSLT15Manager(workingDir.resolve("data"), srcLang, tgtLang).download()
 
   // Create the vocabularies and the datasets
   val srcVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabulary()(srcLang))
