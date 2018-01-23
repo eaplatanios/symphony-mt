@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel}
-import org.platanios.symphony.mt.models.attention.{Attention, LuongAttention}
+import org.platanios.symphony.mt.models.attention.Attention
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -29,7 +29,7 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.BeamSearchDecoder
 /**
   * @author Emmanouil Antonios Platanios
   */
-class GNMTDecoder[S, SS](
+class GNMTDecoder[S, SS, AS, ASS](
     override val tgtLanguage: Language,
     override val tgtVocabulary: Vocabulary,
     override val env: Environment,
@@ -39,14 +39,15 @@ class GNMTDecoder[S, SS](
     val numUnits: Int,
     val numLayers: Int,
     val numResLayers: Int,
+    val attention: Attention[AS, ASS],
     val dataType: DataType = FLOAT32,
     val dropout: Option[Float] = None,
-    val attention: Attention = LuongAttention(scaled = true),
     val useNewAttention: Boolean = true,
     override val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
-    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
+    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
+    evAS: WhileLoopVariable.Aux[AS, ASS]
 ) extends RNNDecoder[S, SS](tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, timeMajor)(evS, evSDropout) {
   override def create(
       encoderTuple: Tuple[Output, Seq[S]], inputSequenceLengths: Output,
@@ -74,7 +75,7 @@ class GNMTDecoder[S, SS](
     val (attentionCell, attentionInitialState) = attention.create[S, SS](
       bottomCell, memory, memorySequenceLengths, numUnits, numUnits, initialState.head, useAttentionLayer = false,
       outputAttention = false, mode)
-    val multiCell = GNMTDecoder.MultiCell[S, SS](
+    val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](
       attentionCell, cells.tail.map(_.createCell(mode, Shape(2 * numUnits))), useNewAttention)
     decode(
       inputSequenceLengths, targetSequences, targetSequenceLengths, (attentionInitialState, initialState.tail),
@@ -83,7 +84,7 @@ class GNMTDecoder[S, SS](
 }
 
 object GNMTDecoder {
-  def apply[S, SS](
+  def apply[S, SS, AS, ASS](
       tgtLanguage: Language,
       tgtVocabulary: Vocabulary,
       env: Environment,
@@ -93,18 +94,19 @@ object GNMTDecoder {
       numUnits: Int,
       numLayers: Int,
       numResLayers: Int,
+      attention: Attention[AS, ASS],
       dataType: DataType = FLOAT32,
       dropout: Option[Float] = None,
-      attention: Attention = LuongAttention(scaled = true),
       useNewAttention: Boolean = true,
       timeMajor: Boolean = false
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): GNMTDecoder[S, SS] = {
-    new GNMTDecoder[S, SS](
-      tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, cell, numUnits, numLayers, numResLayers, dataType,
-      dropout, attention, useNewAttention, timeMajor)(evS, evSDropout)
+      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
+      evAS: WhileLoopVariable.Aux[AS, ASS]
+  ): GNMTDecoder[S, SS, AS, ASS] = {
+    new GNMTDecoder[S, SS, AS, ASS](
+      tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, cell, numUnits, numLayers, numResLayers, attention,
+      dataType, dropout, useNewAttention, timeMajor)(evS, evSDropout, evAS)
   }
 
   /** GNMT model residual function that handles inputs and outputs with different sizes (due to attention). */
@@ -140,24 +142,27 @@ object GNMTDecoder {
     *
     * @author Emmanouil Antonios Platanios
     */
-  class MultiCell[S, SS](
-      val attentionCell: AttentionWrapperCell[S, SS],
+  class MultiCell[S, SS, AS, ASS](
+      val attentionCell: AttentionWrapperCell[S, SS, AS, ASS],
       val cells: Seq[RNNCell[Output, Shape, S, SS]],
       val useNewAttention: Boolean = false,
       val name: String = "GNMTMultiCell"
   )(implicit
-      evS: WhileLoopVariable.Aux[S, SS]
+      evS: WhileLoopVariable.Aux[S, SS],
+      evAS: WhileLoopVariable.Aux[AS, ASS]
   ) extends RNNCell[
-      Output, Shape, (AttentionWrapperState[S, SS], Seq[S]), ((SS, Shape, Shape, Seq[Shape], Seq[Shape]), Seq[SS])] {
+      Output, Shape,
+      (AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]], Seq[S]),
+      ((SS, Shape, Shape, Seq[Shape], Seq[Shape], Seq[ASS]), Seq[SS])] {
     override def outputShape: Shape = cells.last.outputShape
 
-    override def stateShape: ((SS, Shape, Shape, Seq[Shape], Seq[Shape]), Seq[SS]) = {
+    override def stateShape: ((SS, Shape, Shape, Seq[Shape], Seq[Shape], Seq[ASS]), Seq[SS]) = {
       (attentionCell.stateShape, cells.map(_.stateShape))
     }
 
     override def forward(
-        input: Tuple[Output, (AttentionWrapperState[S, SS], Seq[S])]
-    ): Tuple[Output, (AttentionWrapperState[S, SS], Seq[S])] = tf.createWithNameScope(name) {
+        input: Tuple[Output, (AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]], Seq[S])]
+    ): Tuple[Output, (AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]], Seq[S])] = tf.createWithNameScope(name) {
       val minusOne = tf.constant(-1)
       val nextAttentionTuple = attentionCell(Tuple(input.output, input.state._1))
       var currentInput = nextAttentionTuple.output
@@ -178,15 +183,16 @@ object GNMTDecoder {
   }
 
   object MultiCell {
-    def apply[S, SS](
-        attentionCell: AttentionWrapperCell[S, SS],
+    def apply[S, SS, AS, ASS](
+        attentionCell: AttentionWrapperCell[S, SS, AS, ASS],
         cells: Seq[RNNCell[Output, Shape, S, SS]],
         useNewAttention: Boolean = false,
         name: String = "GNMTMultiCell"
     )(implicit
-        evS: WhileLoopVariable.Aux[S, SS]
-    ): MultiCell[S, SS] = {
-      new MultiCell(attentionCell, cells, useNewAttention, name)(evS)
+        evS: WhileLoopVariable.Aux[S, SS],
+        evAS: WhileLoopVariable.Aux[AS, ASS]
+    ): MultiCell[S, SS, AS, ASS] = {
+      new MultiCell(attentionCell, cells, useNewAttention, name)(evS, evAS)
     }
   }
 }

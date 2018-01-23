@@ -18,14 +18,14 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel}
-import org.platanios.symphony.mt.models.attention.{Attention, LuongAttention}
+import org.platanios.symphony.mt.models.attention.Attention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class GNMTConfig[S, SS](
+case class GNMTConfig[S, SS, AS, ASS](
     srcLanguage: Language,
     tgtLanguage: Language,
     srcVocabulary: Vocabulary,
@@ -38,20 +38,21 @@ case class GNMTConfig[S, SS](
     numBiLayers: Int,
     numUniLayers: Int,
     numUniResLayers: Int,
+    attention: Attention[AS, ASS],
     dataType: DataType = FLOAT32,
     dropout: Option[Float] = None,
     encoderResidualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-    attention: Attention = LuongAttention(scaled = true),
     useNewAttention: Boolean = false,
     override val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
-    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
+    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
+    evAS: WhileLoopVariable.Aux[AS, ASS]
 ) extends StateBasedModel.Config[S, SS](
   GNMTEncoder[S, SS](
     srcLanguage, srcVocabulary, env, cell, numUnits, numBiLayers, numUniLayers, numUniResLayers,
     dataType, dropout, encoderResidualFn)(evS, evSDropout),
-  GNMTDecoder[S, SS](
+  GNMTDecoder[S, SS, AS, ASS](
     tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, cell, numUnits, numUniLayers + numBiLayers,
-    numUniResLayers, dataType, dropout, attention, useNewAttention)(evS, evSDropout),
+    numUniResLayers, attention, dataType, dropout, useNewAttention)(evS, evSDropout, evAS),
   timeMajor)

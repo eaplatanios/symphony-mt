@@ -26,7 +26,7 @@ import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, Att
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Attention {
+abstract class Attention[AS, ASS](implicit evAS: WhileLoopVariable.Aux[AS, ASS]) {
   def create[S, SS](
       cell: RNNCell[Output, Shape, S, SS],
       memory: Output,
@@ -40,5 +40,5 @@ trait Attention {
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): (AttentionWrapperCell[S, SS], AttentionWrapperState[S, SS])
+  ): (AttentionWrapperCell[S, SS, AS, ASS], AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]])
 }

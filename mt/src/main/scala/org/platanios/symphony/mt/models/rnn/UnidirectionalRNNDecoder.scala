@@ -28,7 +28,7 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.BeamSearchDecoder
 /**
   * @author Emmanouil Antonios Platanios
   */
-class UnidirectionalRNNDecoder[S, SS](
+class UnidirectionalRNNDecoder[S, SS, AS, ASS](
     override val tgtLanguage: Language,
     override val tgtVocabulary: Vocabulary,
     override val env: Environment,
@@ -41,12 +41,13 @@ class UnidirectionalRNNDecoder[S, SS](
     val residual: Boolean = false,
     val dropout: Option[Float] = None,
     val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-    val attention: Option[Attention] = None,
+    val attention: Option[Attention[AS, ASS]] = None,
     val outputAttention: Boolean = true,
     override val timeMajor: Boolean = false
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
-    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
+    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
+    evAS: WhileLoopVariable.Aux[AS, ASS]
 ) extends RNNDecoder[S, SS](tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, timeMajor)(evS, evSDropout) {
   override def create(
       encoderTuple: Tuple[Output, Seq[S]], inputSequenceLengths: Output,
@@ -89,7 +90,7 @@ class UnidirectionalRNNDecoder[S, SS](
 }
 
 object UnidirectionalRNNDecoder {
-  def apply[S, SS](
+  def apply[S, SS, AS, ASS](
       tgtLanguage: Language,
       tgtVocabulary: Vocabulary,
       env: Environment,
@@ -102,15 +103,16 @@ object UnidirectionalRNNDecoder {
       residual: Boolean = false,
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-      attention: Option[Attention] = None,
+      attention: Option[Attention[AS, ASS]] = None,
       outputAttention: Boolean = false,
       timeMajor: Boolean = false
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): UnidirectionalRNNDecoder[S, SS] = {
-    new UnidirectionalRNNDecoder[S, SS](
+      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
+      evAS: WhileLoopVariable.Aux[AS, ASS]
+  ): UnidirectionalRNNDecoder[S, SS, AS, ASS] = {
+    new UnidirectionalRNNDecoder[S, SS, AS, ASS](
       tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, cell, numUnits, numLayers, dataType, residual, dropout,
-      residualFn, attention, outputAttention, timeMajor)(evS, evSDropout)
+      residualFn, attention, outputAttention, timeMajor)(evS, evSDropout, evAS)
   }
 }
