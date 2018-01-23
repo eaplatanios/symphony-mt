@@ -101,7 +101,7 @@ object IWSLT15 extends App {
       numLayers = 2,
       residual = false,
       dropout = Some(0.2f),
-      attention = None, // Some(LuongAttention(scaled = true)),
+      attention = Some(LuongAttention(scaled = true)),
       outputAttention = true,
       timeMajor = true),
     timeMajor = true)
