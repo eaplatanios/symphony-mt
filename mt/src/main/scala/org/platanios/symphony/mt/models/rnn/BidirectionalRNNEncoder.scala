@@ -58,8 +58,8 @@ class BidirectionalRNNEncoder[S, SS](
     val biCellBw = StateBasedModel.multiCell(
       cell, numUnits, dataType, numLayers / 2, numResLayers / 2, dropout,
       residualFn, numLayers / 2, env.numGPUs, env.randomSeed, "MultiBiCellBw")
-    val createdCellFw = biCellFw.createCell(mode, embeddedSequences.shape)
-    val createdCellBw = biCellBw.createCell(mode, embeddedSequences.shape)
+    val createdCellFw = biCellFw.createCellWithoutContext(mode, embeddedSequences.shape)
+    val createdCellBw = biCellBw.createCellWithoutContext(mode, embeddedSequences.shape)
     val unmergedBiTuple = tf.bidirectionalDynamicRNN(
       createdCellFw, createdCellBw, embeddedSequences, null, null, timeMajor,
       env.parallelIterations, env.swapMemory, sequenceLengths, "BidirectionalLayers")

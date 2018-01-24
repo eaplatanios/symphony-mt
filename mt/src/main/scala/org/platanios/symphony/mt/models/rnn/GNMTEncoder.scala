@@ -60,8 +60,8 @@ class GNMTEncoder[S, SS](
         val biCellBw = StateBasedModel.multiCell(
           cell, numUnits, dataType, numBiLayers, 0, dropout,
           residualFn, numBiLayers, env.numGPUs, env.randomSeed, "MultiBiCellBw")
-        val createdCellFw = biCellFw.createCell(mode, embeddedSequences.shape)
-        val createdCellBw = biCellBw.createCell(mode, embeddedSequences.shape)
+        val createdCellFw = biCellFw.createCellWithoutContext(mode, embeddedSequences.shape)
+        val createdCellBw = biCellBw.createCellWithoutContext(mode, embeddedSequences.shape)
         val unmergedBiTuple = tf.bidirectionalDynamicRNN(
           createdCellFw, createdCellBw, embeddedSequences, null, null, timeMajor, env.parallelIterations,
           env.swapMemory, sequenceLengths, "BidirectionalLayers")
@@ -76,7 +76,7 @@ class GNMTEncoder[S, SS](
     val uniCell = StateBasedModel.multiCell(
       cell, numUnits, dataType, numUniLayers, numUniResLayers, dropout, residualFn,
       2 * numBiLayers, env.numGPUs, env.randomSeed, "MultiUniCell")
-    val uniCellInstance = uniCell.createCell(mode, biTuple.output.shape)
+    val uniCellInstance = uniCell.createCellWithoutContext(mode, biTuple.output.shape)
     val uniTuple = tf.dynamicRNN(
       uniCellInstance, biTuple.output, null, timeMajor, env.parallelIterations, env.swapMemory, sequenceLengths,
       "UnidirectionalLayers")

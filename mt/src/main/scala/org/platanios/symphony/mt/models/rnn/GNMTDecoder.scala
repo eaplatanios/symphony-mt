@@ -76,7 +76,7 @@ class GNMTDecoder[S, SS, AS, ASS](
       bottomCell, memory, memorySequenceLengths, numUnits, numUnits, initialState.head, useAttentionLayer = false,
       outputAttention = false, mode)
     val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](
-      attentionCell, cells.tail.map(_.createCell(mode, Shape(2 * numUnits))), useNewAttention)
+      attentionCell, cells.tail.map(_.createCellWithoutContext(mode, Shape(2 * numUnits))), useNewAttention)
     decode(
       inputSequenceLengths, targetSequences, targetSequenceLengths, (attentionInitialState, initialState.tail),
       embeddings, multiCell, mode)

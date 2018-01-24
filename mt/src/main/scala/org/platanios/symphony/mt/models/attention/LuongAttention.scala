@@ -57,7 +57,7 @@ case class LuongAttention(
       else
         null
     }
-    val createdCell = cell.createCell(mode, Shape(inputSequencesLastAxisSize + numUnits))
+    val createdCell = cell.createCellWithoutContext(mode, Shape(inputSequencesLastAxisSize + numUnits))
     val attentionCell = tf.AttentionWrapperCell(
       createdCell, Seq(attention), attentionWeights, outputAttention = outputAttention)
     (attentionCell, attentionCell.initialState(initialState, memory.dataType))
