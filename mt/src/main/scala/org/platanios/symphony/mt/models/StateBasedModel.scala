@@ -141,7 +141,7 @@ class StateBasedModel[S, SS](
     // Create estimator
     tf.learn.InMemoryEstimator(
       model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),
-      StopCriteria(Some(trainConfig.numSteps)), hooks, tensorBoardConfig = tensorBoardConfig)
+      StopCriteria.steps(trainConfig.numSteps), hooks, tensorBoardConfig = tensorBoardConfig)
   }
 
   private final def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
@@ -210,7 +210,7 @@ class StateBasedModel[S, SS](
   override def train(
       srcTrainDataset: MTTextLinesDataset,
       tgtTrainDataset: MTTextLinesDataset,
-      stopCriteria: StopCriteria = StopCriteria(Some(trainConfig.numSteps))
+      stopCriteria: StopCriteria = StopCriteria.steps(trainConfig.numSteps)
   ): Unit = {
     val trainDataset = () => createSupervisedDataset(
       srcTrainDataset, tgtTrainDataset, trainConfig.batchSize, repeat = true, dataConfig.numBuckets)

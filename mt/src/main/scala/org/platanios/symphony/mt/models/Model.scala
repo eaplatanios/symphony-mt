@@ -51,6 +51,6 @@ trait Model {
   def train(
       srcTrainDataset: MTTextLinesDataset,
       tgtTrainDataset: MTTextLinesDataset,
-      stopCriteria: StopCriteria = StopCriteria(Some(trainConfig.numSteps))
+      stopCriteria: StopCriteria = StopCriteria.steps(trainConfig.numSteps)
   ): Unit
 }
