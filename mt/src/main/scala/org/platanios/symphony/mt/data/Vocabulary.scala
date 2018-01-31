@@ -36,9 +36,7 @@ case class Vocabulary(path: Path, size: Int, dataConfig: DataConfig) {
     * @return Vocabulary lookup table.
     */
   def lookupTable(): LookupTable = {
-    val table = tf.indexTableFromFile(path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN_ID)
-    table.initialize()
-    table
+    tf.indexTableFromFile(path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN_ID)
   }
 }
 
