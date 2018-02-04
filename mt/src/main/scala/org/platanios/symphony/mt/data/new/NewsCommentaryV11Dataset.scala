@@ -40,7 +40,7 @@ class NewsCommentaryV11Dataset(
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
-  downloadsDir = workingDir.resolve("news-commentary-v11").resolve("downloads")
+  downloadsDir = workingDir.resolve("news-commentary-v11")
 ) {
   require(
     NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

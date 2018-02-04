@@ -38,7 +38,7 @@ class EuroparlV7Dataset(
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
-  downloadsDir = workingDir.resolve("europarl-v7").resolve("downloads")
+  downloadsDir = workingDir.resolve("europarl-v7")
 ) {
   require(
     EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

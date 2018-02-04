@@ -38,7 +38,7 @@ abstract class Dataset(
     val bufferSize: Int = 8192,
     val tokenize: Boolean = false
 )(
-    val downloadsDir: Path = workingDir.resolve("downloads")
+    val downloadsDir: Path = workingDir
 ) {
   // Clone the Moses repository, if necessary.
   val mosesDecoder: Utilities.MosesDecoder = Utilities.MosesDecoder(File(downloadsDir) / "moses")
@@ -60,26 +60,38 @@ abstract class Dataset(
 
   /** Extracted files (if needed) from `downloadedFiles`. */
   protected val extractedFiles: Seq[File] = {
-    downloadedFiles.flatMap(Dataset.maybeExtractTGZ(_, bufferSize).listRecursively.filter(_.isRegularFile))
+    Dataset.logger.info("Extracting any downloaded archives.")
+    val files = downloadedFiles.flatMap(Dataset.maybeExtractTGZ(_, bufferSize).listRecursively.filter(_.isRegularFile))
+    Dataset.logger.info("Extracted any downloaded archives.")
+    files
   }
 
   /** Preprocessed files after converting extracted SGM files to normal text files, and (optionally) tokenizing. */
   protected val preprocessedFiles: Seq[File] = {
-    extractedFiles.map(file => {
+    Dataset.logger.info("Preprocessing downloaded files.")
+    val files = extractedFiles.map(file => {
       var newFile = file
       if (file.extension().contains(".sgm")) {
         newFile = file.sibling(file.nameWithoutExtension(includeAll = false))
+        if (newFile.notExists)
         mosesDecoder.sgmToText(file, newFile)
       }
       if (tokenize) {
         // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
         val tokenizedFile = newFile.sibling(
           newFile.nameWithoutExtension(includeAll = false) + ".tok" + newFile.extension.getOrElse(""))
-        mosesDecoder.tokenize(newFile, tokenizedFile, tokenizedFile.extension(includeDot = false).getOrElse(""))
+        if (tokenizedFile.notExists) {
+          val exitCode = mosesDecoder.tokenize(
+            newFile, tokenizedFile, tokenizedFile.extension(includeDot = false).getOrElse(""))
+          if (exitCode != 0)
+            newFile.copyTo(tokenizedFile)
+        }
         newFile = tokenizedFile
       }
       newFile
     })
+    Dataset.logger.info("Preprocessed downloaded files.")
+    files
   }
 
   /** Grouped files included in this dataset. */

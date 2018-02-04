@@ -37,7 +37,7 @@ class IWSLT15Dataset(
   bufferSize = bufferSize,
   tokenize = false
 )(
-  downloadsDir = workingDir.resolve("iwslt-15").resolve("downloads")
+  downloadsDir = workingDir.resolve("iwslt-15")
 ) {
   require(
     IWSLT15Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

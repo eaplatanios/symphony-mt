@@ -38,7 +38,7 @@ class WMT16Dataset(
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
-  downloadsDir = workingDir.resolve("wmt-16").resolve("downloads")
+  downloadsDir = workingDir.resolve("wmt-16")
 ) {
   require(
     WMT16Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

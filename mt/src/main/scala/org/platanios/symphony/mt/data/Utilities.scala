@@ -55,11 +55,11 @@ object Utilities {
           .call()
     }
 
-    def sgmToText(sgmFile: File, textFile: File): Unit = {
+    def sgmToText(sgmFile: File, textFile: File): Int = {
       ((path / "scripts" / "ems" / "support" / "input-from-sgm.perl").toString #< sgmFile.toJava #> textFile.toJava).!
     }
 
-    def tokenize(textFile: File, tokenizedFile: File, languageAbbreviation: String, numThreads: Int = 8): Unit = {
+    def tokenize(textFile: File, tokenizedFile: File, languageAbbreviation: String, numThreads: Int = 8): Int = {
       val tokenizer = (path / "scripts" / "tokenizer" / "tokenizer.perl").toString
       (Seq(tokenizer, "-q", "-l", languageAbbreviation, "-threads", numThreads.toString) #<
           textFile.toJava #>

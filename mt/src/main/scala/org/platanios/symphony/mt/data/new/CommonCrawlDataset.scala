@@ -38,7 +38,7 @@ class CommonCrawlDataset(
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
-  downloadsDir = workingDir.resolve("commoncrawl").resolve("downloads")
+  downloadsDir = workingDir.resolve("commoncrawl")
 ) {
   require(
     CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
