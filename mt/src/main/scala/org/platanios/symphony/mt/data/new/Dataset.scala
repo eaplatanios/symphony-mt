@@ -133,7 +133,7 @@ abstract class Dataset(
       files = files.copy(vocabularies = (srcVocab, tgtVocab))
     }
     if (trainDataSentenceLengthBounds != null) {
-      files.trainCorpora.map(files => {
+      files.copy(trainCorpora = files.trainCorpora.map(files => {
         val corpusFile = files._2.sibling(files._2.nameWithoutExtension(includeAll = false))
         val cleanCorpusFile = files._2.sibling(corpusFile.name + ".clean")
         val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$src")
@@ -146,7 +146,8 @@ abstract class Dataset(
             corpusFile.sibling(corpusFile.name + s".$tgt").copyTo(tgtCleanCorpusFile)
           }
         }
-      })
+        (files._1, srcCleanCorpusFile, tgtCleanCorpusFile)
+      }))
     }
     files
   }

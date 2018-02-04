@@ -54,28 +54,28 @@ class WMT16Dataset(
 
   protected def commonCrawlDataset: Option[CommonCrawlDataset] = {
     if (CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(CommonCrawlDataset(workingDir, srcLanguage, tgtLanguage, bufferSize))
+      Some(CommonCrawlDataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
     else
       None
   }
 
   protected def europarlV7Dataset: Option[EuroparlV7Dataset] = {
     if (EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV7Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize))
+      Some(EuroparlV7Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
     else
       None
   }
 
   protected def europarlV8Dataset: Option[EuroparlV8Dataset] = {
     if (EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV8Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize))
+      Some(EuroparlV8Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
     else
       None
   }
 
   protected def newsCommentaryV11Dataset: Option[NewsCommentaryV11Dataset] = {
     if (NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(NewsCommentaryV11Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize))
+      Some(NewsCommentaryV11Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
     else
       None
   }

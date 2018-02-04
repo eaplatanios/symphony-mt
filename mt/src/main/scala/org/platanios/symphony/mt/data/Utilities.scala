@@ -15,6 +15,8 @@
 
 package org.platanios.symphony.mt.data
 
+import org.platanios.symphony.mt.data.utilities.TrieWordCounter
+
 import better.files._
 import org.eclipse.jgit.api.Git
 
@@ -33,19 +35,17 @@ object Utilities {
       sizeThreshold: Int = -1, countThreshold: Int = -1,
       bufferSize: Int = 8192
   ): Unit = {
-    // TODO: [PERFORMANCE] Make more memory efficient.
     val whitespaceRegex = "\\s+".r
     val writer = new BufferedWriter(vocabFile.newPrintWriter(), bufferSize)
-    tokenizedFiles.flatMap(file => {
+    tokenizedFiles.toStream.flatMap(file => {
       Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
           .getLines
           .flatMap(whitespaceRegex.split)
-    }).foldLeft(Map.empty[String, Int])((count, word) => count + (word -> (count.getOrElse(word, 0) + 1)))
-        .toSeq
-        .sortWith(_._2 > _._2)
-        .take(sizeThreshold)
-        .takeWhile(word => countThreshold < 0 || word._2 >= countThreshold)
-        .foreach(wordPair => writer.write(wordPair._1 + "\t\t\t\t" + wordPair._2 + "\n"))
+    }).foldLeft(TrieWordCounter())((counter, word) => {
+      counter.insertWord(word)
+      counter
+    }).words(sizeThreshold, countThreshold)
+        .foreach(word => writer.write(word + "\n"))
     writer.flush()
     writer.close()
   }
