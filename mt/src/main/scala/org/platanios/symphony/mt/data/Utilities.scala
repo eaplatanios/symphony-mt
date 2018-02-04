@@ -15,8 +15,6 @@
 
 package org.platanios.symphony.mt.data
 
-import org.platanios.symphony.mt.Language
-
 import better.files._
 import org.eclipse.jgit.api.Git
 
@@ -35,11 +33,13 @@ object Utilities {
       sizeThreshold: Int = -1, countThreshold: Int = -1,
       bufferSize: Int = 8192
   ): Unit = {
+    // TODO: [PERFORMANCE] Make more memory efficient.
+    val whitespaceRegex = "\\s+".r
     val writer = new BufferedWriter(vocabFile.newPrintWriter(), bufferSize)
     tokenizedFiles.flatMap(file => {
       Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
           .getLines
-          .flatMap(_.split("\\s+"))
+          .flatMap(whitespaceRegex.split)
     }).foldLeft(Map.empty[String, Int])((count, word) => count + (word -> (count.getOrElse(word, 0) + 1)))
         .toSeq
         .sortWith(_._2 > _._2)
@@ -74,16 +74,17 @@ object Utilities {
     }
 
     def cleanCorpus(
-        corpus: String,
-        cleanCorpus: String,
-        srcLanguage: Language,
-        tgtLanguage: Language,
+        corpusFile: File,
+        cleanCorpusFile: File,
+        srcLanguageAbbreviation: String,
+        tgtLanguageAbbreviation: String,
         minLength: Int,
         maxLength: Int
-    ): Unit = {
+    ): Int = {
       Seq(
-        (path / "scripts" / "training" / "clean-corpus-n.perl").toString, corpus,
-        srcLanguage.abbreviation, tgtLanguage.abbreviation, cleanCorpus, minLength.toString, maxLength.toString).!
+        (path / "scripts" / "training" / "clean-corpus-n.perl").toString, corpusFile.toString(),
+        srcLanguageAbbreviation, tgtLanguageAbbreviation,
+        cleanCorpusFile.toString(), minLength.toString, maxLength.toString).!
     }
   }
 }
