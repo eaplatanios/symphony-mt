@@ -44,18 +44,14 @@ class CommonCrawlDataset(
     CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the CommonCrawl dataset.")
 
-  override def dataDir: Path = {
-    workingDir.resolve("commoncrawl").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
-  }
+  private[this] def src: String = srcLanguage.abbreviation
+  private[this] def tgt: String = tgtLanguage.abbreviation
 
-  private[this] val src: String = srcLanguage.abbreviation
-  private[this] val tgt: String = tgtLanguage.abbreviation
-
-  private[this] val reversed: Boolean = {
+  private[this] def reversed: Boolean = {
     CommonCrawlDataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
-  private[this] val corpusFilenamePrefix: String = {
+  private[this] def corpusFilenamePrefix: String = {
     s"commoncrawl.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
@@ -66,8 +62,8 @@ class CommonCrawlDataset(
   /** Grouped files included in this dataset. */
   override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("CommonCrawl/Train",
-        File(dataDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(dataDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
+        File(downloadsDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(downloadsDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object CommonCrawlDataset {

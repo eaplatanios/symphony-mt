@@ -42,19 +42,15 @@ class IWSLT15Dataset(
   require(
     IWSLT15Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the IWSLT-15 dataset.")
+  
+  private[this] def src: String = srcLanguage.abbreviation
+  private[this] def tgt: String = tgtLanguage.abbreviation
 
-  override def dataDir: Path = {
-    workingDir.resolve("iwslt-15").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
-  }
-
-  private[this] val src: String = srcLanguage.abbreviation
-  private[this] val tgt: String = tgtLanguage.abbreviation
-
-  private[this] val reversed: Boolean = {
+  private[this] def reversed: Boolean = {
     IWSLT15Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
-  private[this] val directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
+  private[this] def directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(
@@ -70,17 +66,17 @@ class IWSLT15Dataset(
   /** Grouped files included in this dataset. */
   override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("IWSLT15/Train",
-        File(dataDir) / s"${IWSLT15Dataset.trainPrefix}.$src",
-        File(dataDir) / s"${IWSLT15Dataset.trainPrefix}.$tgt")),
+        File(downloadsDir) / s"${IWSLT15Dataset.trainPrefix}.$src",
+        File(downloadsDir) / s"${IWSLT15Dataset.trainPrefix}.$tgt")),
     devCorpora = Seq(("IWSLT15/Dev",
-        File(dataDir) / s"${IWSLT15Dataset.devPrefix}.$src",
-        File(dataDir) / s"${IWSLT15Dataset.devPrefix}.$tgt")),
+        File(downloadsDir) / s"${IWSLT15Dataset.devPrefix}.$src",
+        File(downloadsDir) / s"${IWSLT15Dataset.devPrefix}.$tgt")),
     testCorpora = Seq(("IWSLT15/Test",
-        File(dataDir) / s"${IWSLT15Dataset.testPrefix}.$src",
-        File(dataDir) / s"${IWSLT15Dataset.testPrefix}.$tgt")),
+        File(downloadsDir) / s"${IWSLT15Dataset.testPrefix}.$src",
+        File(downloadsDir) / s"${IWSLT15Dataset.testPrefix}.$tgt")),
     vocabularies = Some((
-        File(dataDir) / s"${IWSLT15Dataset.vocabPrefix}.$src",
-        File(dataDir) / s"${IWSLT15Dataset.vocabPrefix}.$tgt")))
+        File(downloadsDir) / s"${IWSLT15Dataset.vocabPrefix}.$src",
+        File(downloadsDir) / s"${IWSLT15Dataset.vocabPrefix}.$tgt")))
 }
 
 object IWSLT15Dataset {

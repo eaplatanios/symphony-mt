@@ -40,8 +40,6 @@ abstract class Dataset(
 )(
     val downloadsDir: Path = workingDir.resolve("downloads")
 ) {
-  def dataDir: Path = workingDir
-
   // Clone the Moses repository, if necessary.
   val mosesDecoder: Utilities.MosesDecoder = Utilities.MosesDecoder(File(downloadsDir) / "moses")
   if (!mosesDecoder.exists)
@@ -70,13 +68,14 @@ abstract class Dataset(
     extractedFiles.map(file => {
       var newFile = file
       if (file.extension().contains(".sgm")) {
-        newFile = file.changeExtensionTo("")
+        newFile = file.sibling(file.nameWithoutExtension(includeAll = false))
         mosesDecoder.sgmToText(file, newFile)
       }
       if (tokenize) {
         // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
-        val tokenizedFile = newFile.renameTo(newFile.nameWithoutExtension + ".tok" + file.extension)
-        mosesDecoder.tokenize(newFile, tokenizedFile, newFile.extension(includeDot = false).get)
+        val tokenizedFile = newFile.sibling(
+          newFile.nameWithoutExtension(includeAll = false) + ".tok" + newFile.extension.getOrElse(""))
+        mosesDecoder.tokenize(newFile, tokenizedFile, tokenizedFile.extension(includeDot = false).getOrElse(""))
         newFile = tokenizedFile
       }
       newFile

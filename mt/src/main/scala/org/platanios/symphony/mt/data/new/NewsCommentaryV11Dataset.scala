@@ -46,18 +46,14 @@ class NewsCommentaryV11Dataset(
     NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the News Commentary v11 dataset.")
 
-  override def dataDir: Path = {
-    workingDir.resolve("news-commentary-v11").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
-  }
+  private[this] def src: String = srcLanguage.abbreviation
+  private[this] def tgt: String = tgtLanguage.abbreviation
 
-  private[this] val src: String = srcLanguage.abbreviation
-  private[this] val tgt: String = tgtLanguage.abbreviation
-
-  private[this] val reversed: Boolean = {
+  private[this] def reversed: Boolean = {
     NewsCommentaryV11Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
-  private[this] val corpusFilenamePrefix: String = {
+  private[this] def corpusFilenamePrefix: String = {
     s"news-commentary-v11.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
@@ -68,8 +64,8 @@ class NewsCommentaryV11Dataset(
   /** Grouped files included in this dataset. */
   override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("NewsCommentaryV11/Train",
-        File(dataDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(dataDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
+        File(downloadsDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(downloadsDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object NewsCommentaryV11Dataset {

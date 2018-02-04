@@ -44,14 +44,10 @@ class WMT16Dataset(
     WMT16Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the WMT16 dataset.")
 
-  override def dataDir: Path = {
-    workingDir.resolve("wmt-16").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
-  }
+  private[this] def src: String = srcLanguage.abbreviation
+  private[this] def tgt: String = tgtLanguage.abbreviation
 
-  private[this] val src: String = srcLanguage.abbreviation
-  private[this] val tgt: String = tgtLanguage.abbreviation
-
-  private[this] val reversed: Boolean = {
+  private[this] def reversed: Boolean = {
     WMT16Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
@@ -90,23 +86,19 @@ class WMT16Dataset(
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = {
-    commonCrawlDataset.map(_.filesToDownload).getOrElse(Seq.empty) ++
-        europarlV7Dataset.map(_.filesToDownload).getOrElse(Seq.empty) ++
-        europarlV8Dataset.map(_.filesToDownload).getOrElse(Seq.empty) ++
-        newsCommentaryV11Dataset.map(_.filesToDownload).getOrElse(Seq.empty) ++
-        WMT16Dataset.devArchives.map(archive => s"${WMT16Dataset.newsCommentaryUrl}/$archive.tgz") ++
+    WMT16Dataset.devArchives.map(archive => s"${WMT16Dataset.newsCommentaryUrl}/$archive.tgz") ++
         WMT16Dataset.testArchives.map(archive => s"${WMT16Dataset.newsCommentaryUrl}/$archive.tgz")
   }
 
   /** Grouped files included in this dataset. */
   override def groupedFiles: Dataset.GroupedFiles = {
     WMT16Dataset.devArchives.foreach(archive => {
-      (File(dataDir) / archive)
-          .copyTo(File(dataDir) / "dev", overwrite = true)
+      (File(downloadsDir) / archive)
+          .copyTo(File(downloadsDir) / "dev", overwrite = true)
     })
     WMT16Dataset.testArchives.foreach(archive => {
-      (File(dataDir) / archive)
-          .copyTo(File(dataDir) / "test", overwrite = true)
+      (File(downloadsDir) / archive)
+          .copyTo(File(downloadsDir) / "test", overwrite = true)
     })
     Dataset.GroupedFiles(
       trainCorpora = {
@@ -119,56 +111,56 @@ class WMT16Dataset(
         val supported2008Languages = Set[Language](Czech, English, French, German, Hungarian, Spanish)
         if (supported2008Languages.contains(srcLanguage) && supported2008Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2008",
-              File(dataDir) / s"news-test2008-src.$src",
-              File(dataDir) / s"news-test2008-ref.$tgt"))
+              File(downloadsDir) / s"news-test2008-src.$src",
+              File(downloadsDir) / s"news-test2008-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2009Languages = Set[Language](Czech, English, French, German, Hungarian, Italian, Spanish)
         if (supported2009Languages.contains(srcLanguage) && supported2009Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2009",
-              File(dataDir) / s"newstest2009-src.$src",
-              File(dataDir) / s"newstest2009-ref.$tgt"))
+              File(downloadsDir) / s"newstest2009-src.$src",
+              File(downloadsDir) / s"newstest2009-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2009SysCombLanguages = Set[Language](Czech, English, French, German, Hungarian, Italian, Spanish)
         if (supported2009SysCombLanguages.contains(srcLanguage) && supported2009SysCombLanguages.contains(tgtLanguage))
           Seq(("WMT16/newssyscomb2009",
-              File(dataDir) / s"newssyscomb2009-src.$src",
-              File(dataDir) / s"newssyscomb2009-ref.$tgt"))
+              File(downloadsDir) / s"newssyscomb2009-src.$src",
+              File(downloadsDir) / s"newssyscomb2009-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2010Languages = Set[Language](Czech, English, French, German, Spanish)
         if (supported2010Languages.contains(srcLanguage) && supported2010Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2010",
-              File(dataDir) / s"newstest2010-src.$src",
-              File(dataDir) / s"newstest2010-ref.$tgt"))
+              File(downloadsDir) / s"newstest2010-src.$src",
+              File(downloadsDir) / s"newstest2010-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2011Languages = Set[Language](Czech, English, French, German, Spanish)
         if (supported2011Languages.contains(srcLanguage) && supported2011Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2011",
-              File(dataDir) / s"newstest2011-src.$src",
-              File(dataDir) / s"newstest2011-ref.$tgt"))
+              File(downloadsDir) / s"newstest2011-src.$src",
+              File(downloadsDir) / s"newstest2011-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2012Languages = Set[Language](Czech, English, French, German, Russian, Spanish)
         if (supported2012Languages.contains(srcLanguage) && supported2012Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2012",
-              File(dataDir) / s"newstest2012-src.$src",
-              File(dataDir) / s"newstest2012-ref.$tgt"))
+              File(downloadsDir) / s"newstest2012-src.$src",
+              File(downloadsDir) / s"newstest2012-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2013Languages = Set[Language](Czech, English, French, German, Russian, Spanish)
         if (supported2013Languages.contains(srcLanguage) && supported2013Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2013",
-              File(dataDir) / s"newstest2013-src.$src",
-              File(dataDir) / s"newstest2013-ref.$tgt"))
+              File(downloadsDir) / s"newstest2013-src.$src",
+              File(downloadsDir) / s"newstest2013-ref.$tgt"))
         else
           Seq.empty
       } ++ {
@@ -176,32 +168,32 @@ class WMT16Dataset(
         val supported2014Languages = Set[Language](Czech, English, French, German, Hindi, Russian)
         if (supported2014Languages.contains(srcLanguage) && supported2014Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2014",
-              File(dataDir) / s"newstest2014-$pair-src.$src",
-              File(dataDir) / s"newstest2014-$pair-ref.$tgt"))
+              File(downloadsDir) / s"newstest2014-$pair-src.$src",
+              File(downloadsDir) / s"newstest2014-$pair-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2014DevLanguages = Set[Language](English, Hindi)
         if (supported2014DevLanguages.contains(srcLanguage) && supported2014DevLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdev2014",
-              File(dataDir) / s"newsdev2014-src.$src",
-              File(dataDir) / s"newsdev2014-ref.$tgt"))
+              File(downloadsDir) / s"newsdev2014-src.$src",
+              File(downloadsDir) / s"newsdev2014-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2015Languages = Set[Language](Czech, English, Finnish, German, Russian)
         if (supported2015Languages.contains(srcLanguage) && supported2015Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2015",
-              File(dataDir) / s"newstest2015-$src$tgt-src.$src",
-              File(dataDir) / s"newstest2015-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / s"newstest2015-$src$tgt-src.$src",
+              File(downloadsDir) / s"newstest2015-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2015DevLanguages = Set[Language](English, Finnish)
         if (supported2015DevLanguages.contains(srcLanguage) && supported2015DevLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdev2015",
-              File(dataDir) / s"newsdev2015-$src$tgt-src.$src",
-              File(dataDir) / s"newsdev2015-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / s"newsdev2015-$src$tgt-src.$src",
+              File(downloadsDir) / s"newsdev2015-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       } ++ {
@@ -209,8 +201,8 @@ class WMT16Dataset(
         if (supported2015DiscussDevLanguages.contains(srcLanguage) &&
             supported2015DiscussDevLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdiscussdev2015",
-              File(dataDir) / s"newsdiscussdev2015-$src$tgt-src.$src",
-              File(dataDir) / s"newsdiscussdev2015-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / s"newsdiscussdev2015-$src$tgt-src.$src",
+              File(downloadsDir) / s"newsdiscussdev2015-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       } ++ {
@@ -218,16 +210,16 @@ class WMT16Dataset(
         if (supported2015DiscussTestLanguages.contains(srcLanguage) &&
             supported2015DiscussTestLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdiscusstest2015",
-              File(dataDir) / s"newsdiscusstest2015-$src$tgt-src.$src",
-              File(dataDir) / s"newsdiscusstest2015-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / s"newsdiscusstest2015-$src$tgt-src.$src",
+              File(downloadsDir) / s"newsdiscusstest2015-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2016DevLanguages = Set[Language](English, Romanian, Turkish)
         if (supported2016DevLanguages.contains(srcLanguage) && supported2016DevLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdev2016",
-              File(dataDir) / s"newsdev2016-$src$tgt-src.$src",
-              File(dataDir) / s"newsdev2016-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / s"newsdev2016-$src$tgt-src.$src",
+              File(downloadsDir) / s"newsdev2016-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       },
@@ -236,8 +228,8 @@ class WMT16Dataset(
         val supported2016Languages = Set[Language](Czech, English, Finnish, German, Romanian, Russian, Turkish)
         if (supported2016Languages.contains(srcLanguage) && supported2016Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2016",
-              File(dataDir) / s"newstest2016-$src$tgt-src.$src",
-              File(dataDir) / s"newstest2016-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / s"newstest2016-$src$tgt-src.$src",
+              File(downloadsDir) / s"newstest2016-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       })

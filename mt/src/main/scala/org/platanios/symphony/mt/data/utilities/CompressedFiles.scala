@@ -42,13 +42,8 @@ object CompressedFiles {
     val inputStream = new TarArchiveInputStream(tarStream)
     var entry = inputStream.getNextTarEntry
     while (entry != null) {
-      if (!entry.isDirectory) {
-        val currentFile = destination.createChild(entry.getName)
-        val parentFile = currentFile.parent
-        if (!parentFile.exists)
-          parentFile.createDirectories()
-        IOUtils.copy(inputStream, currentFile.newFileOutputStream())
-      }
+      if (!entry.isDirectory)
+        IOUtils.copy(inputStream, destination.createChild(entry.getName, createParents = true).newFileOutputStream())
       entry = inputStream.getNextTarEntry
     }
     inputStream.close()

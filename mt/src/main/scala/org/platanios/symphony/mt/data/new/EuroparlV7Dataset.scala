@@ -44,20 +44,16 @@ class EuroparlV7Dataset(
     EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v7 dataset.")
 
-  override def dataDir: Path = {
-    workingDir.resolve("europarl-v7").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
-  }
+  private[this] def src: String = srcLanguage.abbreviation
+  private[this] def tgt: String = tgtLanguage.abbreviation
 
-  private[this] val src: String = srcLanguage.abbreviation
-  private[this] val tgt: String = tgtLanguage.abbreviation
-
-  private[this] val reversed: Boolean = {
+  private[this] def reversed: Boolean = {
     EuroparlV7Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
-  private[this] val corpusArchiveFile: String = if (reversed) s"$tgt-$src" else s"$src-$tgt"
+  private[this] def corpusArchiveFile: String = if (reversed) s"$tgt-$src" else s"$src-$tgt"
 
-  private[this] val corpusFilenamePrefix: String = {
+  private[this] def corpusFilenamePrefix: String = {
     s"europarl-v7.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
@@ -68,8 +64,8 @@ class EuroparlV7Dataset(
   /** Grouped files included in this dataset. */
   override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("EuroparlV7/Train",
-        File(dataDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
-        File(dataDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt")))
+        File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
+        File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object EuroparlV7Dataset {
