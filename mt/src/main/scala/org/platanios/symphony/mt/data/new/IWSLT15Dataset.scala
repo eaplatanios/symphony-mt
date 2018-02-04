@@ -34,7 +34,8 @@ class IWSLT15Dataset(
     override val bufferSize: Int = 8192
 ) extends Dataset(
   workingDir = workingDir.resolve("iwslt-15").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
-  bufferSize = bufferSize
+  bufferSize = bufferSize,
+  tokenize = false
 )(
   downloadsDir = workingDir.resolve("iwslt-15").resolve("downloads")
 ) {
@@ -44,8 +45,6 @@ class IWSLT15Dataset(
 
   private[this] val src: String = srcLanguage.abbreviation
   private[this] val tgt: String = tgtLanguage.abbreviation
-
-  private[this] val name: String = s"$src-$tgt"
 
   private[this] val reversed: Boolean = {
     IWSLT15Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
@@ -66,18 +65,18 @@ class IWSLT15Dataset(
 
   /** Grouped files included in this dataset. */
   override val groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
-    trainCorpora = (
-        File(workingDir) / "iwslt-15" / name / s"${IWSLT15Dataset.trainPrefix}.$src",
-        File(workingDir) / "iwslt-15" / name / s"${IWSLT15Dataset.trainPrefix}.$tgt"),
-    devCorpora = Seq(("Dev",
-        File(workingDir) / "iwslt-15" / name / s"${IWSLT15Dataset.devPrefix}.$src",
-        File(workingDir) / "iwslt-15" / name / s"${IWSLT15Dataset.devPrefix}.$tgt")),
-    testCorpora = Seq(("Test",
-        File(workingDir) / "iwslt-15" / name / s"${IWSLT15Dataset.testPrefix}.$src",
-        File(workingDir) / "iwslt-15" / name / s"${IWSLT15Dataset.testPrefix}.$tgt")),
+    trainCorpora = Seq(("IWSLT15/Train",
+        File(super.workingDir) / s"${IWSLT15Dataset.trainPrefix}.$src",
+        File(super.workingDir) / s"${IWSLT15Dataset.trainPrefix}.$tgt")),
+    devCorpora = Seq(("IWSLT15/Dev",
+        File(super.workingDir) / s"${IWSLT15Dataset.devPrefix}.$src",
+        File(super.workingDir) / s"${IWSLT15Dataset.devPrefix}.$tgt")),
+    testCorpora = Seq(("IWSLT15/Test",
+        File(super.workingDir) / s"${IWSLT15Dataset.testPrefix}.$src",
+        File(super.workingDir) / s"${IWSLT15Dataset.testPrefix}.$tgt")),
     vocabularies = Some((
-        File(workingDir) / "iwslt-15" / name / s"${IWSLT15Dataset.vocabPrefix}.$src",
-        File(workingDir) / "iwslt-15" / name / s"${IWSLT15Dataset.vocabPrefix}.$tgt")))
+        File(super.workingDir) / s"${IWSLT15Dataset.vocabPrefix}.$src",
+        File(super.workingDir) / s"${IWSLT15Dataset.vocabPrefix}.$tgt")))
 }
 
 object IWSLT15Dataset {

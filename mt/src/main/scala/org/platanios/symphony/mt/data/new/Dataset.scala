@@ -35,7 +35,8 @@ import java.nio.file.Path
   */
 abstract class Dataset(
     val workingDir: Path,
-    val bufferSize: Int = 8192
+    val bufferSize: Int = 8192,
+    val tokenize: Boolean = false
 )(
     val downloadsDir: Path = workingDir.resolve("downloads")
 ) {
@@ -62,16 +63,21 @@ abstract class Dataset(
     downloadedFiles.flatMap(Dataset.maybeExtractTGZ(_, bufferSize).listRecursively.filter(_.isRegularFile))
   }
 
-  /** Preprocessed files after converting extracted SGM files to normal text files. */
+  /** Preprocessed files after converting extracted SGM files to normal text files, and (optionally) tokenizing. */
   protected val preprocessedFiles: Seq[File] = {
     extractedFiles.map(file => {
-      if (!file.extension().contains(".sgm")) {
-        file
-      } else {
-        val newFile = file.changeExtensionTo("")
+      var newFile = file
+      if (file.extension().contains(".sgm")) {
+        newFile = file.changeExtensionTo("")
         mosesDecoder.sgmToText(file, newFile)
-        newFile
       }
+      if (tokenize) {
+        // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
+        val tokenizedFile = newFile.renameTo(newFile.nameWithoutExtension + ".tok" + file.extension)
+        mosesDecoder.tokenize(newFile, tokenizedFile, newFile.extension(includeDot = false).get)
+        newFile = tokenizedFile
+      }
+      newFile
     })
   }
 
@@ -83,7 +89,7 @@ object Dataset {
   private[data] val logger = Logger(LoggerFactory.getLogger("Dataset"))
 
   case class GroupedFiles(
-      trainCorpora: (File, File),
+      trainCorpora: Seq[(String, File, File)] = Seq.empty,
       devCorpora: Seq[(String, File, File)] = Seq.empty,
       testCorpora: Seq[(String, File, File)] = Seq.empty,
       vocabularies: Option[(File, File)] = None)
