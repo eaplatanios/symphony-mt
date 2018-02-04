@@ -174,8 +174,8 @@ case class WMT16Manager(
     // 2011 Data
     val supported2011Languages = Set[Language](Czech, English, French, German, Spanish)
     if (supported2011Languages.contains(srcLanguage) && supported2011Languages.contains(tgtLanguage)) {
-      val srcPath = path.resolve(s"newstest2011-src.$src")
-      val tgtPath = path.resolve(s"newstest2011-ref.$tgt")
+      val srcPath = path.resolve(s"newss"newstest2011-ref.$tgt"test2011-src.$src")
+      val tgtPath = path.resolve()
       mosesDecoder.sgmToText(path.resolve(s"newstest2011-src.$src.sgm"), srcPath)
       mosesDecoder.sgmToText(path.resolve(s"newstest2011-ref.$tgt.sgm"), tgtPath)
       srcPaths += srcPath

@@ -59,11 +59,11 @@ object Utilities {
       ((path / "scripts" / "ems" / "support" / "input-from-sgm.perl").toString #< sgmFile.toJava #> textFile.toJava).!
     }
 
-    def tokenize(textFile: File, vocabFile: File, language: Language, numThreads: Int = 8): Unit = {
+    def tokenize(textFile: File, tokenizedFile: File, languageAbbreviation: String, numThreads: Int = 8): Unit = {
       val tokenizer = (path / "scripts" / "tokenizer" / "tokenizer.perl").toString
-      (Seq(tokenizer, "-q", "-l", language.abbreviation, "-threads", numThreads.toString) #<
+      (Seq(tokenizer, "-q", "-l", languageAbbreviation, "-threads", numThreads.toString) #<
           textFile.toJava #>
-          vocabFile.toJava).!
+          tokenizedFile.toJava).!
     }
 
     def cleanCorpus(

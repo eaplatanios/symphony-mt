@@ -52,14 +52,14 @@ case class EuroparlV8Manager(
 
   override def download(bufferSize: Int = 8192): ParallelDataset = {
     // Download and decompress the data, if necessary.
-    val archivePathPrefix = path.resolve(s"${CommonCrawlManager.archivePrefix}")
-    val archivePath = path.resolve(s"${CommonCrawlManager.archivePrefix}.tgz")
+    val archivePathPrefix = path.resolve(s"${EuroparlV8Manager.archivePrefix}")
+    val archivePath = path.resolve(s"${EuroparlV8Manager.archivePrefix}.tgz")
     val srcTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$src")
     val tgtTrainCorpus = archivePathPrefix.resolve(s"$corpusFilenamePrefix.$tgt")
 
     if (!Files.exists(archivePathPrefix)) {
       Manager.maybeDownload(
-        archivePath, s"${CommonCrawlManager.url}/${CommonCrawlManager.archivePrefix}.tgz", bufferSize)
+        archivePath, s"${EuroparlV8Manager.url}/${EuroparlV8Manager.archivePrefix}.tgz", bufferSize)
       CompressedFiles.decompressTGZ(archivePath, archivePathPrefix, bufferSize)
     }
 
