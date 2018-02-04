@@ -30,13 +30,15 @@ class CommonCrawlDataset(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
-    override val tokenize: Boolean = false
+    override val tokenize: Boolean = false,
+    override val trainDataSentenceLengthBounds: (Int, Int) = null
 ) extends Dataset(
   workingDir = workingDir.resolve("commoncrawl").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
-  tokenize = tokenize
+  tokenize = tokenize,
+  trainDataSentenceLengthBounds = trainDataSentenceLengthBounds
 )(
   downloadsDir = workingDir.resolve("commoncrawl")
 ) {
@@ -82,8 +84,9 @@ object CommonCrawlDataset {
       srcLanguage: Language,
       tgtLanguage: Language,
       bufferSize: Int = 8192,
-      tokenize: Boolean = false
+      tokenize: Boolean = false,
+      trainDataSentenceLengthBounds: (Int, Int) = null
   ): CommonCrawlDataset = {
-    new CommonCrawlDataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize)
+    new CommonCrawlDataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
   }
 }

@@ -39,7 +39,8 @@ abstract class Dataset(
     val srcLanguage: Language,
     val tgtLanguage: Language,
     val bufferSize: Int = 8192,
-    val tokenize: Boolean = false
+    val tokenize: Boolean = false,
+    val trainDataSentenceLengthBounds: (Int, Int) = null
 )(
     val downloadsDir: Path = workingDir
 ) {
@@ -117,10 +118,8 @@ abstract class Dataset(
       vocabSizeThreshold: Int = 50000,
       vocabCountThreshold: Int = -1
   ): Dataset.GroupedFiles = {
-    val files = groupFiles
-    if (files.vocabularies != null) {
-      files
-    } else {
+    var files = groupFiles
+    if (files.vocabularies == null) {
       Dataset.logger.info(s"$name - Creating vocabulary files.")
       val srcFiles = files.trainCorpora.map(_._2) ++ files.devCorpora.map(_._2) ++ files.testCorpora.map(_._2)
       val tgtFiles = files.trainCorpora.map(_._3) ++ files.devCorpora.map(_._3) ++ files.testCorpora.map(_._3)
@@ -131,8 +130,25 @@ abstract class Dataset(
       if (File(tgtVocab).notExists)
         Utilities.createVocab(tgtFiles, tgtVocab, vocabSizeThreshold, vocabCountThreshold, bufferSize)
       Dataset.logger.info(s"$name - Created vocabulary files.")
-      files.copy(vocabularies = (srcVocab, tgtVocab))
+      files = files.copy(vocabularies = (srcVocab, tgtVocab))
     }
+    if (trainDataSentenceLengthBounds != null) {
+      files.trainCorpora.map(files => {
+        val corpusFile = files._2.sibling(files._2.nameWithoutExtension(includeAll = false))
+        val cleanCorpusFile = files._2.sibling(corpusFile.name + ".clean")
+        val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$src")
+        val tgtCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$tgt")
+        if (srcCleanCorpusFile.notExists || tgtCleanCorpusFile.notExists) {
+          val exitCode = mosesDecoder.cleanCorpus(
+            corpusFile, cleanCorpusFile, src, tgt, trainDataSentenceLengthBounds._1, trainDataSentenceLengthBounds._2)
+          if (exitCode != 0) {
+            corpusFile.sibling(corpusFile.name + s".$src").copyTo(srcCleanCorpusFile)
+            corpusFile.sibling(corpusFile.name + s".$tgt").copyTo(tgtCleanCorpusFile)
+          }
+        }
+      })
+    }
+    files
   }
 }
 

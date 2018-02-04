@@ -30,13 +30,15 @@ class WMT16Dataset(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
-    override val tokenize: Boolean = true
+    override val tokenize: Boolean = true,
+    override val trainDataSentenceLengthBounds: (Int, Int) = (1, 80)
 ) extends Dataset(
   workingDir = workingDir.resolve("wmt-16").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
-  tokenize = tokenize
+  tokenize = tokenize,
+  trainDataSentenceLengthBounds = trainDataSentenceLengthBounds
 )(
   downloadsDir = workingDir.resolve("wmt-16")
 ) {
@@ -255,8 +257,9 @@ object WMT16Dataset {
       srcLanguage: Language,
       tgtLanguage: Language,
       bufferSize: Int = 8192,
-      tokenize: Boolean = true
+      tokenize: Boolean = true,
+      trainDataSentenceLengthBounds: (Int, Int) = null
   ): WMT16Dataset = {
-    new WMT16Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize)
+    new WMT16Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
   }
 }

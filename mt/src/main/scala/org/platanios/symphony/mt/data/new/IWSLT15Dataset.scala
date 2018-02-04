@@ -35,7 +35,8 @@ class IWSLT15Dataset(
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
-  tokenize = false
+  tokenize = false,
+  trainDataSentenceLengthBounds = null
 )(
   downloadsDir = workingDir.resolve("iwslt-15")
 ) {
