@@ -15,39 +15,39 @@
 
 package org.platanios.symphony.mt.data.utilities
 
+import better.files._
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.utils.IOUtils
 
-import java.io.{File, FileOutputStream, InputStream}
-import java.nio.file.{Files, Path}
+import java.io.InputStream
 import java.util.zip.GZIPInputStream
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 object CompressedFiles {
-  def decompressTGZ(tgzFilePath: Path, destinationPath: Path, bufferSize: Int = 8192): Unit = {
-    decompressTGZStream(Files.newInputStream(tgzFilePath), destinationPath, bufferSize)
+  def decompressTGZ(tgzFile: File, destination: File, bufferSize: Int = 8192): Unit = {
+    decompressTGZStream(tgzFile.newInputStream, destination, bufferSize)
   }
 
-  def decompressTar(tarFilePath: Path, destinationPath: Path, bufferSize: Int = 8192): Unit = {
-    decompressTarStream(Files.newInputStream(tarFilePath), destinationPath, bufferSize)
+  def decompressTar(tarFile: File, destination: File, bufferSize: Int = 8192): Unit = {
+    decompressTarStream(tarFile.newInputStream, destination, bufferSize)
   }
 
-  def decompressTGZStream(tgzStream: InputStream, destinationPath: Path, bufferSize: Int = 8192): Unit = {
-    decompressTarStream(new GZIPInputStream(tgzStream), destinationPath, bufferSize)
+  def decompressTGZStream(tgzStream: InputStream, destination: File, bufferSize: Int = 8192): Unit = {
+    decompressTarStream(new GZIPInputStream(tgzStream), destination, bufferSize)
   }
 
-  def decompressTarStream(tarStream: InputStream, destinationPath: Path, bufferSize: Int = 8192): Unit = {
+  def decompressTarStream(tarStream: InputStream, destination: File, bufferSize: Int = 8192): Unit = {
     val inputStream = new TarArchiveInputStream(tarStream)
     var entry = inputStream.getNextTarEntry
     while (entry != null) {
       if (!entry.isDirectory) {
-        val currentFile = new File(destinationPath.toAbsolutePath.toString, entry.getName)
-        val parentFile = currentFile.getParentFile
+        val currentFile = destination.createChild(entry.getName)
+        val parentFile = currentFile.parent
         if (!parentFile.exists)
-          parentFile.mkdirs()
-        IOUtils.copy(inputStream, new FileOutputStream(currentFile))
+          parentFile.createDirectories()
+        IOUtils.copy(inputStream, currentFile.newFileOutputStream())
       }
       entry = inputStream.getNextTarEntry
     }
