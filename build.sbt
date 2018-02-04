@@ -42,32 +42,15 @@ scalacOptions in ThisBuild ++= Seq(
   "-language:higherKinds",
   "-language:implicitConversions",
   "-unchecked",
-  // "-Xfatal-warnings",
-  // "-Xlog-implicits",
   "-Yno-adapted-args",
-  // "-Ywarn-dead-code",
-  // "-Ywarn-numeric-widen",
-  // "-Ywarn-value-discard",
-  "-Xfuture",
-  "-P:splain:all",
-  "-P:splain:infix",
-  "-P:splain:foundreq",
-  "-P:splain:implicits",
-  "-P:splain:color",
-  "-P:splain:tree"
-  // "-P:splain:boundsimplicits:false"
-)
+  "-Xfuture")
 
 lazy val loggingSettings = Seq(
   libraryDependencies ++= Seq(
     "com.typesafe.scala-logging" %% "scala-logging"   % "3.7.2",
-    "ch.qos.logback"             %  "logback-classic" % "1.2.3")
-)
+    "ch.qos.logback"             %  "logback-classic" % "1.2.3"))
 
-lazy val commonSettings = loggingSettings ++ Seq(
-  // Plugin that prints better implicit resolution errors.
-  addCompilerPlugin("io.tryp"  % "splain" % "0.2.7" cross CrossVersion.patch)
-)
+lazy val commonSettings = loggingSettings
 
 lazy val testSettings = Seq(
   libraryDependencies ++= Seq(
@@ -78,12 +61,24 @@ lazy val testSettings = Seq(
   fork in test := false,
   testForkedParallel in Test := false,
   parallelExecution in Test := false,
-  testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF")
-)
+  testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF"))
 
 lazy val tensorFlowSettings = Seq(
-  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion classifier "linux-gpu-x86_64"
-)
+  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion classifier "linux-gpu-x86_64")
+
+lazy val all = (project in file("."))
+    .aggregate(mt)
+    .dependsOn(mt)
+    .settings(moduleName := "symphony", name := "Symphony")
+    .settings(commonSettings)
+    .settings(publishSettings)
+    .settings(
+      sourcesInBase := false,
+      unmanagedSourceDirectories in Compile := Nil,
+      unmanagedSourceDirectories in Test := Nil,
+      unmanagedResourceDirectories in Compile := Nil,
+      unmanagedResourceDirectories in Test := Nil,
+      publishArtifact := true)
 
 lazy val mt = (project in file("./mt"))
     .settings(moduleName := "symphony-mt", name := "Symphony Machine Translation")
@@ -95,16 +90,14 @@ lazy val mt = (project in file("./mt"))
       libraryDependencies ++= Seq(
         "com.github.pathikrit" %% "better-files" % "3.4.0",
         "org.apache.commons" % "commons-compress" % "1.15",
-        "org.eclipse.jgit" % "org.eclipse.jgit" % "4.9.2.201712150930-r")
-    )
+        "org.eclipse.jgit" % "org.eclipse.jgit" % "4.9.2.201712150930-r"))
 
 lazy val noPublishSettings = Seq(
   publish := Unit,
   publishLocal := Unit,
   publishArtifact := false,
   skip in publish := true,
-  releaseProcess := Nil
-)
+  releaseProcess := Nil)
 
 val deletedPublishedSnapshots = taskKey[Unit]("Delete published snapshots.")
 
@@ -173,5 +166,4 @@ lazy val publishSettings = Seq(
           "--user" :: s"${System.getenv().get("SONATYPE_USERNAME")}:${System.getenv().get("SONATYPE_PASSWORD")}" ::
           "--output" :: "/dev/null" :: "--silent" ::
           s"${Opts.resolver.sonatypeSnapshots.root}/${organization.value.replace(".", "/")}/" :: Nil) ! streams.value.log
-  }
-)
+  })
