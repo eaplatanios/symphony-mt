@@ -34,19 +34,21 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 abstract class Dataset(
-    val workingDir: Path,
+    protected val workingDir: Path,
     val bufferSize: Int = 8192,
     val tokenize: Boolean = false
 )(
     val downloadsDir: Path = workingDir.resolve("downloads")
 ) {
+  def dataDir: Path = workingDir
+
   // Clone the Moses repository, if necessary.
   val mosesDecoder: Utilities.MosesDecoder = Utilities.MosesDecoder(File(downloadsDir) / "moses")
   if (!mosesDecoder.exists)
     mosesDecoder.cloneRepository()
 
   /** Sequence of files to download as part of this dataset. */
-  val filesToDownload: Seq[String]
+  def filesToDownload: Seq[String]
 
   /** Downloaded files listed in `filesToDownload`. */
   protected val downloadedFiles: Seq[File] = {
@@ -82,7 +84,7 @@ abstract class Dataset(
   }
 
   /** Grouped files included in this dataset. */
-  val groupedFiles: Dataset.GroupedFiles
+  def groupedFiles: Dataset.GroupedFiles
 }
 
 object Dataset {

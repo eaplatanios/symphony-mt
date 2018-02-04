@@ -30,7 +30,7 @@ import java.nio.file.Path
 class NewsCommentaryV11Dataset(
     val srcLanguage: Language,
     val tgtLanguage: Language,
-    override val workingDir: Path,
+    override protected val workingDir: Path,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false
 ) extends Dataset(
@@ -46,6 +46,10 @@ class NewsCommentaryV11Dataset(
     NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the News Commentary v11 dataset.")
 
+  override def dataDir: Path = {
+    workingDir.resolve("news-commentary-v11").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
+  }
+
   private[this] val src: String = srcLanguage.abbreviation
   private[this] val tgt: String = tgtLanguage.abbreviation
 
@@ -58,14 +62,14 @@ class NewsCommentaryV11Dataset(
   }
 
   /** Sequence of files to download as part of this dataset. */
-  override val filesToDownload: Seq[String] = Seq(
+  override def filesToDownload: Seq[String] = Seq(
     s"${NewsCommentaryV11Dataset.url}/${NewsCommentaryV11Dataset.archivePrefix}.tgz")
 
   /** Grouped files included in this dataset. */
-  override val groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("NewsCommentaryV11/Train",
-        File(super.workingDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(super.workingDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
+        File(dataDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(dataDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object NewsCommentaryV11Dataset {
@@ -81,5 +85,15 @@ object NewsCommentaryV11Dataset {
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
         supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
+
+  def apply(
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      workingDir: Path,
+      bufferSize: Int = 8192,
+      tokenize: Boolean = false
+  ): NewsCommentaryV11Dataset = {
+    new NewsCommentaryV11Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
   }
 }

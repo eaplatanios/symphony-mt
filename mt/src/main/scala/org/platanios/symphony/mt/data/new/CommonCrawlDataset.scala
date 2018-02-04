@@ -30,7 +30,7 @@ import java.nio.file.Path
 class CommonCrawlDataset(
     val srcLanguage: Language,
     val tgtLanguage: Language,
-    override val workingDir: Path,
+    override protected val workingDir: Path,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false
 ) extends Dataset(
@@ -44,6 +44,10 @@ class CommonCrawlDataset(
     CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the CommonCrawl dataset.")
 
+  override def dataDir: Path = {
+    workingDir.resolve("commoncrawl").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
+  }
+
   private[this] val src: String = srcLanguage.abbreviation
   private[this] val tgt: String = tgtLanguage.abbreviation
 
@@ -56,14 +60,14 @@ class CommonCrawlDataset(
   }
 
   /** Sequence of files to download as part of this dataset. */
-  override val filesToDownload: Seq[String] = Seq(
+  override def filesToDownload: Seq[String] = Seq(
     s"${CommonCrawlDataset.url}/${CommonCrawlDataset.archivePrefix}.tgz")
 
   /** Grouped files included in this dataset. */
-  override val groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("CommonCrawl/Train",
-        File(super.workingDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(super.workingDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
+        File(dataDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(dataDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object CommonCrawlDataset {
@@ -78,5 +82,15 @@ object CommonCrawlDataset {
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
         supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
+
+  def apply(
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      workingDir: Path,
+      bufferSize: Int = 8192,
+      tokenize: Boolean = false
+  ): CommonCrawlDataset = {
+    new CommonCrawlDataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
   }
 }

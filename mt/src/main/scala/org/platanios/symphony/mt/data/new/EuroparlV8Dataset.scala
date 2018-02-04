@@ -30,7 +30,7 @@ import java.nio.file.Path
 class EuroparlV8Dataset(
     val srcLanguage: Language,
     val tgtLanguage: Language,
-    override val workingDir: Path,
+    override protected val workingDir: Path,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false
 ) extends Dataset(
@@ -44,6 +44,10 @@ class EuroparlV8Dataset(
     EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v8 dataset.")
 
+  override def dataDir: Path = {
+    workingDir.resolve("europarl-v8").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
+  }
+
   private[this] val src: String = srcLanguage.abbreviation
   private[this] val tgt: String = tgtLanguage.abbreviation
 
@@ -56,14 +60,14 @@ class EuroparlV8Dataset(
   }
 
   /** Sequence of files to download as part of this dataset. */
-  override val filesToDownload: Seq[String] = Seq(
+  override def filesToDownload: Seq[String] = Seq(
     s"${EuroparlV8Dataset.url}/${EuroparlV8Dataset.archivePrefix}.tgz")
 
   /** Grouped files included in this dataset. */
-  override val groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("EuroparlV8/Train",
-        File(super.workingDir) / EuroparlV8Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(super.workingDir) / EuroparlV8Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
+        File(dataDir) / EuroparlV8Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(dataDir) / EuroparlV8Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object EuroparlV8Dataset {
@@ -77,5 +81,15 @@ object EuroparlV8Dataset {
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
         supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
+
+  def apply(
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      workingDir: Path,
+      bufferSize: Int = 8192,
+      tokenize: Boolean = false
+  ): EuroparlV8Dataset = {
+    new EuroparlV8Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
   }
 }

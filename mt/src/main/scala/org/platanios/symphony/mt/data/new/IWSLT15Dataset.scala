@@ -30,7 +30,7 @@ import java.nio.file.Path
 class IWSLT15Dataset(
     val srcLanguage: Language,
     val tgtLanguage: Language,
-    override val workingDir: Path,
+    override protected val workingDir: Path,
     override val bufferSize: Int = 8192
 ) extends Dataset(
   workingDir = workingDir.resolve("iwslt-15").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
@@ -43,6 +43,10 @@ class IWSLT15Dataset(
     IWSLT15Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the IWSLT-15 dataset.")
 
+  override def dataDir: Path = {
+    workingDir.resolve("iwslt-15").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
+  }
+
   private[this] val src: String = srcLanguage.abbreviation
   private[this] val tgt: String = tgtLanguage.abbreviation
 
@@ -53,7 +57,7 @@ class IWSLT15Dataset(
   private[this] val directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
-  override val filesToDownload: Seq[String] = Seq(
+  override def filesToDownload: Seq[String] = Seq(
     s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.trainPrefix}.$src",
     s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.trainPrefix}.$tgt",
     s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.devPrefix}.$src",
@@ -64,19 +68,19 @@ class IWSLT15Dataset(
     s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.vocabPrefix}.$tgt")
 
   /** Grouped files included in this dataset. */
-  override val groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("IWSLT15/Train",
-        File(super.workingDir) / s"${IWSLT15Dataset.trainPrefix}.$src",
-        File(super.workingDir) / s"${IWSLT15Dataset.trainPrefix}.$tgt")),
+        File(dataDir) / s"${IWSLT15Dataset.trainPrefix}.$src",
+        File(dataDir) / s"${IWSLT15Dataset.trainPrefix}.$tgt")),
     devCorpora = Seq(("IWSLT15/Dev",
-        File(super.workingDir) / s"${IWSLT15Dataset.devPrefix}.$src",
-        File(super.workingDir) / s"${IWSLT15Dataset.devPrefix}.$tgt")),
+        File(dataDir) / s"${IWSLT15Dataset.devPrefix}.$src",
+        File(dataDir) / s"${IWSLT15Dataset.devPrefix}.$tgt")),
     testCorpora = Seq(("IWSLT15/Test",
-        File(super.workingDir) / s"${IWSLT15Dataset.testPrefix}.$src",
-        File(super.workingDir) / s"${IWSLT15Dataset.testPrefix}.$tgt")),
+        File(dataDir) / s"${IWSLT15Dataset.testPrefix}.$src",
+        File(dataDir) / s"${IWSLT15Dataset.testPrefix}.$tgt")),
     vocabularies = Some((
-        File(super.workingDir) / s"${IWSLT15Dataset.vocabPrefix}.$src",
-        File(super.workingDir) / s"${IWSLT15Dataset.vocabPrefix}.$tgt")))
+        File(dataDir) / s"${IWSLT15Dataset.vocabPrefix}.$src",
+        File(dataDir) / s"${IWSLT15Dataset.vocabPrefix}.$tgt")))
 }
 
 object IWSLT15Dataset {
@@ -93,5 +97,14 @@ object IWSLT15Dataset {
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
         supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
+
+  def apply(
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      workingDir: Path,
+      bufferSize: Int = 8192
+  ): IWSLT15Dataset = {
+    new IWSLT15Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize)
   }
 }

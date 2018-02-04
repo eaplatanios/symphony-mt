@@ -30,7 +30,7 @@ import java.nio.file.Path
 class EuroparlV7Dataset(
     val srcLanguage: Language,
     val tgtLanguage: Language,
-    override val workingDir: Path,
+    override protected val workingDir: Path,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false
 ) extends Dataset(
@@ -43,6 +43,10 @@ class EuroparlV7Dataset(
   require(
     EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v7 dataset.")
+
+  override def dataDir: Path = {
+    workingDir.resolve("europarl-v7").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}")
+  }
 
   private[this] val src: String = srcLanguage.abbreviation
   private[this] val tgt: String = tgtLanguage.abbreviation
@@ -58,14 +62,14 @@ class EuroparlV7Dataset(
   }
 
   /** Sequence of files to download as part of this dataset. */
-  override val filesToDownload: Seq[String] = Seq(
+  override def filesToDownload: Seq[String] = Seq(
     s"${EuroparlV7Dataset.url}/$corpusArchiveFile.tgz")
 
   /** Grouped files included in this dataset. */
-  override val groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("EuroparlV7/Train",
-        File(super.workingDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
-        File(super.workingDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt")))
+        File(dataDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
+        File(dataDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object EuroparlV7Dataset {
@@ -82,5 +86,15 @@ object EuroparlV7Dataset {
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
         supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+  }
+
+  def apply(
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      workingDir: Path,
+      bufferSize: Int = 8192,
+      tokenize: Boolean = false
+  ): EuroparlV7Dataset = {
+    new EuroparlV7Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
   }
 }
