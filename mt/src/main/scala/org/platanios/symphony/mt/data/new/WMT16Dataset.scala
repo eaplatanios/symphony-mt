@@ -19,8 +19,6 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 
 import better.files._
-import com.typesafe.scalalogging.Logger
-import org.slf4j.LoggerFactory
 
 import java.nio.file.Path
 
@@ -28,13 +26,15 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class WMT16Dataset(
-    val srcLanguage: Language,
-    val tgtLanguage: Language,
     override protected val workingDir: Path,
+    override val srcLanguage: Language,
+    override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = true
 ) extends Dataset(
   workingDir = workingDir.resolve("wmt-16").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+  srcLanguage = srcLanguage,
+  tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
@@ -44,8 +44,7 @@ class WMT16Dataset(
     WMT16Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the WMT16 dataset.")
 
-  private[this] def src: String = srcLanguage.abbreviation
-  private[this] def tgt: String = tgtLanguage.abbreviation
+  override def name: String = "WMT-16"
 
   private[this] def reversed: Boolean = {
     WMT16Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
@@ -53,28 +52,28 @@ class WMT16Dataset(
 
   protected def commonCrawlDataset: Option[CommonCrawlDataset] = {
     if (CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(CommonCrawlDataset(srcLanguage, tgtLanguage, workingDir, bufferSize))
+      Some(CommonCrawlDataset(workingDir, srcLanguage, tgtLanguage, bufferSize))
     else
       None
   }
 
   protected def europarlV7Dataset: Option[EuroparlV7Dataset] = {
     if (EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV7Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize))
+      Some(EuroparlV7Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize))
     else
       None
   }
 
   protected def europarlV8Dataset: Option[EuroparlV8Dataset] = {
     if (EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV8Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize))
+      Some(EuroparlV8Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize))
     else
       None
   }
 
   protected def newsCommentaryV11Dataset: Option[NewsCommentaryV11Dataset] = {
     if (NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(NewsCommentaryV11Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize))
+      Some(NewsCommentaryV11Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize))
     else
       None
   }
@@ -91,7 +90,7 @@ class WMT16Dataset(
   }
 
   /** Grouped files included in this dataset. */
-  override def groupedFiles: Dataset.GroupedFiles = {
+  override private[data] def groupFiles: Dataset.GroupedFiles = {
     WMT16Dataset.devArchives.foreach(archive => {
       (File(downloadsDir) / archive)
           .copyTo(File(downloadsDir) / "dev", overwrite = true)
@@ -102,65 +101,65 @@ class WMT16Dataset(
     })
     Dataset.GroupedFiles(
       trainCorpora = {
-        commonCrawlDataset.map(_.groupedFiles.trainCorpora).getOrElse(Seq.empty) ++
-            europarlV7Dataset.map(_.groupedFiles.trainCorpora).getOrElse(Seq.empty) ++
-            europarlV8Dataset.map(_.groupedFiles.trainCorpora).getOrElse(Seq.empty) ++
-            newsCommentaryV11Dataset.map(_.groupedFiles.trainCorpora).getOrElse(Seq.empty)
+        commonCrawlDataset.map(_.groupFiles.trainCorpora).getOrElse(Seq.empty) ++
+            europarlV7Dataset.map(_.groupFiles.trainCorpora).getOrElse(Seq.empty) ++
+            europarlV8Dataset.map(_.groupFiles.trainCorpora).getOrElse(Seq.empty) ++
+            newsCommentaryV11Dataset.map(_.groupFiles.trainCorpora).getOrElse(Seq.empty)
       },
       devCorpora = {
         val supported2008Languages = Set[Language](Czech, English, French, German, Hungarian, Spanish)
         if (supported2008Languages.contains(srcLanguage) && supported2008Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2008",
-              File(downloadsDir) / s"news-test2008-src.$src",
-              File(downloadsDir) / s"news-test2008-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"news-test2008-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"news-test2008-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2009Languages = Set[Language](Czech, English, French, German, Hungarian, Italian, Spanish)
         if (supported2009Languages.contains(srcLanguage) && supported2009Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2009",
-              File(downloadsDir) / s"newstest2009-src.$src",
-              File(downloadsDir) / s"newstest2009-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2009-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newstest2009-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2009SysCombLanguages = Set[Language](Czech, English, French, German, Hungarian, Italian, Spanish)
         if (supported2009SysCombLanguages.contains(srcLanguage) && supported2009SysCombLanguages.contains(tgtLanguage))
           Seq(("WMT16/newssyscomb2009",
-              File(downloadsDir) / s"newssyscomb2009-src.$src",
-              File(downloadsDir) / s"newssyscomb2009-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2010Languages = Set[Language](Czech, English, French, German, Spanish)
         if (supported2010Languages.contains(srcLanguage) && supported2010Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2010",
-              File(downloadsDir) / s"newstest2010-src.$src",
-              File(downloadsDir) / s"newstest2010-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2010-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newstest2010-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2011Languages = Set[Language](Czech, English, French, German, Spanish)
         if (supported2011Languages.contains(srcLanguage) && supported2011Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2011",
-              File(downloadsDir) / s"newstest2011-src.$src",
-              File(downloadsDir) / s"newstest2011-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2011-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newstest2011-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2012Languages = Set[Language](Czech, English, French, German, Russian, Spanish)
         if (supported2012Languages.contains(srcLanguage) && supported2012Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2012",
-              File(downloadsDir) / s"newstest2012-src.$src",
-              File(downloadsDir) / s"newstest2012-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2012-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newstest2012-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2013Languages = Set[Language](Czech, English, French, German, Russian, Spanish)
         if (supported2013Languages.contains(srcLanguage) && supported2013Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2013",
-              File(downloadsDir) / s"newstest2013-src.$src",
-              File(downloadsDir) / s"newstest2013-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2013-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newstest2013-ref.$tgt"))
         else
           Seq.empty
       } ++ {
@@ -168,32 +167,32 @@ class WMT16Dataset(
         val supported2014Languages = Set[Language](Czech, English, French, German, Hindi, Russian)
         if (supported2014Languages.contains(srcLanguage) && supported2014Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2014",
-              File(downloadsDir) / s"newstest2014-$pair-src.$src",
-              File(downloadsDir) / s"newstest2014-$pair-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2014DevLanguages = Set[Language](English, Hindi)
         if (supported2014DevLanguages.contains(srcLanguage) && supported2014DevLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdev2014",
-              File(downloadsDir) / s"newsdev2014-src.$src",
-              File(downloadsDir) / s"newsdev2014-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2014-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2014-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2015Languages = Set[Language](Czech, English, Finnish, German, Russian)
         if (supported2015Languages.contains(srcLanguage) && supported2015Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2015",
-              File(downloadsDir) / s"newstest2015-$src$tgt-src.$src",
-              File(downloadsDir) / s"newstest2015-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2015DevLanguages = Set[Language](English, Finnish)
         if (supported2015DevLanguages.contains(srcLanguage) && supported2015DevLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdev2015",
-              File(downloadsDir) / s"newsdev2015-$src$tgt-src.$src",
-              File(downloadsDir) / s"newsdev2015-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       } ++ {
@@ -201,8 +200,8 @@ class WMT16Dataset(
         if (supported2015DiscussDevLanguages.contains(srcLanguage) &&
             supported2015DiscussDevLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdiscussdev2015",
-              File(downloadsDir) / s"newsdiscussdev2015-$src$tgt-src.$src",
-              File(downloadsDir) / s"newsdiscussdev2015-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       } ++ {
@@ -210,16 +209,16 @@ class WMT16Dataset(
         if (supported2015DiscussTestLanguages.contains(srcLanguage) &&
             supported2015DiscussTestLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdiscusstest2015",
-              File(downloadsDir) / s"newsdiscusstest2015-$src$tgt-src.$src",
-              File(downloadsDir) / s"newsdiscusstest2015-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       } ++ {
         val supported2016DevLanguages = Set[Language](English, Romanian, Turkish)
         if (supported2016DevLanguages.contains(srcLanguage) && supported2016DevLanguages.contains(tgtLanguage))
           Seq(("WMT16/newsdev2016",
-              File(downloadsDir) / s"newsdev2016-$src$tgt-src.$src",
-              File(downloadsDir) / s"newsdev2016-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt-src.$src",
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       },
@@ -228,8 +227,8 @@ class WMT16Dataset(
         val supported2016Languages = Set[Language](Czech, English, Finnish, German, Romanian, Russian, Turkish)
         if (supported2016Languages.contains(srcLanguage) && supported2016Languages.contains(tgtLanguage))
           Seq(("WMT16/newstest2016",
-              File(downloadsDir) / s"newstest2016-$src$tgt-src.$src",
-              File(downloadsDir) / s"newstest2016-$src$tgt-ref.$tgt"))
+              File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt-src.$src",
+              File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt-ref.$tgt"))
         else
           Seq.empty
       })
@@ -237,8 +236,6 @@ class WMT16Dataset(
 }
 
 object WMT16Dataset {
-  private[WMT16Dataset] val logger = Logger(LoggerFactory.getLogger("WMT16 Dataset"))
-
   val newsCommentaryUrl            : String      = "http://data.statmt.org/wmt16/translation-task"
   val newsCommentaryParallelArchive: String      = "training-parallel-nc-v11"
   val devArchives                  : Seq[String] = Seq("dev", "dev-romanian-updated")
@@ -254,12 +251,12 @@ object WMT16Dataset {
   }
 
   def apply(
+      workingDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
-      workingDir: Path,
       bufferSize: Int = 8192,
       tokenize: Boolean = true
   ): WMT16Dataset = {
-    new WMT16Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
+    new WMT16Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize)
   }
 }

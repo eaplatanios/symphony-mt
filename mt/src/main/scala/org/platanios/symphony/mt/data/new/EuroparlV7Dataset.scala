@@ -19,8 +19,6 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 
 import better.files._
-import com.typesafe.scalalogging.Logger
-import org.slf4j.LoggerFactory
 
 import java.nio.file.Path
 
@@ -28,13 +26,15 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class EuroparlV7Dataset(
-    val srcLanguage: Language,
-    val tgtLanguage: Language,
     override protected val workingDir: Path,
+    override val srcLanguage: Language,
+    override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false
 ) extends Dataset(
   workingDir = workingDir.resolve("europarl-v7").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+  srcLanguage = srcLanguage,
+  tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
@@ -44,8 +44,7 @@ class EuroparlV7Dataset(
     EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v7 dataset.")
 
-  private[this] def src: String = srcLanguage.abbreviation
-  private[this] def tgt: String = tgtLanguage.abbreviation
+  override def name: String = "Europarl v7"
 
   private[this] def reversed: Boolean = {
     EuroparlV7Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
@@ -62,15 +61,13 @@ class EuroparlV7Dataset(
     s"${EuroparlV7Dataset.url}/$corpusArchiveFile.tgz")
 
   /** Grouped files included in this dataset. */
-  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override private[data] def groupFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("EuroparlV7/Train",
         File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
         File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object EuroparlV7Dataset {
-  private[EuroparlV7Dataset] val logger = Logger(LoggerFactory.getLogger("Europarl v7 Dataset"))
-
   val url: String = "http://www.statmt.org/europarl/v7"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
@@ -85,12 +82,12 @@ object EuroparlV7Dataset {
   }
 
   def apply(
+      workingDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
-      workingDir: Path,
       bufferSize: Int = 8192,
       tokenize: Boolean = false
   ): EuroparlV7Dataset = {
-    new EuroparlV7Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
+    new EuroparlV7Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize)
   }
 }

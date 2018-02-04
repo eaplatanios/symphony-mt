@@ -19,8 +19,6 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 
 import better.files._
-import com.typesafe.scalalogging.Logger
-import org.slf4j.LoggerFactory
 
 import java.nio.file.Path
 
@@ -28,13 +26,15 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class CommonCrawlDataset(
-    val srcLanguage: Language,
-    val tgtLanguage: Language,
     override protected val workingDir: Path,
+    override val srcLanguage: Language,
+    override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false
 ) extends Dataset(
   workingDir = workingDir.resolve("commoncrawl").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+  srcLanguage = srcLanguage,
+  tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
@@ -44,8 +44,7 @@ class CommonCrawlDataset(
     CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the CommonCrawl dataset.")
 
-  private[this] def src: String = srcLanguage.abbreviation
-  private[this] def tgt: String = tgtLanguage.abbreviation
+  override def name: String = "CommonCrawl"
 
   private[this] def reversed: Boolean = {
     CommonCrawlDataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
@@ -60,15 +59,13 @@ class CommonCrawlDataset(
     s"${CommonCrawlDataset.url}/${CommonCrawlDataset.archivePrefix}.tgz")
 
   /** Grouped files included in this dataset. */
-  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override private[data] def groupFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("CommonCrawl/Train",
         File(downloadsDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$src",
         File(downloadsDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object CommonCrawlDataset {
-  private[CommonCrawlDataset] val logger = Logger(LoggerFactory.getLogger("CommonCrawl Dataset"))
-
   val url          : String = "http://www.statmt.org/wmt13"
   val archivePrefix: String = "training-parallel-commoncrawl"
 
@@ -81,12 +78,12 @@ object CommonCrawlDataset {
   }
 
   def apply(
+      workingDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
-      workingDir: Path,
       bufferSize: Int = 8192,
       tokenize: Boolean = false
   ): CommonCrawlDataset = {
-    new CommonCrawlDataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
+    new CommonCrawlDataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize)
   }
 }

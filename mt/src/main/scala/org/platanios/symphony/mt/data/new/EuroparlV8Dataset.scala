@@ -19,8 +19,6 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 
 import better.files._
-import com.typesafe.scalalogging.Logger
-import org.slf4j.LoggerFactory
 
 import java.nio.file.Path
 
@@ -28,13 +26,15 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class EuroparlV8Dataset(
-    val srcLanguage: Language,
-    val tgtLanguage: Language,
     override protected val workingDir: Path,
+    override val srcLanguage: Language,
+    override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false
 ) extends Dataset(
   workingDir = workingDir.resolve("europarl-v8").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+  srcLanguage = srcLanguage,
+  tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
@@ -44,8 +44,7 @@ class EuroparlV8Dataset(
     EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v8 dataset.")
 
-  private[this] def src: String = srcLanguage.abbreviation
-  private[this] def tgt: String = tgtLanguage.abbreviation
+  override def name: String = "Europarl v8"
 
   private[this] def reversed: Boolean = {
     EuroparlV8Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
@@ -60,15 +59,13 @@ class EuroparlV8Dataset(
     s"${EuroparlV8Dataset.url}/${EuroparlV8Dataset.archivePrefix}.tgz")
 
   /** Grouped files included in this dataset. */
-  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override private[data] def groupFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("EuroparlV8/Train",
         File(downloadsDir) / EuroparlV8Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
         File(downloadsDir) / EuroparlV8Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object EuroparlV8Dataset {
-  private[EuroparlV8Dataset] val logger = Logger(LoggerFactory.getLogger("Europarl v8 Dataset"))
-
   val url          : String = "http://data.statmt.org/wmt16/translation-task"
   val archivePrefix: String = "training-parallel-ep-v8"
 
@@ -80,12 +77,12 @@ object EuroparlV8Dataset {
   }
 
   def apply(
+      workingDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
-      workingDir: Path,
       bufferSize: Int = 8192,
       tokenize: Boolean = false
   ): EuroparlV8Dataset = {
-    new EuroparlV8Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
+    new EuroparlV8Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize)
   }
 }

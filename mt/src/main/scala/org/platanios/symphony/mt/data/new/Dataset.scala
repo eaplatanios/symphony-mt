@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.data.`new`
 
+import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.Utilities
 import org.platanios.symphony.mt.data.utilities.CompressedFiles
 
@@ -35,11 +36,18 @@ import java.nio.file.Path
   */
 abstract class Dataset(
     protected val workingDir: Path,
+    val srcLanguage: Language,
+    val tgtLanguage: Language,
     val bufferSize: Int = 8192,
     val tokenize: Boolean = false
 )(
     val downloadsDir: Path = workingDir
 ) {
+  def name: String
+
+  protected def src: String = srcLanguage.abbreviation
+  protected def tgt: String = tgtLanguage.abbreviation
+
   // Clone the Moses repository, if necessary.
   val mosesDecoder: Utilities.MosesDecoder = Utilities.MosesDecoder(File(downloadsDir) / "moses")
   if (!mosesDecoder.exists)
@@ -60,42 +68,72 @@ abstract class Dataset(
 
   /** Extracted files (if needed) from `downloadedFiles`. */
   protected val extractedFiles: Seq[File] = {
-    Dataset.logger.info("Extracting any downloaded archives.")
+    Dataset.logger.info(s"$name - Extracting any downloaded archives.")
     val files = downloadedFiles.flatMap(Dataset.maybeExtractTGZ(_, bufferSize).listRecursively.filter(_.isRegularFile))
-    Dataset.logger.info("Extracted any downloaded archives.")
+    Dataset.logger.info(s"$name - Extracted any downloaded archives.")
     files
   }
 
   /** Preprocessed files after converting extracted SGM files to normal text files, and (optionally) tokenizing. */
   protected val preprocessedFiles: Seq[File] = {
-    Dataset.logger.info("Preprocessing downloaded files.")
+    Dataset.logger.info(s"$name - Preprocessing any downloaded files.")
     val files = extractedFiles.map(file => {
       var newFile = file
-      if (file.extension().contains(".sgm")) {
-        newFile = file.sibling(file.nameWithoutExtension(includeAll = false))
-        if (newFile.notExists)
-        mosesDecoder.sgmToText(file, newFile)
-      }
-      if (tokenize) {
-        // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
-        val tokenizedFile = newFile.sibling(
-          newFile.nameWithoutExtension(includeAll = false) + ".tok" + newFile.extension.getOrElse(""))
-        if (tokenizedFile.notExists) {
-          val exitCode = mosesDecoder.tokenize(
-            newFile, tokenizedFile, tokenizedFile.extension(includeDot = false).getOrElse(""))
-          if (exitCode != 0)
-            newFile.copyTo(tokenizedFile)
+      if (!newFile.name.startsWith(".")) {
+        if (file.extension().contains(".sgm")) {
+          newFile = file.sibling(file.nameWithoutExtension(includeAll = false))
+          if (newFile.notExists)
+            mosesDecoder.sgmToText(file, newFile)
         }
-        newFile = tokenizedFile
+        if (tokenize && !newFile.name.contains(".tok")) {
+          // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
+          val tokenizedFile = newFile.sibling(
+            newFile.nameWithoutExtension(includeAll = false) + ".tok" + newFile.extension.getOrElse(""))
+          if (tokenizedFile.notExists) {
+            val exitCode = mosesDecoder.tokenize(
+              newFile, tokenizedFile, tokenizedFile.extension(includeDot = false).getOrElse(""))
+            if (exitCode != 0)
+              newFile.copyTo(tokenizedFile)
+          }
+          newFile = tokenizedFile
+        }
       }
       newFile
     })
-    Dataset.logger.info("Preprocessed downloaded files.")
+    Dataset.logger.info(s"$name - Preprocessed any downloaded files.")
     files
   }
 
-  /** Grouped files included in this dataset. */
-  def groupedFiles: Dataset.GroupedFiles
+  /** Groups the files included in this dataset. */
+  private[data] def groupFiles: Dataset.GroupedFiles
+
+  /** Returns the files included in this dataset, grouped based on their role.
+    *
+    * @param  vocabSizeThreshold
+    * @param  vocabCountThreshold
+    * @return
+    */
+  def groupedFiles(
+      vocabSizeThreshold: Int = 50000,
+      vocabCountThreshold: Int = -1
+  ): Dataset.GroupedFiles = {
+    val files = groupFiles
+    if (files.vocabularies != null) {
+      files
+    } else {
+      Dataset.logger.info(s"$name - Creating vocabulary files.")
+      val srcFiles = files.trainCorpora.map(_._2) ++ files.devCorpora.map(_._2) ++ files.testCorpora.map(_._2)
+      val tgtFiles = files.trainCorpora.map(_._3) ++ files.devCorpora.map(_._3) ++ files.testCorpora.map(_._3)
+      val srcVocab = downloadsDir.resolve(s"vocab.$src")
+      val tgtVocab = downloadsDir.resolve(s"vocab.$tgt")
+      if (File(srcVocab).notExists)
+        Utilities.createVocab(srcFiles, srcVocab, vocabSizeThreshold, vocabCountThreshold, bufferSize)
+      if (File(tgtVocab).notExists)
+        Utilities.createVocab(tgtFiles, tgtVocab, vocabSizeThreshold, vocabCountThreshold, bufferSize)
+      Dataset.logger.info(s"$name - Created vocabulary files.")
+      files.copy(vocabularies = (srcVocab, tgtVocab))
+    }
+  }
 }
 
 object Dataset {
@@ -105,7 +143,7 @@ object Dataset {
       trainCorpora: Seq[(String, File, File)] = Seq.empty,
       devCorpora: Seq[(String, File, File)] = Seq.empty,
       testCorpora: Seq[(String, File, File)] = Seq.empty,
-      vocabularies: Option[(File, File)] = None)
+      vocabularies: (File, File) = null)
 
   def maybeDownload(file: File, url: String, bufferSize: Int = 8192): Boolean = {
     if (file.exists) {
@@ -145,7 +183,8 @@ object Dataset {
   def maybeExtractTGZ(file: File, bufferSize: Int = 8192): File = {
     if (file.extension(includeAll = true).exists(ext => ext == ".tgz" || ext == ".tar.gz")) {
       val processedFile = file.sibling(file.nameWithoutExtension(includeAll = true))
-      CompressedFiles.decompressTGZ(file, processedFile, bufferSize)
+      if (processedFile.notExists)
+        CompressedFiles.decompressTGZ(file, processedFile, bufferSize)
       processedFile
     } else {
       file

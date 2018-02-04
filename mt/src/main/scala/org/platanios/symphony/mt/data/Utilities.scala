@@ -30,15 +30,22 @@ import scala.sys.process._
   * @author Emmanouil Antonios Platanios
   */
 object Utilities {
-  def createVocab(tokenizedFiles: Set[File], vocabFile: File, bufferSize: Int = 8192): Unit = {
+  def createVocab(
+      tokenizedFiles: Seq[File], vocabFile: File,
+      sizeThreshold: Int = -1, countThreshold: Int = -1,
+      bufferSize: Int = 8192
+  ): Unit = {
     val writer = new BufferedWriter(vocabFile.newPrintWriter(), bufferSize)
     tokenizedFiles.flatMap(file => {
       Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
           .getLines
           .flatMap(_.split("\\s+"))
     }).foldLeft(Map.empty[String, Int])((count, word) => count + (word -> (count.getOrElse(word, 0) + 1)))
-        .toSeq.sortWith(_._2 > _._2)
-        .foreach(wordPair => writer.write(wordPair._1 + "\n"))
+        .toSeq
+        .sortWith(_._2 > _._2)
+        .take(sizeThreshold)
+        .takeWhile(word => countThreshold < 0 || word._2 >= countThreshold)
+        .foreach(wordPair => writer.write(wordPair._1 + "\t\t\t\t" + wordPair._2 + "\n"))
     writer.flush()
     writer.close()
   }

@@ -19,8 +19,6 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 
 import better.files._
-import com.typesafe.scalalogging.Logger
-import org.slf4j.LoggerFactory
 
 import java.nio.file.Path
 
@@ -28,15 +26,17 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class NewsCommentaryV11Dataset(
-    val srcLanguage: Language,
-    val tgtLanguage: Language,
     override protected val workingDir: Path,
+    override val srcLanguage: Language,
+    override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false
 ) extends Dataset(
   workingDir = workingDir
       .resolve("news-commentary-v11")
       .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+  srcLanguage = srcLanguage,
+  tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
   tokenize = tokenize
 )(
@@ -46,8 +46,7 @@ class NewsCommentaryV11Dataset(
     NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the News Commentary v11 dataset.")
 
-  private[this] def src: String = srcLanguage.abbreviation
-  private[this] def tgt: String = tgtLanguage.abbreviation
+  override def name: String = "News Commentary v11"
 
   private[this] def reversed: Boolean = {
     NewsCommentaryV11Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
@@ -62,15 +61,15 @@ class NewsCommentaryV11Dataset(
     s"${NewsCommentaryV11Dataset.url}/${NewsCommentaryV11Dataset.archivePrefix}.tgz")
 
   /** Grouped files included in this dataset. */
-  override def groupedFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
+  override private[data] def groupFiles: Dataset.GroupedFiles = Dataset.GroupedFiles(
     trainCorpora = Seq(("NewsCommentaryV11/Train",
-        File(downloadsDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(downloadsDir) / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
+        File(downloadsDir) / NewsCommentaryV11Dataset.archivePrefix
+            / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(downloadsDir) / NewsCommentaryV11Dataset.archivePrefix
+            / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt")))
 }
 
 object NewsCommentaryV11Dataset {
-  private[NewsCommentaryV11Dataset] val logger = Logger(LoggerFactory.getLogger("News Commentary v11 Dataset"))
-
   val url          : String = "http://data.statmt.org/wmt16/translation-task"
   val archivePrefix: String = "training-parallel-nc-v11"
 
@@ -84,12 +83,12 @@ object NewsCommentaryV11Dataset {
   }
 
   def apply(
+      workingDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
-      workingDir: Path,
       bufferSize: Int = 8192,
       tokenize: Boolean = false
   ): NewsCommentaryV11Dataset = {
-    new NewsCommentaryV11Dataset(srcLanguage, tgtLanguage, workingDir, bufferSize, tokenize)
+    new NewsCommentaryV11Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize)
   }
 }
