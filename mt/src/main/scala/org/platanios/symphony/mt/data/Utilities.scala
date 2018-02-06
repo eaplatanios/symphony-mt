@@ -46,6 +46,7 @@ object Utilities {
       counter.insertWord(word)
       counter
     }).words(sizeThreshold, countThreshold)
+        .toSeq.sortBy(-_._1).map(_._2)
         .foreach(word => writer.write(word + "\n"))
     writer.flush()
     writer.close()

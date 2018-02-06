@@ -18,25 +18,28 @@ package org.platanios.symphony.mt.data
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.lookup.LookupTable
 
+import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
 
 import scala.collection.mutable
 
-/** Contains utilities for dealing with vocabulary files.
+/** Represents a vocabulary of words.
+  *
+  * @param  file File containing the vocabulary, with one word per line.
+  * @param  size Size of this vocabulary (i.e., number of words).
   *
   * @author Emmanouil Antonios Platanios
   */
-case class Vocabulary(path: Path, size: Int, dataConfig: DataConfig) {
+case class Vocabulary private[Vocabulary] (file: File, size: Int) {
   /** Creates a vocabulary lookup table (from word string to word ID), from the provided vocabulary file.
     *
     * @return Vocabulary lookup table.
     */
   def lookupTable(): LookupTable = {
-    tf.indexTableFromFile(path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN_ID)
+    tf.indexTableFromFile(file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN_ID)
   }
 }
 
@@ -64,7 +67,9 @@ object Vocabulary {
     */
   @throws[IllegalArgumentException]
   def apply(
-      file: Path, checkSpecialTokens: Boolean = true, directory: Path = null,
+      file: File,
+      checkSpecialTokens: Boolean = true,
+      directory: File = null,
       dataConfig: DataConfig = DataConfig()
   ): Vocabulary = {
     val check = Vocabulary.check(
@@ -72,7 +77,7 @@ object Vocabulary {
       dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, dataConfig.unknownToken)
     check match {
       case None => throw new IllegalArgumentException(s"Could not load the vocabulary file located at '$file'.")
-      case Some((size, path)) => Vocabulary(path, size, dataConfig)
+      case Some((size, path)) => Vocabulary(path, size)
     }
   }
 
@@ -100,16 +105,21 @@ object Vocabulary {
     * @param  beginOfSequenceToken Special token for the beginning of a sequence. Defaults to `<s>`.
     * @param  endOfSequenceToken   Special token for the end of a sequence. Defaults to `</s>`.
     * @param  unknownToken         Special token for unknown tokens. Defaults to `<unk>`.
+    * @return Option containing the number of tokens and the checked vocabulary file, which could be a new file.
     */
   private[Vocabulary] def check(
-      file: Path, checkSpecialTokens: Boolean = true, directory: Path = null,
-      beginOfSequenceToken: String = BEGIN_OF_SEQUENCE_TOKEN, endOfSequenceToken: String = END_OF_SEQUENCE_TOKEN,
-      unknownToken: String = UNKNOWN_TOKEN): Option[(Int, Path)] = {
-    if (!Files.exists(file)) {
+      file: File,
+      checkSpecialTokens: Boolean = true,
+      directory: File = null,
+      beginOfSequenceToken: String = BEGIN_OF_SEQUENCE_TOKEN,
+      endOfSequenceToken: String = END_OF_SEQUENCE_TOKEN,
+      unknownToken: String = UNKNOWN_TOKEN
+  ): Option[(Int, File)] = {
+    if (file.notExists) {
       None
     } else {
       logger.info(s"Vocabulary file '$file' exists.")
-      val reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)
+      val reader = file.newBufferedReader(StandardCharsets.UTF_8)
       val tokens = mutable.ListBuffer.empty[String]
       var line = reader.readLine()
       while (line != null) {
@@ -128,10 +138,12 @@ object Vocabulary {
             s"The first 3 vocabulary tokens [${tokens(0)}, ${tokens(1)}, ${tokens(2)}] " +
                 s"are not equal to [$unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
           tokens.prepend(unknownToken, beginOfSequenceToken, endOfSequenceToken)
-          val newFile = if (directory != null) directory.resolve(file.getFileName) else file
-          val writer = Files.newBufferedWriter(newFile, StandardCharsets.UTF_8)
+          val newFile = if (directory != null) directory.sibling(file.name) else file
+          logger.info(s"Creating fixed vocabulary file at '$newFile'.")
+          val writer = newFile.newBufferedWriter(StandardCharsets.UTF_8)
           tokens.foreach(token => writer.write(s"$token\n"))
           writer.close()
+          logger.info(s"Created fixed vocabulary file at '$newFile'.")
           Some((tokens.size, newFile))
         } else {
           Some((tokens.size, file))
@@ -146,9 +158,9 @@ object Vocabulary {
     * @param  tgtFile Target vocabulary file.
     * @return Tuple contain the source vocabulary lookup table and the target one.
     */
-  private[Vocabulary] def createTables(srcFile: Path, tgtFile: Path): (tf.LookupTable, tf.LookupTable) = {
-    val srcPath = srcFile.toAbsolutePath.toString
-    val tgtPath = tgtFile.toAbsolutePath.toString
+  private[Vocabulary] def createTables(srcFile: File, tgtFile: File): (tf.LookupTable, tf.LookupTable) = {
+    val srcPath = srcFile.path.toAbsolutePath.toString
+    val tgtPath = tgtFile.path.toAbsolutePath.toString
     val sourceTable = tf.indexTableFromFile(srcPath, defaultValue = UNKNOWN_TOKEN_ID)
     val targetTable = {
       if (srcFile == tgtFile)

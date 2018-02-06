@@ -33,12 +33,12 @@ case class TrieWordCounter() {
     currentNode.incrementCount()
   }
 
-  def words(sizeThreshold: Int = -1, countThreshold: Int = -1): Iterable[String] = {
+  def words(sizeThreshold: Int = -1, countThreshold: Int = -1): Iterable[(Long, String)] = {
     val words = BoundedPriorityQueue[(Long, String)](sizeThreshold)
     rootNode.words.foreach {
       case (count, word) if countThreshold < 0 || count >= countThreshold => words += ((count, word))
     }
-    words.map(_._2)
+    words
   }
 }
 

@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.data
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.utilities.CompressedFiles
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 
 import better.files._
 import com.typesafe.scalalogging.Logger
@@ -156,6 +157,13 @@ object Dataset {
       vocabularies: (File, File) = null,
       bufferSize: Int = 8192
   ) {
+    private[GroupedFiles] val _vocabularies: Option[(Vocabulary, Vocabulary)] = {
+      if (vocabularies == null)
+        None
+      else
+        Some((Vocabulary(vocabularies._1), Vocabulary(vocabularies._2)))
+    }
+
     def withNewVocab(sizeThreshold: Int = 50000, countThreshold: Int = -1): GroupedFiles = {
       Dataset.logger.info(s"$name - Creating vocabulary files.")
       val srcFiles = trainCorpora.map(_._2) ++ devCorpora.map(_._2) ++ testCorpora.map(_._2)
@@ -168,6 +176,29 @@ object Dataset {
         Utilities.createVocab(tgtFiles, tgtVocab, sizeThreshold, countThreshold, bufferSize)
       Dataset.logger.info(s"$name - Created vocabulary files.")
       copy(vocabularies = (srcVocab, tgtVocab))
+    }
+
+    def createInferDataset(batchSize: Int, dataConfig: DataConfig): MTInferDataset = {
+      val files = if (vocabularies != null) this else withNewVocab()
+      val srcTrainDatasets = files.trainCorpora.map(_._2)
+          .map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
+      val srcDataset = joinDatasets(srcTrainDatasets)
+      val srcVocabularyTable = files._vocabularies.get._1.lookupTable()
+      Dataset.createInferDataset(srcDataset, srcVocabularyTable, batchSize, dataConfig)
+    }
+
+    def createTrainDataset(batchSize: Int, dataConfig: DataConfig, repeat: Boolean = true): MTTrainDataset = {
+      val files = if (vocabularies != null) this else withNewVocab()
+      val srcTrainDatasets = files.trainCorpora.map(_._2)
+          .map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
+      val tgtTrainDatasets = files.trainCorpora.map(_._3)
+          .map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
+      val srcDataset = joinDatasets(srcTrainDatasets)
+      val tgtDataset = joinDatasets(tgtTrainDatasets)
+      val srcVocabularyTable = files._vocabularies.get._1.lookupTable()
+      val tgtVocabularyTable = files._vocabularies.get._2.lookupTable()
+      Dataset.createTrainDataset(
+        srcDataset, tgtDataset, srcVocabularyTable, tgtVocabularyTable, batchSize, dataConfig, repeat)
     }
   }
 
@@ -228,5 +259,160 @@ object Dataset {
 
   def joinDatasets(datasets: Seq[MTTextLinesDataset]): MTTextLinesDataset = {
     datasets.reduce((d1, d2) => d1.concatenate(d2))
+  }
+
+  def createInferDataset(
+      srcDataset: MTTextLinesDataset,
+      srcVocabularyTable: tf.LookupTable,
+      batchSize: Int,
+      dataConfig: DataConfig
+  ): MTInferDataset = {
+    val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+
+    val batchingFn = (dataset: MTInferDataset) => {
+      dataset.dynamicPaddedBatch(
+        batchSize,
+        // The first entry represents the source line rows, which are unknown-length vectors.
+        // The last entry is the source row size, which is a scalar.
+        (Shape(-1), Shape.scalar()),
+        // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
+        // not generally need to do this since later on we will be masking out calculations past
+        // the true sequence.
+        (srcEosId, tf.zeros(INT32, Shape.scalar())))
+    }
+
+    val datasetBeforeBatching = srcDataset
+        .map(o => tf.stringSplit(o.expandDims(0)).values)
+        // Crop based on the maximum allowed sequence length.
+        .transform(d => if (dataConfig.srcMaxLength != -1) d.map(dd => dd(0 :: dataConfig.srcMaxLength)) else d)
+        // Reverse the source sequence if necessary.
+        .transform(d => if (dataConfig.srcReverse) d.map(dd => tf.reverse(dd, axes = 0)) else d)
+        // Convert the word strings to IDs. Word strings that are not in the vocabulary
+        // get the lookup table's default value.
+        .map(d => tf.cast(srcVocabularyTable.lookup(d), INT32))
+        // Add sequence lengths.
+        .map(d => (d, tf.size(d, INT32)))
+
+    batchingFn(datasetBeforeBatching)
+  }
+
+  def createTrainDataset(
+      srcDataset: MTTextLinesDataset,
+      tgtDataset: MTTextLinesDataset,
+      srcVocabularyTable: tf.LookupTable,
+      tgtVocabularyTable: tf.LookupTable,
+      batchSize: Int,
+      dataConfig: DataConfig,
+      repeat: Boolean = true
+  ): MTTrainDataset = {
+    val actualBufferSize = if (dataConfig.bufferSize == -1L) 1000 * batchSize else dataConfig.bufferSize
+    val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+    val tgtBosId = tgtVocabularyTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+    val tgtEosId = tgtVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+
+    val batchingFn = (dataset: MTTrainDataset) => {
+      dataset.dynamicPaddedBatch(
+        batchSize,
+        // The first three entries are the source and target line rows, which are unknown-length vectors.
+        // The last two entries are the source and target row sizes, which are scalars.
+        ((Shape(-1), Shape.scalar()), (Shape(-1), Shape(-1), Shape.scalar())),
+        // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
+        // generally need to do this since later on we will be masking out calculations past the true sequence.
+        ((srcEosId, tf.zeros(INT32, Shape.scalar().toOutput())),
+            (tgtEosId, tgtEosId, tf.zeros(INT32, Shape.scalar().toOutput()))))
+    }
+
+    val datasetBeforeBucketing =
+      srcDataset.zip(tgtDataset)
+          .shard(dataConfig.numShards, dataConfig.shardIndex)
+          .drop(dataConfig.dropCount)
+          .transform(d => {
+            if (repeat)
+              d.repeat().prefetch(actualBufferSize)
+            else
+              d
+          })
+          .shuffle(actualBufferSize)
+          // Tokenize by splitting on white spaces.
+          .map(
+            d => (tf.stringSplit(d._1(NewAxis)).values, tf.stringSplit(d._2(NewAxis)).values),
+            name = "Map/StringSplit")
+          .prefetch(actualBufferSize)
+          // Filter zero length input sequences and sequences exceeding the maximum length.
+          .filter(d => tf.logicalAnd(tf.size(d._1) > 0, tf.size(d._2) > 0))
+          // Crop based on the maximum allowed sequence lengths.
+          .transform(d => {
+            if (dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1)
+              d.map(
+                dd => (dd._1(0 :: dataConfig.srcMaxLength), dd._2(0 :: dataConfig.tgtMaxLength)),
+                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+            else if (dataConfig.srcMaxLength != -1)
+              d.map(
+                dd => (dd._1(0 :: dataConfig.srcMaxLength), dd._2),
+                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+            else if (dataConfig.tgtMaxLength != -1)
+              d.map(
+                dd => (dd._1, dd._2(0 :: dataConfig.tgtMaxLength)),
+                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+            else
+              d
+          })
+          // Reverse the source sequence if necessary.
+          .transform(d => {
+            if (dataConfig.srcReverse)
+              d.map(dd => (tf.reverse(dd._1, axes = 0), dd._2), name = "Map/SrcReverse").prefetch(actualBufferSize)
+            else
+              d
+          })
+          // Convert the word strings to IDs. Word strings that are not in the vocabulary
+          // get the lookup table's default value.
+          .map(
+            d => (
+                tf.cast(srcVocabularyTable.lookup(d._1), INT32),
+                tf.cast(tgtVocabularyTable.lookup(d._2), INT32)),
+            dataConfig.numParallelCalls, name = "Map/VocabularyLookup")
+          .prefetch(actualBufferSize)
+          // Create a target input prefixed with 'beginSequenceToken'
+          // and a target output suffixed with 'endSequenceToken'.
+          .map(
+            d => (
+                d._1,
+                tf.concatenate(Seq(tgtBosId.expandDims(0), d._2), axis = 0),
+                tf.concatenate(Seq(d._2, tgtEosId.expandDims(0)), axis = 0)),
+            dataConfig.numParallelCalls, name = "Map/AddDecoderOutput")
+          .prefetch(actualBufferSize)
+          // Add sequence lengths.
+          .map(
+            d => ((d._1, tf.size(d._1, INT32)), (d._2, d._3, tf.size(d._2, INT32))), dataConfig.numParallelCalls,
+            name = "Map/AddLengths")
+          .prefetch(actualBufferSize)
+
+    if (dataConfig.numBuckets == 1) {
+      batchingFn(datasetBeforeBucketing)
+    } else {
+      // Calculate the bucket width by using the maximum source sequence length, if provided. Pairs with length
+      // [0, bucketWidth) go to bucket 0, length [bucketWidth, 2 * bucketWidth) go to bucket 1, etc. Pairs with length
+      // over ((numBuckets - 1) * bucketWidth) all go into the last bucket.
+      val bucketWidth = {
+        if (dataConfig.srcMaxLength != -1)
+          (dataConfig.srcMaxLength + dataConfig.numBuckets - 1) / dataConfig.numBuckets
+        else
+          10
+      }
+
+      def keyFn(element: ((Output, Output), (Output, Output, Output))): Output = {
+        // Bucket sequence  pairs based on the length of their source sequence and target sequence.
+        val bucketId = tf.maximum(
+          tf.truncateDivide(element._1._2, bucketWidth),
+          tf.truncateDivide(element._2._3, bucketWidth))
+        tf.minimum(dataConfig.numBuckets, bucketId).cast(INT64)
+      }
+
+      def reduceFn(pair: (Output, MTTrainDataset)): MTTrainDataset = {
+        batchingFn(pair._2)
+      }
+
+      datasetBeforeBucketing.groupByWindow(keyFn, reduceFn, _ => batchSize)
+    }
   }
 }
