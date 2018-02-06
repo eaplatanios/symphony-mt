@@ -13,11 +13,11 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data.`new`
+package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.Utilities
 import org.platanios.symphony.mt.data.utilities.CompressedFiles
+import org.platanios.tensorflow.api._
 
 import better.files._
 import com.typesafe.scalalogging.Logger
@@ -105,35 +105,24 @@ abstract class Dataset(
     files
   }
 
-  /** Groups the files included in this dataset. */
-  private[data] def groupFiles: Dataset.GroupedFiles
+  /** Returns all the train corpora (tuples containing name, source file, and target file) of this dataset. */
+  def trainCorpora: Seq[(String, File, File)] = Seq.empty
 
-  /** Returns the files included in this dataset, grouped based on their role.
-    *
-    * @param  vocabSizeThreshold
-    * @param  vocabCountThreshold
-    * @return
-    */
-  def groupedFiles(
-      vocabSizeThreshold: Int = 50000,
-      vocabCountThreshold: Int = -1
-  ): Dataset.GroupedFiles = {
-    var files = groupFiles
-    if (files.vocabularies == null) {
-      Dataset.logger.info(s"$name - Creating vocabulary files.")
-      val srcFiles = files.trainCorpora.map(_._2) ++ files.devCorpora.map(_._2) ++ files.testCorpora.map(_._2)
-      val tgtFiles = files.trainCorpora.map(_._3) ++ files.devCorpora.map(_._3) ++ files.testCorpora.map(_._3)
-      val srcVocab = downloadsDir.resolve(s"vocab.$src")
-      val tgtVocab = downloadsDir.resolve(s"vocab.$tgt")
-      if (File(srcVocab).notExists)
-        Utilities.createVocab(srcFiles, srcVocab, vocabSizeThreshold, vocabCountThreshold, bufferSize)
-      if (File(tgtVocab).notExists)
-        Utilities.createVocab(tgtFiles, tgtVocab, vocabSizeThreshold, vocabCountThreshold, bufferSize)
-      Dataset.logger.info(s"$name - Created vocabulary files.")
-      files = files.copy(vocabularies = (srcVocab, tgtVocab))
-    }
+  /** Returns all the dev corpora (tuples containing name, source file, and target file) of this dataset. */
+  def devCorpora: Seq[(String, File, File)] = Seq.empty
+
+  /** Returns all the test corpora (tuples containing name, source file, and target file) of this dataset. */
+  def testCorpora: Seq[(String, File, File)] = Seq.empty
+
+  /** Returns the source and the target vocabulary of this dataset. */
+  def vocabularies: (File, File) = null
+
+  /** Returns the files included in this dataset, grouped based on their role. */
+  def groupedFiles: Dataset.GroupedFiles = {
+    var files = Dataset.GroupedFiles(
+      name, File(workingDir), srcLanguage, tgtLanguage, trainCorpora, devCorpora, testCorpora, vocabularies, bufferSize)
     if (trainDataSentenceLengthBounds != null) {
-      files.copy(trainCorpora = files.trainCorpora.map(files => {
+      files = files.copy(trainCorpora = files.trainCorpora.map(files => {
         val corpusFile = files._2.sibling(files._2.nameWithoutExtension(includeAll = false))
         val cleanCorpusFile = files._2.sibling(corpusFile.name + ".clean")
         val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$src")
@@ -157,10 +146,30 @@ object Dataset {
   private[data] val logger = Logger(LoggerFactory.getLogger("Dataset"))
 
   case class GroupedFiles(
+      name: String,
+      workingDir: File,
+      srcLanguage: Language,
+      tgtLanguage: Language,
       trainCorpora: Seq[(String, File, File)] = Seq.empty,
       devCorpora: Seq[(String, File, File)] = Seq.empty,
       testCorpora: Seq[(String, File, File)] = Seq.empty,
-      vocabularies: (File, File) = null)
+      vocabularies: (File, File) = null,
+      bufferSize: Int = 8192
+  ) {
+    def withNewVocab(sizeThreshold: Int = 50000, countThreshold: Int = -1): GroupedFiles = {
+      Dataset.logger.info(s"$name - Creating vocabulary files.")
+      val srcFiles = trainCorpora.map(_._2) ++ devCorpora.map(_._2) ++ testCorpora.map(_._2)
+      val tgtFiles = trainCorpora.map(_._3) ++ devCorpora.map(_._3) ++ testCorpora.map(_._3)
+      val srcVocab = workingDir / s"vocab.${srcLanguage.abbreviation}"
+      val tgtVocab = workingDir / s"vocab.${tgtLanguage.abbreviation}"
+      if (srcVocab.notExists)
+        Utilities.createVocab(srcFiles, srcVocab, sizeThreshold, countThreshold, bufferSize)
+      if (tgtVocab.notExists)
+        Utilities.createVocab(tgtFiles, tgtVocab, sizeThreshold, countThreshold, bufferSize)
+      Dataset.logger.info(s"$name - Created vocabulary files.")
+      copy(vocabularies = (srcVocab, tgtVocab))
+    }
+  }
 
   def maybeDownload(file: File, url: String, bufferSize: Int = 8192): Boolean = {
     if (file.exists) {
@@ -206,5 +215,18 @@ object Dataset {
     } else {
       file
     }
+  }
+
+  type MTTextLinesDataset = tf.data.Dataset[Tensor, Output, DataType, Shape]
+  type MTInferDataset = tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
+
+  type MTTrainDataset = tf.data.Dataset[
+      ((Tensor, Tensor), (Tensor, Tensor, Tensor)),
+      ((Output, Output), (Output, Output, Output)),
+      ((DataType, DataType), (DataType, DataType, DataType)),
+      ((Shape, Shape), (Shape, Shape, Shape))]
+
+  def joinDatasets(datasets: Seq[MTTextLinesDataset]): MTTextLinesDataset = {
+    datasets.reduce((d1, d2) => d1.concatenate(d2))
   }
 }
