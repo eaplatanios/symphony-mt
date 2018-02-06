@@ -124,6 +124,7 @@ abstract class Dataset(
     dataConfig.loaderSentenceLengthBounds.foreach {
       case (minLength, maxLength) =>
         files = files.copy(trainCorpora = files.trainCorpora.map(files => {
+          // TODO: [DATA] This is a hacky way of checking for the clean corpus files.
           val corpusFile = files._2.sibling(files._2.nameWithoutExtension(includeAll = false))
           val cleanCorpusFile = files._2.sibling(corpusFile.name + ".clean")
           val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$src")

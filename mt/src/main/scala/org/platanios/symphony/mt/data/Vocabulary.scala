@@ -70,7 +70,10 @@ object Vocabulary {
     vocabFile.parent.createDirectories()
     val whitespaceRegex = "\\s+".r
     val writer = new BufferedWriter(
-      vocabFile.newPrintWriter()(Seq(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
+      vocabFile.newPrintWriter()(Seq(
+        StandardOpenOption.CREATE,
+        StandardOpenOption.WRITE,
+        StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
     tokenizedFiles.toStream.flatMap(file => {
       Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
           .getLines
