@@ -77,7 +77,7 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       case None =>
         decode(
           inputSequenceLengths, targetSequences, targetSequenceLengths, initialState,
-          embeddings, uniCell.createCellWithoutContext(mode, Shape(numUnits)), mode)
+          embeddings, uniCell.createCell(mode, Shape(numUnits)), mode)
       case Some(attentionCreator) =>
         val (attentionCell, attentionInitialState) = attentionCreator.create(
           uniCell, memory, memorySequenceLengths, numUnits, numUnits, initialState, useAttentionLayer = true,

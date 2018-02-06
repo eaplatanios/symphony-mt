@@ -55,7 +55,7 @@ class UnidirectionalRNNEncoder[S, SS](
     val uniCell = StateBasedModel.multiCell(
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
       residualFn, 0, env.numGPUs, env.randomSeed, "MultiUniCell")
-    val createdCell = uniCell.createCellWithoutContext(mode, embeddedSequences.shape)
+    val createdCell = uniCell.createCell(mode, embeddedSequences.shape)
     tf.dynamicRNN(
       createdCell, embeddedSequences, null, timeMajor, env.parallelIterations, env.swapMemory, sequenceLengths,
       "UnidirectionalLayers")

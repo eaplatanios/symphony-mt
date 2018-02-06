@@ -51,17 +51,18 @@ object LoadedDataset {
                 language -> vocabFiles.head
               } else if (vocabFiles.isEmpty || !dataConfig.loaderMergeVocabs) {
                 language -> {
-                  Dataset.logger.info(s"Creating vocabulary file for $language.")
                   val tokenizedFiles =
                     files.filter(_.srcLanguage == language).flatMap(_.trainCorpora.map(_._2)) ++
                         files.filter(_.tgtLanguage == language).flatMap(_.trainCorpora.map(_._3))
                   val vocabFile = workingDir / s"vocab.${language.abbreviation}"
-                  if (vocabFile.notExists)
+                  if (vocabFile.notExists) {
+                    Dataset.logger.info(s"Creating vocabulary file for $language.")
                     Vocabulary.createVocabFile(
                       tokenizedFiles.toSeq, vocabFile,
                       dataConfig.vocabSizeThreshold, dataConfig.vocabCountThreshold,
                       dataConfig.loaderBufferSize)
-                  Dataset.logger.info(s"Created vocabulary file for $language.")
+                    Dataset.logger.info(s"Created vocabulary file for $language.")
+                  }
                   vocabFile
                 }
               } else {
@@ -134,22 +135,27 @@ object LoadedDataset {
     }
 
     def withNewVocab(): GroupedFiles = {
-      Dataset.logger.info("Creating vocabulary files.")
       val workingDir = File(dataConfig.loaderWorkingDir)
       val srcFiles = trainCorpora.map(_._2) ++ devCorpora.map(_._2) ++ testCorpora.map(_._2)
       val tgtFiles = trainCorpora.map(_._3) ++ devCorpora.map(_._3) ++ testCorpora.map(_._3)
       val srcVocab = workingDir / s"vocab.${srcLanguage.abbreviation}"
       val tgtVocab = workingDir / s"vocab.${tgtLanguage.abbreviation}"
-      if (srcVocab.notExists)
+      if (srcVocab.notExists) {
+        Dataset.logger.info(s"Creating vocabulary file for ${srcLanguage.abbreviation}.")
         Vocabulary.createVocabFile(
           srcFiles, srcVocab,
           dataConfig.vocabSizeThreshold, dataConfig.vocabCountThreshold,
           dataConfig.loaderBufferSize)
-      if (tgtVocab.notExists)
+        Dataset.logger.info(s"Created vocabulary file for ${srcLanguage.abbreviation}.")
+      }
+      if (tgtVocab.notExists) {
+        Dataset.logger.info(s"Creating vocabulary file for ${tgtLanguage.abbreviation}.")
         Vocabulary.createVocabFile(
           tgtFiles, tgtVocab,
           dataConfig.vocabSizeThreshold, dataConfig.vocabCountThreshold,
           dataConfig.loaderBufferSize)
+        Dataset.logger.info(s"Created vocabulary file for ${tgtLanguage.abbreviation}.")
+      }
       Dataset.logger.info("Created vocabulary files.")
       copy(vocabularies = Some((srcVocab, tgtVocab)))
     }

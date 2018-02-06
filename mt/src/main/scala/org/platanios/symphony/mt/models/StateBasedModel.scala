@@ -131,11 +131,16 @@ class StateBasedModel[S, SS](
           input: ((Output, Output), (Output, Output, Output)),
           mode: Mode
       ): (Output, Output) = {
+        // TODO: !!! I need to fix this repetition in TensorFlow for Scala.
         val encTuple = tf.createWithVariableScope("Encoder") {
-          config.encoder.create(input._1._1, input._1._2, mode)
+          tf.learn.variableScope("Encoder") {
+            config.encoder.create(input._1._1, input._1._2, mode)
+          }
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
-          config.decoder.create(encTuple, input._1._2, input._2._1, input._2._3, mode)
+          tf.learn.variableScope("Decoder") {
+            config.decoder.create(encTuple, input._1._2, input._2._1, input._2._3, mode)
+          }
         }
         (decTuple.sequences, decTuple.sequenceLengths)
       }
@@ -151,10 +156,14 @@ class StateBasedModel[S, SS](
         srcVocabulary.lookupTable()
 
         val encTuple = tf.createWithVariableScope("Encoder") {
-          config.encoder.create(input._1, input._2, mode)
+          tf.learn.variableScope("Encoder") {
+            config.encoder.create(input._1, input._2, mode)
+          }
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
-          config.decoder.create(encTuple, input._2, null, null, mode)
+          tf.learn.variableScope("Decoder") {
+            config.decoder.create(encTuple, input._2, null, null, mode)
+          }
         }
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
         // when using beam search.
