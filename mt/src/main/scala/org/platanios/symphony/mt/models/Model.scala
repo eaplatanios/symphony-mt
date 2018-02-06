@@ -16,9 +16,11 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.data.Dataset.MTTrainDataset
+import org.platanios.symphony.mt.data.Dataset.{MTInferDataset, MTTrainDataset}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
+import org.platanios.symphony.mt.metrics.MTMetric
 import org.platanios.tensorflow.api.learn.StopCriteria
+import org.platanios.tensorflow.api.tensors.Tensor
 
 // TODO: Move embeddings initializer to the configuration.
 // TODO: Add support for optimizer schedules (e.g., Adam for first 1000 steps and then SGD with a different learning rate.
@@ -45,8 +47,15 @@ trait Model {
   val devEvalDataset  : () => MTTrainDataset = null
   val testEvalDataset : () => MTTrainDataset = null
 
-  def train(
+  def train(dataset: () => MTTrainDataset, stopCriteria: StopCriteria = StopCriteria.steps(trainConfig.numSteps)): Unit
+
+  def infer(dataset: () => MTInferDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
+
+  def evaluate(
       dataset: () => MTTrainDataset,
-      stopCriteria: StopCriteria = StopCriteria.steps(trainConfig.numSteps)
-  ): Unit
+      metrics: Seq[MTMetric],
+      maxSteps: Long = -1L,
+      saveSummaries: Boolean = true,
+      name: String = null
+  ): Seq[Tensor]
 }

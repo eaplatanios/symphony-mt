@@ -16,9 +16,9 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.data.Dataset.MTTrainDataset
+import org.platanios.symphony.mt.data.Dataset.{MTInferDataset, MTTrainDataset}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.metrics.BLEUTensorFlow
+import org.platanios.symphony.mt.metrics.{BLEUTensorFlow, MTMetric}
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
@@ -119,7 +119,7 @@ class StateBasedModel[S, SS](
         triggerAtEnd = true, name = "TestEvaluator")
 
     // Create estimator
-    tf.learn.InMemoryEstimator(
+    tf.learn.FileBasedEstimator(
       model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),
       StopCriteria.steps(trainConfig.numSteps), hooks, tensorBoardConfig = tensorBoardConfig)
   }
@@ -192,6 +192,20 @@ class StateBasedModel[S, SS](
       stopCriteria: StopCriteria = StopCriteria.steps(trainConfig.numSteps)
   ): Unit = {
     estimator.train(dataset, stopCriteria)
+  }
+
+  override def infer(dataset: () => MTInferDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
+    estimator.infer(dataset)
+  }
+
+  override def evaluate(
+      dataset: () => MTTrainDataset,
+      metrics: Seq[MTMetric],
+      maxSteps: Long = -1L,
+      saveSummaries: Boolean = true,
+      name: String = null
+  ): Seq[Tensor] = {
+    estimator.evaluate(dataset, metrics, maxSteps, saveSummaries, name)
   }
 }
 
