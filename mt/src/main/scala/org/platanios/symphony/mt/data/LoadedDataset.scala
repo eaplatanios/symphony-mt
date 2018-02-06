@@ -47,7 +47,7 @@ object LoadedDataset {
           files.groupBy(_.tgtLanguage).mapValues(_.filter(_.vocabularies.isDefined).map(_.vocabularies.get._2)))
           .map {
             case (language, vocabFiles) =>
-              if (vocabFiles.size == 1 || !dataConfig.loaderMergeVocabs) {
+              if (vocabFiles.size == 1) {
                 language -> vocabFiles.head
               } else if (vocabFiles.isEmpty || !dataConfig.loaderMergeVocabs) {
                 language -> {
