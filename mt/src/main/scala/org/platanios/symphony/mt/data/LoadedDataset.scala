@@ -34,6 +34,8 @@ class LoadedDataset private[LoadedDataset] (
 ) {
   val workingDir: File = File(dataConfig.loaderWorkingDir)
 
+  def languagePairs: Iterable[(Language, Language)] = datasets.keys
+
   def files(srcLanguage: Language, tgtLanguage: Language): LoadedDataset.GroupedFiles = {
     datasets.getOrElse((srcLanguage, tgtLanguage), datasets((tgtLanguage, srcLanguage)).reversed)
   }

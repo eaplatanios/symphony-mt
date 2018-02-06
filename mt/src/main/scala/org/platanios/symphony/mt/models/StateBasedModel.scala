@@ -195,11 +195,8 @@ class StateBasedModel[S, SS](
     }
   }
 
-  override def train(
-      dataset: () => MTTrainDataset,
-      stopCriteria: StopCriteria = StopCriteria.steps(trainConfig.numSteps)
-  ): Unit = {
-    estimator.train(dataset, stopCriteria)
+  override def train(dataset: () => MTTrainDataset): Unit = {
+    estimator.train(dataset, trainConfig.stopCriteria)
   }
 
   override def infer(dataset: () => MTInferDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {

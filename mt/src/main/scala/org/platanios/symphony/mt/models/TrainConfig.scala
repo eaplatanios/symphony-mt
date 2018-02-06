@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.models
 
+import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.Decay
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 
@@ -30,6 +31,7 @@ case class TrainConfig(
     learningRateDecayRate: Float = 1.0f,
     learningRateDecaySteps: Int = 10000,
     learningRateDecayStartStep: Int = 0,
+    stopCriteria: StopCriteria = StopCriteria(),
     summarySteps: Int = 100,
     checkpointSteps: Int = 1000,
     colocateGradientsWithOps: Boolean = true,

@@ -15,14 +15,14 @@
 
 package org.platanios.symphony.mt.experiments
 
+import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{English, German}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.datasets.WMT16Dataset
 import org.platanios.symphony.mt.models.attention.BahdanauAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
-import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.tensorflow.api.learn.StopCriteria
+import org.platanios.symphony.mt.translators.PairwiseTranslator
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
 import java.nio.file.{Path, Paths}
@@ -44,11 +44,8 @@ object WMT16 extends App {
     srcMaxLength = 50,
     tgtMaxLength = 50)
 
-  val dataset: LoadedDataset.GroupedFiles = {
-    WMT16Dataset(srcLang, tgtLang, dataConfig)
-        .load()
-        .files(srcLang, tgtLang)
-  }
+  val dataset     : LoadedDataset              = WMT16Dataset(srcLang, tgtLang, dataConfig).load()
+  val datasetFiles: LoadedDataset.GroupedFiles = dataset.files(srcLang, tgtLang)
 
   val env = Environment(
     workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
@@ -78,7 +75,7 @@ object WMT16 extends App {
 
   // Create a translator
   val config = GNMTConfig(
-    srcLang, tgtLang, dataset.srcVocab, dataset.tgtVocab, env, dataConfig, inferConfig,
+    srcLang, tgtLang, datasetFiles.srcVocab, datasetFiles.tgtVocab, env, dataConfig, inferConfig,
     cell = BasicLSTM(forgetBias = 1.0f),
     numUnits = 512,
     numBiLayers = 1,
@@ -89,14 +86,16 @@ object WMT16 extends App {
     useNewAttention = false,
     timeMajor = true)
 
-  val trainDataset     = () => dataset.createTrainDataset(TRAIN_DATASET, trainConfig.batchSize, repeat = true)
-  val trainEvalDataset = () => dataset.createTrainDataset(TRAIN_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
-  val devEvalDataset   = () => dataset.createTrainDataset(DEV_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
-  val testEvalDataset  = () => dataset.createTrainDataset(TEST_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
+  val trainDataset     = () => datasetFiles.createTrainDataset(TRAIN_DATASET, trainConfig.batchSize, repeat = true)
+  val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
+  val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
+  val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
 
-  val model = StateBasedModel(
-    config, srcLang, tgtLang, dataset.srcVocab, dataset.tgtVocab, trainEvalDataset, devEvalDataset, testEvalDataset,
+  val model = () => StateBasedModel(
+    config, srcLang, tgtLang, datasetFiles.srcVocab, datasetFiles.tgtVocab, trainEvalDataset, devEvalDataset, testEvalDataset,
     env, dataConfig, trainConfig, inferConfig, logConfig, "Model")
 
-  model.train(trainDataset, StopCriteria.steps(trainConfig.numSteps))
+  val translator = PairwiseTranslator(model)
+
+  translator.train(dataset, trainReverse = false)
 }

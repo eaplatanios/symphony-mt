@@ -18,30 +18,18 @@ package org.platanios.symphony.mt.translators
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.Model
-import org.platanios.tensorflow.api.learn.StopCriteria
+import org.platanios.tensorflow.api.Tensor
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Translator(val model: Model) {
-  def train(
-      trainDatasets: Seq[Translator.DatasetPair],
-      devDatasets: Seq[Translator.DatasetPair] = null,
-      testDatasets: Seq[Translator.DatasetPair] = null,
-      stopCriteria: StopCriteria
-  ): Unit
+abstract class Translator(val model: () => Model) {
+  def train(dataset: LoadedDataset, trainReverse: Boolean = true): Unit
 
+  @throws[IllegalStateException]
   def translate(
       srcLanguage: Language,
       tgtLanguage: Language,
-      dataset: MTTextLinesDataset
-  ): MTTextLinesDataset
-}
-
-object Translator {
-  case class DatasetPair(
-      srcLanguage: Language,
-      tgtLanguage: Language,
-      srcDataset: MTTextLinesDataset,
-      tgtDataset: MTTextLinesDataset)
+      dataset: () => MTInferDataset
+  ): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
 }
