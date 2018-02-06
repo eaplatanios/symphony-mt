@@ -61,7 +61,7 @@ private[utilities] class BoundedPriorityQueue[A](maxSize: Int)(implicit ord: Ord
     this += elem1 += elem2 ++= elems
   }
 
-  override def clear() {
+  override def clear(): Unit = {
     underlying.clear()
   }
 

@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.models
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data.Dataset.{MTInferDataset, MTTrainDataset}
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
-import org.platanios.symphony.mt.metrics.{BLEUTensorFlow, MTMetric}
+import org.platanios.symphony.mt.metrics.{BLEU, MTMetric}
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
@@ -107,15 +107,15 @@ class StateBasedModel[S, SS](
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
     if (logConfig.logTrainEvalSteps > 0 && trainEvalDataset != null)
       hooks += tf.learn.Evaluator(
-        log = true, summariesDir, trainEvalDataset, Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTrainEvalSteps),
+        log = true, summariesDir, trainEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logTrainEvalSteps),
         triggerAtEnd = true, name = "TrainEvaluator")
     if (logConfig.logDevEvalSteps > 0 && devEvalDataset != null)
       hooks += tf.learn.Evaluator(
-        log = true, summariesDir, devEvalDataset, Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logDevEvalSteps),
+        log = true, summariesDir, devEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logDevEvalSteps),
         triggerAtEnd = true, name = "DevEvaluator")
     if (logConfig.logTestEvalSteps > 0 && testEvalDataset != null)
       hooks += tf.learn.Evaluator(
-        log = true, summariesDir, testEvalDataset, Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTestEvalSteps),
+        log = true, summariesDir, testEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logTestEvalSteps),
         triggerAtEnd = true, name = "TestEvaluator")
 
     // Create estimator

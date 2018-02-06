@@ -27,101 +27,7 @@ import scala.collection.mutable
   *
   * @author Emmanouil Antonios Platanios
   */
-object BLEU {
-  /** BLEU score computation result.
-    *
-    * @param  score       Actual BLEU score.
-    * @param  precisions  Precisions computed for each n-gram order.
-    * @param  lengthRatio Ratio of hypothesis sequence lengths to reference sequence lengths. If multiple reference
-    *                     sequences are provided, the minimum length of these sequences is used each time.
-    * @param  smooth      Boolean value indicating whether the BLEU score was smoothed using the method described in
-    *                     [Lin et al. 2004](https://dl.acm.org/citation.cfm?id=1219032).
-    */
-  case class BLEUScore(
-      score: Double, precisions: Seq[Double], lengthRatio: Double, smooth: Boolean) {
-    /** Maximum n-gram order used while computing the BLEU score. */
-    val maxOrder: Int = precisions.size
-
-    /** Brevity penalty computed for the BLEU score. */
-    val brevityPenalty: Double = if (lengthRatio > 1) 1.0 else Math.exp(1.0 - 1.0 / lengthRatio)
-  }
-
-  /** Computes the BLEU score for the provided hypothesis sequences against one or more reference sequences.
-    *
-    * @param  referenceCorpus  Sequence of sequences of reference sequences to use as reference for each translation
-    *                          sequence. Each reference and hypothesis sequence is supposed to be a sequence over
-    *                          tokens of type `T` (typically `String`).
-    * @param  hypothesisCorpus Sequence of hypothesis sequences to score.
-    * @param  maxOrder         Maximum n-gram order to use when computing the BLEU score.
-    * @param  smooth           Boolean value indicating to use the smoothing method described in
-    *                          [Lin et al. 2004](https://dl.acm.org/citation.cfm?id=1219032).
-    * @return Computed BLEU score.
-    */
-  def bleu[T](
-      referenceCorpus: Seq[Seq[Seq[T]]],
-      hypothesisCorpus: Seq[Seq[T]],
-      maxOrder: Int = 4,
-      smooth: Boolean = false): BLEUScore = {
-    // Compute counts for matches and possible matches
-    val (matchesByOrder, possibleMatchesByOrder, referenceLength, hypothesisLength) =
-      nGramMatches(referenceCorpus, hypothesisCorpus, maxOrder)
-
-    // Compute precisions
-    val precisions = matchesByOrder.zip(possibleMatchesByOrder).map {
-      case (matches, possibleMatches) =>
-        if (smooth) {
-          (matches + 1.0) / (possibleMatches + 1.0)
-        } else {
-          if (possibleMatches > 0)
-            matches.toDouble / possibleMatches
-          else
-            0.0
-        }
-    }
-
-    // Compute the BLEU score
-    val geometricMean = if (precisions.min > 0) Math.exp(precisions.map(Math.log(_) / maxOrder).sum) else 0.0
-    val lengthRatio = hypothesisLength.toDouble / referenceLength.toDouble
-    val brevityPenalty = if (lengthRatio > 1) 1.0 else Math.exp(1.0 - 1.0 / lengthRatio)
-    val bleu = geometricMean * brevityPenalty * 100
-    BLEUScore(bleu, precisions, lengthRatio, smooth)
-  }
-
-  private[metrics] def nGramMatches[T](
-      referenceCorpus: Seq[Seq[Seq[T]]],
-      hypothesisCorpus: Seq[Seq[T]],
-      maxOrder: Int = 4
-  ): (Array[Long], Array[Long], Int, Int) = {
-    // Compute counts for matches and possible matches
-    val matchesByOrder = mutable.ArrayBuffer.fill(maxOrder)(0L)
-    val possibleMatchesByOrder = mutable.ArrayBuffer.fill(maxOrder)(0L)
-    var referenceLength: Int = 0
-    var hypothesisLength: Int = 0
-    referenceCorpus.zip(hypothesisCorpus).foreach {
-      case (references, hypothesis) =>
-        referenceLength += references.map(_.size).min
-        hypothesisLength += hypothesis.size
-
-        // Compute n-gram counts
-        val refNGramCounts = references.map(Utilities.countNGrams(_, maxOrder))
-        val hypNGramCounts = Utilities.countNGrams(hypothesis, maxOrder)
-        val overlapNGramCounts = hypNGramCounts.map {
-          case (ngram, count) => ngram -> Math.min(refNGramCounts.map(_.getOrElse(ngram, 0L)).max, count)
-        }
-
-        // Update counts for matches and possible matches
-        overlapNGramCounts.foreach(p => matchesByOrder(p._1.size - 1) += p._2)
-        (0 until maxOrder).foreach(n => {
-          val possibleMatches = hypothesis.size - n
-          if (possibleMatches > 0)
-            possibleMatchesByOrder(n) += possibleMatches
-        })
-    }
-    (matchesByOrder.toArray, possibleMatchesByOrder.toArray, referenceLength, hypothesisLength)
-  }
-}
-
-case class BLEUTensorFlow(
+case class BLEU(
     maxOrder: Int = 4,
     smooth: Boolean = false,
     variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
@@ -235,5 +141,99 @@ case class BLEUTensorFlow(
         Metric.StreamingInstance(value, update, reset, Set(matches, possibleMatches, refLen, hypLen))
       }
     }
+  }
+}
+
+object BLEU {
+  /** BLEU score computation result.
+    *
+    * @param  score       Actual BLEU score.
+    * @param  precisions  Precisions computed for each n-gram order.
+    * @param  lengthRatio Ratio of hypothesis sequence lengths to reference sequence lengths. If multiple reference
+    *                     sequences are provided, the minimum length of these sequences is used each time.
+    * @param  smooth      Boolean value indicating whether the BLEU score was smoothed using the method described in
+    *                     [Lin et al. 2004](https://dl.acm.org/citation.cfm?id=1219032).
+    */
+  case class BLEUScore(
+      score: Double, precisions: Seq[Double], lengthRatio: Double, smooth: Boolean) {
+    /** Maximum n-gram order used while computing the BLEU score. */
+    val maxOrder: Int = precisions.size
+
+    /** Brevity penalty computed for the BLEU score. */
+    val brevityPenalty: Double = if (lengthRatio > 1) 1.0 else Math.exp(1.0 - 1.0 / lengthRatio)
+  }
+
+  /** Computes the BLEU score for the provided hypothesis sequences against one or more reference sequences.
+    *
+    * @param  referenceCorpus  Sequence of sequences of reference sequences to use as reference for each translation
+    *                          sequence. Each reference and hypothesis sequence is supposed to be a sequence over
+    *                          tokens of type `T` (typically `String`).
+    * @param  hypothesisCorpus Sequence of hypothesis sequences to score.
+    * @param  maxOrder         Maximum n-gram order to use when computing the BLEU score.
+    * @param  smooth           Boolean value indicating to use the smoothing method described in
+    *                          [Lin et al. 2004](https://dl.acm.org/citation.cfm?id=1219032).
+    * @return Computed BLEU score.
+    */
+  def bleu[T](
+      referenceCorpus: Seq[Seq[Seq[T]]],
+      hypothesisCorpus: Seq[Seq[T]],
+      maxOrder: Int = 4,
+      smooth: Boolean = false): BLEUScore = {
+    // Compute counts for matches and possible matches
+    val (matchesByOrder, possibleMatchesByOrder, referenceLength, hypothesisLength) =
+      nGramMatches(referenceCorpus, hypothesisCorpus, maxOrder)
+
+    // Compute precisions
+    val precisions = matchesByOrder.zip(possibleMatchesByOrder).map {
+      case (matches, possibleMatches) =>
+        if (smooth) {
+          (matches + 1.0) / (possibleMatches + 1.0)
+        } else {
+          if (possibleMatches > 0)
+            matches.toDouble / possibleMatches
+          else
+            0.0
+        }
+    }
+
+    // Compute the BLEU score
+    val geometricMean = if (precisions.min > 0) Math.exp(precisions.map(Math.log(_) / maxOrder).sum) else 0.0
+    val lengthRatio = hypothesisLength.toDouble / referenceLength.toDouble
+    val brevityPenalty = if (lengthRatio > 1) 1.0 else Math.exp(1.0 - 1.0 / lengthRatio)
+    val bleu = geometricMean * brevityPenalty * 100
+    BLEUScore(bleu, precisions, lengthRatio, smooth)
+  }
+
+  private[metrics] def nGramMatches[T](
+      referenceCorpus: Seq[Seq[Seq[T]]],
+      hypothesisCorpus: Seq[Seq[T]],
+      maxOrder: Int = 4
+  ): (Array[Long], Array[Long], Int, Int) = {
+    // Compute counts for matches and possible matches
+    val matchesByOrder = mutable.ArrayBuffer.fill(maxOrder)(0L)
+    val possibleMatchesByOrder = mutable.ArrayBuffer.fill(maxOrder)(0L)
+    var referenceLength: Int = 0
+    var hypothesisLength: Int = 0
+    referenceCorpus.zip(hypothesisCorpus).foreach {
+      case (references, hypothesis) =>
+        referenceLength += references.map(_.size).min
+        hypothesisLength += hypothesis.size
+
+        // Compute n-gram counts
+        val refNGramCounts = references.map(Utilities.countNGrams(_, maxOrder))
+        val hypNGramCounts = Utilities.countNGrams(hypothesis, maxOrder)
+        val overlapNGramCounts = hypNGramCounts.map {
+          case (ngram, count) => ngram -> Math.min(refNGramCounts.map(_.getOrElse(ngram, 0L)).max, count)
+        }
+
+        // Update counts for matches and possible matches
+        overlapNGramCounts.foreach(p => matchesByOrder(p._1.size - 1) += p._2)
+        (0 until maxOrder).foreach(n => {
+          val possibleMatches = hypothesis.size - n
+          if (possibleMatches > 0)
+            possibleMatchesByOrder(n) += possibleMatches
+        })
+    }
+    (matchesByOrder.toArray, possibleMatchesByOrder.toArray, referenceLength, hypothesisLength)
   }
 }
