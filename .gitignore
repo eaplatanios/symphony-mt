@@ -2,7 +2,6 @@
 
 # Project Specific
 temp/
-datasets/
 
 # Scala Specific
 *.class
