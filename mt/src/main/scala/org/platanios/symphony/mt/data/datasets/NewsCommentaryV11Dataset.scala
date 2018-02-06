@@ -27,14 +27,14 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class NewsCommentaryV11Dataset(
-    override protected val workingDir: Path,
+    protected val dataDir: Path,
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false,
     override val trainDataSentenceLengthBounds: (Int, Int) = null
 ) extends Dataset(
-  workingDir = workingDir
+  workingDir = dataDir
       .resolve("news-commentary-v11")
       .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
@@ -43,7 +43,7 @@ class NewsCommentaryV11Dataset(
   tokenize = tokenize,
   trainDataSentenceLengthBounds = trainDataSentenceLengthBounds
 )(
-  downloadsDir = workingDir.resolve("news-commentary-v11")
+  downloadsDir = dataDir.resolve("news-commentary-v11")
 ) {
   require(
     NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
@@ -85,14 +85,13 @@ object NewsCommentaryV11Dataset {
   }
 
   def apply(
-      workingDir: Path,
+      dataDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
       bufferSize: Int = 8192,
       tokenize: Boolean = false,
       trainDataSentenceLengthBounds: (Int, Int) = null
   ): NewsCommentaryV11Dataset = {
-    new NewsCommentaryV11Dataset(
-      workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
+    new NewsCommentaryV11Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
   }
 }

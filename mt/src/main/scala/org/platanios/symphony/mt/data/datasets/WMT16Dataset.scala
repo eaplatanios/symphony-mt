@@ -27,21 +27,21 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class WMT16Dataset(
-    override protected val workingDir: Path,
+    protected val dataDir: Path,
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = true,
     override val trainDataSentenceLengthBounds: (Int, Int) = (1, 80)
 ) extends Dataset(
-  workingDir = workingDir.resolve("wmt-16").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+  workingDir = dataDir.resolve("wmt-16").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
   tokenize = tokenize,
   trainDataSentenceLengthBounds = trainDataSentenceLengthBounds
 )(
-  downloadsDir = workingDir.resolve("wmt-16")
+  downloadsDir = dataDir.resolve("wmt-16")
 ) {
   require(
     WMT16Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
@@ -55,28 +55,28 @@ class WMT16Dataset(
 
   protected def commonCrawlDataset: Option[CommonCrawlDataset] = {
     if (CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(CommonCrawlDataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
+      Some(CommonCrawlDataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
     else
       None
   }
 
   protected def europarlV7Dataset: Option[EuroparlV7Dataset] = {
     if (EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV7Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
+      Some(EuroparlV7Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
     else
       None
   }
 
   protected def europarlV8Dataset: Option[EuroparlV8Dataset] = {
     if (EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV8Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
+      Some(EuroparlV8Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
     else
       None
   }
 
   protected def newsCommentaryV11Dataset: Option[NewsCommentaryV11Dataset] = {
     if (NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(NewsCommentaryV11Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
+      Some(NewsCommentaryV11Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize = true))
     else
       None
   }
@@ -215,13 +215,13 @@ object WMT16Dataset {
   }
 
   def apply(
-      workingDir: Path,
+      dataDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
       bufferSize: Int = 8192,
       tokenize: Boolean = true,
       trainDataSentenceLengthBounds: (Int, Int) = null
   ): WMT16Dataset = {
-    new WMT16Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
+    new WMT16Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
   }
 }

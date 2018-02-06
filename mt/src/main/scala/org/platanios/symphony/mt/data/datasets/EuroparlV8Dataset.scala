@@ -27,21 +27,21 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class EuroparlV8Dataset(
-    override protected val workingDir: Path,
+    protected val dataDir: Path,
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     override val bufferSize: Int = 8192,
     override val tokenize: Boolean = false,
     override val trainDataSentenceLengthBounds: (Int, Int) = null
 ) extends Dataset(
-  workingDir = workingDir.resolve("europarl-v8").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+  workingDir = dataDir.resolve("europarl-v8").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
   tokenize = tokenize,
   trainDataSentenceLengthBounds = trainDataSentenceLengthBounds
 )(
-  downloadsDir = workingDir.resolve("europarl-v8")
+  downloadsDir = dataDir.resolve("europarl-v8")
 ) {
   require(
     EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
@@ -79,13 +79,13 @@ object EuroparlV8Dataset {
   }
 
   def apply(
-      workingDir: Path,
+      dataDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
       bufferSize: Int = 8192,
       tokenize: Boolean = false,
       trainDataSentenceLengthBounds: (Int, Int) = null
   ): EuroparlV8Dataset = {
-    new EuroparlV8Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
+    new EuroparlV8Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
   }
 }

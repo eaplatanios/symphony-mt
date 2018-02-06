@@ -27,19 +27,19 @@ import java.nio.file.Path
   * @author Emmanouil Antonios Platanios
   */
 class IWSLT15Dataset(
-    override protected val workingDir: Path,
+    protected val dataDir: Path,
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     override val bufferSize: Int = 8192
 ) extends Dataset(
-  workingDir = workingDir.resolve("iwslt-15").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+  workingDir = dataDir.resolve("iwslt-15").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
   bufferSize = bufferSize,
   tokenize = false,
   trainDataSentenceLengthBounds = null
 )(
-  downloadsDir = workingDir.resolve("iwslt-15")
+  downloadsDir = dataDir.resolve("iwslt-15")
 ) {
   require(
     IWSLT15Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
@@ -100,11 +100,11 @@ object IWSLT15Dataset {
   }
 
   def apply(
-      workingDir: Path,
+      dataDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
       bufferSize: Int = 8192
   ): IWSLT15Dataset = {
-    new IWSLT15Dataset(workingDir, srcLanguage, tgtLanguage, bufferSize)
+    new IWSLT15Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize)
   }
 }

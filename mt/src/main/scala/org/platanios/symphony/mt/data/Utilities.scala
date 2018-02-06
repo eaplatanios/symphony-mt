@@ -35,6 +35,7 @@ object Utilities {
       sizeThreshold: Int = -1, countThreshold: Int = -1,
       bufferSize: Int = 8192
   ): Unit = {
+    vocabFile.parent.createDirectories()
     val whitespaceRegex = "\\s+".r
     val writer = new BufferedWriter(vocabFile.newPrintWriter(), bufferSize)
     tokenizedFiles.toStream.flatMap(file => {
