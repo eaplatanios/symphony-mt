@@ -92,7 +92,7 @@ object IWSLT15Dataset {
   val testPrefix : String = "tst2013"
   val vocabPrefix: String = "vocab"
 
-  val supportedLanguagePairs: Set[(Language, Language)] = Set((Vietnamese, English))
+  val supportedLanguagePairs: Set[(Language, Language)] = Set((English, Vietnamese))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||

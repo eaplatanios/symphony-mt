@@ -146,6 +146,11 @@ abstract class Dataset(
 object Dataset {
   private[data] val logger = Logger(LoggerFactory.getLogger("Dataset"))
 
+  sealed trait DatasetType
+  case object TRAIN extends DatasetType
+  case object DEV extends DatasetType
+  case object TEST extends DatasetType
+
   case class GroupedFiles(
       name: String,
       workingDir: File,
@@ -164,7 +169,18 @@ object Dataset {
         Some((Vocabulary(vocabularies._1), Vocabulary(vocabularies._2)))
     }
 
+    lazy val srcVocab: Vocabulary = {
+      val files = if (vocabularies != null) this else withNewVocab()
+      files._vocabularies.get._1
+    }
+
+    lazy val tgtVocab: Vocabulary = {
+      val files = if (vocabularies != null) this else withNewVocab()
+      files._vocabularies.get._2
+    }
+
     def withNewVocab(sizeThreshold: Int = 50000, countThreshold: Int = -1): GroupedFiles = {
+      // TODO: Obtain the default size and count thresholds from configuration case classes.
       Dataset.logger.info(s"$name - Creating vocabulary files.")
       val srcFiles = trainCorpora.map(_._2) ++ devCorpora.map(_._2) ++ testCorpora.map(_._2)
       val tgtFiles = trainCorpora.map(_._3) ++ devCorpora.map(_._3) ++ testCorpora.map(_._3)
@@ -178,21 +194,37 @@ object Dataset {
       copy(vocabularies = (srcVocab, tgtVocab))
     }
 
-    def createInferDataset(batchSize: Int, dataConfig: DataConfig): MTInferDataset = {
+    def createInferDataset(
+        datasetType: DatasetType,
+        batchSize: Int,
+        dataConfig: DataConfig
+    ): MTInferDataset = {
       val files = if (vocabularies != null) this else withNewVocab()
-      val srcTrainDatasets = files.trainCorpora.map(_._2)
-          .map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
-      val srcDataset = joinDatasets(srcTrainDatasets)
+      val corpora = datasetType match {
+        case TRAIN => files.trainCorpora
+        case DEV => files.devCorpora
+        case TEST => files.testCorpora
+      }
+      val srcDatasets = corpora.map(_._2).map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
+      val srcDataset = joinDatasets(srcDatasets)
       val srcVocabularyTable = files._vocabularies.get._1.lookupTable()
       Dataset.createInferDataset(srcDataset, srcVocabularyTable, batchSize, dataConfig)
     }
 
-    def createTrainDataset(batchSize: Int, dataConfig: DataConfig, repeat: Boolean = true): MTTrainDataset = {
+    def createTrainDataset(
+        datasetType: DatasetType,
+        batchSize: Int,
+        dataConfig: DataConfig,
+        repeat: Boolean = true
+    ): MTTrainDataset = {
       val files = if (vocabularies != null) this else withNewVocab()
-      val srcTrainDatasets = files.trainCorpora.map(_._2)
-          .map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
-      val tgtTrainDatasets = files.trainCorpora.map(_._3)
-          .map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
+      val corpora = datasetType match {
+        case TRAIN => files.trainCorpora
+        case DEV => files.devCorpora
+        case TEST => files.testCorpora
+      }
+      val srcTrainDatasets = corpora.map(_._2).map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
+      val tgtTrainDatasets = corpora.map(_._3).map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
       val srcDataset = joinDatasets(srcTrainDatasets)
       val tgtDataset = joinDatasets(tgtTrainDatasets)
       val srcVocabularyTable = files._vocabularies.get._1.lookupTable()

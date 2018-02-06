@@ -16,8 +16,8 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.data.Datasets.{MTTextLinesDataset, MTTrainDataset}
-import org.platanios.symphony.mt.data.{DataConfig, Datasets, Vocabulary}
+import org.platanios.symphony.mt.data.Dataset.MTTrainDataset
+import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.symphony.mt.metrics.BLEUTensorFlow
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
@@ -38,12 +38,9 @@ class StateBasedModel[S, SS](
     override val tgtLanguage: Language,
     override val srcVocabulary: Vocabulary,
     override val tgtVocabulary: Vocabulary,
-    override val srcTrainDataset: MTTextLinesDataset = null,
-    override val tgtTrainDataset: MTTextLinesDataset = null,
-    override val srcDevDataset: MTTextLinesDataset = null,
-    override val tgtDevDataset: MTTextLinesDataset = null,
-    override val srcTestDataset: MTTextLinesDataset = null,
-    override val tgtTestDataset: MTTextLinesDataset = null,
+    override val trainEvalDataset: () => MTTrainDataset = null,
+    override val devEvalDataset: () => MTTrainDataset = null,
+    override val testEvalDataset: () => MTTrainDataset = null,
     override val env: Environment = Environment(),
     override val dataConfig: DataConfig = DataConfig(),
     override val trainConfig: TrainConfig = TrainConfig(),
@@ -57,17 +54,6 @@ class StateBasedModel[S, SS](
   // Create the input and the train input parts of the model.
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
   protected val trainInput = Input((INT32, INT32, INT32), (Shape(-1, -1), Shape(-1, -1), Shape(-1)))
-
-  protected def createSupervisedDataset(
-      srcDataset: MTTextLinesDataset,
-      tgtDataset: MTTextLinesDataset,
-      batchSize: Int,
-      repeat: Boolean,
-      numBuckets: Int
-  ): MTTrainDataset = {
-    Datasets.createTrainDataset(
-      srcDataset, tgtDataset, srcVocabulary.lookupTable(), tgtVocabulary.lookupTable(), dataConfig, batchSize, repeat)
-  }
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
     val maxTime = tf.shape(targetSequences)(1)
@@ -119,23 +105,17 @@ class StateBasedModel[S, SS](
     // Add logging hooks
     if (logConfig.logLossSteps > 0)
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
-    if (logConfig.logTrainEvalSteps > 0 && srcTrainDataset != null && tgtTrainDataset != null)
+    if (logConfig.logTrainEvalSteps > 0 && trainEvalDataset != null)
       hooks += tf.learn.Evaluator(
-        log = true, summariesDir,
-        () => createSupervisedDataset(srcTrainDataset, tgtTrainDataset, logConfig.logEvalBatchSize, repeat = false, 1),
-        Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTrainEvalSteps),
+        log = true, summariesDir, trainEvalDataset, Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTrainEvalSteps),
         triggerAtEnd = true, name = "TrainEvaluator")
-    if (logConfig.logDevEvalSteps > 0 && srcDevDataset != null && tgtDevDataset != null)
+    if (logConfig.logDevEvalSteps > 0 && devEvalDataset != null)
       hooks += tf.learn.Evaluator(
-        log = true, summariesDir,
-        () => createSupervisedDataset(srcDevDataset, tgtDevDataset, logConfig.logEvalBatchSize, repeat = false, 1),
-        Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logDevEvalSteps),
+        log = true, summariesDir, devEvalDataset, Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logDevEvalSteps),
         triggerAtEnd = true, name = "DevEvaluator")
-    if (logConfig.logTestEvalSteps > 0 && srcTestDataset != null && tgtTestDataset != null)
+    if (logConfig.logTestEvalSteps > 0 && testEvalDataset != null)
       hooks += tf.learn.Evaluator(
-        log = true, summariesDir,
-        () => createSupervisedDataset(srcTestDataset, tgtTestDataset, logConfig.logEvalBatchSize, repeat = false, 1),
-        Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTestEvalSteps),
+        log = true, summariesDir, testEvalDataset, Seq(BLEUTensorFlow()), StepHookTrigger(logConfig.logTestEvalSteps),
         triggerAtEnd = true, name = "TestEvaluator")
 
     // Create estimator
@@ -208,13 +188,10 @@ class StateBasedModel[S, SS](
   }
 
   override def train(
-      srcTrainDataset: MTTextLinesDataset,
-      tgtTrainDataset: MTTextLinesDataset,
+      dataset: () => MTTrainDataset,
       stopCriteria: StopCriteria = StopCriteria.steps(trainConfig.numSteps)
   ): Unit = {
-    val trainDataset = () => createSupervisedDataset(
-      srcTrainDataset, tgtTrainDataset, trainConfig.batchSize, repeat = true, dataConfig.numBuckets)
-    estimator.train(trainDataset, stopCriteria)
+    estimator.train(dataset, stopCriteria)
   }
 }
 
@@ -225,12 +202,9 @@ object StateBasedModel {
       tgtLanguage: Language,
       srcVocabulary: Vocabulary,
       tgtVocabulary: Vocabulary,
-      srcTrainDataset: MTTextLinesDataset,
-      tgtTrainDataset: MTTextLinesDataset,
-      srcDevDataset: MTTextLinesDataset = null,
-      tgtDevDataset: MTTextLinesDataset = null,
-      srcTestDataset: MTTextLinesDataset = null,
-      tgtTestDataset: MTTextLinesDataset = null,
+      trainEvalDataset: () => MTTrainDataset = null,
+      devEvalDataset: () => MTTrainDataset = null,
+      testEvalDataset: () => MTTrainDataset = null,
       env: Environment = Environment(),
       dataConfig: DataConfig = DataConfig(),
       trainConfig: TrainConfig = TrainConfig(),
@@ -242,8 +216,7 @@ object StateBasedModel {
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): StateBasedModel[S, SS] = {
     new StateBasedModel[S, SS](
-      config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary,
-      srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
+      config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary, trainEvalDataset, devEvalDataset, testEvalDataset,
       env, dataConfig, trainConfig, inferConfig, logConfig, name)(evS, evSDropout)
   }
 

@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
+import org.platanios.symphony.mt.data.Dataset.MTTrainDataset
 import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
 import org.platanios.tensorflow.api.learn.StopCriteria
 
@@ -41,16 +41,12 @@ trait Model {
   val srcVocabulary: Vocabulary
   val tgtVocabulary: Vocabulary
 
-  val srcTrainDataset: MTTextLinesDataset = null
-  val tgtTrainDataset: MTTextLinesDataset = null
-  val srcDevDataset  : MTTextLinesDataset = null
-  val tgtDevDataset  : MTTextLinesDataset = null
-  val srcTestDataset : MTTextLinesDataset = null
-  val tgtTestDataset : MTTextLinesDataset = null
+  val trainEvalDataset: () => MTTrainDataset = null
+  val devEvalDataset  : () => MTTrainDataset = null
+  val testEvalDataset : () => MTTrainDataset = null
 
   def train(
-      srcTrainDataset: MTTextLinesDataset,
-      tgtTrainDataset: MTTextLinesDataset,
+      dataset: () => MTTrainDataset,
       stopCriteria: StopCriteria = StopCriteria.steps(trainConfig.numSteps)
   ): Unit
 }

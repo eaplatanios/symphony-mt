@@ -17,18 +17,16 @@ package org.platanios.symphony.mt.experiments
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{English, Vietnamese}
-import org.platanios.symphony.mt.data.{DataConfig, ParallelDataset, Vocabulary}
-import org.platanios.symphony.mt.data.Datasets.MTTextLinesDataset
-import org.platanios.symphony.mt.data.managers.IWSLT15Manager
+import org.platanios.symphony.mt.data.{DataConfig, Dataset}
+import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
-import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.StopCriteria
-import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
 import java.nio.file.{Path, Paths}
+
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -40,17 +38,7 @@ object IWSLT15 extends App {
   val srcLang: Language = English
   val tgtLang: Language = Vietnamese
 
-  val parallelDataset: ParallelDataset = IWSLT15Manager(workingDir.resolve("data"), srcLang, tgtLang).download()
-
-  // Create the vocabularies and the datasets
-  val srcVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabulary()(srcLang))
-  val tgtVocab       : Vocabulary         = Vocabulary(parallelDataset.vocabulary()(tgtLang))
-  val srcTrainDataset: MTTextLinesDataset = TextLinesDataset(parallelDataset.trainCorpus()(srcLang).toAbsolutePath.toString)
-  val tgtTrainDataset: MTTextLinesDataset = TextLinesDataset(parallelDataset.trainCorpus()(tgtLang).toAbsolutePath.toString)
-  val srcDevDataset  : MTTextLinesDataset = TextLinesDataset(parallelDataset.devCorpus()(srcLang).toAbsolutePath.toString)
-  val tgtDevDataset  : MTTextLinesDataset = TextLinesDataset(parallelDataset.devCorpus()(tgtLang).toAbsolutePath.toString)
-  val srcTestDataset : MTTextLinesDataset = TextLinesDataset(parallelDataset.testCorpus()(srcLang).toAbsolutePath.toString)
-  val tgtTestDataset : MTTextLinesDataset = TextLinesDataset(parallelDataset.testCorpus()(tgtLang).toAbsolutePath.toString)
+  val dataset: Dataset.GroupedFiles = IWSLT15Dataset(workingDir.resolve("data"), srcLang, tgtLang).groupedFiles.withNewVocab()
 
   // Create general configuration settings
   val env = Environment(
@@ -87,7 +75,7 @@ object IWSLT15 extends App {
   // Create a translator
   val config = StateBasedModel.Config(
     UnidirectionalRNNEncoder(
-      srcLang, srcVocab, env,
+      srcLang, dataset.srcVocab, env,
       cell = BasicLSTM(forgetBias = 1.0f),
       numUnits = 512,
       numLayers = 2,
@@ -95,7 +83,7 @@ object IWSLT15 extends App {
       dropout = Some(0.2f),
       timeMajor = true),
     UnidirectionalRNNDecoder(
-      tgtLang, tgtVocab, env, dataConfig, inferConfig,
+      tgtLang, dataset.tgtVocab, env, dataConfig, inferConfig,
       cell = BasicLSTM(forgetBias = 1.0f),
       numUnits = 512,
       numLayers = 2,
@@ -106,10 +94,14 @@ object IWSLT15 extends App {
       timeMajor = true),
     timeMajor = true)
 
+  val trainDataset     = () => dataset.createTrainDataset(Dataset.TRAIN, trainConfig.batchSize, dataConfig, repeat = true)
+  val trainEvalDataset = () => dataset.createTrainDataset(Dataset.TRAIN, logConfig.logEvalBatchSize, dataConfig.copy(numBuckets = 1), repeat = false)
+  val devEvalDataset   = () => dataset.createTrainDataset(Dataset.DEV, logConfig.logEvalBatchSize, dataConfig.copy(numBuckets = 1), repeat = false)
+  val testEvalDataset  = () => dataset.createTrainDataset(Dataset.TEST, logConfig.logEvalBatchSize, dataConfig.copy(numBuckets = 1), repeat = false)
+
   val model = StateBasedModel(
-    config, srcLang, tgtLang, srcVocab, tgtVocab,
-    srcTrainDataset, tgtTrainDataset, srcDevDataset, tgtDevDataset, srcTestDataset, tgtTestDataset,
+    config, srcLang, tgtLang, dataset.srcVocab, dataset.tgtVocab, trainEvalDataset, devEvalDataset, testEvalDataset,
     env, dataConfig, trainConfig, inferConfig, logConfig, "Model")
 
-  model.train(srcTrainDataset, tgtTrainDataset, StopCriteria.steps(trainConfig.numSteps))
+  model.train(trainDataset, StopCriteria.steps(trainConfig.numSteps))
 }
