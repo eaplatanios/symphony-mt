@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.experiments
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{English, Vietnamese}
-import org.platanios.symphony.mt.data.{DataConfig, Dataset}
+import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
 import org.platanios.symphony.mt.models.attention.LuongAttention
@@ -27,31 +27,33 @@ import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
 import java.nio.file.{Path, Paths}
 
-
 /**
   * @author Emmanouil Antonios Platanios
   */
 object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
 
-  // Create the languages.
   val srcLang: Language = English
   val tgtLang: Language = Vietnamese
 
-  val dataset: Dataset.GroupedFiles = IWSLT15Dataset(workingDir.resolve("data"), srcLang, tgtLang).groupedFiles.withNewVocab()
+  val dataConfig = DataConfig(
+    loaderWorkingDir = workingDir.resolve("data"),
+    numBuckets = 5,
+    srcMaxLength = 50,
+    tgtMaxLength = 50)
 
-  // Create general configuration settings
+  val dataset: LoadedDataset.GroupedFiles = {
+    IWSLT15Dataset(srcLang, tgtLang, dataConfig)
+        .load()
+        .files(srcLang, tgtLang)
+  }
+
   val env = Environment(
     workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
     numGPUs = 4,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
-
-  val dataConfig = DataConfig(
-    numBuckets = 5,
-    srcMaxLength = 50,
-    tgtMaxLength = 50)
 
   val trainConfig = TrainConfig(
     batchSize = 128,
@@ -94,10 +96,10 @@ object IWSLT15 extends App {
       timeMajor = true),
     timeMajor = true)
 
-  val trainDataset     = () => dataset.createTrainDataset(Dataset.TRAIN, trainConfig.batchSize, dataConfig, repeat = true)
-  val trainEvalDataset = () => dataset.createTrainDataset(Dataset.TRAIN, logConfig.logEvalBatchSize, dataConfig.copy(numBuckets = 1), repeat = false)
-  val devEvalDataset   = () => dataset.createTrainDataset(Dataset.DEV, logConfig.logEvalBatchSize, dataConfig.copy(numBuckets = 1), repeat = false)
-  val testEvalDataset  = () => dataset.createTrainDataset(Dataset.TEST, logConfig.logEvalBatchSize, dataConfig.copy(numBuckets = 1), repeat = false)
+  val trainDataset     = () => dataset.createTrainDataset(TRAIN_DATASET, trainConfig.batchSize, repeat = true)
+  val trainEvalDataset = () => dataset.createTrainDataset(TRAIN_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
+  val devEvalDataset   = () => dataset.createTrainDataset(DEV_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
+  val testEvalDataset  = () => dataset.createTrainDataset(TEST_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
 
   val model = StateBasedModel(
     config, srcLang, tgtLang, dataset.srcVocab, dataset.tgtVocab, trainEvalDataset, devEvalDataset, testEvalDataset,

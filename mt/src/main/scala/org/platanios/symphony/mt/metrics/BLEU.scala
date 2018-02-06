@@ -27,13 +27,13 @@ import scala.collection.mutable
   *
   * @author Emmanouil Antonios Platanios
   */
-case class BLEU(
-    maxOrder: Int = 4,
-    smooth: Boolean = false,
-    variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
-    valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
-    updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
-    resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
+class BLEU(
+    val maxOrder: Int = 4,
+    val smooth: Boolean = false,
+    val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
+    val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
+    val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
+    val resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
     override val name: String = "BLEU"
 ) extends Metric[((Output, Output), (Output, Output, Output)), Output] {
   // TODO: Do not ignore the weights.
@@ -145,6 +145,18 @@ case class BLEU(
 }
 
 object BLEU {
+  def apply(
+      maxOrder: Int = 4,
+      smooth: Boolean = false,
+      variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
+      valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
+      updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
+      resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
+      name: String = "BLEU"
+  ): BLEU = {
+    new BLEU(maxOrder, smooth, variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)
+  }
+
   /** BLEU score computation result.
     *
     * @param  score       Actual BLEU score.

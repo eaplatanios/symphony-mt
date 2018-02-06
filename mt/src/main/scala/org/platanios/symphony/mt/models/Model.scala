@@ -16,8 +16,7 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.data.Dataset.{MTInferDataset, MTTrainDataset}
-import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
+import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.metrics.MTMetric
 import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.tensors.Tensor

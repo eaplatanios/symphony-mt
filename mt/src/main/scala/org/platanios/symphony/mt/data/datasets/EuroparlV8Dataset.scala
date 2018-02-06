@@ -17,31 +17,26 @@ package org.platanios.symphony.mt.data.datasets
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
-import org.platanios.symphony.mt.data.Dataset
+import org.platanios.symphony.mt.data.{DataConfig, Dataset}
 
 import better.files._
-
-import java.nio.file.Path
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 class EuroparlV8Dataset(
-    protected val dataDir: Path,
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
-    override val bufferSize: Int = 8192,
-    override val tokenize: Boolean = false,
-    override val trainDataSentenceLengthBounds: (Int, Int) = null
+    override val dataConfig: DataConfig
 ) extends Dataset(
-  workingDir = dataDir.resolve("europarl-v8").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
-  bufferSize = bufferSize,
-  tokenize = tokenize,
-  trainDataSentenceLengthBounds = trainDataSentenceLengthBounds
+  dataConfig = dataConfig.copy(loaderWorkingDir =
+      dataConfig.loaderWorkingDir
+          .resolve("europarl-v8")
+          .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
 )(
-  downloadsDir = dataDir.resolve("europarl-v8")
+  downloadsDir = dataConfig.loaderWorkingDir.resolve("europarl-v8")
 ) {
   require(
     EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
@@ -79,13 +74,10 @@ object EuroparlV8Dataset {
   }
 
   def apply(
-      dataDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
-      bufferSize: Int = 8192,
-      tokenize: Boolean = false,
-      trainDataSentenceLengthBounds: (Int, Int) = null
+      dataConfig: DataConfig
   ): EuroparlV8Dataset = {
-    new EuroparlV8Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
+    new EuroparlV8Dataset(srcLanguage, tgtLanguage, dataConfig)
   }
 }

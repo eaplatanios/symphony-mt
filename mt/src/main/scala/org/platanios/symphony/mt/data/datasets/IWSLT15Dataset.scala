@@ -17,29 +17,26 @@ package org.platanios.symphony.mt.data.datasets
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language.{English, Vietnamese}
-import org.platanios.symphony.mt.data.Dataset
+import org.platanios.symphony.mt.data.{DataConfig, Dataset}
 
 import better.files._
-
-import java.nio.file.Path
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 class IWSLT15Dataset(
-    protected val dataDir: Path,
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
-    override val bufferSize: Int = 8192
+    override val dataConfig: DataConfig
 ) extends Dataset(
-  workingDir = dataDir.resolve("iwslt-15").resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
-  bufferSize = bufferSize,
-  tokenize = false,
-  trainDataSentenceLengthBounds = null
+  dataConfig = dataConfig.copy(loaderWorkingDir =
+      dataConfig.loaderWorkingDir
+          .resolve("iwslt-15")
+          .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
 )(
-  downloadsDir = dataDir.resolve("iwslt-15")
+  downloadsDir = dataConfig.loaderWorkingDir.resolve("iwslt-15")
 ) {
   require(
     IWSLT15Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
@@ -80,9 +77,9 @@ class IWSLT15Dataset(
       File(downloadsDir) / s"${IWSLT15Dataset.testPrefix}.$tgt"))
 
   /** Returns the source and the target vocabulary of this dataset. */
-  override def vocabularies: (File, File) = (
+  override def vocabularies: Option[(File, File)] = Some((
       File(downloadsDir) / s"${IWSLT15Dataset.vocabPrefix}.$src",
-      File(downloadsDir) / s"${IWSLT15Dataset.vocabPrefix}.$tgt")
+      File(downloadsDir) / s"${IWSLT15Dataset.vocabPrefix}.$tgt"))
 }
 
 object IWSLT15Dataset {
@@ -100,11 +97,10 @@ object IWSLT15Dataset {
   }
 
   def apply(
-      dataDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
-      bufferSize: Int = 8192
+      dataConfig: DataConfig
   ): IWSLT15Dataset = {
-    new IWSLT15Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize)
+    new IWSLT15Dataset(srcLanguage, tgtLanguage, dataConfig)
   }
 }

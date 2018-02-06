@@ -15,10 +15,20 @@
 
 package org.platanios.symphony.mt.data
 
+import java.nio.file.{Path, Paths}
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 case class DataConfig(
+    // Loader
+    loaderWorkingDir: Path = Paths.get("working_dir"),
+    loaderBufferSize: Int = 8192,
+    loaderExtractTGZ: Boolean = true,
+    loaderConvertSGMToText: Boolean = true,
+    loaderTokenize: Boolean = false,
+    loaderSentenceLengthBounds: Option[(Int, Int)] = None,
+    loaderMergeVocabs: Boolean = false,
     // Corpus
     numBuckets: Int = 5,
     srcMaxLength: Int = 50,
@@ -30,6 +40,8 @@ case class DataConfig(
     shardIndex: Int = 0,
     numParallelCalls: Int = 4,
     // Vocabulary
+    vocabSizeThreshold: Int = 50000,
+    vocabCountThreshold: Int = -1,
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
     endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN)

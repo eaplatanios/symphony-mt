@@ -15,43 +15,15 @@
 
 package org.platanios.symphony.mt.data
 
-import org.platanios.symphony.mt.data.utilities.TrieWordCounter
-
 import better.files._
 import org.eclipse.jgit.api.Git
 
-import java.io.BufferedWriter
-import java.nio.charset.StandardCharsets
-
-import scala.io.Source
 import scala.sys.process._
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 object Utilities {
-  def createVocab(
-      tokenizedFiles: Seq[File], vocabFile: File,
-      sizeThreshold: Int = -1, countThreshold: Int = -1,
-      bufferSize: Int = 8192
-  ): Unit = {
-    vocabFile.parent.createDirectories()
-    val whitespaceRegex = "\\s+".r
-    val writer = new BufferedWriter(vocabFile.newPrintWriter(), bufferSize)
-    tokenizedFiles.toStream.flatMap(file => {
-      Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
-          .getLines
-          .flatMap(whitespaceRegex.split)
-    }).foldLeft(TrieWordCounter())((counter, word) => {
-      counter.insertWord(word)
-      counter
-    }).words(sizeThreshold, countThreshold)
-        .toSeq.sortBy(-_._1).map(_._2)
-        .foreach(word => writer.write(word + "\n"))
-    writer.flush()
-    writer.close()
-  }
-
   case class MosesDecoder(path: File) {
     val gitUrl: String = "https://github.com/moses-smt/mosesdecoder.git"
 

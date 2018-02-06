@@ -17,33 +17,26 @@ package org.platanios.symphony.mt.data.datasets
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
-import org.platanios.symphony.mt.data.Dataset
+import org.platanios.symphony.mt.data.{DataConfig, Dataset}
 
 import better.files._
-
-import java.nio.file.Path
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 class NewsCommentaryV11Dataset(
-    protected val dataDir: Path,
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
-    override val bufferSize: Int = 8192,
-    override val tokenize: Boolean = false,
-    override val trainDataSentenceLengthBounds: (Int, Int) = null
+    override val dataConfig: DataConfig
 ) extends Dataset(
-  workingDir = dataDir
-      .resolve("news-commentary-v11")
-      .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
-  bufferSize = bufferSize,
-  tokenize = tokenize,
-  trainDataSentenceLengthBounds = trainDataSentenceLengthBounds
+  dataConfig = dataConfig.copy(loaderWorkingDir =
+      dataConfig.loaderWorkingDir
+          .resolve("news-commentary-v11")
+          .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
 )(
-  downloadsDir = dataDir.resolve("news-commentary-v11")
+  downloadsDir = dataConfig.loaderWorkingDir.resolve("news-commentary-v11")
 ) {
   require(
     NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
@@ -85,13 +78,10 @@ object NewsCommentaryV11Dataset {
   }
 
   def apply(
-      dataDir: Path,
       srcLanguage: Language,
       tgtLanguage: Language,
-      bufferSize: Int = 8192,
-      tokenize: Boolean = false,
-      trainDataSentenceLengthBounds: (Int, Int) = null
+      dataConfig: DataConfig
   ): NewsCommentaryV11Dataset = {
-    new NewsCommentaryV11Dataset(dataDir, srcLanguage, tgtLanguage, bufferSize, tokenize, trainDataSentenceLengthBounds)
+    new NewsCommentaryV11Dataset(srcLanguage, tgtLanguage, dataConfig)
   }
 }
