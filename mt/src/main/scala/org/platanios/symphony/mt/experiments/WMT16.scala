@@ -57,17 +57,18 @@ object WMT16 extends App {
   val trainConfig = TrainConfig(
     batchSize = 128,
     maxGradNorm = 5.0f,
-    numSteps = 12000,
+    numSteps = 340000,
     optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
     learningRateInitial = 1.0f,
     learningRateDecayRate = 0.5f,
-    learningRateDecaySteps = 12000 * 1 / (3 * 4),
-    learningRateDecayStartStep = 12000 * 2 / 3,
+    learningRateDecaySteps = 340000 * 1 / (2 * 10),
+    learningRateDecayStartStep = 340000 * 2,
     colocateGradientsWithOps = true)
 
   val inferConfig = InferConfig(
     batchSize = 32,
-    beamWidth = 10)
+    beamWidth = 10,
+    lengthPenaltyWeight = 1.0f)
 
   val logConfig = LogConfig(
     logLossSteps = 100,
@@ -77,7 +78,7 @@ object WMT16 extends App {
   val config = GNMTConfig(
     srcLang, tgtLang, datasetFiles.srcVocab, datasetFiles.tgtVocab, env, dataConfig, inferConfig,
     cell = BasicLSTM(forgetBias = 1.0f),
-    numUnits = 512,
+    numUnits = 1024,
     numBiLayers = 1,
     numUniLayers = 3,
     numUniResLayers = 2,
