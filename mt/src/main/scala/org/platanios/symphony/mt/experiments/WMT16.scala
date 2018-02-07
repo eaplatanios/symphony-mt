@@ -92,8 +92,9 @@ object WMT16 extends App {
   val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
   val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
 
-  val model = () => StateBasedModel(
-    config, srcLang, tgtLang, datasetFiles.srcVocab, datasetFiles.tgtVocab, trainEvalDataset, devEvalDataset, testEvalDataset,
+  val model = (srcLang: Language, tgtLang: Language, srcVocab: Vocabulary, tgtVocab: Vocabulary) => StateBasedModel(
+    config, srcLang, tgtLang, srcVocab, tgtVocab,
+    trainEvalDataset, devEvalDataset, testEvalDataset,
     env, dataConfig, trainConfig, inferConfig, logConfig, "Model")
 
   val translator = PairwiseTranslator(model)

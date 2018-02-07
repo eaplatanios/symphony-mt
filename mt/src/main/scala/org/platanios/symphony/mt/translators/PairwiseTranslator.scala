@@ -26,7 +26,7 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 class PairwiseTranslator protected (
-    override val model: () => Model,
+    override val model: (Language, Language, Vocabulary, Vocabulary) => Model,
 ) extends Translator(model) {
   protected val models: mutable.Map[(Language, Language), Model] = mutable.Map.empty
 
@@ -39,16 +39,19 @@ class PairwiseTranslator protected (
         dataset.languagePairs
       }
     }
-    languagePairs.foreach(pair => {
-      val currentModel = models.getOrElseUpdate(pair, model())
-      val currentDatasetFiles = dataset.files(pair._1, pair._2)
-      val currentDataset = () => {
-        currentDatasetFiles.createTrainDataset(
-          TRAIN_DATASET, currentModel.trainConfig.batchSize,
-          repeat = true, dataConfig = currentDatasetFiles.dataConfig)
-      }
-      currentModel.train(currentDataset)
-    })
+    languagePairs.foreach {
+      case (srcLanguage, tgtLanguage) =>
+        val currentDatasetFiles = dataset.files(srcLanguage, tgtLanguage)
+        val currentModel = models.getOrElseUpdate(
+          (srcLanguage, tgtLanguage),
+          model(srcLanguage, tgtLanguage, currentDatasetFiles.srcVocab, currentDatasetFiles.tgtVocab))
+        val currentDataset = () => {
+          currentDatasetFiles.createTrainDataset(
+            TRAIN_DATASET, currentModel.trainConfig.batchSize,
+            repeat = true, dataConfig = currentDatasetFiles.dataConfig)
+        }
+        currentModel.train(currentDataset)
+    }
   }
 
   @throws[IllegalStateException]
@@ -67,5 +70,7 @@ class PairwiseTranslator protected (
 }
 
 object PairwiseTranslator {
-  def apply(model: () => Model): PairwiseTranslator = new PairwiseTranslator(model)
+  def apply(model: (Language, Language, Vocabulary, Vocabulary) => Model): PairwiseTranslator = {
+    new PairwiseTranslator(model)
+  }
 }

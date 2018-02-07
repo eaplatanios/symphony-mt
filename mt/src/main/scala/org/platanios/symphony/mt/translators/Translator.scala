@@ -23,7 +23,7 @@ import org.platanios.tensorflow.api.Tensor
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Translator(val model: () => Model) {
+abstract class Translator(val model: (Language, Language, Vocabulary, Vocabulary) => Model) {
   def train(dataset: LoadedDataset, trainReverse: Boolean = true): Unit
 
   @throws[IllegalStateException]
