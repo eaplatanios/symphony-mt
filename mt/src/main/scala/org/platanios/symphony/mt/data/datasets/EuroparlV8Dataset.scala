@@ -31,12 +31,12 @@ class EuroparlV8Dataset(
 ) extends Dataset(
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(loaderWorkingDir =
-      dataConfig.loaderWorkingDir
+  dataConfig = dataConfig.copy(workingDir =
+      dataConfig.workingDir
           .resolve("europarl-v8")
           .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
 )(
-  downloadsDir = dataConfig.loaderWorkingDir.resolve("europarl-v8")
+  downloadsDir = dataConfig.workingDir.resolve("europarl-v8")
 ) {
   require(
     EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

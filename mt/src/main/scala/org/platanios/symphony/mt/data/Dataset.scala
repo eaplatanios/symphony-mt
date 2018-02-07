@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.utilities.CompressedFiles
+import org.platanios.symphony.mt.utilities.CompressedFiles
 
 import better.files._
 import com.typesafe.scalalogging.Logger
@@ -35,7 +35,7 @@ abstract class Dataset(
     val tgtLanguage: Language,
     val dataConfig: DataConfig
 )(
-    val downloadsDir: Path = dataConfig.loaderWorkingDir
+    val downloadsDir: Path = dataConfig.workingDir
 ) {
   def name: String
 

@@ -31,12 +31,12 @@ class WMT16Dataset(
 ) extends Dataset(
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(loaderWorkingDir =
-      dataConfig.loaderWorkingDir
+  dataConfig = dataConfig.copy(workingDir =
+      dataConfig.workingDir
           .resolve("wmt-16")
           .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
 )(
-  downloadsDir = dataConfig.loaderWorkingDir.resolve("wmt-16")
+  downloadsDir = dataConfig.workingDir.resolve("wmt-16")
 ) {
   require(
     WMT16Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

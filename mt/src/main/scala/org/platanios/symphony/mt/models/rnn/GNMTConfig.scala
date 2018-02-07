@@ -16,9 +16,10 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
+import org.platanios.symphony.mt.data.DataConfig
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.Attention
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 

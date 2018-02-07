@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.metrics.MTMetric
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.tensors.Tensor
 
 // TODO: Move embeddings initializer to the configuration.

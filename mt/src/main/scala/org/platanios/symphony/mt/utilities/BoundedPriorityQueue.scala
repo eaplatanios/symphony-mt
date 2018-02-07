@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data.utilities
+package org.platanios.symphony.mt.utilities
 
 import java.io.Serializable
 import java.util.{PriorityQueue => JPriorityQueue}

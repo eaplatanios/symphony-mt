@@ -15,6 +15,8 @@
 
 package org.platanios.symphony.mt.data
 
+import org.platanios.symphony.mt.vocabulary._
+
 import java.nio.file.{Path, Paths}
 
 /**
@@ -22,7 +24,7 @@ import java.nio.file.{Path, Paths}
   */
 case class DataConfig(
     // Loader
-    loaderWorkingDir: Path = Paths.get("working_dir"),
+    workingDir: Path = Paths.get("working_dir"),
     loaderBufferSize: Int = 8192,
     loaderExtractTGZ: Boolean = true,
     loaderConvertSGMToText: Boolean = true,
@@ -40,8 +42,7 @@ case class DataConfig(
     shardIndex: Int = 0,
     numParallelCalls: Int = 4,
     // Vocabulary
-    vocabSizeThreshold: Int = 50000,
-    vocabCountThreshold: Int = -1,
+    vocabGenerator: VocabularyGenerator = SimpleVocabularyGenerator(50000, -1, 8192),
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
     endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN)

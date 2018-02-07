@@ -13,9 +13,9 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data
+package org.platanios.symphony.mt.vocabulary
 
-import org.platanios.symphony.mt.data.utilities.TrieWordCounter
+import org.platanios.symphony.mt.data.DataConfig
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.lookup.LookupTable
 
@@ -23,12 +23,9 @@ import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.BufferedWriter
 import java.nio.charset.StandardCharsets
-import java.nio.file.StandardOpenOption
 
 import scala.collection.mutable
-import scala.io.Source
 
 /** Represents a vocabulary of words.
   *
@@ -50,44 +47,6 @@ case class Vocabulary private[Vocabulary] (file: File, size: Int) {
 /** Contains utilities for dealing with vocabularies. */
 object Vocabulary {
   private[this] val logger: Logger = Logger(LoggerFactory.getLogger("Vocabulary"))
-
-  /** Creates a vocabulary file based on the provided tokenized files.
-    *
-    * @param  tokenizedFiles Text files containing tokenized sentences (i.e., where tokens are separated by spaces).
-    * @param  vocabFile      Vocabulary file to create. If the file exists already, it will be replaced.
-    * @param  sizeThreshold  Vocabulary size threshold. If non-negative, then the created vocabulary size will be
-    *                        bounded by this number. This means that only the `sizeThreshold` most frequent words will
-    *                        be kept.
-    * @param  countThreshold Vocabulary count threshold. If non-negative, then all words with counts less than
-    *                        `countThreshold` will be ignored.
-    * @param  bufferSize     Buffer size to use while reading and writing files.
-    */
-  def createVocabFile(
-      tokenizedFiles: Seq[File], vocabFile: File,
-      sizeThreshold: Int = -1, countThreshold: Int = -1,
-      bufferSize: Int = 8192
-  ): Unit = {
-    vocabFile.parent.createDirectories()
-    val whitespaceRegex = "\\s+".r
-    val writer = new BufferedWriter(
-      vocabFile.newPrintWriter()(Seq(
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-    tokenizedFiles.toStream.flatMap(file => {
-      Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
-          .getLines
-          .flatMap(whitespaceRegex.split)
-    }).foldLeft(TrieWordCounter())((counter, word) => {
-      counter.insertWord(word)
-      counter
-    }).words(sizeThreshold, countThreshold)
-        .toSeq.sortBy(-_._1).map(_._2)
-        .filter(_ != "")
-        .foreach(word => writer.write(word + "\n"))
-    writer.flush()
-    writer.close()
-  }
 
   /** Creates a new vocabulary from the provided vocabulary file.
     *

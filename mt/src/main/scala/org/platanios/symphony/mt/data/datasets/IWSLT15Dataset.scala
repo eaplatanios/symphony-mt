@@ -31,12 +31,12 @@ class IWSLT15Dataset(
 ) extends Dataset(
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(loaderWorkingDir =
-      dataConfig.loaderWorkingDir
+  dataConfig = dataConfig.copy(workingDir =
+      dataConfig.workingDir
           .resolve("iwslt-15")
           .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
 )(
-  downloadsDir = dataConfig.loaderWorkingDir.resolve("iwslt-15")
+  downloadsDir = dataConfig.workingDir.resolve("iwslt-15")
 ) {
   require(
     IWSLT15Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

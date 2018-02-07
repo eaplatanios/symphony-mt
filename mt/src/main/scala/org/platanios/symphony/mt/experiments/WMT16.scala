@@ -23,6 +23,7 @@ import org.platanios.symphony.mt.models.attention.BahdanauAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
 import org.platanios.symphony.mt.translators.PairwiseTranslator
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
@@ -38,7 +39,7 @@ object WMT16 extends App {
   val tgtLang: Language = English
 
   val dataConfig = DataConfig(
-    loaderWorkingDir = workingDir.resolve("data"),
+    workingDir = workingDir.resolve("data"),
     loaderTokenize = true,
     loaderSentenceLengthBounds = Some((1, 80)),
     numBuckets = 5,

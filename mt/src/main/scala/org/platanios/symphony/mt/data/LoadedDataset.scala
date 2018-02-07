@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
 
@@ -32,7 +33,7 @@ class LoadedDataset private[LoadedDataset] (
     protected val dataConfig: DataConfig,
     protected val datasets: Map[(Language, Language), LoadedDataset.GroupedFiles]
 ) {
-  val workingDir: File = File(dataConfig.loaderWorkingDir)
+  val workingDir: File = File(dataConfig.workingDir)
 
   def languagePairs: Iterable[(Language, Language)] = datasets.keys
 
@@ -43,7 +44,7 @@ class LoadedDataset private[LoadedDataset] (
 
 object LoadedDataset {
   def apply(dataConfig: DataConfig, files: Traversable[GroupedFiles]): LoadedDataset = {
-    val workingDir = File(dataConfig.loaderWorkingDir)
+    val workingDir = File(dataConfig.workingDir)
     val vocabularies = {
       (files.groupBy(_.srcLanguage).mapValues(_.filter(_.vocabularies.isDefined).map(_.vocabularies.get._1)) ++
           files.groupBy(_.tgtLanguage).mapValues(_.filter(_.vocabularies.isDefined).map(_.vocabularies.get._2)))
@@ -58,12 +59,9 @@ object LoadedDataset {
                         files.filter(_.tgtLanguage == language).flatMap(_.trainCorpora.map(_._3))
                   val vocabFile = workingDir / s"vocab.${language.abbreviation}"
                   if (vocabFile.notExists) {
-                    Dataset.logger.info(s"Creating vocabulary file for $language.")
-                    Vocabulary.createVocabFile(
-                      tokenizedFiles.toSeq, vocabFile,
-                      dataConfig.vocabSizeThreshold, dataConfig.vocabCountThreshold,
-                      dataConfig.loaderBufferSize)
-                    Dataset.logger.info(s"Created vocabulary file for $language.")
+                    Dataset.logger.info(s"Generating vocabulary file for $language.")
+                    dataConfig.vocabGenerator.generate(tokenizedFiles.toSeq, vocabFile)
+                    Dataset.logger.info(s"Generated vocabulary file for $language.")
                   }
                   vocabFile
                 }
@@ -137,28 +135,19 @@ object LoadedDataset {
     }
 
     def withNewVocab(): GroupedFiles = {
-      val workingDir = File(dataConfig.loaderWorkingDir)
-      val srcFiles = trainCorpora.map(_._2) ++ devCorpora.map(_._2) ++ testCorpora.map(_._2)
-      val tgtFiles = trainCorpora.map(_._3) ++ devCorpora.map(_._3) ++ testCorpora.map(_._3)
+      val workingDir = File(dataConfig.workingDir)
       val srcVocab = workingDir / s"vocab.${srcLanguage.abbreviation}"
       val tgtVocab = workingDir / s"vocab.${tgtLanguage.abbreviation}"
       if (srcVocab.notExists) {
-        Dataset.logger.info(s"Creating vocabulary file for ${srcLanguage.abbreviation}.")
-        Vocabulary.createVocabFile(
-          srcFiles, srcVocab,
-          dataConfig.vocabSizeThreshold, dataConfig.vocabCountThreshold,
-          dataConfig.loaderBufferSize)
-        Dataset.logger.info(s"Created vocabulary file for ${srcLanguage.abbreviation}.")
+        Dataset.logger.info(s"Generating vocabulary file for ${srcLanguage.abbreviation}.")
+        dataConfig.vocabGenerator.generate(trainCorpora.map(_._2), srcVocab)
+        Dataset.logger.info(s"Generated vocabulary file for ${srcLanguage.abbreviation}.")
       }
       if (tgtVocab.notExists) {
-        Dataset.logger.info(s"Creating vocabulary file for ${tgtLanguage.abbreviation}.")
-        Vocabulary.createVocabFile(
-          tgtFiles, tgtVocab,
-          dataConfig.vocabSizeThreshold, dataConfig.vocabCountThreshold,
-          dataConfig.loaderBufferSize)
-        Dataset.logger.info(s"Created vocabulary file for ${tgtLanguage.abbreviation}.")
+        Dataset.logger.info(s"Generating vocabulary file for ${tgtLanguage.abbreviation}.")
+        dataConfig.vocabGenerator.generate(trainCorpora.map(_._3), tgtVocab)
+        Dataset.logger.info(s"Generated vocabulary file for ${tgtLanguage.abbreviation}.")
       }
-      Dataset.logger.info("Created vocabulary files.")
       copy(vocabularies = Some((srcVocab, tgtVocab)))
     }
 

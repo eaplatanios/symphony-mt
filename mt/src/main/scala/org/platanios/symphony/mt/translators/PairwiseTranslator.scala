@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.translators
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.Model
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.Tensor
 
 import scala.collection.mutable

@@ -23,6 +23,7 @@ import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConf
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.translators.PairwiseTranslator
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
@@ -38,7 +39,7 @@ object IWSLT15 extends App {
   val tgtLang: Language = Vietnamese
 
   val dataConfig = DataConfig(
-    loaderWorkingDir = workingDir.resolve("data"),
+    workingDir = workingDir.resolve("data"),
     numBuckets = 5,
     srcMaxLength = 50,
     tgtMaxLength = 50)

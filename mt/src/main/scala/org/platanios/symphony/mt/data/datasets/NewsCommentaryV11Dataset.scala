@@ -31,12 +31,12 @@ class NewsCommentaryV11Dataset(
 ) extends Dataset(
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(loaderWorkingDir =
-      dataConfig.loaderWorkingDir
+  dataConfig = dataConfig.copy(workingDir =
+      dataConfig.workingDir
           .resolve("news-commentary-v11")
           .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
 )(
-  downloadsDir = dataConfig.loaderWorkingDir.resolve("news-commentary-v11")
+  downloadsDir = dataConfig.workingDir.resolve("news-commentary-v11")
 ) {
   require(
     NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

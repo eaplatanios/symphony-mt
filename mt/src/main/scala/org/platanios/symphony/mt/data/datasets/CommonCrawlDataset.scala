@@ -31,12 +31,12 @@ class CommonCrawlDataset(
 ) extends Dataset(
   srcLanguage = srcLanguage,
   tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(loaderWorkingDir =
-      dataConfig.loaderWorkingDir
+  dataConfig = dataConfig.copy(workingDir =
+      dataConfig.workingDir
           .resolve("commoncrawl")
           .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
 )(
-  downloadsDir = dataConfig.loaderWorkingDir.resolve("commoncrawl")
+  downloadsDir = dataConfig.workingDir.resolve("commoncrawl")
 ) {
   require(
     CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage),

@@ -16,8 +16,9 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.data.{DataConfig, Vocabulary}
+import org.platanios.symphony.mt.data.DataConfig
 import org.platanios.symphony.mt.models.{Decoder, InferConfig}
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output

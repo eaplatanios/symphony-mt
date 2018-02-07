@@ -20,7 +20,8 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.metrics.{BLEU, MTMetric}
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
-import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
+import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.{DeviceWrapper, DropoutWrapper, MultiCell, ResidualWrapper}
