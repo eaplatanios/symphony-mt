@@ -118,7 +118,7 @@ class StateBasedModel[S, SS](
         triggerAtEnd = true, name = "TestEvaluator")
 
     // Create estimator
-    tf.learn.FileBasedEstimator(
+    tf.learn.InMemoryEstimator(
       model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),
       StopCriteria.steps(trainConfig.numSteps), hooks, tensorBoardConfig = tensorBoardConfig)
   }
