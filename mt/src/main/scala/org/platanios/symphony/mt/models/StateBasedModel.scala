@@ -120,7 +120,7 @@ class StateBasedModel[S, SS](
     // Create estimator
     tf.learn.InMemoryEstimator(
       model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),
-      StopCriteria.steps(trainConfig.numSteps), hooks, tensorBoardConfig = tensorBoardConfig)
+      trainConfig.stopCriteria, hooks, tensorBoardConfig = tensorBoardConfig)
   }
 
   private final def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {

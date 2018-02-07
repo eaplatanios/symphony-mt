@@ -23,6 +23,7 @@ import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConf
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.translators.PairwiseTranslator
+import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
 import java.nio.file.{Path, Paths}
@@ -55,12 +56,12 @@ object IWSLT15 extends App {
   val trainConfig = TrainConfig(
     batchSize = 128,
     maxGradNorm = 5.0f,
-    numSteps = 12000,
     optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
     learningRateInitial = 1.0f,
     learningRateDecayRate = 0.5f,
     learningRateDecaySteps = 12000 * 1 / (3 * 4),
     learningRateDecayStartStep = 12000 * 2 / 3,
+    stopCriteria = StopCriteria(maxSteps = Some(12000)),
     colocateGradientsWithOps = true)
 
   val inferConfig = InferConfig(

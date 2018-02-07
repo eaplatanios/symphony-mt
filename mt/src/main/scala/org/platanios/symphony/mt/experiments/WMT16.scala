@@ -23,6 +23,7 @@ import org.platanios.symphony.mt.models.attention.BahdanauAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
 import org.platanios.symphony.mt.translators.PairwiseTranslator
+import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
 
 import java.nio.file.{Path, Paths}
@@ -57,12 +58,12 @@ object WMT16 extends App {
   val trainConfig = TrainConfig(
     batchSize = 128,
     maxGradNorm = 5.0f,
-    numSteps = 340000,
     optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
     learningRateInitial = 1.0f,
     learningRateDecayRate = 0.5f,
     learningRateDecaySteps = 340000 * 1 / (2 * 10),
     learningRateDecayStartStep = 340000 * 2,
+    stopCriteria = StopCriteria(maxSteps = Some(340000)),
     colocateGradientsWithOps = true)
 
   val inferConfig = InferConfig(
