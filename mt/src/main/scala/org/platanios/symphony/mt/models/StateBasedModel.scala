@@ -140,6 +140,7 @@ class StateBasedModel[S, SS](
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
           tf.learn.variableScope("Decoder") {
+            // TODO: Handle this shift more efficiently.
             // Shift the target sequence one step forward so the decoder learns to output the next word.
             val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
             val tgtSequence = tf.concatenate(Seq(
@@ -195,6 +196,7 @@ class StateBasedModel[S, SS](
           input: ((Output, Output), (Output, Output)),
           mode: Mode
       ): Output = tf.createWithNameScope("Loss") {
+        // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
         // word used as input, rather than the previous predicted word.
         val tgtEosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)

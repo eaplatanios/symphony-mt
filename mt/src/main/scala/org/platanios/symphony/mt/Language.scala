@@ -18,9 +18,11 @@ package org.platanios.symphony.mt
 /**
   * @author Emmanouil Antonios Platanios
   */
-class Language(val name: String, val abbreviation: String)
+class Language protected (val name: String, val abbreviation: String)
 
 object Language {
+  def apply(name: String, abbreviation: String): Language = new Language(name, abbreviation)
+
   case object Bulgarian extends Language("Bulgarian", "bg")
   case object Czech extends Language("Czech", "cs")
   case object Danish extends Language("Danish", "da")
