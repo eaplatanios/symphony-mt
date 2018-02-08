@@ -78,7 +78,7 @@ case class TrainingLogger(
     loss = modelInstance.loss.map(_.cast(FLOAT32))
         .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._2))).orNull
     srcWordCount = modelInstance.trainInput.map(o => tf.sum(o._1._2)).orNull
-    tgtWordCount = modelInstance.trainInput.map(o => tf.sum(o._2._2)).orNull
+    tgtWordCount = modelInstance.trainInput.map(o => tf.sum(o._2._2) + tf.size(o._2._2)).orNull
     totalLoss = 0.0f
     totalSrcWordCount = 0L
     totalTgtWordCount = 0L
