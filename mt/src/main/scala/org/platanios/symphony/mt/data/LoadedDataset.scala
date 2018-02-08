@@ -222,11 +222,11 @@ object LoadedDataset {
           batchSize,
           // The first three entries are the source and target line rows, which are unknown-length vectors.
           // The last two entries are the source and target row sizes, which are scalars.
-          ((Shape(-1), Shape.scalar()), (Shape(-1), Shape(-1), Shape.scalar())),
+          ((Shape(-1), Shape.scalar()), (Shape(-1), Shape.scalar())),
           // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
           // generally need to do this since later on we will be masking out calculations past the true sequence.
           ((srcEosId, tf.zeros(INT32, Shape.scalar().toOutput())),
-              (tgtEosId, tgtEosId, tf.zeros(INT32, Shape.scalar().toOutput()))))
+              (tgtEosId, tf.zeros(INT32, Shape.scalar().toOutput()))))
       }
 
       val datasetBeforeBucketing =
@@ -279,18 +279,9 @@ object LoadedDataset {
                   tf.cast(tgtVocabularyTable.lookup(d._2), INT32)),
               dataConfig.numParallelCalls, name = "Map/VocabularyLookup")
             .prefetch(actualBufferSize)
-            // Create a target input prefixed with 'beginSequenceToken'
-            // and a target output suffixed with 'endSequenceToken'.
-            .map(
-              d => (
-                  d._1,
-                  tf.concatenate(Seq(tgtBosId.expandDims(0), d._2), axis = 0),
-                  tf.concatenate(Seq(d._2, tgtEosId.expandDims(0)), axis = 0)),
-              dataConfig.numParallelCalls, name = "Map/AddDecoderOutput")
-            .prefetch(actualBufferSize)
             // Add sequence lengths.
             .map(
-              d => ((d._1, tf.size(d._1, INT32)), (d._2, d._3, tf.size(d._2, INT32))), dataConfig.numParallelCalls,
+              d => ((d._1, tf.size(d._1, INT32)), (d._2, tf.size(d._2, INT32))), dataConfig.numParallelCalls,
               name = "Map/AddLengths")
             .prefetch(actualBufferSize)
 
@@ -307,11 +298,11 @@ object LoadedDataset {
             10
         }
 
-        def keyFn(element: ((Output, Output), (Output, Output, Output))): Output = {
+        def keyFn(element: ((Output, Output), (Output, Output))): Output = {
           // Bucket sequence  pairs based on the length of their source sequence and target sequence.
           val bucketId = tf.maximum(
             tf.truncateDivide(element._1._2, bucketWidth),
-            tf.truncateDivide(element._2._3, bucketWidth))
+            tf.truncateDivide(element._2._2, bucketWidth))
           tf.minimum(dataConfig.numBuckets, bucketId).cast(INT64)
         }
 

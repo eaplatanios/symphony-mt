@@ -34,23 +34,23 @@ class Perplexity(
     val updatesCollections: Set[Graph.Key[Output]] = Set(Metric.METRIC_UPDATES),
     val resetsCollections: Set[Graph.Key[Op]] = Set(Metric.METRIC_RESETS),
     override val name: String = "Perplexity"
-) extends Metric[((Output, Output), (Output, Output, Output)), Output] {
+) extends Metric[((Output, Output), (Output, Output)), Output] {
   override def compute(
-      values: ((Output, Output), (Output, Output, Output)),
+      values: ((Output, Output), (Output, Output)),
       weights: Output = null,
       name: String = name
   ): Output = {
     tf.createWithNameScope(name) {
       val mask = tf.sequenceMask(values._1._2, tf.shape(values._1._1)(1), dataType = values._1._1.dataType)
       val loss = tf.sum(tf.sequenceLoss(
-        values._1._1, values._2._2, mask, averageAcrossTimeSteps = false, averageAcrossBatch = false))
+        values._1._1, values._2._1, mask, averageAcrossTimeSteps = false, averageAcrossBatch = false))
       val length = tf.sum(values._1._2).cast(values._1._1.dataType)
       tf.exp(Metric.safeScalarDiv(loss, length))
     }
   }
 
   override def streaming(
-      values: ((Output, Output), (Output, Output, Output)),
+      values: ((Output, Output), (Output, Output)),
       weights: Output = null,
       name: String = name
   ): Metric.StreamingInstance[Output] = {
@@ -63,7 +63,7 @@ class Perplexity(
         // Create update ops
         val mask  = tf.sequenceMask(values._1._2, tf.shape(values._1._1)(1), dataType = values._1._1.dataType)
         val updateLoss = loss.assignAdd(tf.sum(tf.sequenceLoss(
-          values._1._1, values._2._2, mask, averageAcrossTimeSteps = false, averageAcrossBatch = false)))
+          values._1._1, values._2._1, mask, averageAcrossTimeSteps = false, averageAcrossBatch = false)))
         val updateLength = length.assignAdd(tf.sum(values._1._2).cast(values._1._1.dataType))
 
         // Create value ops

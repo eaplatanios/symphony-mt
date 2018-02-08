@@ -22,8 +22,8 @@ package object data {
   type MTInferDataset = tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
 
   type MTTrainDataset = tf.data.Dataset[
-      ((Tensor, Tensor), (Tensor, Tensor, Tensor)),
-      ((Output, Output), (Output, Output, Output)),
-      ((DataType, DataType), (DataType, DataType, DataType)),
-      ((Shape, Shape), (Shape, Shape, Shape))]
+      ((Tensor, Tensor), (Tensor, Tensor)),
+      ((Output, Output), (Output, Output)),
+      ((DataType, DataType), (DataType, DataType)),
+      ((Shape, Shape), (Shape, Shape))]
 }

@@ -35,7 +35,7 @@ class BLEU(
     val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
     val resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
     override val name: String = "BLEU"
-) extends Metric[((Output, Output), (Output, Output, Output)), Output] {
+) extends Metric[((Output, Output), (Output, Output)), Output] {
   // TODO: Do not ignore the weights.
 
   private[this] def counts(batch: Seq[Tensor]): Seq[Tensor] = {
@@ -50,8 +50,8 @@ class BLEU(
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
-        val lenScalar = len.scalar.asInstanceOf[Int]
-        Seq(s(1 :: lenScalar).entriesIterator.map(_.asInstanceOf[Int]).toSeq)
+        val lenScalar = len.scalar.asInstanceOf[Int] - 1
+        Seq(s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[Int]).toSeq)
     }
     val (matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen) = BLEU.nGramMatches(refSeq, hypSeq, maxOrder)
     Seq(matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen)
@@ -91,11 +91,11 @@ class BLEU(
   }
 
   override def compute(
-      values: ((Output, Output), (Output, Output, Output)),
+      values: ((Output, Output), (Output, Output)),
       weights: Output = null,
       name: String = this.name
   ): Output = {
-    val ((src, srcLen), (tgt, _, tgtLen)) = values
+    val ((src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
     if (weights != null)
       ops += weights.op
@@ -108,11 +108,11 @@ class BLEU(
   }
 
   override def streaming(
-      values: ((Output, Output), (Output, Output, Output)),
+      values: ((Output, Output), (Output, Output)),
       weights: Output,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
-    val ((src, srcLen), (tgt, _, tgtLen)) = values
+    val ((src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
     if (weights != null)
       ops += weights.op

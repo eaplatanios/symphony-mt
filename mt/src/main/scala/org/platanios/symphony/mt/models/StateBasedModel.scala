@@ -53,7 +53,7 @@ class StateBasedModel[S, SS](
 ) extends Model {
   // Create the input and the train input parts of the model.
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
-  protected val trainInput = Input((INT32, INT32, INT32), (Shape(-1, -1), Shape(-1, -1), Shape(-1)))
+  protected val trainInput = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
     val maxTime = tf.shape(targetSequences)(1)
@@ -75,9 +75,9 @@ class StateBasedModel[S, SS](
 
   protected val estimator: tf.learn.Estimator[
       (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
-      ((Tensor, Tensor), (Tensor, Tensor, Tensor)), ((Output, Output), (Output, Output, Output)),
-      ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape)),
-      ((Output, Output), (Output, Output, Output))] = tf.createWithNameScope(name) {
+      ((Tensor, Tensor), (Tensor, Tensor)), ((Output, Output), (Output, Output)),
+      ((DataType, DataType), (DataType, DataType)), ((Shape, Shape), (Shape, Shape)),
+      ((Output, Output), (Output, Output))] = tf.createWithNameScope(name) {
     val model = learn.Model(
       input = input,
       layer = inferLayer,
@@ -124,12 +124,12 @@ class StateBasedModel[S, SS](
       trainConfig.stopCriteria, hooks, tensorBoardConfig = tensorBoardConfig)
   }
 
-  private final def trainLayer: Layer[((Output, Output), (Output, Output, Output)), (Output, Output)] = {
-    new Layer[((Output, Output), (Output, Output, Output)), (Output, Output)](name) {
+  private final def trainLayer: Layer[((Output, Output), (Output, Output)), (Output, Output)] = {
+    new Layer[((Output, Output), (Output, Output)), (Output, Output)](name) {
       override val layerType: String = "TrainLayer"
 
       override protected def _forward(
-          input: ((Output, Output), (Output, Output, Output)),
+          input: ((Output, Output), (Output, Output)),
           mode: Mode
       ): (Output, Output) = {
         // TODO: !!! I need to fix this repetition in TensorFlow for Scala.
@@ -140,7 +140,13 @@ class StateBasedModel[S, SS](
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
           tf.learn.variableScope("Decoder") {
-            config.decoder.create(encTuple, input._1._2, input._2._1, input._2._3, mode)
+            // Shift the target sequence one step forward so the decoder learns to output the next word.
+            val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+            val tgtSequence = tf.concatenate(Seq(
+              tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtBosId),
+              input._2._1), axis = 1)
+            val tgtSequenceLength = input._2._2 + 1
+            config.decoder.create(encTuple, input._1._2, tgtSequence, tgtSequenceLength, mode)
           }
         }
         (decTuple.sequences, decTuple.sequenceLengths)
@@ -181,15 +187,22 @@ class StateBasedModel[S, SS](
     }
   }
 
-  private final def lossLayer: Layer[((Output, Output), (Output, Output, Output)), Output] = {
-    new Layer[((Output, Output), (Output, Output, Output)), Output](name) {
+  private final def lossLayer: Layer[((Output, Output), (Output, Output)), Output] = {
+    new Layer[((Output, Output), (Output, Output)), Output](name) {
       override val layerType: String = "Loss"
 
       override protected def _forward(
-          input: ((Output, Output), (Output, Output, Output)),
+          input: ((Output, Output), (Output, Output)),
           mode: Mode
       ): Output = tf.createWithNameScope("Loss") {
-        val lossValue = loss(input._1._1, input._2._2, input._2._3)
+        // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
+        // word used as input, rather than the previous predicted word.
+        val tgtEosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+        val tgtSequence = tf.concatenate(Seq(
+          input._2._1,
+          tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
+        val tgtSequenceLength = input._2._2 + 1
+        val lossValue = loss(input._1._1, tgtSequence, tgtSequenceLength)
         tf.summary.scalar("Loss", lossValue)
         lossValue
       }

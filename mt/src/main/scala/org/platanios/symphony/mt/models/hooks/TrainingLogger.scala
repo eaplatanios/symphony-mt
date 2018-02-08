@@ -49,9 +49,9 @@ case class TrainingLogger(
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
     (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
-    ((Tensor, Tensor), (Tensor, Tensor, Tensor)), ((Output, Output), (Output, Output, Output)),
-    ((DataType, DataType), (DataType, DataType, DataType)), ((Shape, Shape), (Shape, Shape, Shape)),
-    ((Output, Output), (Output, Output, Output))]
+    ((Tensor, Tensor), (Tensor, Tensor)), ((Output, Output), (Output, Output)),
+    ((DataType, DataType), (DataType, DataType)), ((Shape, Shape), (Shape, Shape)),
+    ((Output, Output), (Output, Output))]
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 
@@ -76,9 +76,9 @@ case class TrainingLogger(
     shouldTrigger = false
     gradientsNorm = modelInstance.gradientsAndVariables.map(g => tf.globalNorm(g.map(_._1))).orNull
     loss = modelInstance.loss.map(_.cast(FLOAT32))
-        .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._3))).orNull
+        .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._2))).orNull
     srcWordCount = modelInstance.trainInput.map(o => tf.sum(o._1._2)).orNull
-    tgtWordCount = modelInstance.trainInput.map(o => tf.sum(o._2._3)).orNull
+    tgtWordCount = modelInstance.trainInput.map(o => tf.sum(o._2._2)).orNull
     totalLoss = 0.0f
     totalSrcWordCount = 0L
     totalTgtWordCount = 0L
