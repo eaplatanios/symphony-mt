@@ -29,13 +29,14 @@ import scala.collection.immutable.Traversable
 /**
   * @author Emmanouil Antonios Platanios
   */
-class LoadedDataset private[LoadedDataset] (
-    protected val dataConfig: DataConfig,
-    protected val datasets: Map[(Language, Language), LoadedDataset.GroupedFiles]
+class LoadedDataset protected (
+    val dataConfig: DataConfig,
+    val vocabularies: Map[Language, Vocabulary],
+    val datasets: Map[(Language, Language), LoadedDataset.GroupedFiles]
 ) {
   val workingDir: File = File(dataConfig.workingDir)
 
-  def languagePairs: Iterable[(Language, Language)] = datasets.keys
+  def languagePairs: Set[(Language, Language)] = datasets.keySet ++ datasets.keySet.map(l => (l._2, l._1))
 
   def files(srcLanguage: Language, tgtLanguage: Language): LoadedDataset.GroupedFiles = {
     datasets.getOrElse((srcLanguage, tgtLanguage), datasets((tgtLanguage, srcLanguage)).reversed)
@@ -80,6 +81,7 @@ object LoadedDataset {
     }
     new LoadedDataset(
       dataConfig,
+      vocabularies.mapValues(Vocabulary(_)),
       files
           .groupBy(dataset => (dataset.srcLanguage, dataset.tgtLanguage))
           .mapValues(_.reduce((dataset1, dataset2) => {
@@ -153,7 +155,6 @@ object LoadedDataset {
 
     def createInferDataset(
         datasetType: DatasetType,
-        batchSize: Int,
         dataConfig: DataConfig = dataConfig
     ): MTInferDataset = {
       val files = if (vocabularies.isDefined) this else withNewVocab()
@@ -164,6 +165,7 @@ object LoadedDataset {
       }
       val srcDatasets = corpora.map(_._2).map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
       val srcDataset = joinDatasets(srcDatasets)
+      val batchSize = dataConfig.inferBatchSize
       val srcVocabularyTable = files._vocabularies.get._1.lookupTable()
       val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
@@ -196,9 +198,9 @@ object LoadedDataset {
 
     def createTrainDataset(
         datasetType: DatasetType,
-        batchSize: Int,
         repeat: Boolean = true,
-        dataConfig: DataConfig = dataConfig
+        dataConfig: DataConfig = dataConfig,
+        isEval: Boolean = false
     ): MTTrainDataset = {
       val files = if (vocabularies.isDefined) this else withNewVocab()
       val corpora = datasetType match {
@@ -212,6 +214,7 @@ object LoadedDataset {
       val tgtDataset = joinDatasets(tgtTrainDatasets)
       val srcVocabularyTable = files._vocabularies.get._1.lookupTable()
       val tgtVocabularyTable = files._vocabularies.get._2.lookupTable()
+      val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
       val actualBufferSize = if (dataConfig.bufferSize == -1L) 1000 * batchSize else dataConfig.bufferSize
       val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
       val tgtBosId = tgtVocabularyTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)

@@ -55,7 +55,6 @@ object IWSLT15 extends App {
     randomSeed = Some(10))
 
   val trainConfig = TrainConfig(
-    batchSize = 128,
     maxGradNorm = 5.0f,
     optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
     learningRateInitial = 1.0f,
@@ -65,9 +64,7 @@ object IWSLT15 extends App {
     stopCriteria = StopCriteria(maxSteps = Some(12000)),
     colocateGradientsWithOps = true)
 
-  val inferConfig = InferConfig(
-    batchSize = 32,
-    beamWidth = 10)
+  val inferConfig = InferConfig(beamWidth = 10)
 
   val logConfig = LogConfig(
     logLossSteps = 100,
@@ -95,10 +92,10 @@ object IWSLT15 extends App {
       timeMajor = true),
     timeMajor = true)
 
-  val trainDataset     = () => datasetFiles.createTrainDataset(TRAIN_DATASET, trainConfig.batchSize, repeat = true)
-  val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
-  val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
-  val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, logConfig.logEvalBatchSize, repeat = false, dataConfig.copy(numBuckets = 1))
+  val trainDataset     = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = true)
+  val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
+  val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
+  val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
 
   val model = (srcLang: Language, tgtLang: Language, srcVocab: Vocabulary, tgtVocab: Vocabulary) => StateBasedModel(
     config, srcLang, tgtLang, srcVocab, tgtVocab,

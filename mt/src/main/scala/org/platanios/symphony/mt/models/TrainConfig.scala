@@ -23,7 +23,6 @@ import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Op
   * @author Emmanouil Antonios Platanios
   */
 case class TrainConfig(
-    batchSize: Int = 128,
     maxGradNorm: Float = 5.0f,
     optimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
     learningRateInitial: Float = 1.0f,

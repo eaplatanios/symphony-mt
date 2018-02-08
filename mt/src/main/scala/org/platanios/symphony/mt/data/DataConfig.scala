@@ -32,6 +32,9 @@ case class DataConfig(
     loaderSentenceLengthBounds: Option[(Int, Int)] = None,
     loaderMergeVocabs: Boolean = false,
     // Corpus
+    trainBatchSize: Int = 128,
+    inferBatchSize: Int = 32,
+    evaluateBatchSize: Int = 32,
     numBuckets: Int = 5,
     srcMaxLength: Int = 50,
     tgtMaxLength: Int = 50,
