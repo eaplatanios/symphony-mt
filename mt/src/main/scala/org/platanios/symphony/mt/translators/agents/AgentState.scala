@@ -16,11 +16,9 @@
 package org.platanios.symphony.mt.translators.agents
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-sealed trait ActorType
-
-case object SystemActor extends ActorType
-case class AgentActor(language: Language) extends ActorType
+case class AgentState(language: Language, vocab: Vocabulary)
