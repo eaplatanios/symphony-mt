@@ -48,8 +48,7 @@ class PairwiseTranslator protected (
           model(srcLanguage, tgtLanguage, currentDatasetFiles.srcVocab, currentDatasetFiles.tgtVocab))
         val currentDataset = () => {
           currentDatasetFiles.createTrainDataset(
-            TRAIN_DATASET, currentModel.trainConfig.batchSize,
-            repeat = true, dataConfig = currentDatasetFiles.dataConfig)
+            TRAIN_DATASET, repeat = true, dataConfig = currentDatasetFiles.dataConfig)
         }
         currentModel.train(currentDataset)
     }

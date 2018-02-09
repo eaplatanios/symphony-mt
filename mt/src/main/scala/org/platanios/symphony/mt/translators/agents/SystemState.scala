@@ -15,7 +15,6 @@
 
 package org.platanios.symphony.mt.translators.agents
 
-import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.implicits.SerializationImplicits._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 
@@ -29,9 +28,9 @@ import java.io.FileNotFoundException
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class AgentState(language: Language, vocab: Vocabulary)
+case class SystemState(interlinguaVocab: Vocabulary, agents: Seq[AgentState])
 
-object AgentState {
+object SystemState {
   def save(state: SystemState, file: File): File = {
     file.createIfNotExists(createParents = true)
     file.overwrite(state.asJson.asYaml.spaces2)
