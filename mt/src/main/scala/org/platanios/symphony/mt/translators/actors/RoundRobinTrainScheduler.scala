@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.translators.actors
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.LoadedDataset
 import org.platanios.symphony.mt.translators.actors.Messages.AgentTrainRequest
+import org.platanios.tensorflow.api.learn.StopCriteria
 
 import akka.actor._
 
@@ -28,7 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger
   */
 class RoundRobinTrainScheduler protected (
     override protected val dataset: LoadedDataset,
-    override protected val agents: Map[Language, ActorRef]
+    override protected val agents: Map[Language, ActorRef],
+    val trainStepsPerRequest: Long = 10L
 )(implicit sender: ActorRef = Actor.noSender) extends TrainScheduler(dataset, agents) {
   /** Contains the train datasets used by this train scheduler. */
   protected val datasets: Map[Language, Seq[(Language, TrainScheduler.DatasetIterator)]] = {
@@ -58,14 +60,14 @@ class RoundRobinTrainScheduler protected (
       nextIndex = 0
     }
     val nextDataset = dataset(nextIndex)
-    agent ! AgentTrainRequest(agents(nextDataset._1), nextDataset._2.next())
+    agent ! AgentTrainRequest(agents(nextDataset._1), nextDataset._2.next(), StopCriteria.steps(trainStepsPerRequest))
   }
 }
 
 object RoundRobinTrainScheduler {
-  def apply(dataset: LoadedDataset, agents: Map[Language, ActorRef])(implicit
+  def apply(dataset: LoadedDataset, agents: Map[Language, ActorRef], trainStepsPerRequest: Long = 10L)(implicit
       sender: ActorRef = Actor.noSender
   ): RoundRobinTrainScheduler = {
-    new RoundRobinTrainScheduler(dataset, agents)(sender)
+    new RoundRobinTrainScheduler(dataset, agents, trainStepsPerRequest)(sender)
   }
 }

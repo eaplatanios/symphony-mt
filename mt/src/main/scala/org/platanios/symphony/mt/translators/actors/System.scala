@@ -109,7 +109,7 @@ class System(
       })
     }
     // TODO: Make this configurable.
-    trainScheduler = RoundRobinTrainScheduler(dataset, agents.toMap)
+    trainScheduler = RoundRobinTrainScheduler(dataset, agents.toMap, trainStepsPerRequest = 10L)
     trainScheduler.initialize()
   }
 

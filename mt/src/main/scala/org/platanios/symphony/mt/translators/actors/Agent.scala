@@ -21,6 +21,7 @@ import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.learn.StopCriteria
 
 import akka.actor._
 
@@ -51,24 +52,24 @@ class Agent(
   override def receive: Receive = {
     case Type =>
       sender() ! AgentActor(language)
-    case AgentTrainRequest(tgtAgent, parallelSentences) =>
-      processAgentTrainRequest(tgtAgent, parallelSentences)
+    case AgentTrainRequest(tgtAgent, parallelSentences, stopCriteria) =>
+      processAgentTrainRequest(tgtAgent, parallelSentences, stopCriteria)
     case AgentTranslateToInterlinguaRequest(id, sentences) =>
       processTranslateToInterlinguaRequest(id, sentences)
     case AgentTranslateToInterlinguaResponse(id, interlinguaSentences) =>
       processTranslateToInterlinguaResponse(id, interlinguaSentences)
     case AgentTranslateFromInterlinguaRequest(id, interlinguaSentences) =>
       processTranslateFromInterlinguaRequest(id, interlinguaSentences)
-    case AgentTranslateFromInterlinguaResponse(id, sentences) =>
-      processTranslateFromInterlinguaResponse(id, sentences)
+    case AgentTranslateFromInterlinguaResponse(id, sentences) => ???
   }
 
   protected def processAgentTrainRequest(
       tgtAgent: ActorRef,
-      parallelSentences: ((Tensor, Tensor), (Tensor, Tensor))
+      parallelSentences: ((Tensor, Tensor), (Tensor, Tensor)),
+      stopCriteria: StopCriteria
   ): Unit = {
     requestManager.set(
-      uniqueIdCounter, Agent.RequestInformation(sender(), parallelSentences._1, isTrain = true))
+      uniqueIdCounter, Agent.RequestInformation(sender(), parallelSentences._1, Some(stopCriteria)))
     tgtAgent ! AgentTranslateToInterlinguaRequest(uniqueIdCounter, parallelSentences._2)
     uniqueIdCounter += 1
   }
@@ -81,21 +82,17 @@ class Agent(
 
   protected def processTranslateToInterlinguaResponse(id: Long, interlinguaSentences: (Tensor, Tensor)): Unit = {
     requestManager.get(id) match {
-      case Some(Agent.RequestInformation(requester, srcSentences, isTrain)) =>
-        if (isTrain) {
-          // Train model for the human language to interlingua translation direction.
-          langToInterlinguaModel.train(() => tf.data.TensorDataset(
-            (srcSentences, interlinguaSentences)).repeat().asInstanceOf[MTTrainDataset], ???)
+      case Some(Agent.RequestInformation(requester, srcSentences, Some(trainStopCriteria))) =>
+        // Train model for the human language to interlingua translation direction.
+        langToInterlinguaModel.train(() => tf.data.TensorDataset(
+          (srcSentences, interlinguaSentences)).repeat().asInstanceOf[MTTrainDataset], trainStopCriteria)
 
-          // Train model for the interlingua to human language translation direction.
-          interlinguaToLangModel.train(() => tf.data.TensorDataset(
-            (interlinguaSentences, srcSentences)).repeat().asInstanceOf[MTTrainDataset], ???)
+        // Train model for the interlingua to human language translation direction.
+        interlinguaToLangModel.train(() => tf.data.TensorDataset(
+          (interlinguaSentences, srcSentences)).repeat().asInstanceOf[MTTrainDataset], trainStopCriteria)
 
-          // Send a message to the requester notifying that this agent is done processing this train request.
-          requester ! AgentTrainResponse()
-        } else {
-          ??? // TODO: Impossible case as `AgentTranslateToInterlinguaRequest` is only sent from within the train request.
-        }
+        // Send a message to the requester notifying that this agent is done processing this train request.
+        requester ! AgentTrainResponse()
       case None => log.warning(
         s"Ignoring translate-to-interlingua response with ID '$id' " +
             s"because no relevant stored information was found.")
@@ -108,10 +105,6 @@ class Agent(
         interlinguaSentences).repeat().asInstanceOf[MTInferDataset]).next()._2
     sender() ! AgentTranslateFromInterlinguaResponse(id, translatedSentences)
   }
-
-  protected def processTranslateFromInterlinguaResponse(id: Long, sentences: (Tensor, Tensor)): Unit = {
-    ??? // TODO: Impossible case as `AgentTranslateFromInterlinguaRequest` is only sent from translation systems.
-  }
 }
 
 object Agent {
@@ -123,5 +116,8 @@ object Agent {
       requestManagerType: RequestManager.Type = RequestManager.Hash
   ): Props = Props(new Agent(language, languageVocab, interlinguaVocab, model, requestManagerType))
 
-  case class RequestInformation(requester: ActorRef, sentences: (Tensor, Tensor), isTrain: Boolean)
+  case class RequestInformation(
+      requester: ActorRef,
+      sentences: (Tensor, Tensor),
+      trainStopCriteria: Option[StopCriteria])
 }

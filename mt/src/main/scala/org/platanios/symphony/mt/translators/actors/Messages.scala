@@ -18,8 +18,8 @@ package org.platanios.symphony.mt.translators.actors
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.LoadedDataset
 import org.platanios.tensorflow.api.Tensor
-
 import akka.actor.ActorRef
+import org.platanios.tensorflow.api.learn.StopCriteria
 
 /** Contains all the messages used by the translation system and agent actors.
   *
@@ -71,8 +71,10 @@ object Messages {
     *                           containing a padded tensor with word IDs in the agent's language and a tensor with the
     *                           sentence lengths. The second tuple element is the corresponding tuple for the sentences
     *                           in the target language.
+    * @param  stopCriteria      Stop criteria to use for this train request.
     */
-  case class AgentTrainRequest(tgtAgent: ActorRef, parallelSentences: ((Tensor, Tensor), (Tensor, Tensor)))
+  case class AgentTrainRequest(
+      tgtAgent: ActorRef, parallelSentences: ((Tensor, Tensor), (Tensor, Tensor)), stopCriteria: StopCriteria)
 
   /** Message sent by a translation agent, once it has finished processing a train request. */
   case class AgentTrainResponse()
