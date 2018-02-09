@@ -66,20 +66,16 @@ object Messages {
   /** Message sent by a translation system to a translation agent, that provides it with a training pair for some
     * target language.
     *
-    * @param  id                Unique ID for this request.
     * @param  tgtAgent          Translation agent responsible for the target language.
     * @param  parallelSentences Tuple containing parallel sentence examples. The first tuple element is a tuple
     *                           containing a padded tensor with word IDs in the agent's language and a tensor with the
     *                           sentence lengths. The second tuple element is the corresponding tuple for the sentences
     *                           in the target language.
     */
-  case class AgentTrainRequest(id: Long, tgtAgent: ActorRef, parallelSentences: ((Tensor, Tensor), (Tensor, Tensor)))
+  case class AgentTrainRequest(tgtAgent: ActorRef, parallelSentences: ((Tensor, Tensor), (Tensor, Tensor)))
 
-  /** Message sent by a translation agent, once it has finished processing a train request.
-    *
-    * @param  id Unique ID that corresponds to the ID of the request for which this response is generated.
-    */
-  case class AgentTrainResponse(id: Long)
+  /** Message sent by a translation agent, once it has finished processing a train request. */
+  case class AgentTrainResponse()
 
   /** Message sent to translation agents requesting a batch of sentences to be translated to the interlingua.
     *

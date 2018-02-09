@@ -16,9 +16,31 @@
 package org.platanios.symphony.mt.translators.agents
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.implicits.SerializationImplicits._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
+
+import better.files.File
+import io.circe.syntax._
+import io.circe.yaml.{parser => YAMLParser}
+import io.circe.yaml.syntax._
+
+import java.io.FileNotFoundException
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 case class AgentState(language: Language, vocab: Vocabulary)
+
+object SystemState {
+  def save(state: SystemState, file: File): File = {
+    file.createIfNotExists(createParents = true)
+    file.overwrite(state.asJson.asYaml.spaces2)
+  }
+
+  def load(file: File): Either[Throwable, SystemState] = {
+    if (file.notExists)
+      Left(new FileNotFoundException(s"'$file' was not found."))
+    else
+      YAMLParser.parse(file.contentAsString).flatMap(_.as[SystemState])
+  }
+}
