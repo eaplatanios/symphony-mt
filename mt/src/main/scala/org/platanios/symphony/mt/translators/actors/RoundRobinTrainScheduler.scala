@@ -34,9 +34,11 @@ class RoundRobinTrainScheduler protected (
 )(implicit sender: ActorRef = Actor.noSender) extends TrainScheduler(dataset, agents) {
   /** Contains the train datasets used by this train scheduler. */
   protected val datasets: Map[Language, Seq[(Language, TrainScheduler.DatasetIterator)]] = {
-    dataset.languagePairs.map(languages =>
-      languages._1 -> ((languages._2, TrainScheduler.DatasetIterator(
-        dataset.files(languages._1, languages._2), dataset.dataConfig)))).groupBy(_._1).mapValues(_.toSeq.map(_._2))
+    val aggregated = dataset.languagePairs.map {
+      case (srcLang, tgtLang) =>
+        srcLang -> ((tgtLang, TrainScheduler.DatasetIterator(dataset.files(srcLang, tgtLang), dataset.dataConfig)))
+    }
+    aggregated.toSeq.groupBy(_._1).mapValues(_.map(_._2))
   }
 
   protected var currentIndices: Map[ActorRef, (Language, AtomicInteger)] = {
@@ -53,7 +55,7 @@ class RoundRobinTrainScheduler protected (
     * receives an agent train response message. */
   override def onTrainResponse(agent: ActorRef): Unit = {
     val (lang, index) = currentIndices(agent)
-    var nextIndex = index.incrementAndGet()
+    var nextIndex = index.getAndIncrement()
     val dataset = datasets(lang)
     if (nextIndex >= dataset.size) {
       index.set(0)

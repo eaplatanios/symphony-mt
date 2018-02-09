@@ -126,7 +126,7 @@ class StateBasedModel[S, SS](
               dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength, mode)
           }
         }
-        (decTuple.sequences, decTuple.sequenceLengths)
+        (decTuple.sequences(::, 0 :: -1), decTuple.sequenceLengths - 1)
       }
     }
   }
@@ -161,7 +161,7 @@ class StateBasedModel[S, SS](
           else
             decTuple.sequences
         }
-        (outputSequence, decTuple.sequenceLengths)
+        (outputSequence(::, 0 :: -1), decTuple.sequenceLengths - 1)
       }
     }
   }

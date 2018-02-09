@@ -45,12 +45,12 @@ class BLEU(
     val (refSentences, refLengths) = (ref.unstack(), refLen.unstack())
     val hypSeq = hypSentences.zip(hypLengths).map {
       case (s, len) =>
-        val lenScalar = len.scalar.asInstanceOf[Int] - 1
+        val lenScalar = len.scalar.asInstanceOf[Int]
         s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[Int]).toSeq
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
-        val lenScalar = len.scalar.asInstanceOf[Int] - 1
+        val lenScalar = len.scalar.asInstanceOf[Int]
         Seq(s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[Int]).toSeq)
     }
     val (matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen) = BLEU.nGramMatches(refSeq, hypSeq, maxOrder)
