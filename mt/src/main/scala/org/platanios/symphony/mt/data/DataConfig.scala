@@ -30,7 +30,7 @@ case class DataConfig(
     loaderConvertSGMToText: Boolean = true,
     loaderTokenize: Boolean = false,
     loaderSentenceLengthBounds: Option[(Int, Int)] = None,
-    loaderMergeVocabs: Boolean = false,
+    loaderVocab: DatasetVocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, 8192)),
     // Corpus
     trainBatchSize: Int = 128,
     inferBatchSize: Int = 32,
@@ -45,7 +45,6 @@ case class DataConfig(
     shardIndex: Int = 0,
     numParallelCalls: Int = 4,
     // Vocabulary
-    vocabGenerator: VocabularyGenerator = SimpleVocabularyGenerator(50000, -1, 8192),
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
     endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
     unknownToken: String = Vocabulary.UNKNOWN_TOKEN)

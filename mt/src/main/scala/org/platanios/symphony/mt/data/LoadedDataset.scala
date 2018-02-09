@@ -16,12 +16,10 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.symphony.mt.vocabulary.{Vocabulary, VocabularyGenerator}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
-
 import better.files._
-
 import java.io.BufferedWriter
 
 import scala.collection.immutable.Traversable
@@ -51,31 +49,34 @@ object LoadedDataset {
           files.groupBy(_.tgtLanguage).mapValues(_.filter(_.vocabularies.isDefined).map(_.vocabularies.get._2)))
           .map {
             case (language, vocabFiles) =>
-              if (vocabFiles.size == 1) {
-                language -> vocabFiles.head
-              } else if (vocabFiles.isEmpty || !dataConfig.loaderMergeVocabs) {
-                language -> {
-                  val tokenizedFiles =
-                    files.filter(_.srcLanguage == language).flatMap(_.trainCorpora.map(_._2)) ++
-                        files.filter(_.tgtLanguage == language).flatMap(_.trainCorpora.map(_._3))
-                  val vocabFile = workingDir / s"vocab.${language.abbreviation}"
-                  if (vocabFile.notExists) {
-                    Dataset.logger.info(s"Generating vocabulary file for $language.")
-                    dataConfig.vocabGenerator.generate(tokenizedFiles.toSeq, vocabFile)
-                    Dataset.logger.info(s"Generated vocabulary file for $language.")
+              dataConfig.loaderVocab match {
+                case GeneratedVocabulary(generator) =>
+                  language -> {
+                    val tokenizedFiles =
+                      files.filter(_.srcLanguage == language).flatMap(_.trainCorpora.map(_._2)) ++
+                          files.filter(_.tgtLanguage == language).flatMap(_.trainCorpora.map(_._3))
+                    val vocabFile = workingDir / s"vocab.${language.abbreviation}"
+                    if (vocabFile.notExists) {
+                      Dataset.logger.info(s"Generating vocabulary file for $language.")
+                      generator.generate(tokenizedFiles.toSeq, vocabFile)
+                      Dataset.logger.info(s"Generated vocabulary file for $language.")
+                    }
+                    vocabFile
                   }
-                  vocabFile
-                }
-              } else {
-                val vocabFile = workingDir.createChild(s"vocab.${language.abbreviation}", createParents = true)
-                val writer = new BufferedWriter(vocabFile.newPrintWriter(), dataConfig.loaderBufferSize)
-                vocabFiles.toStream
-                    .flatMap(_.lineIterator).toSet
-                    .filter(_ != "")
-                    .foreach(word => writer.write(word + "\n"))
-                writer.flush()
-                writer.close()
-                language -> vocabFile
+                case MergedVocabularies if vocabFiles.size == 1 =>
+                  language -> vocabFiles.head
+                case MergedVocabularies if vocabFiles.nonEmpty =>
+                  val vocabFile = workingDir.createChild(s"vocab.${language.abbreviation}", createParents = true)
+                  val writer = new BufferedWriter(vocabFile.newPrintWriter(), dataConfig.loaderBufferSize)
+                  vocabFiles.toStream
+                      .flatMap(_.lineIterator).toSet
+                      .filter(_ != "")
+                      .foreach(word => writer.write(word + "\n"))
+                  writer.flush()
+                  writer.close()
+                  language -> vocabFile
+                case MergedVocabularies if vocabFiles.isEmpty =>
+                  throw new IllegalArgumentException("No existing vocabularies found to merge.")
               }
           }
     }
@@ -118,13 +119,15 @@ object LoadedDataset {
     }
 
     lazy val srcVocab: Vocabulary = {
-      val files = if (vocabularies.isDefined) this else withNewVocab()
-      files._vocabularies.get._1
+      if (vocabularies.isEmpty)
+        throw new IllegalStateException("No vocabulary file has been generated.")
+      _vocabularies.get._1
     }
 
     lazy val tgtVocab: Vocabulary = {
-      val files = if (vocabularies.isDefined) this else withNewVocab()
-      files._vocabularies.get._2
+      if (vocabularies.isEmpty)
+        throw new IllegalStateException("No vocabulary file has been generated.")
+      _vocabularies.get._2
     }
 
     def reversed: GroupedFiles = {
@@ -136,18 +139,18 @@ object LoadedDataset {
         vocabularies.map(f => (f._2, f._1)))
     }
 
-    def withNewVocab(): GroupedFiles = {
+    def generateVocab(generator: VocabularyGenerator): GroupedFiles = {
       val workingDir = File(dataConfig.workingDir)
       val srcVocab = workingDir / s"vocab.${srcLanguage.abbreviation}"
       val tgtVocab = workingDir / s"vocab.${tgtLanguage.abbreviation}"
       if (srcVocab.notExists) {
         Dataset.logger.info(s"Generating vocabulary file for ${srcLanguage.abbreviation}.")
-        dataConfig.vocabGenerator.generate(trainCorpora.map(_._2), srcVocab)
+        generator.generate(trainCorpora.map(_._2), srcVocab)
         Dataset.logger.info(s"Generated vocabulary file for ${srcLanguage.abbreviation}.")
       }
       if (tgtVocab.notExists) {
         Dataset.logger.info(s"Generating vocabulary file for ${tgtLanguage.abbreviation}.")
-        dataConfig.vocabGenerator.generate(trainCorpora.map(_._3), tgtVocab)
+        generator.generate(trainCorpora.map(_._3), tgtVocab)
         Dataset.logger.info(s"Generated vocabulary file for ${tgtLanguage.abbreviation}.")
       }
       copy(vocabularies = Some((srcVocab, tgtVocab)))
@@ -157,16 +160,18 @@ object LoadedDataset {
         datasetType: DatasetType,
         dataConfig: DataConfig = dataConfig
     ): MTInferDataset = {
-      val files = if (vocabularies.isDefined) this else withNewVocab()
+      if (vocabularies.isEmpty)
+        throw new IllegalStateException("Cannot create an inference dataset without vocabulary files.")
+
       val corpora = datasetType match {
-        case TRAIN_DATASET => files.trainCorpora
-        case DEV_DATASET => files.devCorpora
-        case TEST_DATASET => files.testCorpora
+        case TRAIN_DATASET => trainCorpora
+        case DEV_DATASET => devCorpora
+        case TEST_DATASET => testCorpora
       }
       val srcDatasets = corpora.map(_._2).map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
       val srcDataset = joinDatasets(srcDatasets)
       val batchSize = dataConfig.inferBatchSize
-      val srcVocabularyTable = files._vocabularies.get._1.lookupTable()
+      val srcVocabularyTable = _vocabularies.get._1.lookupTable()
       val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
       val batchingFn = (dataset: MTInferDataset) => {
@@ -202,22 +207,23 @@ object LoadedDataset {
         dataConfig: DataConfig = dataConfig,
         isEval: Boolean = false
     ): MTTrainDataset = {
-      val files = if (vocabularies.isDefined) this else withNewVocab()
+      if (vocabularies.isEmpty)
+        throw new IllegalStateException("Cannot create a training dataset without vocabulary files.")
+
       val corpora = datasetType match {
-        case TRAIN_DATASET => files.trainCorpora
-        case DEV_DATASET => files.devCorpora
-        case TEST_DATASET => files.testCorpora
+        case TRAIN_DATASET => trainCorpora
+        case DEV_DATASET => devCorpora
+        case TEST_DATASET => testCorpora
       }
       val srcTrainDatasets = corpora.map(_._2).map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
       val tgtTrainDatasets = corpora.map(_._3).map(file => TextLinesDataset(file.path.toAbsolutePath.toString()))
       val srcDataset = joinDatasets(srcTrainDatasets)
       val tgtDataset = joinDatasets(tgtTrainDatasets)
-      val srcVocabularyTable = files._vocabularies.get._1.lookupTable()
-      val tgtVocabularyTable = files._vocabularies.get._2.lookupTable()
+      val srcVocabularyTable = _vocabularies.get._1.lookupTable()
+      val tgtVocabularyTable = _vocabularies.get._2.lookupTable()
       val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
       val actualBufferSize = if (dataConfig.bufferSize == -1L) 1000 * batchSize else dataConfig.bufferSize
       val srcEosId = srcVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-      val tgtBosId = tgtVocabularyTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
       val tgtEosId = tgtVocabularyTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
       val batchingFn = (dataset: MTTrainDataset) => {
