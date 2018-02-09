@@ -63,6 +63,17 @@ object Messages {
       srcSentences: (Tensor, Tensor),
       tgtSentences: (Tensor, Tensor))
 
+  /** Message sent by a translation system to a translation agent, that provides it with sentences in its own language,
+    * so that it learns to translate between its own language and the interlingua.
+    *
+    * @param  sentences    Sentences in the agent's own language, to be used for self-training.
+    * @param  stopCriteria Stop criteria to use for this train request.
+    */
+  case class AgentSelfTrainRequest(sentences: (Tensor, Tensor), stopCriteria: StopCriteria)
+
+  /** Message sent by a translation agent, once it has finished processing a self-train request. */
+  case class AgentSelfTrainResponse()
+
   /** Message sent by a translation system to a translation agent, that provides it with a training pair for some
     * target language.
     *
