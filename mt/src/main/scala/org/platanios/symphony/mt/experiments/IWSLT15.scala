@@ -68,8 +68,17 @@ object IWSLT15 extends App {
   //  val devEvalDataset  : () => MTTrainDataset = null
   //  val testEvalDataset : () => MTTrainDataset = null
 
-  def model(src: (Language, Vocabulary), tgt: (Language, Vocabulary), env: Environment): Model = {
+  def model(
+      srcLang: Language,
+      srcVocab: Vocabulary,
+      tgtLang: Language,
+      tgtVocab: Vocabulary,
+      env: Environment
+  ): Model = {
     StateBasedModel(
+      name = "Model",
+      srcLang = srcLang, srcVocab = srcVocab,
+      tgtLang = tgtLang, tgtVocab = tgtVocab,
       StateBasedModel.Config(
         env,
         UnidirectionalRNNEncoder(
@@ -97,9 +106,8 @@ object IWSLT15 extends App {
         learningRateDecaySteps = 12000 * 1 / (3 * 4),
         learningRateDecayStartStep = 12000 * 2 / 3,
         colocateGradientsWithOps = true),
-      src._1, tgt._1, src._2, tgt._2,
       trainEvalDataset, devEvalDataset, testEvalDataset,
-      dataConfig, logConfig, "Model")
+      dataConfig, logConfig)
   }
 
   val translator = PairwiseTranslator(env, model)

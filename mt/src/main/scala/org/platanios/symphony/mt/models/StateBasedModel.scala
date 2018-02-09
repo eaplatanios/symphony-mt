@@ -34,42 +34,24 @@ import org.platanios.tensorflow.api.ops.training.optimizers.decay.{Decay, Expone
   * @author Emmanouil Antonios Platanios
   */
 class StateBasedModel[S, SS](
-    val config: StateBasedModel.Config[S, SS],
+    override val name: String = "Model",
     override val srcLang: Language,
-    override val tgtLang: Language,
     override val srcVocab: Vocabulary,
+    override val tgtLang: Language,
     override val tgtVocab: Vocabulary,
+    val config: StateBasedModel.Config[S, SS],
     override val trainEvalDataset: () => MTTrainDataset = null,
     override val devEvalDataset: () => MTTrainDataset = null,
     override val testEvalDataset: () => MTTrainDataset = null,
     override val dataConfig: DataConfig = DataConfig(),
-    override val logConfig: LogConfig = LogConfig(),
-    override val name: String = "Model"
+    override val logConfig: LogConfig = LogConfig()
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Model {
+) extends Model(name, srcLang, srcVocab, tgtLang, tgtVocab) {
   // Create the input and the train input parts of the model.
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
   protected val trainInput = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
-
-  protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
-    val maxTime = tf.shape(targetSequences)(1)
-    val transposedTargetSequences = if (config.timeMajor) targetSequences.transpose() else targetSequences
-    val crossEntropy = tf.sparseSoftmaxCrossEntropy(predictedSequences, transposedTargetSequences)
-    val weights = tf.sequenceMask(targetSequenceLengths, maxTime, predictedSequences.dataType)
-    val transposedWeights = if (config.timeMajor) weights.transpose() else weights
-    tf.sum(crossEntropy * transposedWeights) / tf.size(targetSequenceLengths).cast(FLOAT32)
-  }
-
-  protected def optimizer: tf.train.Optimizer = {
-    val decay = ExponentialDecay(
-      config.learningRateDecayRate,
-      config.learningRateDecaySteps,
-      staircase = true,
-      config.learningRateDecayStartStep)
-    config.optimizer(config.learningRateInitial, decay)
-  }
 
   protected val estimator: tf.learn.Estimator[
       (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
@@ -207,6 +189,24 @@ class StateBasedModel[S, SS](
     }
   }
 
+  protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
+    val maxTime = tf.shape(targetSequences)(1)
+    val transposedTargetSequences = if (config.timeMajor) targetSequences.transpose() else targetSequences
+    val crossEntropy = tf.sparseSoftmaxCrossEntropy(predictedSequences, transposedTargetSequences)
+    val weights = tf.sequenceMask(targetSequenceLengths, maxTime, predictedSequences.dataType)
+    val transposedWeights = if (config.timeMajor) weights.transpose() else weights
+    tf.sum(crossEntropy * transposedWeights) / tf.size(targetSequenceLengths).cast(FLOAT32)
+  }
+
+  protected def optimizer: tf.train.Optimizer = {
+    val decay = ExponentialDecay(
+      config.learningRateDecayRate,
+      config.learningRateDecaySteps,
+      staircase = true,
+      config.learningRateDecayStartStep)
+    config.optimizer(config.learningRateInitial, decay)
+  }
+
   override def train(dataset: () => MTTrainDataset, stopCriteria: StopCriteria): Unit = {
     estimator.train(dataset, stopCriteria)
   }
@@ -228,25 +228,25 @@ class StateBasedModel[S, SS](
 
 object StateBasedModel {
   def apply[S, SS](
+      name: String = "Model",
+      srcLang: Language,
+      srcVocab: Vocabulary,
+      tgtLang: Language,
+      tgtVocab: Vocabulary,
       config: StateBasedModel.Config[S, SS],
-      srcLanguage: Language,
-      tgtLanguage: Language,
-      srcVocabulary: Vocabulary,
-      tgtVocabulary: Vocabulary,
       trainEvalDataset: () => MTTrainDataset = null,
       devEvalDataset: () => MTTrainDataset = null,
       testEvalDataset: () => MTTrainDataset = null,
       dataConfig: DataConfig = DataConfig(),
-      logConfig: LogConfig = LogConfig(),
-      name: String = "Model"
+      logConfig: LogConfig = LogConfig()
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): StateBasedModel[S, SS] = {
     new StateBasedModel[S, SS](
-      config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary,
+      name, srcLang, srcVocab, tgtLang, tgtVocab, config,
       trainEvalDataset, devEvalDataset, testEvalDataset,
-      dataConfig, logConfig, name)(evS, evSDropout)
+      dataConfig, logConfig)(evS, evSDropout)
   }
 
   class Config[S, SS] protected (

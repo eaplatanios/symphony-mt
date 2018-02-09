@@ -15,13 +15,13 @@
 
 package org.platanios.symphony.mt
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.Path
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 case class Environment(
-    workingDir: Path = Paths.get("temp"),
+    workingDir: Path,
     numGPUs: Int = 0,
     firstGPU: Int = 0,
     parallelIterations: Int = 32,

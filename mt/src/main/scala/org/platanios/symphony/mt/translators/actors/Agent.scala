@@ -31,11 +31,11 @@ class Agent(
     val language: Language,
     protected val languageVocab: Vocabulary,
     protected val interlinguaVocab: Vocabulary,
-    protected val model: ((Language, Vocabulary), (Language, Vocabulary)) => Model,
+    protected val model: (Language, Vocabulary, Language, Vocabulary) => Model,
     protected val requestManagerType: RequestManager.Type = RequestManager.Hash
 ) extends Actor with ActorLogging {
-  protected val langToInterlinguaModel: Model = model((language, languageVocab), (Interlingua, interlinguaVocab))
-  protected val interlinguaToLangModel: Model = model((Interlingua, interlinguaVocab), (language, languageVocab))
+  protected val langToInterlinguaModel: Model = model(language, languageVocab, Interlingua, interlinguaVocab)
+  protected val interlinguaToLangModel: Model = model(Interlingua, interlinguaVocab, language, languageVocab)
 
   /** Used for messages that map to stored request information. */
   protected var uniqueIdCounter: Long = 0L
@@ -119,7 +119,7 @@ object Agent {
       language: Language,
       languageVocab: Vocabulary,
       interlinguaVocab: Vocabulary,
-      model: ((Language, Vocabulary), (Language, Vocabulary)) => Model,
+      model: (Language, Vocabulary, Language, Vocabulary) => Model,
       requestManagerType: RequestManager.Type = RequestManager.Hash
   ): Props = Props(new Agent(language, languageVocab, interlinguaVocab, model, requestManagerType))
 

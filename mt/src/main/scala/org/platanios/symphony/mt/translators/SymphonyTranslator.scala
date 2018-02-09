@@ -31,7 +31,7 @@ import akka.actor._
   */
 class SymphonyTranslator protected (
     val env: Environment,
-    override val model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model,
+    override val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
     val name: String
 ) extends Translator(model) {
   protected val actorSystem: ActorSystem = ActorSystem(s"SymphonyTranslator$name")
@@ -54,7 +54,7 @@ class SymphonyTranslator protected (
 object SymphonyTranslator {
   def apply(
       env: Environment,
-      model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model,
+      model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
       name: String
   ): SymphonyTranslator = {
     new SymphonyTranslator(env, model, name)

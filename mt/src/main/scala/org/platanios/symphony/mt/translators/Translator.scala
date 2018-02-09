@@ -25,7 +25,7 @@ import org.platanios.tensorflow.api.learn.StopCriteria
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Translator(val model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model) {
+abstract class Translator(val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model) {
   def train(dataset: LoadedDataset, stopCriteria: StopCriteria): Unit
 
   @throws[IllegalStateException]

@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models
 
-import org.platanios.symphony.mt.{Environment, Language, LogConfig}
+import org.platanios.symphony.mt.{Language, LogConfig}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.metrics.MTMetric
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -29,16 +29,15 @@ import org.platanios.tensorflow.api.tensors.Tensor
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Model {
-  val name: String = "Model"
-
+abstract class Model protected (
+    val name: String,
+    val srcLang: Language,
+    val srcVocab: Vocabulary,
+    val tgtLang: Language,
+    val tgtVocab: Vocabulary
+) {
   val dataConfig : DataConfig  = DataConfig()
   val logConfig  : LogConfig   = LogConfig()
-
-  val srcLang : Language
-  val tgtLang : Language
-  val srcVocab: Vocabulary
-  val tgtVocab: Vocabulary
 
   val trainEvalDataset: () => MTTrainDataset = null
   val devEvalDataset  : () => MTTrainDataset = null

@@ -29,7 +29,7 @@ import scala.collection.mutable
   */
 class PairwiseTranslator protected (
     val env: Environment,
-    override val model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model
+    override val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model
 ) extends Translator(model) {
   protected val models: mutable.Map[(Language, Language), Model] = mutable.Map.empty
 
@@ -51,7 +51,7 @@ class PairwiseTranslator protected (
         val currentDatasetFiles = dataset.files(srcLanguage, tgtLanguage)
         val currentModel = models.getOrElseUpdate(
           (srcLanguage, tgtLanguage),
-          model((srcLanguage, currentDatasetFiles.srcVocab), (tgtLanguage, currentDatasetFiles.tgtVocab), env))
+          model(srcLanguage, currentDatasetFiles.srcVocab, tgtLanguage, currentDatasetFiles.tgtVocab, env))
         val currentDataset = () => {
           currentDatasetFiles.createTrainDataset(
             TRAIN_DATASET, repeat = true, dataConfig = currentDatasetFiles.dataConfig)
@@ -78,7 +78,7 @@ class PairwiseTranslator protected (
 object PairwiseTranslator {
   def apply(
       env: Environment,
-      model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model
+      model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model
   ): PairwiseTranslator = {
     new PairwiseTranslator(env, model)
   }

@@ -66,8 +66,17 @@ object WMT16 extends App {
   val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
   val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
 
-  def model(src: (Language, Vocabulary), tgt: (Language, Vocabulary), env: Environment): Model = {
+  def model(
+      srcLang: Language,
+      srcVocab: Vocabulary,
+      tgtLang: Language,
+      tgtVocab: Vocabulary,
+      env: Environment
+  ): Model = {
     StateBasedModel(
+      name = "Model",
+      srcLang = srcLang, srcVocab = srcVocab,
+      tgtLang = tgtLang, tgtVocab = tgtVocab,
       StateBasedModel.Config(
         env,
         GNMTEncoder(
@@ -97,9 +106,8 @@ object WMT16 extends App {
         learningRateDecaySteps = 340000 * 1 / (2 * 10),
         learningRateDecayStartStep = 340000 * 2,
         colocateGradientsWithOps = true),
-      src._1, tgt._1, src._2, tgt._2,
       trainEvalDataset, devEvalDataset, testEvalDataset,
-      dataConfig, logConfig, "Model")
+      dataConfig, logConfig)
   }
 
   val translator = PairwiseTranslator(env, model)

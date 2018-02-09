@@ -34,7 +34,7 @@ import scala.collection.mutable
   */
 class System(
     val config: SystemConfig,
-    protected val model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model,
+    protected val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
     protected val requestManagerType: RequestManager.Type = RequestManager.Hash
 ) extends Actor with ActorLogging {
   /** Working directory for this translation system. */
@@ -160,7 +160,7 @@ class System(
     agents.getOrElseUpdate(lang, context.actorOf(
       Agent.props(
         lang, vocab, systemState.interlinguaVocab,
-        model(_, _, config.environment.copy(workingDir = workingDir.path)),
+        model(_, _, _, _, config.environment.copy(workingDir = workingDir.path)),
         requestManagerType), s"translation-agent-${lang.abbreviation}"))
   }
 }
@@ -170,7 +170,7 @@ object System {
 
   def props(
       config: SystemConfig,
-      model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model,
+      model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
       requestManagerType: RequestManager.Type = RequestManager.Hash
   ): Props = {
     Props(new System(config, model, requestManagerType))
