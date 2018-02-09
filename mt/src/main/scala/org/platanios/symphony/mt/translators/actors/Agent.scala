@@ -65,9 +65,10 @@ class Agent(
     case AgentTranslateFromInterlinguaResponse(id, sentences) => ???
   }
 
+  @throws[IllegalArgumentException]
   protected def processAgentSelfTrainRequest(sentences: (Tensor, Tensor), stopCriteria: StopCriteria): Unit = {
     if (languageVocab.size != interlinguaVocab.size)
-      throw new InvalidMessageException(
+      throw new IllegalArgumentException(
         s"Self-training can only be used if the agent's vocabulary size (${languageVocab.size}) " +
             s"matches the interlingua vocabulary size (${interlinguaVocab.size}).")
 
