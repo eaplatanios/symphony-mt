@@ -32,7 +32,6 @@ import org.platanios.tensorflow.api.tensors.Tensor
 trait Model {
   val name: String = "Model"
 
-  val env        : Environment = Environment()
   val dataConfig : DataConfig  = DataConfig()
   val logConfig  : LogConfig   = LogConfig()
 

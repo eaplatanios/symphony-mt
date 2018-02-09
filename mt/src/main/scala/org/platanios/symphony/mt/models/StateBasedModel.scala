@@ -85,14 +85,14 @@ class StateBasedModel[S, SS](
       optimizer = optimizer,
       clipGradients = tf.learn.ClipGradientsByGlobalNorm(config.maxGradNorm),
       colocateGradientsWithOps = config.colocateGradientsWithOps)
-    val summariesDir = env.workingDir.resolve("summaries")
+    val summariesDir = config.env.workingDir.resolve("summaries")
 
     // Create estimator hooks
     var hooks = Set[tf.learn.Hook](
       // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
-      tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(config.checkpointSteps)))
+      tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
 
     // Add logging hooks
     if (logConfig.logLossSteps > 0)
@@ -112,7 +112,9 @@ class StateBasedModel[S, SS](
 
     // Create estimator
     tf.learn.InMemoryEstimator(
-      model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed), trainHooks = hooks)
+      model,
+      tf.learn.Configuration(Some(config.env.workingDir), randomSeed = config.env.randomSeed),
+      trainHooks = hooks)
   }
 
   private final def trainLayer: Layer[((Output, Output), (Output, Output)), (Output, Output)] = {
@@ -126,7 +128,7 @@ class StateBasedModel[S, SS](
         // TODO: !!! I need to fix this repetition in TensorFlow for Scala.
         val encTuple = tf.createWithVariableScope("Encoder") {
           tf.learn.variableScope("Encoder") {
-            config.encoder.create(env, input._1._1, input._1._2, srcVocab, mode)
+            config.encoder.create(config.env, input._1._1, input._1._2, srcVocab, mode)
           }
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
@@ -138,7 +140,7 @@ class StateBasedModel[S, SS](
               tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtBosId),
               input._2._1), axis = 1)
             val tgtSequenceLength = input._2._2 + 1
-            config.decoder.create(env, encTuple, input._1._2, tgtVocab, dataConfig.tgtMaxLength,
+            config.decoder.create(config.env, encTuple, input._1._2, tgtVocab, dataConfig.tgtMaxLength,
               dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength, mode)
           }
         }
@@ -157,13 +159,13 @@ class StateBasedModel[S, SS](
 
         val encTuple = tf.createWithVariableScope("Encoder") {
           tf.learn.variableScope("Encoder") {
-            config.encoder.create(env, input._1, input._2, srcVocab, mode)
+            config.encoder.create(config.env, input._1, input._2, srcVocab, mode)
           }
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
           tf.learn.variableScope("Decoder") {
             config.decoder.create(
-              env, encTuple, input._2, tgtVocab, dataConfig.tgtMaxLength,
+              config.env, encTuple, input._2, tgtVocab, dataConfig.tgtMaxLength,
               dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, null, null, mode)
           }
         }
