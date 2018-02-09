@@ -45,6 +45,8 @@ object TrainScheduler {
       val files: LoadedDataset.GroupedFiles,
       val dataConfig: DataConfig
   ) extends Iterator[((Tensor, Tensor), (Tensor, Tensor))] {
+    // TODO: [RECOVERY] Add ability to recover if the session crashes.
+
     protected val graph  : Graph   = Graph()
     protected val session: Session = Session(graph)
 
@@ -64,11 +66,12 @@ object TrainScheduler {
 
     override def hasNext: Boolean = true
     override def next(): ((Tensor, Tensor), (Tensor, Tensor)) = {
-      initialized.compareAndSet(false, tf.createWith(graph) {
-        session.run(targets = tf.initializers)
-        session.run(targets = initOp)
-        true
-      })
+      if (initialized.compareAndSet(false, true)) {
+        tf.createWith(graph) {
+          session.run(targets = tf.initializers)
+          session.run(targets = initOp)
+        }
+      }
       session.run(fetches = nextOutput)
     }
   }
