@@ -113,7 +113,7 @@ class Agent(
 
         // Send a message to the requester notifying that this agent is done processing this train request.
         requester ! AgentTrainResponse()
-      case None => log.warning(
+      case _ => log.warning(
         s"Ignoring translate-to-interlingua response with ID '$id' " +
             s"because no relevant stored information was found.")
     }
