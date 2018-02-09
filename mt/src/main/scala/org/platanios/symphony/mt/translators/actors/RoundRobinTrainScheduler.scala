@@ -15,10 +15,11 @@
 
 package org.platanios.symphony.mt.translators.actors
 
-import akka.actor.ActorRef
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.LoadedDataset
 import org.platanios.symphony.mt.translators.actors.Messages.AgentTrainRequest
+
+import akka.actor._
 
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -28,13 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger
 class RoundRobinTrainScheduler protected (
     override protected val dataset: LoadedDataset,
     override protected val agents: Map[Language, ActorRef]
-) extends TrainScheduler(dataset, agents) {
+)(implicit sender: ActorRef = Actor.noSender) extends TrainScheduler(dataset, agents) {
   /** Contains the train datasets used by this train scheduler. */
   protected val datasets: Map[Language, Seq[(Language, TrainScheduler.DatasetIterator)]] = {
     dataset.languagePairs.map(languages =>
-      languages._1 -> (datasets.getOrElse(languages._1, Seq.empty) :+
-          ((languages._2, TrainScheduler.DatasetIterator(
-            dataset.files(languages._1, languages._2), dataset.dataConfig))))).toMap
+      languages._1 -> ((languages._2, TrainScheduler.DatasetIterator(
+        dataset.files(languages._1, languages._2), dataset.dataConfig)))).groupBy(_._1).mapValues(_.toSeq.map(_._2))
   }
 
   protected var currentIndices: Map[ActorRef, (Language, AtomicInteger)] = {
@@ -43,13 +43,13 @@ class RoundRobinTrainScheduler protected (
 
   /** Initializes this train scheduler. This method is always called by the translation system, in order to start
     * the training process. */
-  override protected def initialize(): Unit = {
+  override def initialize(): Unit = {
     agents.values.foreach(onTrainResponse)
   }
 
   /** Responds to a translation agent's train response. This method is called by the translation system, whenever it
     * receives an agent train response message. */
-  override protected def onTrainResponse(agent: ActorRef): Unit = {
+  override def onTrainResponse(agent: ActorRef): Unit = {
     val (lang, index) = currentIndices(agent)
     var nextIndex = index.incrementAndGet()
     val dataset = datasets(lang)
@@ -63,7 +63,9 @@ class RoundRobinTrainScheduler protected (
 }
 
 object RoundRobinTrainScheduler {
-  def apply(dataset: LoadedDataset, agents: Map[Language, ActorRef]): RoundRobinTrainScheduler = {
-    new RoundRobinTrainScheduler(dataset, agents)
+  def apply(dataset: LoadedDataset, agents: Map[Language, ActorRef])(implicit
+      sender: ActorRef = Actor.noSender
+  ): RoundRobinTrainScheduler = {
+    new RoundRobinTrainScheduler(dataset, agents)(sender)
   }
 }

@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.translators
 
-import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -27,11 +27,14 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 class PairwiseTranslator protected (
-    override val model: (Language, Language, Vocabulary, Vocabulary) => Model,
+    val env: Environment,
+    override val model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model
 ) extends Translator(model) {
   protected val models: mutable.Map[(Language, Language), Model] = mutable.Map.empty
 
-  override def train(dataset: LoadedDataset, trainReverse: Boolean = true): Unit = {
+  override def train(dataset: LoadedDataset): Unit = train(dataset, trainReverse = true)
+
+  def train(dataset: LoadedDataset, trainReverse: Boolean): Unit = {
     val languagePairs = {
       if (trainReverse) {
         // We train models for both possible translation directions.
@@ -45,7 +48,7 @@ class PairwiseTranslator protected (
         val currentDatasetFiles = dataset.files(srcLanguage, tgtLanguage)
         val currentModel = models.getOrElseUpdate(
           (srcLanguage, tgtLanguage),
-          model(srcLanguage, tgtLanguage, currentDatasetFiles.srcVocab, currentDatasetFiles.tgtVocab))
+          model((srcLanguage, currentDatasetFiles.srcVocab), (tgtLanguage, currentDatasetFiles.tgtVocab), env))
         val currentDataset = () => {
           currentDatasetFiles.createTrainDataset(
             TRAIN_DATASET, repeat = true, dataConfig = currentDatasetFiles.dataConfig)
@@ -70,7 +73,10 @@ class PairwiseTranslator protected (
 }
 
 object PairwiseTranslator {
-  def apply(model: (Language, Language, Vocabulary, Vocabulary) => Model): PairwiseTranslator = {
-    new PairwiseTranslator(model)
+  def apply(
+      env: Environment,
+      model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model
+  ): PairwiseTranslator = {
+    new PairwiseTranslator(env, model)
   }
 }

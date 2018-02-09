@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.translators
 
-import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -24,8 +24,8 @@ import org.platanios.tensorflow.api.Tensor
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Translator(val model: (Language, Language, Vocabulary, Vocabulary) => Model) {
-  def train(dataset: LoadedDataset, trainReverse: Boolean = true): Unit
+abstract class Translator(val model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model) {
+  def train(dataset: LoadedDataset): Unit
 
   @throws[IllegalStateException]
   def translate(

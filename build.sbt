@@ -30,7 +30,7 @@ organization in ThisBuild := "org.platanios"
 // every 24 hours.
 resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
 
-val tensorFlowForScalaVersion = "0.1.1"
+val tensorFlowForScalaVersion = "0.1.2-SNAPSHOT"
 
 autoCompilerPlugins in ThisBuild := true
 

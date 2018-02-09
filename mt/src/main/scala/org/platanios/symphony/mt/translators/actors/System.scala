@@ -47,7 +47,7 @@ class System(
   protected val systemStateFile: File = systemWorkingDir / "state.yaml"
 
   /** State for this translation system. */
-  protected val systemState: SystemState = SystemState.load(systemStateFile) match {
+  protected var systemState: SystemState = SystemState.load(systemStateFile) match {
     case Left(failure) =>
       System.logger.info(s"Translation system state file '$systemStateFile' could not be loaded.", failure)
       System.logger.info("A new translation system state file will be created.")
@@ -89,6 +89,8 @@ class System(
       sender() ! SystemActor
     case SystemTrainRequest(dataset) =>
       processSystemTrainRequest(dataset)
+    case AgentTrainResponse() =>
+      trainScheduler.onTrainResponse(sender())
     case SystemTranslateRequest(srcLang, tgtLang, sentences) =>
       processSystemTranslateRequest(sender(), srcLang, tgtLang, sentences)
     case AgentTranslateToInterlinguaResponse(id, sentences) =>
@@ -99,10 +101,16 @@ class System(
 
   protected def processSystemTrainRequest(dataset: LoadedDataset): Unit = {
     dataset.vocabularies.foreach {
-      case (lang, vocab) => agents.getOrElseUpdate(lang, createAgent(lang, vocab, cleanWorkingDir = true))
+      case (lang, vocab) => agents.getOrElseUpdate(lang, {
+        val agent = createAgent(lang, vocab, cleanWorkingDir = true)
+        systemState = systemState.copy(agents = systemState.agents :+ AgentState(lang, vocab))
+        SystemState.save(systemState, systemStateFile)
+        agent
+      })
     }
     // TODO: Make this configurable.
     trainScheduler = RoundRobinTrainScheduler(dataset, agents.toMap)
+    trainScheduler.initialize()
   }
 
   @throws[IllegalArgumentException]

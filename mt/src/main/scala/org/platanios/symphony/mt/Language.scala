@@ -18,7 +18,9 @@ package org.platanios.symphony.mt
 /**
   * @author Emmanouil Antonios Platanios
   */
-class Language protected (val name: String, val abbreviation: String)
+class Language protected (val name: String, val abbreviation: String) {
+  override def toString: String = name
+}
 
 object Language {
   def apply(name: String, abbreviation: String): Language = new Language(name, abbreviation)

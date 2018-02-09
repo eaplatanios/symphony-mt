@@ -55,10 +55,10 @@ class Agent(
       processAgentTrainRequest(tgtAgent, parallelSentences)
     case AgentTranslateToInterlinguaRequest(id, sentences) =>
       processTranslateToInterlinguaRequest(id, sentences)
-    case AgentTranslateToInterlinguaResponse(id, sentences) =>
-      processTranslateToInterlinguaResponse(id, sentences)
-    case AgentTranslateFromInterlinguaRequest(id, sentences) =>
-      processTranslateFromInterlinguaRequest(id, sentences)
+    case AgentTranslateToInterlinguaResponse(id, interlinguaSentences) =>
+      processTranslateToInterlinguaResponse(id, interlinguaSentences)
+    case AgentTranslateFromInterlinguaRequest(id, interlinguaSentences) =>
+      processTranslateFromInterlinguaRequest(id, interlinguaSentences)
     case AgentTranslateFromInterlinguaResponse(id, sentences) =>
       processTranslateFromInterlinguaResponse(id, sentences)
   }
@@ -68,36 +68,28 @@ class Agent(
       parallelSentences: ((Tensor, Tensor), (Tensor, Tensor))
   ): Unit = {
     requestManager.set(
-      uniqueIdCounter, Agent.RequestInformation(sender(), parallelSentences._2, isTrain = true))
+      uniqueIdCounter, Agent.RequestInformation(sender(), parallelSentences._1, isTrain = true))
     tgtAgent ! AgentTranslateToInterlinguaRequest(uniqueIdCounter, parallelSentences._2)
     uniqueIdCounter += 1
   }
 
   protected def processTranslateToInterlinguaRequest(id: Long, sentences: (Tensor, Tensor)): Unit = {
-    val translatedSentences = langToInterlinguaModel.infer(() => {
-      tf.data.fromGenerator(() => Seq(sentences), (INT32, INT32), (Shape(-1), Shape.scalar()))
-          .asInstanceOf[MTInferDataset]
-    }).next()._2
+    val translatedSentences = langToInterlinguaModel.infer(
+      () => tf.data.TensorDataset(sentences).repeat().asInstanceOf[MTInferDataset]).next()._2
     sender() ! AgentTranslateToInterlinguaResponse(id, translatedSentences)
   }
 
-  protected def processTranslateToInterlinguaResponse(id: Long, sentences: (Tensor, Tensor)): Unit = {
+  protected def processTranslateToInterlinguaResponse(id: Long, interlinguaSentences: (Tensor, Tensor)): Unit = {
     requestManager.get(id) match {
-      case Some(Agent.RequestInformation(requester, tgtInterlingua, isTrain)) =>
+      case Some(Agent.RequestInformation(requester, srcSentences, isTrain)) =>
         if (isTrain) {
           // Train model for the human language to interlingua translation direction.
-          langToInterlinguaModel.train(() => tf.data.fromGenerator(
-            () => Seq((sentences, tgtInterlingua)),
-            ((INT32, INT32), (INT32, INT32)),
-            ((Shape(-1), Shape.scalar()), (Shape(-1), Shape.scalar()))
-          ).asInstanceOf[MTTrainDataset])
+          langToInterlinguaModel.train(() => tf.data.TensorDataset(
+            (srcSentences, interlinguaSentences)).repeat().asInstanceOf[MTTrainDataset])
 
           // Train model for the interlingua to human language translation direction.
-          interlinguaToLangModel.train(() => tf.data.fromGenerator(
-            () => Seq((tgtInterlingua, sentences)),
-            ((INT32, INT32), (INT32, INT32)),
-            ((Shape(-1), Shape.scalar()), (Shape(-1), Shape.scalar()))
-          ).asInstanceOf[MTTrainDataset])
+          interlinguaToLangModel.train(() => tf.data.TensorDataset(
+            (interlinguaSentences, srcSentences)).repeat().asInstanceOf[MTTrainDataset])
 
           // Send a message to the requester notifying that this agent is done processing this train request.
           requester ! AgentTrainResponse()
@@ -110,11 +102,10 @@ class Agent(
     }
   }
 
-  protected def processTranslateFromInterlinguaRequest(id: Long, sentences: (Tensor, Tensor)): Unit = {
-    val translatedSentences = interlinguaToLangModel.infer(() => {
-      tf.data.fromGenerator(() => Seq(sentences), (INT32, INT32), (Shape(-1), Shape.scalar()))
-          .asInstanceOf[MTInferDataset]
-    }).next()._2
+  protected def processTranslateFromInterlinguaRequest(id: Long, interlinguaSentences: (Tensor, Tensor)): Unit = {
+    val translatedSentences = interlinguaToLangModel.infer(
+      () => tf.data.TensorDataset(
+        interlinguaSentences).repeat().asInstanceOf[MTInferDataset]).next()._2
     sender() ! AgentTranslateFromInterlinguaResponse(id, translatedSentences)
   }
 

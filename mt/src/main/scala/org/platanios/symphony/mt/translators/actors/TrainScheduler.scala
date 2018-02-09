@@ -33,11 +33,11 @@ abstract class TrainScheduler(
 ) {
   /** Initializes this train scheduler. This method is always called by the translation system, in order to start
     * the training process. */
-  protected def initialize(): Unit
+  def initialize(): Unit
 
   /** Responds to a translation agent's train response. This method is called by the translation system, whenever it
     * receives an agent train response message. */
-  protected def onTrainResponse(agent: ActorRef): Unit
+  def onTrainResponse(agent: ActorRef): Unit
 }
 
 object TrainScheduler {
@@ -64,7 +64,8 @@ object TrainScheduler {
 
     override def hasNext: Boolean = true
     override def next(): ((Tensor, Tensor), (Tensor, Tensor)) = {
-      initialized.compareAndSet(false, {
+      initialized.compareAndSet(false, tf.createWith(graph) {
+        session.run(targets = tf.initializers)
         session.run(targets = initOp)
         true
       })
