@@ -21,7 +21,7 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.datasets.WMT16Dataset
 import org.platanios.symphony.mt.models.attention.BahdanauAttention
 import org.platanios.symphony.mt.models.rnn._
-import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
+import org.platanios.symphony.mt.models.{Model, StateBasedModel}
 import org.platanios.symphony.mt.translators.PairwiseTranslator
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
@@ -56,48 +56,53 @@ object WMT16 extends App {
     swapMemory = true,
     randomSeed = Some(10))
 
-  val trainConfig = TrainConfig(
-    maxGradNorm = 5.0f,
-    optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
-    learningRateInitial = 1.0f,
-    learningRateDecayRate = 0.5f,
-    learningRateDecaySteps = 340000 * 1 / (2 * 10),
-    learningRateDecayStartStep = 340000 * 2,
-    stopCriteria = StopCriteria(maxSteps = Some(340000)),
-    colocateGradientsWithOps = true)
-
-  val inferConfig = InferConfig(
-    beamWidth = 10,
-    lengthPenaltyWeight = 1.0f)
-
   val logConfig = LogConfig(
     logLossSteps = 100,
     logTrainEvalSteps = -1)
 
-  // Create a translator
-  val config = GNMTConfig(
-    srcLang, tgtLang, datasetFiles.srcVocab, datasetFiles.tgtVocab, env, dataConfig, inferConfig,
-    cell = BasicLSTM(forgetBias = 1.0f),
-    numUnits = 1024,
-    numBiLayers = 1,
-    numUniLayers = 3,
-    numUniResLayers = 2,
-    dropout = Some(0.2f),
-    attention = BahdanauAttention(normalized = true),
-    useNewAttention = false,
-    timeMajor = true)
-
   val trainDataset     = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = true)
+
   val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
   val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
   val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
 
-  val model = (srcLang: Language, tgtLang: Language, srcVocab: Vocabulary, tgtVocab: Vocabulary) => StateBasedModel(
-    config, srcLang, tgtLang, srcVocab, tgtVocab,
-    trainEvalDataset, devEvalDataset, testEvalDataset,
-    env, dataConfig, trainConfig, inferConfig, logConfig, "Model")
+  def model(src: (Language, Vocabulary), tgt: (Language, Vocabulary), env: Environment): Model = {
+    StateBasedModel(
+      StateBasedModel.Config(
+        env,
+        GNMTEncoder(
+          cell = BasicLSTM(forgetBias = 1.0f),
+          numUnits = 1024,
+          numBiLayers = 1,
+          numUniLayers = 3,
+          numUniResLayers = 2,
+          dropout = Some(0.2f),
+          timeMajor = true),
+        GNMTDecoder(
+          cell = BasicLSTM(forgetBias = 1.0f),
+          numUnits = 1024,
+          numLayers = 1 + 3, // Number of encoder bidirectional and unidirectional layers
+          numResLayers = 2,
+          attention = BahdanauAttention(normalized = true),
+          dropout = Some(0.2f),
+          useNewAttention = true,
+          timeMajor = true,
+          beamWidth = 10,
+          lengthPenaltyWeight = 1.0f),
+        timeMajor = true,
+        maxGradNorm = 5.0f,
+        optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
+        learningRateInitial = 1.0f,
+        learningRateDecayRate = 0.5f,
+        learningRateDecaySteps = 340000 * 1 / (2 * 10),
+        learningRateDecayStartStep = 340000 * 2,
+        colocateGradientsWithOps = true),
+      src._1, tgt._1, src._2, tgt._2,
+      trainEvalDataset, devEvalDataset, testEvalDataset,
+      dataConfig, logConfig, "Model")
+  }
 
-  val translator = PairwiseTranslator(model)
+  val translator = PairwiseTranslator(env, model)
 
-  translator.train(dataset, trainReverse = false)
+  translator.train(dataset, StopCriteria.steps(340000), trainReverse = false)
 }

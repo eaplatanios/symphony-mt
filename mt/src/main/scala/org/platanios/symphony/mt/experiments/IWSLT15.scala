@@ -19,10 +19,10 @@ import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{English, Vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
-import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel, TrainConfig}
+import org.platanios.symphony.mt.models.{Model, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
-import org.platanios.symphony.mt.translators.PairwiseTranslator
+import org.platanios.symphony.mt.translators.{PairwiseTranslator, SymphonyTranslator}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
@@ -48,61 +48,63 @@ object IWSLT15 extends App {
   val datasetFiles: LoadedDataset.GroupedFiles = dataset.files(srcLang, tgtLang)
 
   val env = Environment(
-    workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
-    numGPUs = 4,
+    workingDir = Paths.get("temp").resolve("symphony").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+    numGPUs = 0,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
-
-  val trainConfig = TrainConfig(
-    maxGradNorm = 5.0f,
-    optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
-    learningRateInitial = 1.0f,
-    learningRateDecayRate = 0.5f,
-    learningRateDecaySteps = 12000 * 1 / (3 * 4),
-    learningRateDecayStartStep = 12000 * 2 / 3,
-    stopCriteria = StopCriteria(maxSteps = Some(12000)),
-    colocateGradientsWithOps = true)
-
-  val inferConfig = InferConfig(beamWidth = 10)
 
   val logConfig = LogConfig(
     logLossSteps = 100,
     logTrainEvalSteps = -1)
 
-  // Create a translator
-  val config = StateBasedModel.Config(
-    UnidirectionalRNNEncoder(
-      srcLang, datasetFiles.srcVocab, env,
-      cell = BasicLSTM(forgetBias = 1.0f),
-      numUnits = 512,
-      numLayers = 2,
-      residual = false,
-      dropout = Some(0.2f),
-      timeMajor = true),
-    UnidirectionalRNNDecoder(
-      tgtLang, datasetFiles.tgtVocab, env, dataConfig, inferConfig,
-      cell = BasicLSTM(forgetBias = 1.0f),
-      numUnits = 512,
-      numLayers = 2,
-      residual = false,
-      dropout = Some(0.2f),
-      attention = Some(LuongAttention(scaled = true)),
-      outputAttention = true,
-      timeMajor = true),
-    timeMajor = true)
+  val trainDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = true)
 
-  val trainDataset     = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = true)
   val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
   val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
   val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
 
-  val model = (srcLang: Language, tgtLang: Language, srcVocab: Vocabulary, tgtVocab: Vocabulary) => StateBasedModel(
-    config, srcLang, tgtLang, srcVocab, tgtVocab,
-    trainEvalDataset, devEvalDataset, testEvalDataset,
-    env, dataConfig, trainConfig, inferConfig, logConfig, "Model")
+  //  val trainEvalDataset: () => MTTrainDataset = null
+  //  val devEvalDataset  : () => MTTrainDataset = null
+  //  val testEvalDataset : () => MTTrainDataset = null
 
-  val translator = PairwiseTranslator(model)
+  def model(src: (Language, Vocabulary), tgt: (Language, Vocabulary), env: Environment): Model = {
+    StateBasedModel(
+      StateBasedModel.Config(
+        env,
+        UnidirectionalRNNEncoder(
+          cell = BasicLSTM(forgetBias = 1.0f),
+          numUnits = 32,
+          numLayers = 2,
+          residual = false,
+          dropout = Some(0.2f),
+          timeMajor = true),
+        UnidirectionalRNNDecoder(
+          cell = BasicLSTM(forgetBias = 1.0f),
+          numUnits = 32,
+          numLayers = 2,
+          residual = false,
+          dropout = Some(0.2f),
+          attention = Some(LuongAttention(scaled = true)),
+          outputAttention = true,
+          timeMajor = true,
+          beamWidth = 10),
+        timeMajor = true,
+        maxGradNorm = 5.0f,
+        optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
+        learningRateInitial = 1.0f,
+        learningRateDecayRate = 0.5f,
+        learningRateDecaySteps = 12000 * 1 / (3 * 4),
+        learningRateDecayStartStep = 12000 * 2 / 3,
+        colocateGradientsWithOps = true),
+      src._1, tgt._1, src._2, tgt._2,
+      trainEvalDataset, devEvalDataset, testEvalDataset,
+      dataConfig, logConfig, "Model")
+  }
 
-  translator.train(dataset, trainReverse = false)
+  val translator = PairwiseTranslator(env, model)
+  translator.train(dataset, StopCriteria.steps(12000), trainReverse = false)
+
+  //  val translator = SymphonyTranslator(env, model, "IWSLT-15")
+  //  translator.train(dataset, StopCriteria.steps(12000))
 }

@@ -15,9 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.data.DataConfig
-import org.platanios.symphony.mt.models.{InferConfig, StateBasedModel}
+import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.models.StateBasedModel
 import org.platanios.symphony.mt.models.attention.Attention
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -31,11 +30,6 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.BeamSearchDecoder
   * @author Emmanouil Antonios Platanios
   */
 class GNMTDecoder[S, SS, AS, ASS](
-    override val tgtLanguage: Language,
-    override val tgtVocabulary: Vocabulary,
-    override val env: Environment,
-    override val dataConfig: DataConfig,
-    override val inferConfig: InferConfig,
     val cell: Cell[S, SS],
     val numUnits: Int,
     val numLayers: Int,
@@ -44,34 +38,46 @@ class GNMTDecoder[S, SS, AS, ASS](
     val dataType: DataType = FLOAT32,
     val dropout: Option[Float] = None,
     val useNewAttention: Boolean = true,
-    override val timeMajor: Boolean = false
+    override val timeMajor: Boolean = false,
+    // Inference
+    override val beamWidth: Int = 10,
+    override val lengthPenaltyWeight: Float = 0.0f,
+    override val decoderMaxLengthFactor: Float = 2.0f
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
     evAS: WhileLoopVariable.Aux[AS, ASS]
-) extends RNNDecoder[S, SS](tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, timeMajor)(evS, evSDropout) {
+) extends RNNDecoder[S, SS](timeMajor, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)(evS, evSDropout) {
   override def create(
-      encoderTuple: Tuple[Output, Seq[S]], inputSequenceLengths: Output,
-      targetSequences: Output, targetSequenceLengths: Output, mode: Mode
+      env: Environment,
+      encoderTuple: Tuple[Output, Seq[S]],
+      srcSequenceLengths: Output,
+      tgtVocab: Vocabulary,
+      tgtMaxLength: Int,
+      beginOfSequenceToken: String,
+      endOfSequenceToken: String,
+      tgtSequences: Output = null,
+      tgtSequenceLengths: Output = null,
+      mode: Mode
   ): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = StateBasedModel.embeddings(dataType, tgtVocabulary.size, numUnits, "Embeddings")
+    val embeddings = StateBasedModel.embeddings(dataType, tgtVocab.size, numUnits, "Embeddings")
 
     // RNN cells
     val cells = StateBasedModel.cells(
       cell, numUnits, dataType, numLayers, numResLayers, dropout,
-      Some(GNMTDecoder.residualFn[Output, Shape]), 0, env.numGPUs, env.randomSeed, "Cells")
+      Some(GNMTDecoder.residualFn[Output, Shape]), 0, env.numGPUs, env.firstGPU, env.randomSeed, "Cells")
 
     // Attention
     val bottomCell = cells.head
     var initialState = encoderTuple.state
     var memory = if (timeMajor) encoderTuple.output.transpose(Tensor(1, 0, 2)) else encoderTuple.output
-    var memorySequenceLengths = inputSequenceLengths
-    if (inferConfig.beamWidth > 1 && !mode.isTraining) {
+    var memorySequenceLengths = srcSequenceLengths
+    if (beamWidth > 1 && !mode.isTraining) {
       // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
-      initialState = BeamSearchDecoder.tileForBeamSearch(initialState, inferConfig.beamWidth)
-      memory = BeamSearchDecoder.tileForBeamSearch(memory, inferConfig.beamWidth)
-      memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, inferConfig.beamWidth)
+      initialState = BeamSearchDecoder.tileForBeamSearch(initialState, beamWidth)
+      memory = BeamSearchDecoder.tileForBeamSearch(memory, beamWidth)
+      memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, beamWidth)
     }
     val (attentionCell, attentionInitialState) = attention.create[S, SS](
       bottomCell, memory, memorySequenceLengths, numUnits, numUnits, initialState.head, useAttentionLayer = false,
@@ -79,18 +85,13 @@ class GNMTDecoder[S, SS, AS, ASS](
     val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](
       attentionCell, cells.tail.map(_.createCell(mode, Shape(2 * numUnits))), useNewAttention)
     decode(
-      inputSequenceLengths, targetSequences, targetSequenceLengths, (attentionInitialState, initialState.tail),
-      embeddings, multiCell, mode)
+      env, srcSequenceLengths, tgtSequences, tgtSequenceLengths, (attentionInitialState, initialState.tail),
+      embeddings, multiCell, tgtVocab, tgtMaxLength, beginOfSequenceToken, endOfSequenceToken, mode)
   }
 }
 
 object GNMTDecoder {
   def apply[S, SS, AS, ASS](
-      tgtLanguage: Language,
-      tgtVocabulary: Vocabulary,
-      env: Environment,
-      dataConfig: DataConfig,
-      inferConfig: InferConfig,
       cell: Cell[S, SS],
       numUnits: Int,
       numLayers: Int,
@@ -99,15 +100,19 @@ object GNMTDecoder {
       dataType: DataType = FLOAT32,
       dropout: Option[Float] = None,
       useNewAttention: Boolean = true,
-      timeMajor: Boolean = false
+      timeMajor: Boolean = false,
+      // Inference
+      beamWidth: Int = 10,
+      lengthPenaltyWeight: Float = 0.0f,
+      decoderMaxLengthFactor: Float = 2.0f
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
       evAS: WhileLoopVariable.Aux[AS, ASS]
   ): GNMTDecoder[S, SS, AS, ASS] = {
     new GNMTDecoder[S, SS, AS, ASS](
-      tgtLanguage, tgtVocabulary, env, dataConfig, inferConfig, cell, numUnits, numLayers, numResLayers, attention,
-      dataType, dropout, useNewAttention, timeMajor)(evS, evSDropout, evAS)
+      cell, numUnits, numLayers, numResLayers, attention, dataType, dropout, useNewAttention,
+      timeMajor, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)(evS, evSDropout, evAS)
   }
 
   /** GNMT model residual function that handles inputs and outputs with different sizes (due to attention). */

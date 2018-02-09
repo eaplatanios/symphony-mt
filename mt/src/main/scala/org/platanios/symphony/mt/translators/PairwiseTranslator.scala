@@ -20,6 +20,7 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.Tensor
+import org.platanios.tensorflow.api.learn.StopCriteria
 
 import scala.collection.mutable
 
@@ -32,9 +33,11 @@ class PairwiseTranslator protected (
 ) extends Translator(model) {
   protected val models: mutable.Map[(Language, Language), Model] = mutable.Map.empty
 
-  override def train(dataset: LoadedDataset): Unit = train(dataset, trainReverse = true)
+  override def train(dataset: LoadedDataset, stopCriteria: StopCriteria): Unit = {
+    train(dataset, stopCriteria, trainReverse = true)
+  }
 
-  def train(dataset: LoadedDataset, trainReverse: Boolean): Unit = {
+  def train(dataset: LoadedDataset, stopCriteria: StopCriteria, trainReverse: Boolean): Unit = {
     val languagePairs = {
       if (trainReverse) {
         // We train models for both possible translation directions.
@@ -53,7 +56,7 @@ class PairwiseTranslator protected (
           currentDatasetFiles.createTrainDataset(
             TRAIN_DATASET, repeat = true, dataConfig = currentDatasetFiles.dataConfig)
         }
-        currentModel.train(currentDataset)
+        currentModel.train(currentDataset, stopCriteria)
     }
   }
 

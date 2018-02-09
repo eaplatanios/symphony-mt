@@ -22,6 +22,7 @@ import org.platanios.symphony.mt.translators.actors.SystemConfig
 import org.platanios.symphony.mt.translators.actors.Messages.SystemTrainRequest
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.Tensor
+import org.platanios.tensorflow.api.learn.StopCriteria
 
 import akka.actor._
 
@@ -38,7 +39,7 @@ class SymphonyTranslator protected (
     actorSystem.actorOf(actors.System.props(SystemConfig(env, 1000), model), s"System$name")
   }
 
-  override def train(dataset: LoadedDataset): Unit = {
+  override def train(dataset: LoadedDataset, stopCriteria: StopCriteria): Unit = {
     system ! SystemTrainRequest(dataset)
   }
 

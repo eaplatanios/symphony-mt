@@ -15,7 +15,9 @@
 
 package org.platanios.symphony.mt.models.rnn
 
+import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.Encoder
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -28,9 +30,11 @@ abstract class RNNEncoder[S, SS]()(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Encoder[Tuple[Output, Seq[S]]] {
-  def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]]
-}
-
-object RNNEncoder {
-  case class Instance[S](tuple: Tuple[Output, Seq[S]])
+  def create(
+      env: Environment,
+      srcSequences: Output,
+      srcSequenceLengths: Output,
+      srcVocab: Vocabulary,
+      mode: Mode
+  ): Tuple[Output, Seq[S]]
 }

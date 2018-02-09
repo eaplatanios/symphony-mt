@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.{Environment, Language}
+import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.StateBasedModel
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -27,9 +27,6 @@ import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
   * @author Emmanouil Antonios Platanios
   */
 class GNMTEncoder[S, SS](
-    val srcLanguage: Language,
-    val srcVocabulary: Vocabulary,
-    val env: Environment,
     val cell: Cell[S, SS],
     val numUnits: Int,
     val numBiLayers: Int,
@@ -43,12 +40,18 @@ class GNMTEncoder[S, SS](
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends RNNEncoder[S, SS]()(evS, evSDropout) {
-  override def create(inputSequences: Output, sequenceLengths: Output, mode: Mode): Tuple[Output, Seq[S]] = {
+  override def create(
+      env: Environment,
+      srcSequences: Output,
+      srcSequenceLengths: Output,
+      srcVocab: Vocabulary,
+      mode: Mode
+  ): Tuple[Output, Seq[S]] = {
     // Time-major transpose
-    val transposedSequences = if (timeMajor) inputSequences.transpose() else inputSequences
+    val transposedSequences = if (timeMajor) srcSequences.transpose() else srcSequences
 
     // Embeddings
-    val embeddings = StateBasedModel.embeddings(dataType, srcVocabulary.size, numUnits, "Embeddings")
+    val embeddings = StateBasedModel.embeddings(dataType, srcVocab.size, numUnits, "Embeddings")
     val embeddedSequences = tf.embeddingLookup(embeddings, transposedSequences)
 
     // Bidirectional RNN layers
@@ -56,15 +59,15 @@ class GNMTEncoder[S, SS](
       if (numBiLayers > 0) {
         val biCellFw = StateBasedModel.multiCell(
           cell, numUnits, dataType, numBiLayers, 0, dropout,
-          residualFn, 0, env.numGPUs, env.randomSeed, "MultiBiCellFw")
+          residualFn, 0, env.numGPUs, env.firstGPU, env.randomSeed, "MultiBiCellFw")
         val biCellBw = StateBasedModel.multiCell(
           cell, numUnits, dataType, numBiLayers, 0, dropout,
-          residualFn, numBiLayers, env.numGPUs, env.randomSeed, "MultiBiCellBw")
+          residualFn, numBiLayers, env.numGPUs, env.firstGPU, env.randomSeed, "MultiBiCellBw")
         val createdCellFw = biCellFw.createCell(mode, embeddedSequences.shape)
         val createdCellBw = biCellBw.createCell(mode, embeddedSequences.shape)
         val unmergedBiTuple = tf.bidirectionalDynamicRNN(
           createdCellFw, createdCellBw, embeddedSequences, null, null, timeMajor, env.parallelIterations,
-          env.swapMemory, sequenceLengths, "BidirectionalLayers")
+          env.swapMemory, srcSequenceLengths, "BidirectionalLayers")
         Tuple(
           tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1), unmergedBiTuple._2.state)
       } else {
@@ -75,10 +78,10 @@ class GNMTEncoder[S, SS](
     // Unidirectional RNN layers
     val uniCell = StateBasedModel.multiCell(
       cell, numUnits, dataType, numUniLayers, numUniResLayers, dropout, residualFn,
-      2 * numBiLayers, env.numGPUs, env.randomSeed, "MultiUniCell")
+      2 * numBiLayers, env.numGPUs, env.firstGPU, env.randomSeed, "MultiUniCell")
     val uniCellInstance = uniCell.createCell(mode, biTuple.output.shape)
     val uniTuple = tf.dynamicRNN(
-      uniCellInstance, biTuple.output, null, timeMajor, env.parallelIterations, env.swapMemory, sequenceLengths,
+      uniCellInstance, biTuple.output, null, timeMajor, env.parallelIterations, env.swapMemory, srcSequenceLengths,
       "UnidirectionalLayers")
 
     // Pass all of the encoder's state except for the first bi-directional layer's state, to the decoder.
@@ -88,9 +91,6 @@ class GNMTEncoder[S, SS](
 
 object GNMTEncoder {
   def apply[S, SS](
-      srcLanguage: Language,
-      srcVocabulary: Vocabulary,
-      env: Environment,
       cell: Cell[S, SS],
       numUnits: Int,
       numBiLayers: Int,
@@ -105,7 +105,7 @@ object GNMTEncoder {
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): GNMTEncoder[S, SS] = {
     new GNMTEncoder[S, SS](
-      srcLanguage, srcVocabulary, env, cell, numUnits, numBiLayers, numUniLayers, numUniResLayers, dataType, dropout,
+      cell, numUnits, numBiLayers, numUniLayers, numUniResLayers, dataType, dropout,
       residualFn, timeMajor)(evS, evSDropout)
   }
 }

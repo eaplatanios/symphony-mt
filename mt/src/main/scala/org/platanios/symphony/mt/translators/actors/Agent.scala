@@ -85,11 +85,11 @@ class Agent(
         if (isTrain) {
           // Train model for the human language to interlingua translation direction.
           langToInterlinguaModel.train(() => tf.data.TensorDataset(
-            (srcSentences, interlinguaSentences)).repeat().asInstanceOf[MTTrainDataset])
+            (srcSentences, interlinguaSentences)).repeat().asInstanceOf[MTTrainDataset], ???)
 
           // Train model for the interlingua to human language translation direction.
           interlinguaToLangModel.train(() => tf.data.TensorDataset(
-            (interlinguaSentences, srcSentences)).repeat().asInstanceOf[MTTrainDataset])
+            (interlinguaSentences, srcSentences)).repeat().asInstanceOf[MTTrainDataset], ???)
 
           // Send a message to the requester notifying that this agent is done processing this train request.
           requester ! AgentTrainResponse()

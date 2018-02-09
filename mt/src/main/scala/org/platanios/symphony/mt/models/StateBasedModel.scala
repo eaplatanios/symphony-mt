@@ -21,30 +21,28 @@ import org.platanios.symphony.mt.metrics.{BLEU, MTMetric}
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.tensorflow.api.learn.Mode
+import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.{DeviceWrapper, DropoutWrapper, MultiCell, ResidualWrapper}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
-import org.platanios.tensorflow.api.ops.training.optimizers.decay.ExponentialDecay
+import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
+import org.platanios.tensorflow.api.ops.training.optimizers.decay.{Decay, ExponentialDecay}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 class StateBasedModel[S, SS](
     val config: StateBasedModel.Config[S, SS],
-    override val srcLanguage: Language,
-    override val tgtLanguage: Language,
-    override val srcVocabulary: Vocabulary,
-    override val tgtVocabulary: Vocabulary,
+    override val srcLang: Language,
+    override val tgtLang: Language,
+    override val srcVocab: Vocabulary,
+    override val tgtVocab: Vocabulary,
     override val trainEvalDataset: () => MTTrainDataset = null,
     override val devEvalDataset: () => MTTrainDataset = null,
     override val testEvalDataset: () => MTTrainDataset = null,
-    override val env: Environment = Environment(),
     override val dataConfig: DataConfig = DataConfig(),
-    override val trainConfig: TrainConfig = TrainConfig(),
-    override val inferConfig: InferConfig = InferConfig(),
     override val logConfig: LogConfig = LogConfig(),
     override val name: String = "Model"
 )(implicit
@@ -66,11 +64,11 @@ class StateBasedModel[S, SS](
 
   protected def optimizer: tf.train.Optimizer = {
     val decay = ExponentialDecay(
-      trainConfig.learningRateDecayRate,
-      trainConfig.learningRateDecaySteps,
+      config.learningRateDecayRate,
+      config.learningRateDecaySteps,
       staircase = true,
-      trainConfig.learningRateDecayStartStep)
-    trainConfig.optimizer(trainConfig.learningRateInitial, decay)
+      config.learningRateDecayStartStep)
+    config.optimizer(config.learningRateInitial, decay)
   }
 
   protected val estimator: tf.learn.Estimator[
@@ -85,22 +83,16 @@ class StateBasedModel[S, SS](
       trainInput = trainInput,
       loss = lossLayer,
       optimizer = optimizer,
-      clipGradients = tf.learn.ClipGradientsByGlobalNorm(trainConfig.maxGradNorm),
-      colocateGradientsWithOps = trainConfig.colocateGradientsWithOps)
+      clipGradients = tf.learn.ClipGradientsByGlobalNorm(config.maxGradNorm),
+      colocateGradientsWithOps = config.colocateGradientsWithOps)
     val summariesDir = env.workingDir.resolve("summaries")
-    val tensorBoardConfig = {
-      if (trainConfig.launchTensorBoard)
-        tf.learn.TensorBoardConfig(summariesDir, reloadInterval = 1)
-      else
-        null
-    }
 
     // Create estimator hooks
     var hooks = Set[tf.learn.Hook](
       // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-      tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainConfig.summarySteps)),
-      tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(trainConfig.checkpointSteps)))
+      tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
+      tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(config.checkpointSteps)))
 
     // Add logging hooks
     if (logConfig.logLossSteps > 0)
@@ -120,8 +112,7 @@ class StateBasedModel[S, SS](
 
     // Create estimator
     tf.learn.InMemoryEstimator(
-      model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed),
-      trainConfig.stopCriteria, hooks, tensorBoardConfig = tensorBoardConfig)
+      model, tf.learn.Configuration(Some(env.workingDir), randomSeed = env.randomSeed), trainHooks = hooks)
   }
 
   private final def trainLayer: Layer[((Output, Output), (Output, Output)), (Output, Output)] = {
@@ -135,19 +126,20 @@ class StateBasedModel[S, SS](
         // TODO: !!! I need to fix this repetition in TensorFlow for Scala.
         val encTuple = tf.createWithVariableScope("Encoder") {
           tf.learn.variableScope("Encoder") {
-            config.encoder.create(input._1._1, input._1._2, mode)
+            config.encoder.create(env, input._1._1, input._1._2, srcVocab, mode)
           }
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
           tf.learn.variableScope("Decoder") {
             // TODO: Handle this shift more efficiently.
             // Shift the target sequence one step forward so the decoder learns to output the next word.
-            val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+            val tgtBosId = tgtVocab.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
             val tgtSequence = tf.concatenate(Seq(
               tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtBosId),
               input._2._1), axis = 1)
             val tgtSequenceLength = input._2._2 + 1
-            config.decoder.create(encTuple, input._1._2, tgtSequence, tgtSequenceLength, mode)
+            config.decoder.create(env, encTuple, input._1._2, tgtVocab, dataConfig.tgtMaxLength,
+              dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength, mode)
           }
         }
         (decTuple.sequences, decTuple.sequenceLengths)
@@ -161,16 +153,18 @@ class StateBasedModel[S, SS](
 
       override protected def _forward(input: (Output, Output), mode: Mode): (Output, Output) = {
         // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
-        srcVocabulary.lookupTable()
+        srcVocab.lookupTable()
 
         val encTuple = tf.createWithVariableScope("Encoder") {
           tf.learn.variableScope("Encoder") {
-            config.encoder.create(input._1, input._2, mode)
+            config.encoder.create(env, input._1, input._2, srcVocab, mode)
           }
         }
         val decTuple = tf.createWithVariableScope("Decoder") {
           tf.learn.variableScope("Decoder") {
-            config.decoder.create(encTuple, input._2, null, null, mode)
+            config.decoder.create(
+              env, encTuple, input._2, tgtVocab, dataConfig.tgtMaxLength,
+              dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, null, null, mode)
           }
         }
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
@@ -199,7 +193,7 @@ class StateBasedModel[S, SS](
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
         // word used as input, rather than the previous predicted word.
-        val tgtEosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+        val tgtEosId = tgtVocab.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
         val tgtSequence = tf.concatenate(Seq(
           input._2._1,
           tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
@@ -211,8 +205,8 @@ class StateBasedModel[S, SS](
     }
   }
 
-  override def train(dataset: () => MTTrainDataset): Unit = {
-    estimator.train(dataset, trainConfig.stopCriteria)
+  override def train(dataset: () => MTTrainDataset, stopCriteria: StopCriteria): Unit = {
+    estimator.train(dataset, stopCriteria)
   }
 
   override def infer(dataset: () => MTInferDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
@@ -240,10 +234,7 @@ object StateBasedModel {
       trainEvalDataset: () => MTTrainDataset = null,
       devEvalDataset: () => MTTrainDataset = null,
       testEvalDataset: () => MTTrainDataset = null,
-      env: Environment = Environment(),
       dataConfig: DataConfig = DataConfig(),
-      trainConfig: TrainConfig = TrainConfig(),
-      inferConfig: InferConfig = InferConfig(),
       logConfig: LogConfig = LogConfig(),
       name: String = "Model"
   )(implicit
@@ -251,22 +242,49 @@ object StateBasedModel {
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): StateBasedModel[S, SS] = {
     new StateBasedModel[S, SS](
-      config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary, trainEvalDataset, devEvalDataset, testEvalDataset,
-      env, dataConfig, trainConfig, inferConfig, logConfig, name)(evS, evSDropout)
+      config, srcLanguage, tgtLanguage, srcVocabulary, tgtVocabulary,
+      trainEvalDataset, devEvalDataset, testEvalDataset,
+      dataConfig, logConfig, name)(evS, evSDropout)
   }
 
-  class Config[S, SS](
+  class Config[S, SS] protected (
+      val env: Environment,
+      // Model
       val encoder: RNNEncoder[S, SS],
       val decoder: RNNDecoder[S, SS],
-      val timeMajor: Boolean = false)
+      val timeMajor: Boolean = false,
+      // Training
+      val maxGradNorm: Float = 5.0f,
+      val optimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
+      val learningRateInitial: Float = 1.0f,
+      val learningRateDecayRate: Float = 1.0f,
+      val learningRateDecaySteps: Int = 10000,
+      val learningRateDecayStartStep: Int = 0,
+      val colocateGradientsWithOps: Boolean = true,
+      val summarySteps: Int = 100,
+      val checkpointSteps: Int = 1000)
 
   object Config {
     def apply[S, SS](
+        env: Environment,
+        // Model
         encoder: RNNEncoder[S, SS],
         decoder: RNNDecoder[S, SS],
-        timeMajor: Boolean = false
+        timeMajor: Boolean = false,
+        // Training
+        maxGradNorm: Float = 5.0f,
+        optimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
+        learningRateInitial: Float = 1.0f,
+        learningRateDecayRate: Float = 1.0f,
+        learningRateDecaySteps: Int = 10000,
+        learningRateDecayStartStep: Int = 0,
+        colocateGradientsWithOps: Boolean = true,
+        summarySteps: Int = 100,
+        checkpointSteps: Int = 1000
     ): Config[S, SS] = {
-      new Config[S, SS](encoder, decoder, timeMajor)
+      new Config[S, SS](
+        env, encoder, decoder, timeMajor, maxGradNorm, optimizer, learningRateInitial, learningRateDecayRate,
+        learningRateDecaySteps, learningRateDecayStartStep, colocateGradientsWithOps, summarySteps, checkpointSteps)
     }
   }
 
@@ -276,11 +294,11 @@ object StateBasedModel {
     tf.variable(name, dataType, Shape(srcSize, numUnits), embeddingsInitializer)
   }
 
-  private[this] def device(layerIndex: Int, numGPUs: Int = 0): String = {
-    if (numGPUs == 0)
+  private[this] def device(layerIndex: Int, numGPUs: Int = 0, firstGPU: Int = 0): String = {
+    if (numGPUs - firstGPU <= 0)
       "/device:CPU:0"
     else
-      s"/device:GPU:${layerIndex % numGPUs}"
+      s"/device:GPU:${firstGPU + (layerIndex % (numGPUs - firstGPU))}"
   }
 
   private[models] def cell[S, SS](
@@ -313,6 +331,7 @@ object StateBasedModel {
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
       baseGPU: Int = 0,
       numGPUs: Int = 0,
+      firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
   )(implicit
@@ -322,7 +341,7 @@ object StateBasedModel {
     (0 until numLayers).map(i => {
       cell(
         cellCreator, numUnits, dataType, dropout, if (i >= numLayers - numResidualLayers) residualFn else None,
-        Some(device(i + baseGPU, numGPUs)), seed, s"Cell$i")
+        Some(device(i + baseGPU, numGPUs, firstGPU)), seed, s"Cell$i")
     })
   }
 
@@ -336,6 +355,7 @@ object StateBasedModel {
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
       baseGPU: Int = 0,
       numGPUs: Int = 0,
+      firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
   )(implicit
@@ -344,6 +364,6 @@ object StateBasedModel {
   ): tf.learn.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {
     MultiCell(name, cells(
       cellCreator, numUnits, dataType, numLayers, numResidualLayers, dropout,
-      residualFn, baseGPU, numGPUs, seed, name))
+      residualFn, baseGPU, numGPUs, firstGPU, seed, name))
   }
 }

@@ -20,12 +20,13 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.Tensor
+import org.platanios.tensorflow.api.learn.StopCriteria
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 abstract class Translator(val model: ((Language, Vocabulary), (Language, Vocabulary), Environment) => Model) {
-  def train(dataset: LoadedDataset): Unit
+  def train(dataset: LoadedDataset, stopCriteria: StopCriteria): Unit
 
   @throws[IllegalStateException]
   def translate(

@@ -19,6 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.metrics.MTMetric
 import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.tensors.Tensor
 
 // TODO: Move embeddings initializer to the configuration.
@@ -33,20 +34,18 @@ trait Model {
 
   val env        : Environment = Environment()
   val dataConfig : DataConfig  = DataConfig()
-  val trainConfig: TrainConfig = TrainConfig()
-  val inferConfig: InferConfig = InferConfig()
   val logConfig  : LogConfig   = LogConfig()
 
-  val srcLanguage  : Language
-  val tgtLanguage  : Language
-  val srcVocabulary: Vocabulary
-  val tgtVocabulary: Vocabulary
+  val srcLang : Language
+  val tgtLang : Language
+  val srcVocab: Vocabulary
+  val tgtVocab: Vocabulary
 
   val trainEvalDataset: () => MTTrainDataset = null
   val devEvalDataset  : () => MTTrainDataset = null
   val testEvalDataset : () => MTTrainDataset = null
 
-  def train(dataset: () => MTTrainDataset): Unit
+  def train(dataset: () => MTTrainDataset, stopCriteria: StopCriteria): Unit
 
   def infer(dataset: () => MTInferDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
 
