@@ -30,14 +30,12 @@ import java.nio.file.Path
   *
   * @author Emmanouil Antonios Platanios
   */
-abstract class Dataset(
-    val srcLanguage: Language,
-    val tgtLanguage: Language,
-    val dataConfig: DataConfig
-)(
-    val downloadsDir: Path = dataConfig.workingDir
-) {
+abstract class Dataset(val srcLanguage: Language, val tgtLanguage: Language) {
   def name: String
+
+  def dataConfig: DataConfig
+
+  def downloadsDir: Path = dataConfig.workingDir
 
   protected def src: String = srcLanguage.abbreviation
   protected def tgt: String = tgtLanguage.abbreviation

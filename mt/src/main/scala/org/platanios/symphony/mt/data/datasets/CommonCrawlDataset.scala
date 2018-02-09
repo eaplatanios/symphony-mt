@@ -21,28 +21,30 @@ import org.platanios.symphony.mt.data.{DataConfig, Dataset}
 
 import better.files._
 
+import java.nio.file.Path
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 class CommonCrawlDataset(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
-    override val dataConfig: DataConfig
-) extends Dataset(
-  srcLanguage = srcLanguage,
-  tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(workingDir =
-      dataConfig.workingDir
-          .resolve("commoncrawl")
-          .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
-)(
-  downloadsDir = dataConfig.workingDir.resolve("commoncrawl")
-) {
+    val config: DataConfig
+) extends Dataset(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
     CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the CommonCrawl dataset.")
 
   override def name: String = "CommonCrawl"
+
+  override def dataConfig: DataConfig = {
+    config.copy(workingDir =
+        config.workingDir
+            .resolve("commoncrawl")
+            .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
+  }
+
+  override def downloadsDir: Path = config.workingDir.resolve("commoncrawl").resolve("downloads")
 
   private[this] def reversed: Boolean = {
     CommonCrawlDataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))

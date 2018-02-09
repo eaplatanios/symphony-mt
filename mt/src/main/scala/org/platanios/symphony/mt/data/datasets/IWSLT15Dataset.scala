@@ -21,28 +21,30 @@ import org.platanios.symphony.mt.data.{DataConfig, Dataset}
 
 import better.files._
 
+import java.nio.file.Path
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 class IWSLT15Dataset(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
-    override val dataConfig: DataConfig
-) extends Dataset(
-  srcLanguage = srcLanguage,
-  tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(workingDir =
-      dataConfig.workingDir
-          .resolve("iwslt-15")
-          .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
-)(
-  downloadsDir = dataConfig.workingDir.resolve("iwslt-15")
-) {
+    val config: DataConfig
+) extends Dataset(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
     IWSLT15Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the IWSLT-15 dataset.")
 
   override def name: String = "IWSLT-15"
+
+  override def dataConfig: DataConfig = {
+    config.copy(workingDir =
+        config.workingDir
+            .resolve("iwslt-15")
+            .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
+  }
+
+  override def downloadsDir: Path = config.workingDir.resolve("iwslt-15").resolve("downloads")
 
   private[this] def reversed: Boolean = {
     IWSLT15Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))

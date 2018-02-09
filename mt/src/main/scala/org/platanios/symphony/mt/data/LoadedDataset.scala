@@ -19,7 +19,9 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.{Vocabulary, VocabularyGenerator}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.TextLinesDataset
+
 import better.files._
+
 import java.io.BufferedWriter
 
 import scala.collection.immutable.Traversable
@@ -85,16 +87,21 @@ object LoadedDataset {
       vocabularies.mapValues(Vocabulary(_)),
       files
           .groupBy(dataset => (dataset.srcLanguage, dataset.tgtLanguage))
-          .mapValues(_.reduce((dataset1, dataset2) => {
-            GroupedFiles(
-              srcLanguage = dataset1.srcLanguage,
-              tgtLanguage = dataset1.tgtLanguage,
-              dataConfig = dataConfig,
-              trainCorpora = dataset1.trainCorpora ++ dataset2.trainCorpora,
-              devCorpora = dataset1.devCorpora ++ dataset2.devCorpora,
-              testCorpora = dataset1.testCorpora ++ dataset2.testCorpora,
-              vocabularies = Some((vocabularies(dataset1.srcLanguage), vocabularies(dataset1.tgtLanguage))))
-          })))
+          .map {
+            case ((srcLang, tgtLang), allFiles) =>
+              (srcLang, tgtLang) -> allFiles.fold(GroupedFiles(srcLang, tgtLang, dataConfig)) {
+                (files1, files2) => {
+                  GroupedFiles(
+                    srcLanguage = srcLang,
+                    tgtLanguage = tgtLang,
+                    dataConfig = dataConfig,
+                    trainCorpora = files1.trainCorpora ++ files2.trainCorpora,
+                    devCorpora = files1.devCorpora ++ files2.devCorpora,
+                    testCorpora = files1.testCorpora ++ files2.testCorpora,
+                    vocabularies = Some((vocabularies(srcLang), vocabularies(tgtLang))))
+                }
+              }
+          })
   }
 
   def merge(dataConfig: DataConfig, datasets: Traversable[LoadedDataset]): LoadedDataset = {

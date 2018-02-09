@@ -21,28 +21,30 @@ import org.platanios.symphony.mt.data.{DataConfig, Dataset}
 
 import better.files._
 
+import java.nio.file.Path
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 class EuroparlV8Dataset(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
-    override val dataConfig: DataConfig
-) extends Dataset(
-  srcLanguage = srcLanguage,
-  tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(workingDir =
-      dataConfig.workingDir
-          .resolve("europarl-v8")
-          .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
-)(
-  downloadsDir = dataConfig.workingDir.resolve("europarl-v8")
-) {
+    val config: DataConfig
+) extends Dataset(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
     EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v8 dataset.")
 
   override def name: String = "Europarl v8"
+
+  override def dataConfig: DataConfig = {
+    config.copy(workingDir =
+        config.workingDir
+            .resolve("europarl-v8")
+            .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
+  }
+
+  override def downloadsDir: Path = config.workingDir.resolve("europarl-v8").resolve("downloads")
 
   private[this] def reversed: Boolean = {
     EuroparlV8Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))

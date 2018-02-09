@@ -21,28 +21,30 @@ import org.platanios.symphony.mt.data.{DataConfig, Dataset}
 
 import better.files._
 
+import java.nio.file.Path
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 class WMT16Dataset(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
-    override val dataConfig: DataConfig
-) extends Dataset(
-  srcLanguage = srcLanguage,
-  tgtLanguage = tgtLanguage,
-  dataConfig = dataConfig.copy(workingDir =
-      dataConfig.workingDir
-          .resolve("wmt-16")
-          .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
-)(
-  downloadsDir = dataConfig.workingDir.resolve("wmt-16")
-) {
+    val config: DataConfig
+) extends Dataset(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
     WMT16Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the WMT16 dataset.")
 
   override def name: String = "WMT-16"
+
+  override def dataConfig: DataConfig = {
+    config.copy(workingDir =
+        config.workingDir
+            .resolve("wmt-16")
+            .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
+  }
+
+  override def downloadsDir: Path = config.workingDir.resolve("wmt-16").resolve("downloads")
 
   private[this] def reversed: Boolean = {
     WMT16Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
@@ -50,28 +52,32 @@ class WMT16Dataset(
 
   protected def commonCrawlDataset: Option[CommonCrawlDataset] = {
     if (CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(CommonCrawlDataset(srcLanguage, tgtLanguage, dataConfig.copy(loaderSentenceLengthBounds = None)))
+      Some(CommonCrawlDataset(
+        srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir, loaderSentenceLengthBounds = None)))
     else
       None
   }
 
   protected def europarlV7Dataset: Option[EuroparlV7Dataset] = {
     if (EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV7Dataset(srcLanguage, tgtLanguage, dataConfig.copy(loaderSentenceLengthBounds = None)))
+      Some(EuroparlV7Dataset(
+        srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir, loaderSentenceLengthBounds = None)))
     else
       None
   }
 
   protected def europarlV8Dataset: Option[EuroparlV8Dataset] = {
     if (EuroparlV8Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV8Dataset(srcLanguage, tgtLanguage, dataConfig.copy(loaderSentenceLengthBounds = None)))
+      Some(EuroparlV8Dataset(
+        srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir, loaderSentenceLengthBounds = None)))
     else
       None
   }
 
   protected def newsCommentaryV11Dataset: Option[NewsCommentaryV11Dataset] = {
     if (NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(NewsCommentaryV11Dataset(srcLanguage, tgtLanguage, dataConfig.copy(loaderSentenceLengthBounds = None)))
+      Some(NewsCommentaryV11Dataset(
+        srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir, loaderSentenceLengthBounds = None)))
     else
       None
   }
