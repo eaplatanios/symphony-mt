@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.translators.agents
+package org.platanios.symphony.mt.translators.actors
 
 import scala.collection.mutable
 
@@ -26,7 +26,7 @@ import scala.collection.mutable
   *
   * @author Emmanouil Antonios Platanios
   */
-private[agents] sealed trait RequestManager[R] {
+private[actors] sealed trait RequestManager[R] {
   /** Sets the request data for the provided ID to the provided value.
     *
     * @param  id   Request ID.
@@ -50,7 +50,7 @@ private[agents] sealed trait RequestManager[R] {
 }
 
 /** Request manager that uses a hash map for storing the request data. */
-private[agents] case class HashRequestManager[R] private[agents] () extends RequestManager[R] {
+private[actors] case class HashRequestManager[R] private[actors] () extends RequestManager[R] {
   /** Cache containing the stored request data. */
   private[this] val cache: mutable.LongMap[R] = mutable.LongMap.empty[R]
 

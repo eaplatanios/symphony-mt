@@ -13,12 +13,12 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.translators.agents
+package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.LoadedDataset
 import org.platanios.symphony.mt.models.Model
-import org.platanios.symphony.mt.translators.agents.Messages._
+import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary._
 import org.platanios.tensorflow.api.Tensor
 
@@ -158,7 +158,7 @@ class System(
 }
 
 object System {
-  private[agents] val logger = Logger(LoggerFactory.getLogger("Translation System"))
+  private[actors] val logger = Logger(LoggerFactory.getLogger("Translation System"))
 
   def props(
       config: SystemConfig,

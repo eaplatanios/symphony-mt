@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.Language
 /**
   * @author Emmanouil Antonios Platanios
   */
-package object agents {
+package object actors {
   /** Represents the agents' common (and hidden) language, which is called the interlingua. */
   case object Interlingua extends Language("Interlingua", "il")
 }

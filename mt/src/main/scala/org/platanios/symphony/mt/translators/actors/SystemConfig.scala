@@ -13,10 +13,10 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.translators.agents
+package org.platanios.symphony.mt.translators.actors
 
+import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.implicits.SerializationImplicits._
-import org.platanios.symphony.mt.vocabulary.Vocabulary
 
 import better.files.File
 import io.circe.syntax._
@@ -28,18 +28,18 @@ import java.io.FileNotFoundException
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class SystemState(interlinguaVocab: Vocabulary, agents: Seq[AgentState])
+case class SystemConfig(environment: Environment, interlinguaVocabSize: Int)
 
-object SystemState {
-  def save(state: SystemState, file: File): File = {
+object SystemConfig {
+  def save(config: SystemConfig, file: File): File = {
     file.createIfNotExists(createParents = true)
-    file.overwrite(state.asJson.asYaml.spaces2)
+    file.overwrite(config.asJson.asYaml.spaces2)
   }
 
-  def load(file: File): Either[Throwable, SystemState] = {
+  def load(file: File): Either[Throwable, SystemConfig] = {
     if (file.notExists)
       Left(new FileNotFoundException(s"'$file' was not found."))
     else
-      YAMLParser.parse(file.contentAsString).flatMap(_.as[SystemState])
+      YAMLParser.parse(file.contentAsString).flatMap(_.as[SystemConfig])
   }
 }

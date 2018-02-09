@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.translators.agents
+package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.LoadedDataset

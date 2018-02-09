@@ -13,12 +13,12 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.translators.agents
+package org.platanios.symphony.mt.translators.actors
 
 import akka.actor.ActorRef
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.LoadedDataset
-import org.platanios.symphony.mt.translators.agents.Messages.AgentTrainRequest
+import org.platanios.symphony.mt.translators.actors.Messages.AgentTrainRequest
 
 import java.util.concurrent.atomic.AtomicInteger
 

@@ -13,12 +13,12 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.translators.agents
+package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.{MTInferDataset, MTTrainDataset}
 import org.platanios.symphony.mt.models.Model
-import org.platanios.symphony.mt.translators.agents.Messages._
+import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
