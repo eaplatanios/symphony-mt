@@ -22,7 +22,7 @@ import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
-import org.platanios.symphony.mt.translators.{PairwiseTranslator, SymphonyTranslator}
+import org.platanios.symphony.mt.translators.PairwiseTranslator
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
@@ -48,8 +48,8 @@ object IWSLT15 extends App {
   val datasetFiles: LoadedDataset.GroupedFiles = dataset.files(srcLang, tgtLang)
 
   val env = Environment(
-    workingDir = Paths.get("temp").resolve("symphony").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
-    numGPUs = 0,
+    workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+    numGPUs = 4,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
@@ -57,16 +57,6 @@ object IWSLT15 extends App {
   val logConfig = LogConfig(
     logLossSteps = 100,
     logTrainEvalSteps = -1)
-
-  val trainDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = true)
-
-  val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
-  val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
-  val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
-
-  //  val trainEvalDataset: () => MTTrainDataset = null
-  //  val devEvalDataset  : () => MTTrainDataset = null
-  //  val testEvalDataset : () => MTTrainDataset = null
 
   def model(
       srcLang: Language,
@@ -106,13 +96,12 @@ object IWSLT15 extends App {
         learningRateDecaySteps = 12000 * 1 / (3 * 4),
         learningRateDecayStartStep = 12000 * 2 / 3,
         colocateGradientsWithOps = true),
-      trainEvalDataset, devEvalDataset, testEvalDataset,
+      trainEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
+      devEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
+      testEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
       dataConfig, logConfig)
   }
 
   val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(12000), trainReverse = false)
-
-  //  val translator = SymphonyTranslator(env, model, "IWSLT-15")
-  //  translator.train(dataset, StopCriteria.steps(12000))
+  translator.train(dataset, StopCriteria.steps(12000), trainReverse = true)
 }

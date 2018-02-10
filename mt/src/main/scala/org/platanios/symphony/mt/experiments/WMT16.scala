@@ -50,7 +50,7 @@ object WMT16 extends App {
   val datasetFiles: LoadedDataset.GroupedFiles = dataset.files(srcLang, tgtLang)
 
   val env = Environment(
-    workingDir = Paths.get("temp").resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+    workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
     numGPUs = 4,
     parallelIterations = 32,
     swapMemory = true,
@@ -59,12 +59,6 @@ object WMT16 extends App {
   val logConfig = LogConfig(
     logLossSteps = 100,
     logTrainEvalSteps = -1)
-
-  val trainDataset     = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = true)
-
-  val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
-  val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
-  val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
 
   def model(
       srcLang: Language,
@@ -106,11 +100,12 @@ object WMT16 extends App {
         learningRateDecaySteps = 340000 * 1 / (2 * 10),
         learningRateDecayStartStep = 340000 * 2,
         colocateGradientsWithOps = true),
-      trainEvalDataset, devEvalDataset, testEvalDataset,
+      trainEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
+      devEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
+      testEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
       dataConfig, logConfig)
   }
 
   val translator = PairwiseTranslator(env, model)
-
   translator.train(dataset, StopCriteria.steps(340000), trainReverse = false)
 }
