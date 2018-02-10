@@ -34,7 +34,7 @@ import java.nio.file.{Path, Paths}
   * @author Emmanouil Antonios Platanios
   */
 object SymphonyIWSLT15 extends App {
-  val workingDir: Path = Paths.get("temp-symphony")
+  val workingDir: Path = Paths.get("temp").resolve("symphony")
 
   val srcLang        : Language = English
   val tgtLang        : Language = Vietnamese
