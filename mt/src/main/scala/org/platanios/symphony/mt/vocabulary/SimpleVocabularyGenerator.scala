@@ -64,7 +64,6 @@ class SimpleVocabularyGenerator protected (
       counter
     }).words(sizeThreshold, countThreshold)
         .toSeq.sortBy(-_._1).map(_._2)
-        .filter(_ != "")
         .foreach(word => writer.write(word + "\n"))
     writer.flush()
     writer.close()
