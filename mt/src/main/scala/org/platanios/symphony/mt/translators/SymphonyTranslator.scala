@@ -30,13 +30,13 @@ import akka.actor._
   * @author Emmanouil Antonios Platanios
   */
 class SymphonyTranslator protected (
-    val env: Environment,
+    val systemConfig: SystemConfig,
     override val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
     val name: String
 ) extends Translator(model) {
   protected val actorSystem: ActorSystem = ActorSystem(s"SymphonyTranslator$name")
   protected val system     : ActorRef    = {
-    actorSystem.actorOf(actors.System.props(SystemConfig(env, 1000), model), s"System$name")
+    actorSystem.actorOf(actors.System.props(systemConfig, model), s"System$name")
   }
 
   override def train(dataset: LoadedDataset, stopCriteria: StopCriteria): Unit = {
@@ -53,10 +53,10 @@ class SymphonyTranslator protected (
 
 object SymphonyTranslator {
   def apply(
-      env: Environment,
+      systemConfig: SystemConfig,
       model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
       name: String
   ): SymphonyTranslator = {
-    new SymphonyTranslator(env, model, name)
+    new SymphonyTranslator(systemConfig, model, name)
   }
 }

@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.LoadedDataset
-import org.platanios.symphony.mt.translators.actors.Messages.AgentTrainRequest
+import org.platanios.symphony.mt.translators.actors.Messages.{AgentSelfTrainRequest, AgentTrainRequest}
 import org.platanios.tensorflow.api.learn.StopCriteria
 
 import akka.actor._
@@ -30,8 +30,11 @@ import java.util.concurrent.atomic.AtomicInteger
 class RoundRobinTrainScheduler protected (
     override protected val dataset: LoadedDataset,
     override protected val agents: Map[Language, ActorRef],
+    val selfTrainSteps: Long = 0L,
     val trainStepsPerRequest: Long = 10L
 )(implicit sender: ActorRef = Actor.noSender) extends TrainScheduler(dataset, agents) {
+  protected var completedSteps: Long = 0L
+
   /** Contains the train datasets used by this train scheduler. */
   protected val datasets: Map[Language, Seq[(Language, TrainScheduler.DatasetIterator)]] = {
     val aggregated = dataset.languagePairs(includeReverse = true).map {
@@ -54,6 +57,7 @@ class RoundRobinTrainScheduler protected (
   /** Responds to a translation agent's train response. This method is called by the translation system, whenever it
     * receives an agent train response message. */
   override def onTrainResponse(agent: ActorRef): Unit = {
+    completedSteps += 1L
     val (lang, index) = currentIndices(agent)
     var nextIndex = index.getAndIncrement()
     val dataset = datasets(lang)
@@ -62,14 +66,22 @@ class RoundRobinTrainScheduler protected (
       nextIndex = 0
     }
     val nextDataset = dataset(nextIndex)
-    agent ! AgentTrainRequest(agents(nextDataset._1), nextDataset._2.next(), StopCriteria.steps(trainStepsPerRequest))
+    if (completedSteps < selfTrainSteps + 1L)
+      agent ! AgentSelfTrainRequest(nextDataset._2.next()._1, StopCriteria.steps(trainStepsPerRequest))
+    else
+      agent ! AgentTrainRequest(agents(nextDataset._1), nextDataset._2.next(), StopCriteria.steps(trainStepsPerRequest))
   }
 }
 
 object RoundRobinTrainScheduler {
-  def apply(dataset: LoadedDataset, agents: Map[Language, ActorRef], trainStepsPerRequest: Long = 10L)(implicit
+  def apply(
+      dataset: LoadedDataset,
+      agents: Map[Language, ActorRef],
+      selfTrainSteps: Long = 0L,
+      trainStepsPerRequest: Long = 10L
+  )(implicit
       sender: ActorRef = Actor.noSender
   ): RoundRobinTrainScheduler = {
-    new RoundRobinTrainScheduler(dataset, agents, trainStepsPerRequest)(sender)
+    new RoundRobinTrainScheduler(dataset, agents, selfTrainSteps, trainStepsPerRequest)(sender)
   }
 }

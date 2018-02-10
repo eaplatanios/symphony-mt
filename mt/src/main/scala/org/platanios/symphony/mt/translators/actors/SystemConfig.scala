@@ -28,7 +28,11 @@ import java.io.FileNotFoundException
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class SystemConfig(environment: Environment, interlinguaVocabSize: Int)
+case class SystemConfig(
+  env: Environment,
+  interlinguaVocabSize: Int, 
+  selfTrainSteps: Long = 0L, 
+  trainStepsPerRequest: Long = 10L)
 
 object SystemConfig {
   def save(config: SystemConfig, file: File): File = {

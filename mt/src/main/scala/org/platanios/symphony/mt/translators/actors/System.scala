@@ -38,10 +38,10 @@ class System(
     protected val requestManagerType: RequestManager.Type = RequestManager.Hash
 ) extends Actor with ActorLogging {
   /** Working directory for this translation system. */
-  protected val systemWorkingDir: File = File(config.environment.workingDir) / "system"
+  protected val systemWorkingDir: File = File(config.env.workingDir) / "system"
 
   /** Working directory for all translation agents. */
-  protected val agentsWorkingDir: File = File(config.environment.workingDir) / "agents"
+  protected val agentsWorkingDir: File = File(config.env.workingDir) / "agents"
 
   /** State file for this translation system. */
   protected val systemStateFile: File = systemWorkingDir / "state.yaml"
@@ -89,6 +89,8 @@ class System(
       sender() ! SystemActor
     case SystemTrainRequest(dataset) =>
       processSystemTrainRequest(dataset)
+    case AgentSelfTrainResponse() =>
+      trainScheduler.onTrainResponse(sender())
     case AgentTrainResponse() =>
       trainScheduler.onTrainResponse(sender())
     case SystemTranslateRequest(srcLang, tgtLang, sentences) =>
@@ -109,7 +111,10 @@ class System(
       })
     }
     // TODO: Make this configurable.
-    trainScheduler = RoundRobinTrainScheduler(dataset, agents.toMap, trainStepsPerRequest = 10L)
+    trainScheduler = RoundRobinTrainScheduler(
+      dataset, agents.toMap, 
+      selfTrainSteps = config.selfTrainSteps, 
+      trainStepsPerRequest = config.trainStepsPerRequest)
     trainScheduler.initialize()
   }
 
@@ -160,7 +165,7 @@ class System(
     agents.getOrElseUpdate(lang, context.actorOf(
       Agent.props(
         lang, vocab, systemState.interlinguaVocab,
-        model(_, _, _, _, config.environment.copy(workingDir = workingDir.path)),
+        model(_, _, _, _, config.env.copy(workingDir = workingDir.path)),
         requestManagerType), s"translation-agent-${lang.abbreviation}"))
   }
 }
