@@ -34,7 +34,7 @@ class RoundRobinTrainScheduler protected (
 )(implicit sender: ActorRef = Actor.noSender) extends TrainScheduler(dataset, agents) {
   /** Contains the train datasets used by this train scheduler. */
   protected val datasets: Map[Language, Seq[(Language, TrainScheduler.DatasetIterator)]] = {
-    val aggregated = dataset.languagePairs.map {
+    val aggregated = dataset.languagePairs(includeReverse = true).map {
       case (srcLang, tgtLang) =>
         srcLang -> ((tgtLang, TrainScheduler.DatasetIterator(dataset.files(srcLang, tgtLang), dataset.dataConfig)))
     }

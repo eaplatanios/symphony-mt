@@ -36,7 +36,12 @@ class LoadedDataset protected (
 ) {
   val workingDir: File = File(dataConfig.workingDir)
 
-  def languagePairs: Set[(Language, Language)] = datasets.keySet ++ datasets.keySet.map(l => (l._2, l._1))
+  def languagePairs(includeReverse: Boolean = true): Set[(Language, Language)] = {
+    if (includeReverse)
+      datasets.keySet ++ datasets.keySet.map(l => (l._2, l._1))
+    else
+      datasets.keySet
+  }
 
   def files(srcLanguage: Language, tgtLanguage: Language): LoadedDataset.GroupedFiles = {
     datasets.getOrElse((srcLanguage, tgtLanguage), datasets((tgtLanguage, srcLanguage)).reversed)

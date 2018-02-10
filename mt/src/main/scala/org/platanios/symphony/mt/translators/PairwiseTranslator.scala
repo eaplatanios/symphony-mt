@@ -38,20 +38,14 @@ class PairwiseTranslator protected (
   }
 
   def train(dataset: LoadedDataset, stopCriteria: StopCriteria, trainReverse: Boolean): Unit = {
-    val languagePairs = {
-      if (trainReverse) {
-        // We train models for both possible translation directions.
-        dataset.languagePairs.flatMap(p => Seq((p._1, p._2), (p._2, p._1)))
-      } else {
-        dataset.languagePairs
-      }
-    }
-    languagePairs.foreach {
+    dataset.languagePairs(trainReverse).foreach {
       case (srcLanguage, tgtLanguage) =>
         val currentDatasetFiles = dataset.files(srcLanguage, tgtLanguage)
         val currentModel = models.getOrElseUpdate(
           (srcLanguage, tgtLanguage),
-          model(srcLanguage, currentDatasetFiles.srcVocab, tgtLanguage, currentDatasetFiles.tgtVocab, env))
+          model(
+            srcLanguage, currentDatasetFiles.srcVocab, tgtLanguage, currentDatasetFiles.tgtVocab,
+            env.copy(workingDir = env.workingDir.resolve(s"$srcLanguage-$tgtLanguage"))))
         val currentDataset = () => {
           currentDatasetFiles.createTrainDataset(
             TRAIN_DATASET, repeat = true, dataConfig = currentDatasetFiles.dataConfig)
