@@ -45,7 +45,7 @@ class PairwiseTranslator protected (
           (srcLanguage, tgtLanguage),
           model(
             srcLanguage, currentDatasetFiles.srcVocab, tgtLanguage, currentDatasetFiles.tgtVocab,
-            env.copy(workingDir = env.workingDir.resolve(s"$srcLanguage-$tgtLanguage"))))
+            env.copy(workingDir = env.workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))))
         val currentDataset = () => {
           currentDatasetFiles.createTrainDataset(
             TRAIN_DATASET, repeat = true, dataConfig = currentDatasetFiles.dataConfig)
