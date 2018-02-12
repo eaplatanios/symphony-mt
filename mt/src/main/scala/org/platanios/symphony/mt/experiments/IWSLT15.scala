@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.experiments
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.Language.{English, Vietnamese}
+import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
@@ -35,8 +35,8 @@ import java.nio.file.{Path, Paths}
 object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp")
 
-  val srcLang: Language = English
-  val tgtLang: Language = Vietnamese
+  val srcLang: Language = english
+  val tgtLang: Language = vietnamese
 
   val dataConfig = DataConfig(
     workingDir = workingDir.resolve("data"),

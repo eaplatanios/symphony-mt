@@ -35,8 +35,8 @@ class Agent(
     protected val model: (Language, Vocabulary, Language, Vocabulary) => Model,
     protected val requestManagerType: RequestManager.Type = RequestManager.Hash
 ) extends Actor with ActorLogging {
-  protected val langToInterlinguaModel: Model = model(language, languageVocab, Interlingua, interlinguaVocab)
-  protected val interlinguaToLangModel: Model = model(Interlingua, interlinguaVocab, language, languageVocab)
+  protected val langToInterlinguaModel: Model = model(language, languageVocab, interlingua, interlinguaVocab)
+  protected val interlinguaToLangModel: Model = model(interlingua, interlinguaVocab, language, languageVocab)
 
   /** Used for messages that map to stored request information. */
   protected var uniqueIdCounter: Long = 0L

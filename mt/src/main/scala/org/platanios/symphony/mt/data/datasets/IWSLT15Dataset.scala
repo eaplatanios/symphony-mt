@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.data.datasets
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.Language.{English, Vietnamese}
+import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data.{DataConfig, Dataset}
 
 import better.files._
@@ -91,7 +91,7 @@ object IWSLT15Dataset {
   val testPrefix : String = "tst2013"
   val vocabPrefix: String = "vocab"
 
-  val supportedLanguagePairs: Set[(Language, Language)] = Set((English, Vietnamese))
+  val supportedLanguagePairs: Set[(Language, Language)] = Set((english, vietnamese))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||

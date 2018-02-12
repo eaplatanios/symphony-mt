@@ -22,5 +22,5 @@ import org.platanios.symphony.mt.Language
   */
 package object actors {
   /** Represents the agents' common (and hidden) language, which is called the interlingua. */
-  case object Interlingua extends Language("Interlingua", "il")
+  val interlingua: Language = Language("Interlingua", "il")
 }

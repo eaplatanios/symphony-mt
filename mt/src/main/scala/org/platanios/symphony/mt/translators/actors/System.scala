@@ -51,7 +51,7 @@ class System(
     case Left(failure) =>
       System.logger.info(s"Translation system state file '$systemStateFile' could not be loaded.", failure)
       System.logger.info("A new translation system state file will be created.")
-      val interlinguaVocabFile = systemWorkingDir / s"vocab.${Interlingua.abbreviation}"
+      val interlinguaVocabFile = systemWorkingDir / s"vocab.${interlingua.abbreviation}"
       if (interlinguaVocabFile.notExists) {
         System.logger.info(s"Generating vocabulary file for $language.")
         DummyVocabularyGenerator(config.interlinguaVocabSize).generate(Seq.empty[File], interlinguaVocabFile)
@@ -66,9 +66,11 @@ class System(
   }
 
   /** Map containing the translation agents managed by this translation system. */
-  protected val agents: mutable.Map[Language, ActorRef] = mutable.HashMap[Language, ActorRef](
-    systemState.agents.map(agentState =>
-      agentState.language -> createAgent(agentState.language, agentState.vocab, cleanWorkingDir = false)): _*)
+  protected val agents: mutable.Map[Language, ActorRef] = mutable.HashMap.empty[Language, ActorRef]
+
+  // Initialize the agents map from the current system state (in case it's been loaded from a file).
+  systemState.agents.foreach(agentState =>
+    agentState.language -> createAgent(agentState.language, agentState.vocab, cleanWorkingDir = false))
 
   /** Used for messages that map to stored request information. */
   protected var uniqueIdCounter: Long = 0L

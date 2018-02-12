@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.Language.{English, Vietnamese}
+import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
@@ -36,12 +36,12 @@ import java.nio.file.{Path, Paths}
 object SymphonyIWSLT15 extends App {
   val workingDir: Path = Paths.get("temp").resolve("symphony")
 
-  val srcLang        : Language = English
-  val tgtLang        : Language = Vietnamese
+  val srcLang        : Language = english
+  val tgtLang        : Language = vietnamese
   val commonVocabSize: Int      = 10000
 
   val dataConfig = DataConfig(
-    workingDir = workingDir.resolve("data"),
+    workingDir = Paths.get("temp").resolve("data"),
     numBuckets = 5,
     srcMaxLength = 50,
     tgtMaxLength = 50,

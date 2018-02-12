@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.experiments
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
-import org.platanios.symphony.mt.Language.{English, German}
+import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.datasets.WMT16Dataset
 import org.platanios.symphony.mt.models.attention.BahdanauAttention
@@ -35,8 +35,8 @@ import java.nio.file.{Path, Paths}
 object WMT16 extends App {
   val workingDir: Path = Paths.get("temp")
 
-  val srcLang: Language = German
-  val tgtLang: Language = English
+  val srcLang: Language = german
+  val tgtLang: Language = english
 
   val dataConfig = DataConfig(
     workingDir = workingDir.resolve("data"),
