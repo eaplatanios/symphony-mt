@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.LoadedDataset
+import org.platanios.symphony.mt.data.{DatasetIterator, LoadedDataset}
 import org.platanios.symphony.mt.translators.actors.Messages.{AgentSelfTrainRequest, AgentTrainRequest}
 import org.platanios.tensorflow.api.learn.StopCriteria
 
@@ -36,10 +36,10 @@ class RoundRobinTrainScheduler protected (
   protected var completedSteps: Long = 0L
 
   /** Contains the train datasets used by this train scheduler. */
-  protected val datasets: Map[Language, Seq[(Language, TrainScheduler.DatasetIterator)]] = {
+  protected val datasets: Map[Language, Seq[(Language, DatasetIterator)]] = {
     val aggregated = dataset.languagePairs(includeReverse = true).map {
       case (srcLang, tgtLang) =>
-        srcLang -> ((tgtLang, TrainScheduler.DatasetIterator(dataset.files(srcLang, tgtLang), dataset.dataConfig)))
+        srcLang -> ((tgtLang, DatasetIterator(dataset.files(srcLang, tgtLang), dataset.dataConfig)))
     }
     aggregated.toSeq.groupBy(_._1).mapValues(_.map(_._2))
   }

@@ -16,13 +16,9 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.{DataConfig, LoadedDataset, TRAIN_DATASET}
-import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.io.data.InitializableIterator
+import org.platanios.symphony.mt.data.LoadedDataset
 
 import akka.actor.ActorRef
-
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -38,50 +34,4 @@ abstract class TrainScheduler(
   /** Responds to a translation agent's train response. This method is called by the translation system, whenever it
     * receives an agent train response message. */
   def onTrainResponse(agent: ActorRef): Unit
-}
-
-object TrainScheduler {
-  class DatasetIterator protected (
-      val files: LoadedDataset.GroupedFiles,
-      val dataConfig: DataConfig
-  ) extends Iterator[((Tensor, Tensor), (Tensor, Tensor))] {
-    // TODO: [RECOVERY] Add ability to recover if the session crashes.
-
-    protected val graph  : Graph   = Graph()
-    protected val session: Session = Session(graph)
-
-    protected val iterator: InitializableIterator[
-        ((Tensor, Tensor), (Tensor, Tensor)),
-        ((Output, Output), (Output, Output)),
-        ((DataType, DataType), (DataType, DataType)),
-        ((Shape, Shape), (Shape, Shape))] = tf.createWith(graph) {
-      tf.data.iteratorFromDataset(
-        files.createTrainDataset(TRAIN_DATASET, repeat = true, dataConfig, isEval = false))
-    }
-
-    protected val initOp    : Op                                   = tf.createWith(graph)(iterator.initializer)
-    protected val nextOutput: ((Output, Output), (Output, Output)) = tf.createWith(graph)(iterator.next())
-
-    protected var initialized: AtomicBoolean = new AtomicBoolean(false)
-
-    override def hasNext: Boolean = true
-    override def next(): ((Tensor, Tensor), (Tensor, Tensor)) = {
-      if (initialized.compareAndSet(false, true)) {
-        tf.createWith(graph) {
-          session.run(targets = tf.initializers)
-          session.run(targets = initOp)
-        }
-      }
-      session.run(fetches = nextOutput)
-    }
-  }
-
-  object DatasetIterator {
-    def apply(
-        files: LoadedDataset.GroupedFiles,
-        dataConfig: DataConfig
-    ): DatasetIterator = {
-      new DatasetIterator(files, dataConfig)
-    }
-  }
 }
