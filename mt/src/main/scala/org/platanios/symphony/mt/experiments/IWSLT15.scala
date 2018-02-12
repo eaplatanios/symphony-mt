@@ -19,6 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
+import org.platanios.symphony.mt.evaluation.{BLEU, Evaluator}
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
@@ -33,13 +34,13 @@ import java.nio.file.{Path, Paths}
   * @author Emmanouil Antonios Platanios
   */
 object IWSLT15 extends App {
-  val workingDir: Path = Paths.get("temp")
+  val workingDir: Path = Paths.get("temp").resolve("pairwise")
 
   val srcLang: Language = english
   val tgtLang: Language = vietnamese
 
   val dataConfig = DataConfig(
-    workingDir = workingDir.resolve("data"),
+    workingDir = Paths.get("temp").resolve("data"),
     numBuckets = 5,
     srcMaxLength = 50,
     tgtMaxLength = 50)
@@ -73,14 +74,14 @@ object IWSLT15 extends App {
         env,
         UnidirectionalRNNEncoder(
           cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 32,
+          numUnits = 512,
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
           timeMajor = true),
         UnidirectionalRNNDecoder(
           cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 32,
+          numUnits = 512,
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
@@ -103,5 +104,8 @@ object IWSLT15 extends App {
   }
 
   val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(12000), trainReverse = true)
+  translator.train(dataset, StopCriteria.steps(12000), trainReverse = false)
+
+  val evaluator = Evaluator()
+  evaluator.evaluate(BLEU(), translator, dataset.files(srcLang, tgtLang), TEST_DATASET, dataConfig)
 }
