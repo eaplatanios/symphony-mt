@@ -44,7 +44,7 @@ class Evaluator protected () {
         inputs, Seq(INT32, INT32))
       val metricOps = metric.streaming(((prediction(0), prediction(1)), next._2))
       session.run(targets = tf.initializers)
-      session.run(targets = iterator.initializer)
+      session.run(targets = Set(iterator.initializer, tf.localVariablesInitializer()))
       try {
         while (true)
           session.run(targets = metricOps.update)
