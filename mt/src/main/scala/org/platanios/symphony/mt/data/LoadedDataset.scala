@@ -52,16 +52,16 @@ object LoadedDataset {
   def apply(dataConfig: DataConfig, files: Traversable[GroupedFiles]): LoadedDataset = {
     val workingDir = File(dataConfig.workingDir)
     val vocabularies = {
-      (files.groupBy(_.srcLanguage).mapValues(_.filter(_.vocabularies.isDefined).map(_.vocabularies.get._1)) ++
-          files.groupBy(_.tgtLanguage).mapValues(_.filter(_.vocabularies.isDefined).map(_.vocabularies.get._2)))
+      (files.groupBy(_.srcLang).mapValues(_.filter(_.vocabularies.isDefined).map(_.vocabularies.get._1)) ++
+          files.groupBy(_.tgtLang).mapValues(_.filter(_.vocabularies.isDefined).map(_.vocabularies.get._2)))
           .map {
             case (language, vocabFiles) =>
               dataConfig.loaderVocab match {
                 case GeneratedVocabulary(generator) =>
                   language -> {
                     val tokenizedFiles =
-                      files.filter(_.srcLanguage == language).flatMap(_.trainCorpora.map(_._2)) ++
-                          files.filter(_.tgtLanguage == language).flatMap(_.trainCorpora.map(_._3))
+                      files.filter(_.srcLang == language).flatMap(_.trainCorpora.map(_._2)) ++
+                          files.filter(_.tgtLang == language).flatMap(_.trainCorpora.map(_._3))
                     val vocabFile = workingDir / s"vocab.${language.abbreviation}"
                     if (vocabFile.notExists) {
                       Dataset.logger.info(s"Generating vocabulary file for $language.")
@@ -91,14 +91,14 @@ object LoadedDataset {
       dataConfig,
       vocabularies.mapValues(Vocabulary(_)),
       files
-          .groupBy(dataset => (dataset.srcLanguage, dataset.tgtLanguage))
+          .groupBy(dataset => (dataset.srcLang, dataset.tgtLang))
           .map {
             case ((srcLang, tgtLang), allFiles) =>
               (srcLang, tgtLang) -> allFiles.fold(GroupedFiles(srcLang, tgtLang, dataConfig)) {
                 (files1, files2) => {
                   GroupedFiles(
-                    srcLanguage = srcLang,
-                    tgtLanguage = tgtLang,
+                    srcLang = srcLang,
+                    tgtLang = tgtLang,
                     dataConfig = dataConfig,
                     trainCorpora = files1.trainCorpora ++ files2.trainCorpora,
                     devCorpora = files1.devCorpora ++ files2.devCorpora,
@@ -118,8 +118,8 @@ object LoadedDataset {
   }
 
   case class GroupedFiles(
-      srcLanguage: Language,
-      tgtLanguage: Language,
+      srcLang: Language,
+      tgtLang: Language,
       dataConfig: DataConfig,
       trainCorpora: Seq[(String, File, File)] = Seq.empty,
       devCorpora: Seq[(String, File, File)] = Seq.empty,
@@ -144,7 +144,7 @@ object LoadedDataset {
 
     def reversed: GroupedFiles = {
       GroupedFiles(
-        tgtLanguage, srcLanguage, dataConfig,
+        tgtLang, srcLang, dataConfig,
         trainCorpora.map(f => (f._1, f._3, f._2)),
         devCorpora.map(f => (f._1, f._3, f._2)),
         testCorpora.map(f => (f._1, f._3, f._2)),
@@ -153,17 +153,17 @@ object LoadedDataset {
 
     def generateVocab(generator: VocabularyGenerator): GroupedFiles = {
       val workingDir = File(dataConfig.workingDir)
-      val srcVocab = workingDir / s"vocab.${srcLanguage.abbreviation}"
-      val tgtVocab = workingDir / s"vocab.${tgtLanguage.abbreviation}"
+      val srcVocab = workingDir / s"vocab.${srcLang.abbreviation}"
+      val tgtVocab = workingDir / s"vocab.${tgtLang.abbreviation}"
       if (srcVocab.notExists) {
-        Dataset.logger.info(s"Generating vocabulary file for ${srcLanguage.abbreviation}.")
+        Dataset.logger.info(s"Generating vocabulary file for ${srcLang.abbreviation}.")
         generator.generate(trainCorpora.map(_._2), srcVocab)
-        Dataset.logger.info(s"Generated vocabulary file for ${srcLanguage.abbreviation}.")
+        Dataset.logger.info(s"Generated vocabulary file for ${srcLang.abbreviation}.")
       }
       if (tgtVocab.notExists) {
-        Dataset.logger.info(s"Generating vocabulary file for ${tgtLanguage.abbreviation}.")
+        Dataset.logger.info(s"Generating vocabulary file for ${tgtLang.abbreviation}.")
         generator.generate(trainCorpora.map(_._3), tgtVocab)
-        Dataset.logger.info(s"Generated vocabulary file for ${tgtLanguage.abbreviation}.")
+        Dataset.logger.info(s"Generated vocabulary file for ${tgtLang.abbreviation}.")
       }
       copy(vocabularies = Some((srcVocab, tgtVocab)))
     }

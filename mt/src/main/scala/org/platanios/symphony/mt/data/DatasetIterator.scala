@@ -20,9 +20,12 @@ import org.platanios.tensorflow.api.ops.io.data.InitializableIterator
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
-  * @param  files
-  * @param  dataConfig
+/** Iterator over a TensorFlow dataset.
+  *
+  * This iterator creates a TensorFlow dataset for `files` and a session that loads it and iterates over its elements.
+  *
+  * @param  files      Files from which to construct the dataset iterator.
+  * @param  dataConfig Data configuration to use.
   *
   * @author Emmanouil Antonios Platanios
   */
