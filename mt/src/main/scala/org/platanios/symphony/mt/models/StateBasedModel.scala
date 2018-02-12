@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.metrics.{BLEU, MTMetric}
+import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric}
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary

@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.metrics
+package org.platanios.symphony.mt.evaluation
 
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.Op
@@ -216,7 +216,7 @@ object BLEU {
     BLEUScore(bleu, precisions, lengthRatio, smooth)
   }
 
-  private[metrics] def nGramMatches[T](
+  private[evaluation] def nGramMatches[T](
       referenceCorpus: Seq[Seq[Seq[T]]],
       hypothesisCorpus: Seq[Seq[T]],
       maxOrder: Int = 4

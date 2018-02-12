@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Language, LogConfig}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.metrics.MTMetric
+import org.platanios.symphony.mt.evaluation.MTMetric
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.tensors.Tensor

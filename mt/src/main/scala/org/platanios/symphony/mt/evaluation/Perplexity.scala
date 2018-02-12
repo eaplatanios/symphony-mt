@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.metrics
+package org.platanios.symphony.mt.evaluation
 
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.metrics.Metric

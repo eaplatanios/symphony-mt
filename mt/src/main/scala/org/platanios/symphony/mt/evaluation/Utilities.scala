@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.metrics
+package org.platanios.symphony.mt.evaluation
 
 import scala.collection.mutable
 

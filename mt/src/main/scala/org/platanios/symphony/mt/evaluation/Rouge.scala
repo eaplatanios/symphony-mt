@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.metrics
+package org.platanios.symphony.mt.evaluation
 
 /** Contains methods for computing 
   * [Recall-Oriented Understudy for Gisting Evaluation (ROUGE)](https://en.wikipedia.org/wiki/ROUGE_(metric)) scores 
