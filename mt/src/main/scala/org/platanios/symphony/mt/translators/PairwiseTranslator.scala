@@ -60,12 +60,12 @@ class PairwiseTranslator protected (
       tgtLanguage: Language,
       dataset: () => MTInferDataset
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
-    models.get((srcLanguage, tgtLanguage)) match {
-      case None => // TODO: Maybe instead of throwing an exception we want to let an untrained model make predictions.
-        throw new IllegalStateException(
-          s"This pairwise translator has not been trained to translate from $srcLanguage to $tgtLanguage.")
-      case Some(currentModel) => currentModel.infer(dataset)
-    }
+    val model = models.getOrElseUpdate(
+      (srcLanguage, tgtLanguage),
+      model(
+        srcLanguage, currentDatasetFiles.srcVocab, tgtLanguage, currentDatasetFiles.tgtVocab,
+        env.copy(workingDir = env.workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))))
+    model.infer(dataset)
   }
 }
 
