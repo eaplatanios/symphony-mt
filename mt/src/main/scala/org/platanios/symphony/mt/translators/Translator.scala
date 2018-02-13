@@ -31,12 +31,21 @@ abstract class Translator(val model: (Language, Vocabulary, Language, Vocabulary
   @throws[IllegalStateException]
   def translate(
       srcLang: Language,
+      srcVocab: Vocabulary,
       tgtLang: Language,
+      tgtVocab: Vocabulary,
       dataset: () => MTInferDataset
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
 
   @throws[IllegalStateException]
-  def translate(srcLang: Language, tgtLang: Language, input: (Tensor, Tensor)): (Tensor, Tensor) = {
-    translate(srcLang, tgtLang, () => tf.data.TensorDataset(input).asInstanceOf[MTInferDataset]).next()._2
+  def translate(
+      srcLang: Language,
+      srcVocab: Vocabulary,
+      tgtLang: Language,
+      tgtVocab: Vocabulary,
+      input: (Tensor, Tensor)
+  ): (Tensor, Tensor) = {
+    translate(
+      srcLang, srcVocab, tgtLang, tgtVocab, () => tf.data.TensorDataset(input).asInstanceOf[MTInferDataset]).next()._2
   }
 }

@@ -27,7 +27,9 @@ class Evaluator protected (
 ) {
   def evaluate(translator: Translator): Map[String, Tensor] = {
     val srcLang = datasetFiles.srcLang
+    val srcVocab = datasetFiles.srcVocab
     val tgtLang = datasetFiles.tgtLang
+    val tgtVocab = datasetFiles.tgtVocab
     val graph = Graph()
     val session = Session(graph)
     val values = tf.createWith(graph) {
@@ -37,7 +39,7 @@ class Evaluator protected (
       val inputs = Seq(next._1._1, next._1._2)
       val prediction = tf.callback(
         (inputs: Seq[Tensor]) => {
-          val output = translator.translate(srcLang, tgtLang, (inputs(0), inputs(1)))
+          val output = translator.translate(srcLang, srcVocab, tgtLang, tgtVocab, (inputs(0), inputs(1)))
           Seq(output._1, output._2)
         },
         inputs, Seq(INT32, INT32))

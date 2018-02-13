@@ -45,8 +45,10 @@ class SymphonyTranslator protected (
 
   @throws[IllegalStateException]
   override def translate(
-      srcLanguage: Language,
-      tgtLanguage: Language,
+      srcLang: Language,
+      srcVocab: Vocabulary,
+      tgtLang: Language,
+      tgtVocab: Vocabulary,
       dataset: () => MTInferDataset
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = ???
 }

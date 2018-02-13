@@ -56,16 +56,18 @@ class PairwiseTranslator protected (
 
   @throws[IllegalStateException]
   override def translate(
-      srcLanguage: Language,
-      tgtLanguage: Language,
+      srcLang: Language,
+      srcVocab: Vocabulary,
+      tgtLang: Language,
+      tgtVocab: Vocabulary,
       dataset: () => MTInferDataset
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
-    val model = models.getOrElseUpdate(
-      (srcLanguage, tgtLanguage),
+    val currentModel = models.getOrElseUpdate(
+      (srcLang, tgtLang),
       model(
-        srcLanguage, currentDatasetFiles.srcVocab, tgtLanguage, currentDatasetFiles.tgtVocab,
-        env.copy(workingDir = env.workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))))
-    model.infer(dataset)
+        srcLang, srcVocab, tgtLang, tgtVocab,
+        env.copy(workingDir = env.workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"))))
+    currentModel.infer(dataset)
   }
 }
 
