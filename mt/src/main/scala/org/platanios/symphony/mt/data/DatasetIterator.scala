@@ -56,7 +56,7 @@ class DatasetIterator protected (
   override def next(): ((Tensor, Tensor), (Tensor, Tensor)) = {
     if (initialized.compareAndSet(false, true)) {
       tf.createWith(graph) {
-        session.run(targets = tf.initializers)
+        session.run(targets = tf.lookupsInitializer())
         session.run(targets = initOp)
       }
     }
