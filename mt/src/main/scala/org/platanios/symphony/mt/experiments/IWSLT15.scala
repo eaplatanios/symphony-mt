@@ -106,6 +106,6 @@ object IWSLT15 extends App {
   val translator = PairwiseTranslator(env, model)
   translator.train(dataset, StopCriteria.steps(12000), trainReverse = false)
 
-  val evaluator = Evaluator()
-  evaluator.evaluate(BLEU(), translator, dataset.files(srcLang, tgtLang), TEST_DATASET, dataConfig)
+  val evaluator = Evaluator(Seq(BLEU()), dataset.files(srcLang, tgtLang), TEST_DATASET, dataConfig)
+  evaluator.evaluate(translator)
 }
