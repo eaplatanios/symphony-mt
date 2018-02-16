@@ -87,7 +87,7 @@ class FileParallelDataset protected (
         (srcEosId, tf.zeros(INT32, Shape.scalar())))
     }
 
-    val dataset = joinMonolingualDatasets(
+    val dataset = joinTensorDatasets(
       files(language).map(file => tf.data.TextLinesDataset(file.path.toAbsolutePath.toString())))
     val datasetBeforeBatching = dataset
         .map(o => tf.stringSplit(o.expandDims(0)).values)
@@ -118,9 +118,9 @@ class FileParallelDataset protected (
     val srcEosId = srcVocabTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
     val tgtEosId = tgtVocabTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
-    val srcDataset = joinMonolingualDatasets(
+    val srcDataset = joinTensorDatasets(
       files(language1).map(file => tf.data.TextLinesDataset(file.path.toAbsolutePath.toString())))
-    val tgtDataset = joinMonolingualDatasets(
+    val tgtDataset = joinTensorDatasets(
       files(language2).map(file => tf.data.TextLinesDataset(file.path.toAbsolutePath.toString())))
 
     val batchingFn = (dataset: TFBilingualDataset) => {

@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.{joinBilingualDatasets, ParallelDataset, TFBilingualDataset, TFMonolingualDataset}
+import org.platanios.symphony.mt.data.{joinTensorPairDatasets, ParallelDataset, TFBilingualDataset, TFMonolingualDataset}
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -128,12 +128,12 @@ class Agent protected (
         // Train model for the human language to interlingua translation direction.
         lang1ToLang2Model.train(() =>
           dataset.toTFMonolingual(language1._1)
-              .zip(joinBilingualDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset)).repeat())
+              .zip(joinTensorPairDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset)).repeat())
               .asInstanceOf[TFBilingualDataset], trainStopCriteria)
 
         // Train model for the interlingua to human language translation direction.
         lang2ToLang1Model.train(() =>
-          joinBilingualDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset)).repeat()
+          joinTensorPairDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset)).repeat()
               .zip(dataset.toTFMonolingual(language1._1))
               .asInstanceOf[TFBilingualDataset], trainStopCriteria)
 
