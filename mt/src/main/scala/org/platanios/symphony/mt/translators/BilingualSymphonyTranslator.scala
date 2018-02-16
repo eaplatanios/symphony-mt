@@ -29,14 +29,14 @@
 ///**
 //  * @author Emmanouil Antonios Platanios
 //  */
-//class SymphonyTranslator protected (
+//class BilingualSymphonyTranslator protected (
 //    val systemConfig: SystemConfig,
 //    override val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
 //    val name: String
 //) extends Translator(model) {
 //  protected val actorSystem: ActorSystem = ActorSystem(s"SymphonyTranslator$name")
 //  protected val system     : ActorRef    = {
-//    actorSystem.actorOf(actors.System.props(systemConfig, model), s"System$name")
+//    actorSystem.actorOf(actors.BilingualSystem.props(systemConfig, model), s"System$name")
 //  }
 //
 //  override def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
@@ -50,12 +50,12 @@
 //  ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = ???
 //}
 //
-//object SymphonyTranslator {
+//object BilingualSymphonyTranslator {
 //  def apply(
 //      systemConfig: SystemConfig,
 //      model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
 //      name: String
-//  ): SymphonyTranslator = {
-//    new SymphonyTranslator(systemConfig, model, name)
+//  ): BilingualSymphonyTranslator = {
+//    new BilingualSymphonyTranslator(systemConfig, model, name)
 //  }
 //}

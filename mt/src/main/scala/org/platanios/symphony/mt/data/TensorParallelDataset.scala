@@ -68,7 +68,7 @@ class TensorParallelDataset protected (
     */
   override def toTFMonolingual(language: Language): TFMonolingualDataset = {
     checkSupportsLanguage(language)
-    joinBilingualDatasets(tensors(language).map(tf.data.TensorSlicesDataset(_)))
+    joinBilingualDatasets(tensors(language).map(tf.data.TensorDataset(_)))
   }
 
   override def toTFBilingual(
@@ -76,7 +76,13 @@ class TensorParallelDataset protected (
       language2: Language,
       repeat: Boolean = true,
       isEval: Boolean = false
-  ): TFBilingualDataset = ???
+  ): TFBilingualDataset = {
+    checkSupportsLanguage(language1)
+    checkSupportsLanguage(language2)
+    val dataset1 = joinBilingualDatasets(tensors(language1).map(tf.data.TensorDataset(_)))
+    val dataset2 = joinBilingualDatasets(tensors(language2).map(tf.data.TensorDataset(_)))
+    dataset1.zip(dataset2)
+  }
 }
 
 object TensorParallelDataset {

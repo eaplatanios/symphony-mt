@@ -28,7 +28,7 @@ import java.io.FileNotFoundException
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class SystemState(interlinguaVocab: Vocabulary, agents: Seq[AgentState])
+case class SystemState(interlinguaVocab: Option[Vocabulary], agents: Seq[AgentState])
 
 object SystemState {
   def save(state: SystemState, file: File): File = {

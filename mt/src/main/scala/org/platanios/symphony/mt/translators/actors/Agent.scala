@@ -25,6 +25,8 @@ import org.platanios.tensorflow.api.learn.StopCriteria
 
 import akka.actor._
 
+import scala.collection.mutable
+
 /**
   * @author Emmanouil Antonios Platanios
   */
@@ -36,6 +38,8 @@ class Agent protected (
 ) extends Actor with ActorLogging {
   protected val lang1ToLang2Model: Model = model(language1._1, language1._2, language2._1, language2._2)
   protected val lang2ToLang1Model: Model = model(language2._1, language2._2, language1._1, language1._2)
+
+  protected val otherAgents: mutable.Map[(Language, Language), ActorRef] = mutable.Map.empty
 
   /** Used for messages that map to stored request information. */
   protected var uniqueIdCounter: Long = 0L
@@ -56,10 +60,12 @@ class Agent protected (
   override def receive: Receive = {
     case Type =>
       sender() ! AgentActor(language1._1, language2._1)
+    case AgentForLanguagePair(srcLanguage, tgtLanguage, agent) =>
+      otherAgents.update((srcLanguage, tgtLanguage), agent)
     case AgentSelfTrainRequest(dataset, stopCriteria) =>
       processAgentSelfTrainRequest(dataset, stopCriteria)
     case AgentTrainRequest(tgtAgent, dataset, stopCriteria) =>
-      processAgentTrainRequest(tgtAgent, dataset, stopCriteria)
+      processAgentTrainRequest(dataset, stopCriteria)
     case AgentTranslateRequest(id, srcLanguage, tgtLanguage, dataset) =>
       processTranslateRequest(id, srcLanguage, tgtLanguage, dataset)
     case AgentTranslateResponse(id, language, sentences) =>
@@ -79,13 +85,20 @@ class Agent protected (
   }
 
   protected def processAgentTrainRequest(
-      tgtAgent: ActorRef,
       dataset: ParallelDataset,
       stopCriteria: StopCriteria
   ): Unit = {
-    requestManager.set(uniqueIdCounter, Agent.RequestInformation(sender(), dataset, Some(stopCriteria)))
-    tgtAgent ! AgentTranslateRequest(uniqueIdCounter, language2._1, interlingua, dataset)
-    uniqueIdCounter += 1
+    if (dataset.languages.contains(language1._1) && dataset.languages.contains(language2._1)) {
+      // TODO: !!! This is currently blocking which is bad.
+      lang1ToLang2Model.train(() => dataset.toTFBilingual(language1._1, language2._1), stopCriteria)
+      lang2ToLang1Model.train(() => dataset.toTFBilingual(language2._1, language1._1), stopCriteria)
+      sender() ! AgentTrainResponse()
+    } else {
+      ???
+      requestManager.set(uniqueIdCounter, Agent.RequestInformation(sender(), dataset, Some(stopCriteria)))
+      otherAgents(language1._1 -> language2._1) ! AgentTranslateRequest(uniqueIdCounter, language1._1, language2._1, dataset)
+      uniqueIdCounter += 1
+    }
   }
 
   protected def processTranslateRequest(
@@ -96,9 +109,9 @@ class Agent protected (
   ): Unit = {
     val translatedSentences = {
       if (srcLanguage == language1._1 && tgtLanguage == language2._1)
-        lang1ToLang2Model.infer(() => dataset.toTFMonolingual(language1._1)).map(_._2)
+        lang1ToLang2Model.infer(() => dataset.toTFMonolingual(language1._1)).map(_._2).filter(_ != null).toArray
       else if (srcLanguage == language2._1 && tgtLanguage == language1._1)
-        lang2ToLang1Model.infer(() => dataset.toTFMonolingual(language2._1)).map(_._2)
+        lang2ToLang1Model.infer(() => dataset.toTFMonolingual(language2._1)).map(_._2).filter(_ != null).toArray
       else throw new IllegalArgumentException(
         s"Agent '${self.path.name}' cannot translate from $srcLanguage to $tgtLanguage.")
     }
@@ -108,19 +121,19 @@ class Agent protected (
   protected def processTranslateResponse(
       id: Long,
       language: Language,
-      sentences: Iterator[(Tensor, Tensor)]
+      sentences: Seq[(Tensor, Tensor)]
   ): Unit = {
     requestManager.get(id) match {
       case Some(Agent.RequestInformation(requester, dataset, Some(trainStopCriteria))) =>
         // Train model for the human language to interlingua translation direction.
         lang1ToLang2Model.train(() =>
           dataset.toTFMonolingual(language1._1)
-              .zip(joinBilingualDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset).toSeq).repeat())
+              .zip(joinBilingualDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset)).repeat())
               .asInstanceOf[TFBilingualDataset], trainStopCriteria)
 
         // Train model for the interlingua to human language translation direction.
         lang2ToLang1Model.train(() =>
-          joinBilingualDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset).toSeq).repeat()
+          joinBilingualDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset)).repeat()
               .zip(dataset.toTFMonolingual(language1._1))
               .asInstanceOf[TFBilingualDataset], trainStopCriteria)
 

@@ -30,6 +30,8 @@ object Messages {
   /** Message sent to any actor, requesting for a response containing the agent's type. */
   case object Type
 
+  case class AgentForLanguagePair(srcLanguage: Language, tgtLanguage: Language, agent: ActorRef)
+
   /** Message handled by a translation system, that provides it with a training dataset.
     *
     * @param  dataset      Training dataset containing parallel corpora for (potentially) multiple language pairs.
@@ -61,7 +63,7 @@ object Messages {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataset: ParallelDataset, // TODO: Switch to not returning `srcSentences` when we start using a request ID.
-      tgtSentences: Iterator[(Tensor, Tensor)])
+      tgtSentences: Seq[(Tensor, Tensor)])
 
   /** Message sent by a translation system to a translation agent, that provides it with sentences in its own language,
     * so that it learns to translate between its own language and the interlingua.
@@ -102,5 +104,5 @@ object Messages {
     * @param  sentences Iterator over translated sentences. Each element is a tuple that contains a padded tensor with
     *                   word IDs in the interlingua and a tensor with the sentence lengths.
     */
-  case class AgentTranslateResponse(id: Long, language: Language, sentences: Iterator[(Tensor, Tensor)])
+  case class AgentTranslateResponse(id: Long, language: Language, sentences: Seq[(Tensor, Tensor)])
 }

@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.data.{ParallelDataset, TensorParallelDataset}
+import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary._
@@ -33,7 +33,7 @@ import scala.collection.mutable
 /**
   * @author Emmanouil Antonios Platanios
   */
-class System protected (
+class BilingualSystem protected (
     val config: SystemConfig,
     protected val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
     protected val requestManagerType: RequestManager.Type = RequestManager.Hash
@@ -51,15 +51,9 @@ class System protected (
   protected var systemState: SystemState = SystemState.load(systemStateFile) match {
     case Left(failure) =>
       System.logger.info(s"Translation system state file '$systemStateFile' could not be loaded.", failure.getMessage)
-      System.logger.info("A new translation system state file will be created.")
-      val interlinguaVocabFile = systemWorkingDir / s"vocab.${interlingua.abbreviation}"
-      if (interlinguaVocabFile.notExists) {
-        System.logger.info(s"Generating vocabulary file for $language.")
-        DummyVocabularyGenerator(config.interlinguaVocabSize).generate(Seq.empty[File], interlinguaVocabFile)
-        System.logger.info(s"Generated vocabulary file for $language.")
-      }
+      System.logger.info("A new bilingual translation system state file will be created.")
       SystemState(
-        interlinguaVocab = Some(Vocabulary(interlinguaVocabFile)),
+        interlinguaVocab = None,
         agents = Seq.empty[AgentState])
     case Right(state) =>
       System.logger.info(s"The translation system state file '$systemStateFile' was loaded.")
@@ -67,10 +61,13 @@ class System protected (
   }
 
   /** Map containing the translation agents managed by this translation system. */
-  protected val agents: mutable.Map[Language, ActorRef] = mutable.HashMap.empty[Language, ActorRef]
+  protected val agents: mutable.Map[(Language, Language), ActorRef] = {
+    mutable.HashMap.empty[(Language, Language), ActorRef]
+  }
 
   // Initialize the agents map from the current system state (in case it's been loaded from a file).
-  systemState.agents.foreach(agentState => createAgent(agentState.language1, cleanWorkingDir = false))
+  systemState.agents.foreach(agentState =>
+    createAgent(agentState.language1, agentState.language2, cleanWorkingDir = false))
 
   /** Used for messages that map to stored request information. */
   protected var uniqueIdCounter: Long = 0L
@@ -80,9 +77,6 @@ class System protected (
     requestManagerType.newManager[System.RequestInformation]()
   }
 
-  // TODO: Make this configurable.
-  protected var trainScheduler: TrainScheduler = _
-
   override def preStart(): Unit = log.info("Translation system started.")
   override def postStop(): Unit = log.info("Translation system stopped.")
 
@@ -91,10 +85,8 @@ class System protected (
       sender() ! SystemActor
     case SystemTrainRequest(dataset, stopCriteria) =>
       processSystemTrainRequest(dataset, stopCriteria)
-    case AgentSelfTrainResponse() =>
-      trainScheduler.onTrainResponse(sender())
-    case AgentTrainResponse() =>
-      trainScheduler.onTrainResponse(sender())
+    case AgentSelfTrainResponse() => ???
+    case AgentTrainResponse() => ???
     case SystemTranslateRequest(srcLanguage, tgtLanguage, dataset) =>
       processSystemTranslateRequest(srcLanguage, tgtLanguage, dataset)
     case AgentTranslateResponse(id, language, sentences) =>
@@ -103,23 +95,21 @@ class System protected (
 
   protected def processSystemTrainRequest(
       dataset: ParallelDataset,
-      stopCriteria: StopCriteria // TODO: !!! Use the stop criteria.
+      stopCriteria: StopCriteria
   ): Unit = {
-    dataset.vocabulary.foreach {
-      case (lang, vocab) => agents.getOrElseUpdate(lang, {
-        val agent = createAgent(lang -> vocab, cleanWorkingDir = true)
-        systemState = systemState.copy(agents = systemState.agents :+
-            AgentState(lang -> vocab, interlingua -> systemState.interlinguaVocab.get))
-        SystemState.save(systemState, systemStateFile)
-        agent
-      })
+    dataset.languagePairs(includeReversed = false).foreach {
+      case (language1, language2) =>
+        val agent = agents.getOrElseUpdate((language1, language2), {
+          val vocabulary1 = dataset.vocabulary(language1)
+          val vocabulary2 = dataset.vocabulary(language2)
+          val agent = createAgent(language1 -> vocabulary1, language2 -> vocabulary2, cleanWorkingDir = true)
+          systemState = systemState.copy(agents = systemState.agents :+
+              AgentState(language1 -> vocabulary1, language2 -> vocabulary2))
+          SystemState.save(systemState, systemStateFile)
+          agent
+        })
+        agent ! AgentTrainRequest(agent, dataset, stopCriteria)
     }
-    // TODO: Make this configurable.
-    trainScheduler = RoundRobinTrainScheduler(
-      dataset, agents.toMap,
-      selfTrainSteps = config.selfTrainSteps,
-      trainStepsPerRequest = config.trainStepsPerRequest)
-    trainScheduler.initialize()
   }
 
   @throws[IllegalArgumentException]
@@ -129,11 +119,9 @@ class System protected (
       dataset: ParallelDataset
   ): Unit = {
     requestManager.set(uniqueIdCounter, System.RequestInformation(sender(), srcLanguage, tgtLanguage, dataset))
-    if (!agents.contains(srcLanguage))
-      throw new IllegalArgumentException(s"No training data have been provided for language '$srcLanguage'.")
-    if (!agents.contains(tgtLanguage))
-      throw new IllegalArgumentException(s"No training data have been provided for language '$tgtLanguage'.")
-    agents(srcLanguage) ! AgentTranslateRequest(uniqueIdCounter, srcLanguage, interlingua, dataset)
+    if (!agents.contains((srcLanguage, tgtLanguage)))
+      throw new IllegalArgumentException(s"No training data exist for language pair $srcLanguage - $tgtLanguage.")
+    agents((srcLanguage, tgtLanguage)) ! AgentTranslateRequest(uniqueIdCounter, srcLanguage, tgtLanguage, dataset)
     uniqueIdCounter += 1
   }
 
@@ -146,43 +134,53 @@ class System protected (
     requestManager.get(id, remove = false) match {
       case Some(System.RequestInformation(requester, srcLanguage, tgtLanguage, dataset)) if language == tgtLanguage =>
         requester ! SystemTranslateResponse(srcLanguage, tgtLanguage, dataset, sentences)
-      case Some(System.RequestInformation(_, _, tgtLanguage, _)) =>
-        if (!agents.contains(tgtLanguage))
-          throw new IllegalArgumentException(s"No training data have been provided for language '$tgtLanguage'.")
+      case Some(System.RequestInformation(_, _, tgtLanguage, dataset)) =>
+        if (!agents.contains((language, tgtLanguage)))
+          throw new IllegalArgumentException(s"No training data exist for language pair $language - $tgtLanguage.")
         // TODO: !!! Make this more efficient. Creating new datasets can have an overhead.
-        agents(tgtLanguage) ! AgentTranslateRequest(id, interlingua, tgtLanguage, TensorParallelDataset(
-          "", Map(interlingua -> systemState.interlinguaVocab.get), Map(interlingua -> sentences.toSeq)))
+        agents((language, tgtLanguage)) ! AgentTranslateRequest(id, language, tgtLanguage, TensorParallelDataset(
+          "", Map(language -> dataset.vocabulary(language)), Map(language -> sentences.toSeq)))
       case None => log.warning(
         s"Ignoring agent translate response with ID '$id' because no relevant stored information was found.")
     }
   }
 
   protected def createAgent(
-      language: (Language, Vocabulary),
+      language1: (Language, Vocabulary),
+      language2: (Language, Vocabulary),
       cleanWorkingDir: Boolean = false
   ): ActorRef = {
-    val languagePair = s"${language._1.abbreviation}-${interlingua.abbreviation}"
+    val languagePair = s"${language1._1.abbreviation}-${language2._1.abbreviation}"
     val workingDir = agentsWorkingDir / languagePair
     if (cleanWorkingDir && workingDir.exists)
       workingDir.delete()
     workingDir.createIfNotExists(asDirectory = true, createParents = true)
-    agents.getOrElseUpdate(language._1, context.actorOf(
-      Agent.props(
-        language, interlingua -> systemState.interlinguaVocab.get,
-        model(_, _, _, _, config.env.copy(workingDir = workingDir.path)),
-        requestManagerType), s"translation-agent-$languagePair"))
+    agents.getOrElseUpdate((language1._1, language2._1), {
+      val agent = context.actorOf(
+        Agent.props(
+          language1, language2, model(_, _, _, _, config.env.copy(workingDir = workingDir.path)),
+          requestManagerType), s"translation-agent-$languagePair")
+      agents.values.foreach(_ ! AgentForLanguagePair(language1._1, language2._1, agent))
+      agents.values.foreach(_ ! AgentForLanguagePair(language2._1, language1._1, agent))
+      agents.foreach {
+        case ((l1, l2), a) =>
+          agent ! AgentForLanguagePair(l1, l2, a)
+          agent ! AgentForLanguagePair(l2, l1, a)
+      }
+      agent
+    })
   }
 }
 
-object System {
-  private[actors] val logger = Logger(LoggerFactory.getLogger("Translation System"))
+object BilingualSystem {
+  private[actors] val logger = Logger(LoggerFactory.getLogger("Bilingual Translation System"))
 
   def props(
       config: SystemConfig,
       model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
       requestManagerType: RequestManager.Type = RequestManager.Hash
   ): Props = {
-    Props(new System(config, model, requestManagerType))
+    Props(new BilingualSystem(config, model, requestManagerType))
   }
 
   case class RequestInformation(
