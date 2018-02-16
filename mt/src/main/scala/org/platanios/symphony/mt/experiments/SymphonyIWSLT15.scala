@@ -22,7 +22,7 @@ import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
-//import org.platanios.symphony.mt.translators.SymphonyTranslator
+import org.platanios.symphony.mt.translators.SymphonyTranslator
 import org.platanios.symphony.mt.translators.actors.SystemConfig
 import org.platanios.symphony.mt.vocabulary.{SimpleVocabularyGenerator, Vocabulary}
 import org.platanios.tensorflow.api.learn.StopCriteria
@@ -51,7 +51,7 @@ object SymphonyIWSLT15 extends App {
 
   val env = Environment(
     workingDir = workingDir,
-    numGPUs = 0,
+    numGPUs = 4,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
@@ -89,14 +89,14 @@ object SymphonyIWSLT15 extends App {
         env,
         UnidirectionalRNNEncoder(
           cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 32,
+          numUnits = 512,
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
           timeMajor = true),
         UnidirectionalRNNDecoder(
           cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 32,
+          numUnits = 512,
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
@@ -116,6 +116,6 @@ object SymphonyIWSLT15 extends App {
       dataConfig, logConfig)
   }
 
-  //  val translator = SymphonyTranslator(systemConfig, model, "IWSLT-15")
-  //  translator.train(dataset, StopCriteria.steps(12000))
+  val translator = SymphonyTranslator(systemConfig, model, "IWSLT-15")
+  translator.train(dataset, StopCriteria.steps(12000))()
 }

@@ -40,7 +40,7 @@ class BilingualEvaluator[T <: ParallelDataset[T]] protected (
           val output = translator.translate(
             srcLanguage -> dataset.vocabulary(srcLanguage),
             tgtLanguage -> dataset.vocabulary(tgtLanguage),
-            (inputs(0), inputs(1)))
+            (inputs(0), inputs(1))).next()._2
           Seq(output._1, output._2)
         },
         inputs, Seq(INT32, INT32))

@@ -37,14 +37,13 @@ abstract class Translator(val model: (Language, Vocabulary, Language, Vocabulary
       dataset: ParallelDataset[T]
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
 
-  @throws[IllegalStateException]
   def translate(
       srcLanguage: (Language, Vocabulary),
       tgtLanguage: (Language, Vocabulary),
       input: (Tensor, Tensor)
-  ): (Tensor, Tensor) = {
+  ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
     translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
       name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
-      tensors = Map(srcLanguage._1 -> Seq(input)))).next()._2
+      tensors = Map(srcLanguage._1 -> Seq(input))))
   }
 }
