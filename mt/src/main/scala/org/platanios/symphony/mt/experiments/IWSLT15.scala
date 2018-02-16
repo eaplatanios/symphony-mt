@@ -19,6 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
+import org.platanios.symphony.mt.evaluation.{BLEU, BilingualEvaluator}
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
@@ -48,7 +49,7 @@ object IWSLT15 extends App {
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
-    numGPUs = 4,
+    numGPUs = 0,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
@@ -72,14 +73,14 @@ object IWSLT15 extends App {
         env,
         UnidirectionalRNNEncoder(
           cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 512,
+          numUnits = 32,
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
           timeMajor = true),
         UnidirectionalRNNDecoder(
           cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 512,
+          numUnits = 32,
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
@@ -104,6 +105,6 @@ object IWSLT15 extends App {
   val translator = PairwiseTranslator(env, model)
   translator.train(dataset, StopCriteria.steps(12000))(languagePairs = Set(srcLang -> tgtLang))
 
-  // val evaluator = Evaluator(Seq(BLEU()), dataset.files(srcLang, tgtLang), Test, dataConfig)
-  // evaluator.evaluate(translator)
+  val evaluator = BilingualEvaluator(Seq(BLEU()), srcLang, tgtLang, dataset.filterTypes(Test), dataConfig)
+  println(evaluator.evaluate(translator).values.head.scalar.asInstanceOf[Float])
 }

@@ -27,17 +27,17 @@ import better.files.File
 class FileParallelDataset protected (
     override val name: String,
     override val vocabulary: Map[Language, Vocabulary],
-    val files: Map[Language, Seq[File]],
-    val fileTypes: Seq[DatasetType],
     override val dataConfig: DataConfig,
+    val files: Map[Language, Seq[File]],
+    val fileTypes: Seq[DatasetType] = null,
     val fileKeys: Seq[String] = null
 ) extends ParallelDataset[FileParallelDataset] {
   override def filterLanguages(languages: Language*): FileParallelDataset = {
     languages.foreach(checkSupportsLanguage)
     FileParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
-      vocabulary.filterKeys(languages.contains), files.filterKeys(languages.contains),
-      fileTypes, dataConfig)
+      vocabulary.filterKeys(languages.contains), dataConfig,
+      files.filterKeys(languages.contains), fileTypes, fileKeys)
   }
 
   override def filterTypes(types: DatasetType*): FileParallelDataset = {
@@ -45,8 +45,8 @@ class FileParallelDataset protected (
     val filteredFileTypes = fileTypes.filter(types.contains)
     val filteredFileKeys = fileKeys.zip(fileTypes).filter(f => types.contains(f._2)).map(_._1)
     FileParallelDataset(
-      s"$name/${types.mkString("-")}", vocabulary, filteredGroupedFiles,
-      filteredFileTypes, dataConfig, filteredFileKeys)
+      s"$name/${types.mkString("-")}", vocabulary, dataConfig,
+      filteredGroupedFiles, filteredFileTypes, filteredFileKeys)
   }
 
   override def filterKeys(keys: String*): FileParallelDataset = {
@@ -55,8 +55,8 @@ class FileParallelDataset protected (
     val filteredFileTypes = fileKeys.zip(fileTypes).filter(f => keys.contains(f._1)).map(_._2)
     val filteredFileKeys = fileKeys.filter(keys.contains)
     FileParallelDataset(
-      s"$name/${keys.mkString("-")}", vocabulary, filteredGroupedFiles,
-      filteredFileTypes, dataConfig, filteredFileKeys)
+      s"$name/${keys.mkString("-")}", vocabulary, dataConfig,
+      filteredGroupedFiles, filteredFileTypes, filteredFileKeys)
   }
 
   /** Creates and returns a TensorFlow dataset, for the specified language.
@@ -221,11 +221,11 @@ object FileParallelDataset {
   def apply(
       name: String,
       vocabularies: Map[Language, Vocabulary],
-      groupedFiles: Map[Language, Seq[File]],
-      fileTypes: Seq[DatasetType],
       dataConfig: DataConfig,
+      files: Map[Language, Seq[File]],
+      fileTypes: Seq[DatasetType] = null,
       fileKeys: Seq[String] = null
   ): FileParallelDataset = {
-    new FileParallelDataset(name, vocabularies, groupedFiles, fileTypes, dataConfig, fileKeys)
+    new FileParallelDataset(name, vocabularies, dataConfig, files, fileTypes, fileKeys)
   }
 }

@@ -26,25 +26,28 @@ class TensorParallelDataset protected (
     override val name: String,
     override val vocabulary: Map[Language, Vocabulary],
     val tensors: Map[Language, Seq[(Tensor, Tensor)]],
-    val tensorTypes: Seq[DatasetType],
-    override val dataConfig: DataConfig,
+    val tensorTypes: Seq[DatasetType] = null,
     val tensorKeys: Seq[String] = null
 ) extends ParallelDataset[TensorParallelDataset] {
+  // TODO: !!!
+  override val dataConfig: DataConfig = null
+
   override def filterLanguages(languages: Language*): TensorParallelDataset = {
     languages.foreach(checkSupportsLanguage)
     TensorParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
       vocabulary.filterKeys(languages.contains), tensors.filterKeys(languages.contains),
-      tensorTypes, dataConfig)
+      tensorTypes, tensorKeys)
   }
 
   override def filterTypes(types: DatasetType*): TensorParallelDataset = {
+    require(tensorTypes.nonEmpty, "Cannot filter a parallel dataset by tensor type when it contains no tensor types.")
     val filteredGroupedTensors = tensors.mapValues(_.zip(tensorTypes).filter(f => types.contains(f._2)).map(_._1))
     val filteredFileTypes = tensorTypes.filter(types.contains)
     val filteredFileKeys = tensorKeys.zip(tensorTypes).filter(f => types.contains(f._2)).map(_._1)
     TensorParallelDataset(
       s"$name/${types.mkString("-")}", vocabulary, filteredGroupedTensors,
-      filteredFileTypes, dataConfig, filteredFileKeys)
+      filteredFileTypes, filteredFileKeys)
   }
 
   override def filterKeys(keys: String*): TensorParallelDataset = {
@@ -54,7 +57,7 @@ class TensorParallelDataset protected (
     val filteredTensorsKeys = tensorKeys.filter(keys.contains)
     TensorParallelDataset(
       s"$name/${keys.mkString("-")}", vocabulary, filteredGroupedTensors,
-      filteredTensorTypes, dataConfig, filteredTensorsKeys)
+      filteredTensorTypes, filteredTensorsKeys)
   }
 
   /** Creates and returns a TensorFlow dataset, for the specified language.
@@ -107,11 +110,10 @@ object TensorParallelDataset {
   def apply(
       name: String,
       vocabularies: Map[Language, Vocabulary],
-      groupedTensors: Map[Language, Seq[(Tensor, Tensor)]],
-      tensorTypes: Seq[DatasetType],
-      dataConfig: DataConfig,
+      tensors: Map[Language, Seq[(Tensor, Tensor)]],
+      tensorTypes: Seq[DatasetType] = null,
       tensorKeys: Seq[String] = null
   ): TensorParallelDataset = {
-    new TensorParallelDataset(name, vocabularies, groupedTensors, tensorTypes, dataConfig, tensorKeys)
+    new TensorParallelDataset(name, vocabularies, tensors, tensorTypes, tensorKeys)
   }
 }

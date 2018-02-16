@@ -181,7 +181,7 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
     }
 
     val files = Map(srcLanguage -> srcFiles, tgtLanguage -> tgtFiles)
-    FileParallelDataset(name, vocabulary, files, fileTypes, dataConfig, fileKeys)
+    FileParallelDataset(name, vocabulary, dataConfig, files, fileTypes, fileKeys)
   }
 }
 

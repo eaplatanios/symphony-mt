@@ -15,31 +15,32 @@
 
 package org.platanios.symphony.mt.evaluation
 
+import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.translators.Translator
 import org.platanios.tensorflow.api._
 
-class Evaluator protected (
+class BilingualEvaluator[T <: ParallelDataset[T]] protected (
     val metrics: Seq[MTMetric],
-    val datasetFiles: LoadedDataset.GroupedFiles,
-    val datasetType: DatasetType,
+    val srcLanguage: Language,
+    val tgtLanguage: Language,
+    val dataset: ParallelDataset[T],
     val dataConfig: DataConfig
 ) {
   def evaluate(translator: Translator): Map[String, Tensor] = {
-    val srcLang = datasetFiles.srcLang
-    val srcVocab = datasetFiles.srcVocab
-    val tgtLang = datasetFiles.tgtLang
-    val tgtVocab = datasetFiles.tgtVocab
     val graph = Graph()
     val session = Session(graph)
     val values = tf.createWith(graph) {
-      val dataset = datasetFiles.createTrainDataset(datasetType, repeat = false, dataConfig, isEval = true)
-      val iterator = tf.data.iteratorFromDataset(dataset)
+      val tfDataset = dataset.toTFBilingual(srcLanguage, tgtLanguage, dataConfig, repeat = false, isEval = true)
+      val iterator = tf.data.iteratorFromDataset(tfDataset)
       val next = iterator.next()
       val inputs = Seq(next._1._1, next._1._2)
       val prediction = tf.callback(
         (inputs: Seq[Tensor]) => {
-          val output = translator.translate(srcLang, srcVocab, tgtLang, tgtVocab, (inputs(0), inputs(1)))
+          val output = translator.translate(
+            srcLanguage -> dataset.vocabulary(srcLanguage),
+            tgtLanguage -> dataset.vocabulary(tgtLanguage),
+            (inputs(0), inputs(1)))
           Seq(output._1, output._2)
         },
         inputs, Seq(INT32, INT32))
@@ -63,13 +64,14 @@ class Evaluator protected (
   }
 }
 
-object Evaluator {
-  def apply(
+object BilingualEvaluator {
+  def apply[T <: ParallelDataset[T]](
       metrics: Seq[MTMetric],
-      datasetFiles: LoadedDataset.GroupedFiles,
-      datasetType: DatasetType,
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      dataset: ParallelDataset[T],
       dataConfig: DataConfig
-  ): Evaluator = {
-    new Evaluator(metrics, datasetFiles, datasetType, dataConfig)
+  ): BilingualEvaluator[T] = {
+    new BilingualEvaluator(metrics, srcLanguage, tgtLanguage, dataset, dataConfig)
   }
 }

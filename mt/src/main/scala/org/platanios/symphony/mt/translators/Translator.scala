@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.data.ParallelDataset
+import org.platanios.symphony.mt.data.{ParallelDataset, TensorParallelDataset}
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -36,4 +36,15 @@ abstract class Translator(val model: (Language, Vocabulary, Language, Vocabulary
       tgtLanguage: Language,
       dataset: ParallelDataset[T]
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
+
+  @throws[IllegalStateException]
+  def translate(
+      srcLanguage: (Language, Vocabulary),
+      tgtLanguage: (Language, Vocabulary),
+      input: (Tensor, Tensor)
+  ): (Tensor, Tensor) = {
+    translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
+      name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
+      tensors = Map(srcLanguage._1 -> Seq(input)))).next()._2
+  }
 }
