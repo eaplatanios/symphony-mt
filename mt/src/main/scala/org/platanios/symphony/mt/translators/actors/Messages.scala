@@ -16,10 +16,11 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.LoadedDataset
+import org.platanios.symphony.mt.data.ParallelDataset
 import org.platanios.tensorflow.api.Tensor
-import akka.actor.ActorRef
 import org.platanios.tensorflow.api.learn.StopCriteria
+
+import akka.actor.ActorRef
 
 /** Contains all the messages used by the translation system and agent actors.
   *
@@ -33,7 +34,7 @@ object Messages {
     *
     * @param  dataset Training dataset containing parallel corpora for (potentially) multiple language pairs.
     */
-  case class SystemTrainRequest(dataset: LoadedDataset)
+  case class SystemTrainRequest[T <: ParallelDataset[T]](dataset: ParallelDataset[T])
 
   // TODO: Use IDs for the system translate requests and responses.
 

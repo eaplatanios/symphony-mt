@@ -22,6 +22,6 @@ project/plugins/project/
 # IntelliJ Specific
 **/.idea/**/*
 
-# Ensime Specifiv
+# Ensime Specific
 .ensime
 .ensime_cache

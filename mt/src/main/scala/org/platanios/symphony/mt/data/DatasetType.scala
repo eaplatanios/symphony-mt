@@ -20,6 +20,10 @@ package org.platanios.symphony.mt.data
   */
 sealed trait DatasetType
 
-case object TRAIN_DATASET extends DatasetType
-case object DEV_DATASET extends DatasetType
-case object TEST_DATASET extends DatasetType
+object DatasetType {
+  def types: Set[DatasetType] = Set(Train, Dev, Test)
+}
+
+case object Train extends DatasetType
+case object Dev extends DatasetType
+case object Test extends DatasetType

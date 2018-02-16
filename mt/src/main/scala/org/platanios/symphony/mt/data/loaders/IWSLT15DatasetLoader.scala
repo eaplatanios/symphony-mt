@@ -13,11 +13,11 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data.datasets
+package org.platanios.symphony.mt.data.loaders
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language.{english, vietnamese}
-import org.platanios.symphony.mt.data.{DataConfig, Dataset}
+import org.platanios.symphony.mt.data._
 
 import better.files._
 
@@ -26,13 +26,13 @@ import java.nio.file.Path
 /**
   * @author Emmanouil Antonios Platanios
   */
-class IWSLT15Dataset(
+class IWSLT15DatasetLoader(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     val config: DataConfig
-) extends Dataset(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
+) extends ParallelDatasetLoader(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
-    IWSLT15Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
+    IWSLT15DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the IWSLT-15 dataset.")
 
   override def name: String = "IWSLT-15"
@@ -47,44 +47,42 @@ class IWSLT15Dataset(
   override def downloadsDir: Path = config.workingDir.resolve("iwslt-15").resolve("downloads")
 
   private[this] def reversed: Boolean = {
-    IWSLT15Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+    IWSLT15DatasetLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
   private[this] def directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(
-    s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.trainPrefix}.$src",
-    s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.trainPrefix}.$tgt",
-    s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.devPrefix}.$src",
-    s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.devPrefix}.$tgt",
-    s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.testPrefix}.$src",
-    s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.testPrefix}.$tgt",
-    s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.vocabPrefix}.$src",
-    s"${IWSLT15Dataset.url}/$directoryName/${IWSLT15Dataset.vocabPrefix}.$tgt")
+    s"${IWSLT15DatasetLoader.url}/$directoryName/${IWSLT15DatasetLoader.trainPrefix}.$src",
+    s"${IWSLT15DatasetLoader.url}/$directoryName/${IWSLT15DatasetLoader.trainPrefix}.$tgt",
+    s"${IWSLT15DatasetLoader.url}/$directoryName/${IWSLT15DatasetLoader.devPrefix}.$src",
+    s"${IWSLT15DatasetLoader.url}/$directoryName/${IWSLT15DatasetLoader.devPrefix}.$tgt",
+    s"${IWSLT15DatasetLoader.url}/$directoryName/${IWSLT15DatasetLoader.testPrefix}.$src",
+    s"${IWSLT15DatasetLoader.url}/$directoryName/${IWSLT15DatasetLoader.testPrefix}.$tgt",
+    s"${IWSLT15DatasetLoader.url}/$directoryName/${IWSLT15DatasetLoader.vocabPrefix}.$src",
+    s"${IWSLT15DatasetLoader.url}/$directoryName/${IWSLT15DatasetLoader.vocabPrefix}.$tgt")
 
-  /** Returns all the train corpora (tuples containing name, source file, and target file) of this dataset. */
-  override def trainCorpora: Seq[(String, File, File)] = Seq(("IWSLT15/Train",
-      File(downloadsDir) / s"${IWSLT15Dataset.trainPrefix}.$src",
-      File(downloadsDir) / s"${IWSLT15Dataset.trainPrefix}.$tgt"))
-
-  /** Returns all the dev corpora (tuples containing name, source file, and target file) of this dataset. */
-  override def devCorpora: Seq[(String, File, File)] = Seq(("IWSLT15/Dev",
-      File(downloadsDir) / s"${IWSLT15Dataset.devPrefix}.$src",
-      File(downloadsDir) / s"${IWSLT15Dataset.devPrefix}.$tgt"))
-
-  /** Returns all the test corpora (tuples containing name, source file, and target file) of this dataset. */
-  override def testCorpora: Seq[(String, File, File)] = Seq(("IWSLT15/Test",
-      File(downloadsDir) / s"${IWSLT15Dataset.testPrefix}.$src",
-      File(downloadsDir) / s"${IWSLT15Dataset.testPrefix}.$tgt"))
+  /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
+  override def corpora(datasetType: DatasetType): Seq[(String, File, File)] = datasetType match {
+    case Train => Seq(("IWSLT15/Train",
+        File(downloadsDir) / s"${IWSLT15DatasetLoader.trainPrefix}.$src",
+        File(downloadsDir) / s"${IWSLT15DatasetLoader.trainPrefix}.$tgt"))
+    case Dev => Seq(("IWSLT15/Dev",
+        File(downloadsDir) / s"${IWSLT15DatasetLoader.devPrefix}.$src",
+        File(downloadsDir) / s"${IWSLT15DatasetLoader.devPrefix}.$tgt"))
+    case Test => Seq(("IWSLT15/Test",
+        File(downloadsDir) / s"${IWSLT15DatasetLoader.testPrefix}.$src",
+        File(downloadsDir) / s"${IWSLT15DatasetLoader.testPrefix}.$tgt"))
+  }
 
   /** Returns the source and the target vocabulary of this dataset. */
-  override def vocabularies: Option[(File, File)] = Some((
-      File(downloadsDir) / s"${IWSLT15Dataset.vocabPrefix}.$src",
-      File(downloadsDir) / s"${IWSLT15Dataset.vocabPrefix}.$tgt"))
+  override def vocabularies: (Seq[File], Seq[File]) = (
+      Seq(File(downloadsDir) / s"${IWSLT15DatasetLoader.vocabPrefix}.$src"),
+      Seq(File(downloadsDir) / s"${IWSLT15DatasetLoader.vocabPrefix}.$tgt"))
 }
 
-object IWSLT15Dataset {
+object IWSLT15DatasetLoader {
   val url        : String = "https://nlp.stanford.edu/projects/nmt/data"
   val trainPrefix: String = "train"
   val devPrefix  : String = "tst2012"
@@ -102,7 +100,7 @@ object IWSLT15Dataset {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataConfig: DataConfig
-  ): IWSLT15Dataset = {
-    new IWSLT15Dataset(srcLanguage, tgtLanguage, dataConfig)
+  ): IWSLT15DatasetLoader = {
+    new IWSLT15DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
   }
 }

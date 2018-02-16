@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.data.LoadedDataset
+import org.platanios.symphony.mt.data.ParallelDataset
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary._
@@ -32,7 +32,7 @@ import scala.collection.mutable
 /**
   * @author Emmanouil Antonios Platanios
   */
-class System(
+class System[T <: ParallelDataset[T]](
     val config: SystemConfig,
     protected val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
     protected val requestManagerType: RequestManager.Type = RequestManager.Hash
@@ -49,7 +49,7 @@ class System(
   /** State for this translation system. */
   protected var systemState: SystemState = SystemState.load(systemStateFile) match {
     case Left(failure) =>
-      System.logger.info(s"Translation system state file '$systemStateFile' could not be loaded.", failure)
+      System.logger.info(s"Translation system state file '$systemStateFile' could not be loaded.", failure.getMessage)
       System.logger.info("A new translation system state file will be created.")
       val interlinguaVocabFile = systemWorkingDir / s"vocab.${interlingua.abbreviation}"
       if (interlinguaVocabFile.notExists) {
@@ -81,7 +81,7 @@ class System(
   }
 
   // TODO: Make this configurable.
-  protected var trainScheduler: TrainScheduler = _
+  protected var trainScheduler: TrainScheduler[T] = _
 
   override def preStart(): Unit = log.info("Translation system started.")
   override def postStop(): Unit = log.info("Translation system stopped.")
@@ -90,7 +90,7 @@ class System(
     case Type =>
       sender() ! SystemActor
     case SystemTrainRequest(dataset) =>
-      processSystemTrainRequest(dataset)
+      processSystemTrainRequest(dataset.asInstanceOf[ParallelDataset[T]])
     case AgentSelfTrainResponse() =>
       trainScheduler.onTrainResponse(sender())
     case AgentTrainResponse() =>
@@ -103,8 +103,8 @@ class System(
       processAgentTranslateFromInterlinguaResponse(id, sentences)
   }
 
-  protected def processSystemTrainRequest(dataset: LoadedDataset): Unit = {
-    dataset.vocabularies.foreach {
+  protected def processSystemTrainRequest(dataset: ParallelDataset[T]): Unit = {
+    dataset.vocabulary.foreach {
       case (lang, vocab) => agents.getOrElseUpdate(lang, {
         val agent = createAgent(lang, vocab, cleanWorkingDir = true)
         systemState = systemState.copy(agents = systemState.agents :+ AgentState(lang, vocab))

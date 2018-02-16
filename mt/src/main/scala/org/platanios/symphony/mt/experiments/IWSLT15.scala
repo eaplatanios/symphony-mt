@@ -18,8 +18,7 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
-import org.platanios.symphony.mt.evaluation.{BLEU, Evaluator}
+import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
@@ -45,8 +44,7 @@ object IWSLT15 extends App {
     srcMaxLength = 50,
     tgtMaxLength = 50)
 
-  val dataset     : LoadedDataset              = IWSLT15Dataset(srcLang, tgtLang, dataConfig).load()
-  val datasetFiles: LoadedDataset.GroupedFiles = dataset.files(srcLang, tgtLang)
+  val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLang, tgtLang, dataConfig).load()
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
@@ -97,15 +95,15 @@ object IWSLT15 extends App {
         learningRateDecaySteps = 12000 * 1 / (3 * 4),
         learningRateDecayStartStep = 12000 * 2 / 3,
         colocateGradientsWithOps = true),
-      trainEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
-      devEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
-      testEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
+      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
+      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
+      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
       dataConfig, logConfig)
   }
 
   val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(12000), trainReverse = false)
+  translator.train(dataset, StopCriteria.steps(12000))(languagePairs = Set(srcLang -> tgtLang))
 
-  val evaluator = Evaluator(Seq(BLEU()), dataset.files(srcLang, tgtLang), TEST_DATASET, dataConfig)
-  evaluator.evaluate(translator)
+  // val evaluator = Evaluator(Seq(BLEU()), dataset.files(srcLang, tgtLang), Test, dataConfig)
+  // evaluator.evaluate(translator)
 }

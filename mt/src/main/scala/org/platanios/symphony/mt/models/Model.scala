@@ -39,16 +39,16 @@ abstract class Model protected (
   val dataConfig : DataConfig  = DataConfig()
   val logConfig  : LogConfig   = LogConfig()
 
-  val trainEvalDataset: () => MTTrainDataset = null
-  val devEvalDataset  : () => MTTrainDataset = null
-  val testEvalDataset : () => MTTrainDataset = null
+  val trainEvalDataset: () => TFBilingualDataset = null
+  val devEvalDataset  : () => TFBilingualDataset = null
+  val testEvalDataset : () => TFBilingualDataset = null
 
-  def train(dataset: () => MTTrainDataset, stopCriteria: StopCriteria): Unit
+  def train(dataset: () => TFBilingualDataset, stopCriteria: StopCriteria): Unit
 
-  def infer(dataset: () => MTInferDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
+  def infer(dataset: () => TFMonolingualDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
 
   def evaluate(
-      dataset: () => MTTrainDataset,
+      dataset: () => TFBilingualDataset,
       metrics: Seq[MTMetric],
       maxSteps: Long = -1L,
       saveSummaries: Boolean = true,

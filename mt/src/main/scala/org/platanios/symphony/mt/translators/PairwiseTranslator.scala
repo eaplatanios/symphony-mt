@@ -33,41 +33,32 @@ class PairwiseTranslator protected (
 ) extends Translator(model) {
   protected val models: mutable.Map[(Language, Language), Model] = mutable.Map.empty
 
-  override def train(dataset: LoadedDataset, stopCriteria: StopCriteria): Unit = {
-    train(dataset, stopCriteria, trainReverse = true)
-  }
-
-  def train(dataset: LoadedDataset, stopCriteria: StopCriteria, trainReverse: Boolean): Unit = {
-    dataset.languagePairs(trainReverse).foreach {
+  override def train[T <: ParallelDataset[T]](
+      dataset: ParallelDataset[T],
+      stopCriteria: StopCriteria
+  )(languagePairs: Set[(Language, Language)] = dataset.languagePairs): Unit = {
+    languagePairs.foreach {
       case (srcLanguage, tgtLanguage) =>
-        val currentDatasetFiles = dataset.files(srcLanguage, tgtLanguage)
         val currentModel = models.getOrElseUpdate(
           (srcLanguage, tgtLanguage),
           model(
-            srcLanguage, currentDatasetFiles.srcVocab, tgtLanguage, currentDatasetFiles.tgtVocab,
+            srcLanguage, dataset.vocabulary(srcLanguage), tgtLanguage, dataset.vocabulary(tgtLanguage),
             env.copy(workingDir = env.workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))))
-        val currentDataset = () => {
-          currentDatasetFiles.createTrainDataset(
-            TRAIN_DATASET, repeat = true, dataConfig = currentDatasetFiles.dataConfig)
-        }
-        currentModel.train(currentDataset, stopCriteria)
+        currentModel.train(() => dataset.filterTypes(Train).toTFBilingual(srcLanguage, tgtLanguage, repeat = true), stopCriteria)
     }
   }
 
-  @throws[IllegalStateException]
-  override def translate(
-      srcLang: Language,
-      srcVocab: Vocabulary,
-      tgtLang: Language,
-      tgtVocab: Vocabulary,
-      dataset: () => MTInferDataset
+  override def translate[T <: ParallelDataset[T]](
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      dataset: ParallelDataset[T]
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
     val currentModel = models.getOrElseUpdate(
-      (srcLang, tgtLang),
+      (srcLanguage, tgtLanguage),
       model(
-        srcLang, srcVocab, tgtLang, tgtVocab,
-        env.copy(workingDir = env.workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"))))
-    currentModel.infer(dataset)
+        srcLanguage, dataset.vocabulary(srcLanguage), tgtLanguage, dataset.vocabulary(tgtLanguage),
+        env.copy(workingDir = env.workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))))
+    currentModel.infer(() => dataset.toTFMonolingual(srcLanguage))
   }
 }
 

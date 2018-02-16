@@ -13,11 +13,11 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data.datasets
+package org.platanios.symphony.mt.data.loaders
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
-import org.platanios.symphony.mt.data.{DataConfig, Dataset}
+import org.platanios.symphony.mt.data._
 
 import better.files._
 
@@ -26,50 +26,52 @@ import java.nio.file.Path
 /**
   * @author Emmanouil Antonios Platanios
   */
-class CommonCrawlDataset(
+class EuroparlV8DatasetLoader(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     val config: DataConfig
-) extends Dataset(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
+) extends ParallelDatasetLoader(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
-    CommonCrawlDataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
-    "The provided language pair is not supported by the CommonCrawl dataset.")
+    EuroparlV8DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
+    "The provided language pair is not supported by the Europarl v8 dataset.")
 
-  override def name: String = "CommonCrawl"
+  override def name: String = "Europarl v8"
 
   override def dataConfig: DataConfig = {
     config.copy(workingDir =
         config.workingDir
-            .resolve("commoncrawl")
+            .resolve("europarl-v8")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("commoncrawl").resolve("downloads")
+  override def downloadsDir: Path = config.workingDir.resolve("europarl-v8").resolve("downloads")
 
   private[this] def reversed: Boolean = {
-    CommonCrawlDataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+    EuroparlV8DatasetLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
   private[this] def corpusFilenamePrefix: String = {
-    s"commoncrawl.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
+    s"europarl-v8.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(
-    s"${CommonCrawlDataset.url}/${CommonCrawlDataset.archivePrefix}.tgz")
+    s"${EuroparlV8DatasetLoader.url}/${EuroparlV8DatasetLoader.archivePrefix}.tgz")
 
-  /** Returns all the train corpora (tuples containing name, source file, and target file) of this dataset. */
-  override def trainCorpora: Seq[(String, File, File)] = Seq(("CommonCrawl/Train",
-      File(downloadsDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$src",
-      File(downloadsDir) / CommonCrawlDataset.archivePrefix / s"$corpusFilenamePrefix.$tgt"))
+  /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
+  override def corpora(datasetType: DatasetType): Seq[(String, File, File)] = datasetType match {
+    case Train => Seq(("EuroparlV8/Train",
+        File(downloadsDir) / EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(downloadsDir) / EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt"))
+    case _ => Seq.empty
+  }
 }
 
-object CommonCrawlDataset {
-  val url          : String = "http://www.statmt.org/wmt13"
-  val archivePrefix: String = "training-parallel-commoncrawl"
+object EuroparlV8DatasetLoader {
+  val url          : String = "http://data.statmt.org/wmt16/translation-task"
+  val archivePrefix: String = "training-parallel-ep-v8"
 
-  val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (czech, english), (french, english), (german, english), (russian, english), (spanish, english))
+  val supportedLanguagePairs: Set[(Language, Language)] = Set((finnish, english), (romanian, english))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
@@ -80,7 +82,7 @@ object CommonCrawlDataset {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataConfig: DataConfig
-  ): CommonCrawlDataset = {
-    new CommonCrawlDataset(srcLanguage, tgtLanguage, dataConfig)
+  ): EuroparlV8DatasetLoader = {
+    new EuroparlV8DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
   }
 }

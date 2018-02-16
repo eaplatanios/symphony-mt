@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.data._
+import org.platanios.symphony.mt.data.ParallelDataset
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -26,26 +26,14 @@ import org.platanios.tensorflow.api.learn.StopCriteria
   * @author Emmanouil Antonios Platanios
   */
 abstract class Translator(val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model) {
-  def train(dataset: LoadedDataset, stopCriteria: StopCriteria): Unit
+  def train[T <: ParallelDataset[T]](
+      dataset: ParallelDataset[T],
+      stopCriteria: StopCriteria
+  )(languagePairs: Set[(Language, Language)] = dataset.languagePairs): Unit
 
-  @throws[IllegalStateException]
-  def translate(
-      srcLang: Language,
-      srcVocab: Vocabulary,
-      tgtLang: Language,
-      tgtVocab: Vocabulary,
-      dataset: () => MTInferDataset
+  def translate[T <: ParallelDataset[T]](
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      dataset: ParallelDataset[T]
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
-
-  @throws[IllegalStateException]
-  def translate(
-      srcLang: Language,
-      srcVocab: Vocabulary,
-      tgtLang: Language,
-      tgtVocab: Vocabulary,
-      input: (Tensor, Tensor)
-  ): (Tensor, Tensor) = {
-    translate(
-      srcLang, srcVocab, tgtLang, tgtVocab, () => tf.data.TensorDataset(input).asInstanceOf[MTInferDataset]).next()._2
-  }
 }

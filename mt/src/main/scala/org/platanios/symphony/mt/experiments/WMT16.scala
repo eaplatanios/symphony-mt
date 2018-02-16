@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.datasets.WMT16Dataset
+import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
 import org.platanios.symphony.mt.models.attention.BahdanauAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
@@ -46,8 +46,7 @@ object WMT16 extends App {
     srcMaxLength = 50,
     tgtMaxLength = 50)
 
-  val dataset     : LoadedDataset              = WMT16Dataset(srcLang, tgtLang, dataConfig).load()
-  val datasetFiles: LoadedDataset.GroupedFiles = dataset.files(srcLang, tgtLang)
+  val dataset: FileParallelDataset = WMT16DatasetLoader(srcLang, tgtLang, dataConfig).load()
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
@@ -100,12 +99,12 @@ object WMT16 extends App {
         learningRateDecaySteps = 340000 * 1 / (2 * 10),
         learningRateDecayStartStep = 340000 * 2,
         colocateGradientsWithOps = true),
-      trainEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
-      devEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
-      testEvalDataset = () => dataset.files(srcLang, tgtLang).createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true),
+      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
+      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
+      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
       dataConfig, logConfig)
   }
 
   val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(340000), trainReverse = false)
+  translator.train(dataset, StopCriteria.steps(340000))(languagePairs = Set(srcLang -> tgtLang))
 }

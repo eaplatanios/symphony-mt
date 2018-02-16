@@ -18,12 +18,23 @@ package org.platanios.symphony.mt
 import org.platanios.tensorflow.api.{DataType, Output, Shape, Tensor, tf}
 
 package object data {
-  type MTTextLinesDataset = tf.data.Dataset[Tensor, Output, DataType, Shape]
-  type MTInferDataset = tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
+  type TFMonolingualDataset = tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
 
-  type MTTrainDataset = tf.data.Dataset[
+  type TFBilingualDataset = tf.data.Dataset[
       ((Tensor, Tensor), (Tensor, Tensor)),
       ((Output, Output), (Output, Output)),
       ((DataType, DataType), (DataType, DataType)),
       ((Shape, Shape), (Shape, Shape))]
+
+  private[data] def joinMonolingualDatasets(
+      datasets: Seq[tf.data.Dataset[Tensor, Output, DataType, Shape]]
+  ): tf.data.Dataset[Tensor, Output, DataType, Shape] = {
+    datasets.reduce((d1, d2) => d1.concatenate(d2))
+  }
+
+  private[data] def joinBilingualDatasets(
+      datasets: Seq[tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]]
+  ): tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)] = {
+    datasets.reduce((d1, d2) => d1.concatenate(d2))
+  }
 }

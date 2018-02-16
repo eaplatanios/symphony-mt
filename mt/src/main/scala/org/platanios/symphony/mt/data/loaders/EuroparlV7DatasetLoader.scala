@@ -13,11 +13,11 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data.datasets
+package org.platanios.symphony.mt.data.loaders
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
-import org.platanios.symphony.mt.data.{DataConfig, Dataset}
+import org.platanios.symphony.mt.data._
 
 import better.files._
 
@@ -26,13 +26,13 @@ import java.nio.file.Path
 /**
   * @author Emmanouil Antonios Platanios
   */
-class EuroparlV7Dataset(
+class EuroparlV7DatasetLoader(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     val config: DataConfig
-) extends Dataset(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
+) extends ParallelDatasetLoader(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
-    EuroparlV7Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
+    EuroparlV7DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the Europarl v7 dataset.")
 
   override def name: String = "Europarl v7"
@@ -47,7 +47,7 @@ class EuroparlV7Dataset(
   override def downloadsDir: Path = config.workingDir.resolve("europarl-v7").resolve("downloads")
 
   private[this] def reversed: Boolean = {
-    EuroparlV7Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+    EuroparlV7DatasetLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
   private[this] def corpusArchiveFile: String = if (reversed) s"$tgt-$src" else s"$src-$tgt"
@@ -58,15 +58,18 @@ class EuroparlV7Dataset(
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(
-    s"${EuroparlV7Dataset.url}/$corpusArchiveFile.tgz")
+    s"${EuroparlV7DatasetLoader.url}/$corpusArchiveFile.tgz")
 
-  /** Returns all the train corpora (tuples containing name, source file, and target file) of this dataset. */
-  override def trainCorpora: Seq[(String, File, File)] = Seq(("EuroparlV7/Train",
-      File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
-      File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt"))
+  /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
+  override def corpora(datasetType: DatasetType): Seq[(String, File, File)] = datasetType match {
+    case Train => Seq(("EuroparlV7/Train",
+        File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
+        File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt"))
+    case _ => Seq.empty
+  }
 }
 
-object EuroparlV7Dataset {
+object EuroparlV7DatasetLoader {
   val url: String = "http://www.statmt.org/europarl/v7"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
@@ -84,7 +87,7 @@ object EuroparlV7Dataset {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataConfig: DataConfig
-  ): EuroparlV7Dataset = {
-    new EuroparlV7Dataset(srcLanguage, tgtLanguage, dataConfig)
+  ): EuroparlV7DatasetLoader = {
+    new EuroparlV7DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
   }
 }

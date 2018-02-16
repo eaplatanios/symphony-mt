@@ -40,9 +40,9 @@ class StateBasedModel[S, SS](
     override val tgtLang: Language,
     override val tgtVocab: Vocabulary,
     val config: StateBasedModel.Config[S, SS],
-    override val trainEvalDataset: () => MTTrainDataset = null,
-    override val devEvalDataset: () => MTTrainDataset = null,
-    override val testEvalDataset: () => MTTrainDataset = null,
+    override val trainEvalDataset: () => TFBilingualDataset = null,
+    override val devEvalDataset: () => TFBilingualDataset = null,
+    override val testEvalDataset: () => TFBilingualDataset = null,
     override val dataConfig: DataConfig = DataConfig(),
     override val logConfig: LogConfig = LogConfig()
 )(implicit
@@ -207,16 +207,16 @@ class StateBasedModel[S, SS](
     config.optimizer(config.learningRateInitial, decay)
   }
 
-  override def train(dataset: () => MTTrainDataset, stopCriteria: StopCriteria): Unit = {
+  override def train(dataset: () => TFBilingualDataset, stopCriteria: StopCriteria): Unit = {
     estimator.train(dataset, stopCriteria)
   }
 
-  override def infer(dataset: () => MTInferDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
+  override def infer(dataset: () => TFMonolingualDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
     estimator.infer(dataset)
   }
 
   override def evaluate(
-      dataset: () => MTTrainDataset,
+      dataset: () => TFBilingualDataset,
       metrics: Seq[MTMetric],
       maxSteps: Long = -1L,
       saveSummaries: Boolean = true,
@@ -234,9 +234,9 @@ object StateBasedModel {
       tgtLang: Language,
       tgtVocab: Vocabulary,
       config: StateBasedModel.Config[S, SS],
-      trainEvalDataset: () => MTTrainDataset = null,
-      devEvalDataset: () => MTTrainDataset = null,
-      testEvalDataset: () => MTTrainDataset = null,
+      trainEvalDataset: () => TFBilingualDataset = null,
+      devEvalDataset: () => TFBilingualDataset = null,
+      testEvalDataset: () => TFBilingualDataset = null,
       dataConfig: DataConfig = DataConfig(),
       logConfig: LogConfig = LogConfig()
   )(implicit

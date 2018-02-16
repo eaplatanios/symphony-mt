@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.{MTInferDataset, MTTrainDataset}
+import org.platanios.symphony.mt.data.{TFMonolingualDataset, TFBilingualDataset}
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -74,11 +74,11 @@ class Agent(
 
     // Train model for the human language to interlingua translation direction.
     langToInterlinguaModel.train(() => tf.data.TensorDataset(
-      (sentences, sentences)).repeat().asInstanceOf[MTTrainDataset], stopCriteria)
+      (sentences, sentences)).repeat().asInstanceOf[TFBilingualDataset], stopCriteria)
 
     // Train model for the interlingua to human language translation direction.
     interlinguaToLangModel.train(() => tf.data.TensorDataset(
-      (sentences, sentences)).repeat().asInstanceOf[MTTrainDataset], stopCriteria)
+      (sentences, sentences)).repeat().asInstanceOf[TFBilingualDataset], stopCriteria)
 
     // Send a message to the requester notifying that this agent is done processing this train request.
     sender() ! AgentSelfTrainResponse()
@@ -97,7 +97,7 @@ class Agent(
 
   protected def processTranslateToInterlinguaRequest(id: Long, sentences: (Tensor, Tensor)): Unit = {
     val translatedSentences = langToInterlinguaModel.infer(
-      () => tf.data.TensorDataset(sentences).asInstanceOf[MTInferDataset]).next()._2
+      () => tf.data.TensorDataset(sentences).asInstanceOf[TFMonolingualDataset]).next()._2
     sender() ! AgentTranslateToInterlinguaResponse(id, translatedSentences)
   }
 
@@ -106,11 +106,11 @@ class Agent(
       case Some(Agent.RequestInformation(requester, srcSentences, Some(trainStopCriteria))) =>
         // Train model for the human language to interlingua translation direction.
         langToInterlinguaModel.train(() => tf.data.TensorDataset(
-          (srcSentences, interlinguaSentences)).repeat().asInstanceOf[MTTrainDataset], trainStopCriteria)
+          (srcSentences, interlinguaSentences)).repeat().asInstanceOf[TFBilingualDataset], trainStopCriteria)
 
         // Train model for the interlingua to human language translation direction.
         interlinguaToLangModel.train(() => tf.data.TensorDataset(
-          (interlinguaSentences, srcSentences)).repeat().asInstanceOf[MTTrainDataset], trainStopCriteria)
+          (interlinguaSentences, srcSentences)).repeat().asInstanceOf[TFBilingualDataset], trainStopCriteria)
 
         // Send a message to the requester notifying that this agent is done processing this train request.
         requester ! AgentTrainResponse()
@@ -122,7 +122,7 @@ class Agent(
 
   protected def processTranslateFromInterlinguaRequest(id: Long, interlinguaSentences: (Tensor, Tensor)): Unit = {
     val translatedSentences = interlinguaToLangModel.infer(
-      () => tf.data.TensorDataset(interlinguaSentences).asInstanceOf[MTInferDataset]).next()._2
+      () => tf.data.TensorDataset(interlinguaSentences).asInstanceOf[TFMonolingualDataset]).next()._2
     sender() ! AgentTranslateFromInterlinguaResponse(id, translatedSentences)
   }
 }

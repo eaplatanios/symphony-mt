@@ -18,11 +18,11 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.datasets.IWSLT15Dataset
+import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.models.attention.LuongAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
-import org.platanios.symphony.mt.translators.SymphonyTranslator
+//import org.platanios.symphony.mt.translators.SymphonyTranslator
 import org.platanios.symphony.mt.translators.actors.SystemConfig
 import org.platanios.symphony.mt.vocabulary.{SimpleVocabularyGenerator, Vocabulary}
 import org.platanios.tensorflow.api.learn.StopCriteria
@@ -47,8 +47,7 @@ object SymphonyIWSLT15 extends App {
     tgtMaxLength = 50,
     loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(commonVocabSize, -1, 8192)))
 
-  val dataset     : LoadedDataset              = IWSLT15Dataset(srcLang, tgtLang, dataConfig).load()
-  val datasetFiles: LoadedDataset.GroupedFiles = dataset.files(srcLang, tgtLang)
+  val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLang, tgtLang, dataConfig).load()
 
   val env = Environment(
     workingDir = workingDir,
@@ -62,20 +61,18 @@ object SymphonyIWSLT15 extends App {
     logTrainEvalSteps = -1)
 
   val systemConfig = SystemConfig(
-    env = env, 
-    interlinguaVocabSize = commonVocabSize, 
-    selfTrainSteps = 1000L, 
+    env = env,
+    interlinguaVocabSize = commonVocabSize,
+    selfTrainSteps = 200L,
     trainStepsPerRequest = 10L)
-
-  val trainDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = true)
 
   //  val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
   //  val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
   //  val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
 
-  val trainEvalDataset: () => MTTrainDataset = null
-  val devEvalDataset  : () => MTTrainDataset = null
-  val testEvalDataset : () => MTTrainDataset = null
+  val trainEvalDataset: () => TFBilingualDataset = null
+  val devEvalDataset  : () => TFBilingualDataset = null
+  val testEvalDataset : () => TFBilingualDataset = null
 
   def model(
       srcLang: Language,
@@ -119,6 +116,6 @@ object SymphonyIWSLT15 extends App {
       dataConfig, logConfig)
   }
 
-  val translator = SymphonyTranslator(systemConfig, model, "IWSLT-15")
-  translator.train(dataset, StopCriteria.steps(12000))
+  //  val translator = SymphonyTranslator(systemConfig, model, "IWSLT-15")
+  //  translator.train(dataset, StopCriteria.steps(12000))
 }

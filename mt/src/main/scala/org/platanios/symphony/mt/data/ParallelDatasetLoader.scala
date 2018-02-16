@@ -17,20 +17,21 @@ package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.utilities.CompressedFiles
-
 import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.IOException
+import java.io.{BufferedWriter, IOException}
 import java.net.URL
 import java.nio.file.Path
+
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 
 /** Parallel dataset used for machine translation experiments.
   *
   * @author Emmanouil Antonios Platanios
   */
-abstract class Dataset(val srcLanguage: Language, val tgtLanguage: Language) {
+abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage: Language) {
   def name: String
 
   def dataConfig: DataConfig
@@ -53,7 +54,7 @@ abstract class Dataset(val srcLanguage: Language, val tgtLanguage: Language) {
     filesToDownload.map(url => {
       val (_, filename) = url.splitAt(url.lastIndexOf('/') + 1)
       val path = File(downloadsDir) / filename
-      Dataset.maybeDownload(path, url, dataConfig.loaderBufferSize)
+      ParallelDatasetLoader.maybeDownload(path, url, dataConfig.loaderBufferSize)
       path
     })
   }
@@ -63,19 +64,19 @@ abstract class Dataset(val srcLanguage: Language, val tgtLanguage: Language) {
     if (!dataConfig.loaderExtractTGZ) {
       downloadedFiles.flatMap(_.listRecursively.filter(_.isRegularFile))
     } else {
-      Dataset.logger.info(s"$name - Extracting any downloaded archives.")
+      ParallelDatasetLoader.logger.info(s"$name - Extracting any downloaded archives.")
       val files = downloadedFiles.flatMap(
-        Dataset.maybeExtractTGZ(_, dataConfig.loaderBufferSize)
+        ParallelDatasetLoader.maybeExtractTGZ(_, dataConfig.loaderBufferSize)
             .listRecursively
             .filter(_.isRegularFile))
-      Dataset.logger.info(s"$name - Extracted any downloaded archives.")
+      ParallelDatasetLoader.logger.info(s"$name - Extracted any downloaded archives.")
       files
     }
   }
 
   /** Preprocessed files after converting extracted SGM files to normal text files, and (optionally) tokenizing. */
   protected val preprocessedFiles: Seq[File] = {
-    Dataset.logger.info(s"$name - Preprocessing any downloaded files.")
+    ParallelDatasetLoader.logger.info(s"$name - Preprocessing any downloaded files.")
     val files = extractedFiles.map(file => {
       var newFile = file
       if (!newFile.name.startsWith(".")) {
@@ -99,32 +100,38 @@ abstract class Dataset(val srcLanguage: Language, val tgtLanguage: Language) {
       }
       newFile
     })
-    Dataset.logger.info(s"$name - Preprocessed any downloaded files.")
+    ParallelDatasetLoader.logger.info(s"$name - Preprocessed any downloaded files.")
     files
   }
 
-  /** Returns all the train corpora (tuples containing name, source file, and target file) of this dataset. */
-  def trainCorpora: Seq[(String, File, File)] = Seq.empty
+  /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
+  def corpora(datasetType: DatasetType): Seq[(String, File, File)] = Seq.empty
 
-  /** Returns all the dev corpora (tuples containing name, source file, and target file) of this dataset. */
-  def devCorpora: Seq[(String, File, File)] = Seq.empty
-
-  /** Returns all the test corpora (tuples containing name, source file, and target file) of this dataset. */
-  def testCorpora: Seq[(String, File, File)] = Seq.empty
-
-  /** Returns the source and the target vocabulary of this dataset. */
-  def vocabularies: Option[(File, File)] = None
+  /** Returns the source and the target language vocabularies of this dataset. */
+  def vocabularies: (Seq[File], Seq[File]) = (Seq.empty, Seq.empty)
 
   /** Returns the files included in this dataset, grouped based on their role. */
-  def load(): LoadedDataset = {
-    var files = LoadedDataset.GroupedFiles(
-      srcLanguage, tgtLanguage, dataConfig, trainCorpora, devCorpora, testCorpora, vocabularies)
+  def load(): FileParallelDataset = {
+    // Collect all files.
+    var srcFiles = Seq.empty[File]
+    var tgtFiles = Seq.empty[File]
+    var fileTypes = Seq.empty[DatasetType]
+    var fileKeys = Seq.empty[String]
+    DatasetType.types.foreach(datasetType => {
+      val typeCorpora = corpora(datasetType)
+      srcFiles ++= typeCorpora.map(_._2)
+      tgtFiles ++= typeCorpora.map(_._3)
+      fileTypes ++= Seq.fill(typeCorpora.length)(datasetType)
+      fileKeys ++= typeCorpora.map(_._1)
+    })
+
+    // Clean the corpora, if necessary.
     dataConfig.loaderSentenceLengthBounds.foreach {
       case (minLength, maxLength) =>
-        files = files.copy(trainCorpora = files.trainCorpora.map(files => {
+        val cleanedFiles = srcFiles.map(files => {
           // TODO: [DATA] This is a hacky way of checking for the clean corpus files.
-          val corpusFile = files._2.sibling(files._2.nameWithoutExtension(includeAll = false))
-          val cleanCorpusFile = files._2.sibling(corpusFile.name + ".clean")
+          val corpusFile = files.sibling(files.nameWithoutExtension(includeAll = false))
+          val cleanCorpusFile = files.sibling(corpusFile.name + ".clean")
           val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$src")
           val tgtCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$tgt")
           if (srcCleanCorpusFile.notExists || tgtCleanCorpusFile.notExists) {
@@ -135,14 +142,50 @@ abstract class Dataset(val srcLanguage: Language, val tgtLanguage: Language) {
               corpusFile.sibling(corpusFile.name + s".$tgt").copyTo(tgtCleanCorpusFile)
             }
           }
-          (files._1, srcCleanCorpusFile, tgtCleanCorpusFile)
-        }))
+          (srcCleanCorpusFile, tgtCleanCorpusFile)
+        }).unzip
+        srcFiles = cleanedFiles._1
+        tgtFiles = cleanedFiles._2
     }
-    LoadedDataset(dataConfig, Set(files))
+
+    // Generate vocabularies, if necessary.
+    val workingDir = File(dataConfig.workingDir)
+    val vocabulary = Map(srcLanguage -> vocabularies._1, tgtLanguage -> vocabularies._2).map {
+      case (l, v) =>
+        dataConfig.loaderVocab match {
+          case GeneratedVocabulary(generator) =>
+            l -> {
+              val tokenizedFiles = if (l == srcLanguage) srcFiles else tgtFiles
+              val vocabFile = workingDir / s"vocab.${l.abbreviation}"
+              if (vocabFile.notExists) {
+                ParallelDatasetLoader.logger.info(s"Generating vocabulary file for $l.")
+                generator.generate(tokenizedFiles, vocabFile)
+                ParallelDatasetLoader.logger.info(s"Generated vocabulary file for $l.")
+              }
+              Vocabulary(vocabFile)
+            }
+          case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
+          case MergedVocabularies if v.nonEmpty =>
+            val vocabFile = workingDir.createChild(s"vocab.${l.abbreviation}", createParents = true)
+            val writer = new BufferedWriter(vocabFile.newPrintWriter(), dataConfig.loaderBufferSize)
+            v.toStream
+                .flatMap(_.lineIterator).toSet
+                .filter(_ != "")
+                .foreach(word => writer.write(word + "\n"))
+            writer.flush()
+            writer.close()
+            l -> Vocabulary(vocabFile)
+          case MergedVocabularies if v.isEmpty =>
+            throw new IllegalArgumentException("No existing vocabularies found to merge.")
+        }
+    }
+
+    val files = Map(srcLanguage -> srcFiles, tgtLanguage -> tgtFiles)
+    FileParallelDataset(name, vocabulary, files, fileTypes, dataConfig, fileKeys)
   }
 }
 
-object Dataset {
+object ParallelDatasetLoader {
   private[data] val logger = Logger(LoggerFactory.getLogger("Dataset"))
 
   def maybeDownload(file: File, url: String, bufferSize: Int = 8192): Boolean = {

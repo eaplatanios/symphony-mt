@@ -13,11 +13,11 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data.datasets
+package org.platanios.symphony.mt.data.loaders
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
-import org.platanios.symphony.mt.data.{DataConfig, Dataset}
+import org.platanios.symphony.mt.data._
 
 import better.files._
 
@@ -26,13 +26,13 @@ import java.nio.file.Path
 /**
   * @author Emmanouil Antonios Platanios
   */
-class NewsCommentaryV11Dataset(
+class NewsCommentaryV11DatasetLoader(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     val config: DataConfig
-) extends Dataset(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
+) extends ParallelDatasetLoader(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
-    NewsCommentaryV11Dataset.isLanguagePairSupported(srcLanguage, tgtLanguage),
+    NewsCommentaryV11DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the News Commentary v11 dataset.")
 
   override def name: String = "News Commentary v11"
@@ -47,7 +47,7 @@ class NewsCommentaryV11Dataset(
   override def downloadsDir: Path = config.workingDir.resolve("news-commentary-v11").resolve("downloads")
 
   private[this] def reversed: Boolean = {
-    NewsCommentaryV11Dataset.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+    NewsCommentaryV11DatasetLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
   private[this] def corpusFilenamePrefix: String = {
@@ -56,17 +56,20 @@ class NewsCommentaryV11Dataset(
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(
-    s"${NewsCommentaryV11Dataset.url}/${NewsCommentaryV11Dataset.archivePrefix}.tgz")
+    s"${NewsCommentaryV11DatasetLoader.url}/${NewsCommentaryV11DatasetLoader.archivePrefix}.tgz")
 
-  /** Returns all the train corpora (tuples containing name, source file, and target file) of this dataset. */
-  override def trainCorpora: Seq[(String, File, File)] = Seq(("NewsCommentaryV11/Train",
-      File(downloadsDir) / NewsCommentaryV11Dataset.archivePrefix
-          / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$src",
-      File(downloadsDir) / NewsCommentaryV11Dataset.archivePrefix
-          / NewsCommentaryV11Dataset.archivePrefix / s"$corpusFilenamePrefix.$tgt"))
+  /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
+  override def corpora(datasetType: DatasetType): Seq[(String, File, File)] = datasetType match {
+    case Train => Seq(("NewsCommentaryV11/Train",
+        File(downloadsDir) / NewsCommentaryV11DatasetLoader.archivePrefix
+            / NewsCommentaryV11DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(downloadsDir) / NewsCommentaryV11DatasetLoader.archivePrefix
+            / NewsCommentaryV11DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt"))
+    case _ => Seq.empty
+  }
 }
 
-object NewsCommentaryV11Dataset {
+object NewsCommentaryV11DatasetLoader {
   val url          : String = "http://data.statmt.org/wmt16/translation-task"
   val archivePrefix: String = "training-parallel-nc-v11"
 
@@ -83,7 +86,7 @@ object NewsCommentaryV11Dataset {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataConfig: DataConfig
-  ): NewsCommentaryV11Dataset = {
-    new NewsCommentaryV11Dataset(srcLanguage, tgtLanguage, dataConfig)
+  ): NewsCommentaryV11DatasetLoader = {
+    new NewsCommentaryV11DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
   }
 }

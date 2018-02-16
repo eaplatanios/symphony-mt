@@ -15,23 +15,30 @@
 
 package org.platanios.symphony.mt.data
 
+import org.platanios.symphony.mt.Language
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.io.data.InitializableIterator
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Iterator over a TensorFlow dataset.
+/** Iterator over pairs of sentences in a TensorFlow dataset, for the provided languages.
   *
-  * This iterator creates a TensorFlow dataset for `files` and a session that loads it and iterates over its elements.
+  * This iterator creates a TensorFlow dataset for `dataset` and a session that loads it and iterates over its elements.
   *
-  * @param  files      Files from which to construct the dataset iterator.
+  * @param  dataset    Dataset from which to construct this iterator.
+  * @param  language1  First language.
+  * @param  language2  Second language.
   * @param  dataConfig Data configuration to use.
   *
   * @author Emmanouil Antonios Platanios
   */
-class DatasetIterator protected (
-    val files: LoadedDataset.GroupedFiles,
-    val dataConfig: DataConfig
+class BilingualDatasetIterator[T <: ParallelDataset[T]] protected (
+    val dataset: ParallelDataset[T],
+    val language1: Language,
+    val language2: Language,
+    val dataConfig: DataConfig,
+    val repeat: Boolean = true,
+    val isEval: Boolean = false
 ) extends Iterator[((Tensor, Tensor), (Tensor, Tensor))] {
   // TODO: [RECOVERY] Add ability to recover if the session crashes.
 
@@ -44,7 +51,7 @@ class DatasetIterator protected (
       ((DataType, DataType), (DataType, DataType)),
       ((Shape, Shape), (Shape, Shape))] = tf.createWith(graph) {
     tf.data.iteratorFromDataset(
-      files.createTrainDataset(TRAIN_DATASET, repeat = true, dataConfig, isEval = false))
+      dataset.filterTypes(Train).toTFBilingual(language1, language2, dataConfig, repeat, isEval))
   }
 
   protected val initOp    : Op                                   = tf.createWith(graph)(iterator.initializer)
@@ -64,11 +71,15 @@ class DatasetIterator protected (
   }
 }
 
-object DatasetIterator {
-  def apply(
-      files: LoadedDataset.GroupedFiles,
-      dataConfig: DataConfig
-  ): DatasetIterator = {
-    new DatasetIterator(files, dataConfig)
+object BilingualDatasetIterator {
+  def apply[T <: ParallelDataset[T]](
+      dataset: ParallelDataset[T],
+      language1: Language,
+      language2: Language,
+      dataConfig: DataConfig,
+      repeat: Boolean = true,
+      isEval: Boolean = false
+  ): BilingualDatasetIterator[T] = {
+    new BilingualDatasetIterator[T](dataset, language1, language2, dataConfig, repeat, isEval)
   }
 }

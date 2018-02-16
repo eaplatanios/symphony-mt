@@ -16,15 +16,15 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.LoadedDataset
+import org.platanios.symphony.mt.data.ParallelDataset
 
 import akka.actor.ActorRef
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class TrainScheduler(
-    protected val dataset: LoadedDataset,
+abstract class TrainScheduler[T <: ParallelDataset[T]](
+    protected val dataset: ParallelDataset[T],
     protected val agents: Map[Language, ActorRef]
 ) {
   /** Initializes this train scheduler. This method is always called by the translation system, in order to start

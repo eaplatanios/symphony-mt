@@ -38,7 +38,6 @@ case class DataConfig(
     numBuckets: Int = 5,
     srcMaxLength: Int = 50,
     tgtMaxLength: Int = 50,
-    srcReverse: Boolean = false,
     bufferSize: Long = -1L,
     dropCount: Int = 0,
     numShards: Long = 1,
