@@ -21,10 +21,9 @@ import org.platanios.symphony.mt.vocabulary.Vocabulary
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait ParallelDataset[T <: ParallelDataset[T]] {
+trait ParallelDataset {
   val name      : String
   val vocabulary: Map[Language, Vocabulary]
-  val dataConfig: DataConfig
 
   def supportsLanguage(language: Language): Boolean = vocabulary.contains(language)
 
@@ -36,17 +35,19 @@ trait ParallelDataset[T <: ParallelDataset[T]] {
 
   def languages: Set[Language] = vocabulary.keySet
 
-  def languagePairs: Set[(Language, Language)] = {
-    languages.toSeq.combinations(2)
+  def languagePairs(includeReversed: Boolean = true): Set[(Language, Language)] = {
+    val pairs = languages.toSeq.combinations(2)
         .map(c => (c(0), c(1)))
         .filter(p => p._1 != p._2)
-        .flatMap(p => Seq(p, (p._2, p._1)))
-        .toSet
+    if (includeReversed)
+      pairs.flatMap(p => Seq(p, (p._2, p._1))).toSet
+    else
+      pairs.toSet
   }
 
-  def filterLanguages(languages: Language*): T
-  def filterTypes(fileTypes: DatasetType*): T
-  def filterKeys(keys: String*): T
+  def filterLanguages(languages: Language*): ParallelDataset
+  def filterTypes(fileTypes: DatasetType*): ParallelDataset
+  def filterKeys(keys: String*): ParallelDataset
 
   /** Creates and returns a TensorFlow dataset, for the specified language.
     *
@@ -54,16 +55,14 @@ trait ParallelDataset[T <: ParallelDataset[T]] {
     *   - `INT32` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
     *   - `INT32` tensor containing the input sentence lengths, with shape `[batchSize]`.
     *
-    * @param  language   Language for which the TensorFlow dataset is constructed.
-    * @param  dataConfig Data configuration to use (optionally overriding this dataset's configuration).
+    * @param  language Language for which the TensorFlow dataset is constructed.
     * @return Created TensorFlow dataset.
     */
-  def toTFMonolingual(language: Language, dataConfig: DataConfig = dataConfig): TFMonolingualDataset
+  def toTFMonolingual(language: Language): TFMonolingualDataset
 
   def toTFBilingual(
       language1: Language,
       language2: Language,
-      dataConfig: DataConfig = dataConfig,
       repeat: Boolean = true,
       isEval: Boolean = false
   ): TFBilingualDataset

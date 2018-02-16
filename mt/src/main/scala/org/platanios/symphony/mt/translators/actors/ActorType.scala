@@ -23,4 +23,4 @@ import org.platanios.symphony.mt.Language
 sealed trait ActorType
 
 case object SystemActor extends ActorType
-case class AgentActor(language: Language) extends ActorType
+case class AgentActor(language1: Language, language2: Language) extends ActorType

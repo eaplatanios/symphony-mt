@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.{TFMonolingualDataset, TFBilingualDataset}
+import org.platanios.symphony.mt.data.{joinBilingualDatasets, ParallelDataset, TFBilingualDataset, TFMonolingualDataset}
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -28,15 +28,14 @@ import akka.actor._
 /**
   * @author Emmanouil Antonios Platanios
   */
-class Agent(
-    val language: Language,
-    protected val languageVocab: Vocabulary,
-    protected val interlinguaVocab: Vocabulary,
+class Agent protected (
+    val language1: (Language, Vocabulary),
+    val language2: (Language, Vocabulary),
     protected val model: (Language, Vocabulary, Language, Vocabulary) => Model,
     protected val requestManagerType: RequestManager.Type = RequestManager.Hash
 ) extends Actor with ActorLogging {
-  protected val langToInterlinguaModel: Model = model(language, languageVocab, interlingua, interlinguaVocab)
-  protected val interlinguaToLangModel: Model = model(interlingua, interlinguaVocab, language, languageVocab)
+  protected val lang1ToLang2Model: Model = model(language1._1, language1._2, language2._1, language2._2)
+  protected val lang2ToLang1Model: Model = model(language2._1, language2._2, language1._1, language1._2)
 
   /** Used for messages that map to stored request information. */
   protected var uniqueIdCounter: Long = 0L
@@ -46,39 +45,34 @@ class Agent(
     requestManagerType.newManager[Agent.RequestInformation]()
   }
 
-  override def preStart(): Unit = log.info(s"Translation agent for '$language' started.")
-  override def postStop(): Unit = log.info(s"Translation agent for '$language' stopped.")
+  override def preStart(): Unit = {
+    log.info(s"Translation agent for '${language1._1.abbreviation}-${language2._1.abbreviation}' started.")
+  }
+
+  override def postStop(): Unit = {
+    log.info(s"Translation agent for '${language1._1.abbreviation}-${language2._1.abbreviation}' stopped.")
+  }
 
   override def receive: Receive = {
     case Type =>
-      sender() ! AgentActor(language)
-    case AgentSelfTrainRequest(sentences, stopCriteria) =>
-      processAgentSelfTrainRequest(sentences, stopCriteria)
-    case AgentTrainRequest(tgtAgent, parallelSentences, stopCriteria) =>
-      processAgentTrainRequest(tgtAgent, parallelSentences, stopCriteria)
-    case AgentTranslateToInterlinguaRequest(id, sentences) =>
-      processTranslateToInterlinguaRequest(id, sentences)
-    case AgentTranslateToInterlinguaResponse(id, interlinguaSentences) =>
-      processTranslateToInterlinguaResponse(id, interlinguaSentences)
-    case AgentTranslateFromInterlinguaRequest(id, interlinguaSentences) =>
-      processTranslateFromInterlinguaRequest(id, interlinguaSentences)
-    case AgentTranslateFromInterlinguaResponse(id, sentences) => ???
+      sender() ! AgentActor(language1._1, language2._1)
+    case AgentSelfTrainRequest(dataset, stopCriteria) =>
+      processAgentSelfTrainRequest(dataset, stopCriteria)
+    case AgentTrainRequest(tgtAgent, dataset, stopCriteria) =>
+      processAgentTrainRequest(tgtAgent, dataset, stopCriteria)
+    case AgentTranslateRequest(id, srcLanguage, tgtLanguage, dataset) =>
+      processTranslateRequest(id, srcLanguage, tgtLanguage, dataset)
+    case AgentTranslateResponse(id, language, sentences) =>
+      processTranslateResponse(id, language, sentences)
   }
 
   @throws[IllegalArgumentException]
-  protected def processAgentSelfTrainRequest(sentences: (Tensor, Tensor), stopCriteria: StopCriteria): Unit = {
-    if (languageVocab.size != interlinguaVocab.size)
-      throw new IllegalArgumentException(
-        s"Self-training can only be used if the agent's vocabulary size (${languageVocab.size}) " +
-            s"matches the interlingua vocabulary size (${interlinguaVocab.size}).")
+  protected def processAgentSelfTrainRequest(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
+    require(language1._2.size == language2._2.size, "For self-training, all agent vocabularies must have same size.")
 
-    // Train model for the human language to interlingua translation direction.
-    langToInterlinguaModel.train(() => tf.data.TensorDataset(
-      (sentences, sentences)).repeat().asInstanceOf[TFBilingualDataset], stopCriteria)
-
-    // Train model for the interlingua to human language translation direction.
-    interlinguaToLangModel.train(() => tf.data.TensorDataset(
-      (sentences, sentences)).repeat().asInstanceOf[TFBilingualDataset], stopCriteria)
+    // Train the translation models in both directions.
+    lang1ToLang2Model.train(() => dataset.toTFBilingual(language1._1, language2._1, repeat = true), stopCriteria)
+    lang2ToLang1Model.train(() => dataset.toTFBilingual(language2._1, language1._1, repeat = true), stopCriteria)
 
     // Send a message to the requester notifying that this agent is done processing this train request.
     sender() ! AgentSelfTrainResponse()
@@ -86,58 +80,68 @@ class Agent(
 
   protected def processAgentTrainRequest(
       tgtAgent: ActorRef,
-      parallelSentences: ((Tensor, Tensor), (Tensor, Tensor)),
+      dataset: ParallelDataset,
       stopCriteria: StopCriteria
   ): Unit = {
-    requestManager.set(
-      uniqueIdCounter, Agent.RequestInformation(sender(), parallelSentences._1, Some(stopCriteria)))
-    tgtAgent ! AgentTranslateToInterlinguaRequest(uniqueIdCounter, parallelSentences._2)
+    requestManager.set(uniqueIdCounter, Agent.RequestInformation(sender(), dataset, Some(stopCriteria)))
+    tgtAgent ! AgentTranslateRequest(uniqueIdCounter, language2._1, interlingua, dataset)
     uniqueIdCounter += 1
   }
 
-  protected def processTranslateToInterlinguaRequest(id: Long, sentences: (Tensor, Tensor)): Unit = {
-    val translatedSentences = langToInterlinguaModel.infer(
-      () => tf.data.TensorDataset(sentences).asInstanceOf[TFMonolingualDataset]).next()._2
-    sender() ! AgentTranslateToInterlinguaResponse(id, translatedSentences)
+  protected def processTranslateRequest(
+      id: Long,
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      dataset: ParallelDataset
+  ): Unit = {
+    val translatedSentences = {
+      if (srcLanguage == language1._1 && tgtLanguage == language2._1)
+        lang1ToLang2Model.infer(() => dataset.toTFMonolingual(language1._1)).map(_._2)
+      else if (srcLanguage == language2._1 && tgtLanguage == language1._1)
+        lang2ToLang1Model.infer(() => dataset.toTFMonolingual(language2._1)).map(_._2)
+      else throw new IllegalArgumentException(
+        s"Agent '${self.path.name}' cannot translate from $srcLanguage to $tgtLanguage.")
+    }
+    sender() ! AgentTranslateResponse(id, tgtLanguage, translatedSentences)
   }
 
-  protected def processTranslateToInterlinguaResponse(id: Long, interlinguaSentences: (Tensor, Tensor)): Unit = {
+  protected def processTranslateResponse(
+      id: Long,
+      language: Language,
+      sentences: Iterator[(Tensor, Tensor)]
+  ): Unit = {
     requestManager.get(id) match {
-      case Some(Agent.RequestInformation(requester, srcSentences, Some(trainStopCriteria))) =>
+      case Some(Agent.RequestInformation(requester, dataset, Some(trainStopCriteria))) =>
         // Train model for the human language to interlingua translation direction.
-        langToInterlinguaModel.train(() => tf.data.TensorDataset(
-          (srcSentences, interlinguaSentences)).repeat().asInstanceOf[TFBilingualDataset], trainStopCriteria)
+        lang1ToLang2Model.train(() =>
+          dataset.toTFMonolingual(language1._1)
+              .zip(joinBilingualDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset).toSeq).repeat())
+              .asInstanceOf[TFBilingualDataset], trainStopCriteria)
 
         // Train model for the interlingua to human language translation direction.
-        interlinguaToLangModel.train(() => tf.data.TensorDataset(
-          (interlinguaSentences, srcSentences)).repeat().asInstanceOf[TFBilingualDataset], trainStopCriteria)
+        lang2ToLang1Model.train(() =>
+          joinBilingualDatasets(sentences.map(tf.data.TensorDataset(_): TFMonolingualDataset).toSeq).repeat()
+              .zip(dataset.toTFMonolingual(language1._1))
+              .asInstanceOf[TFBilingualDataset], trainStopCriteria)
 
         // Send a message to the requester notifying that this agent is done processing this train request.
         requester ! AgentTrainResponse()
       case _ => log.warning(
-        s"Ignoring translate-to-interlingua response with ID '$id' " +
-            s"because no relevant stored information was found.")
+        s"Ignoring translate response with ID '$id' because no relevant stored information was found.")
     }
-  }
-
-  protected def processTranslateFromInterlinguaRequest(id: Long, interlinguaSentences: (Tensor, Tensor)): Unit = {
-    val translatedSentences = interlinguaToLangModel.infer(
-      () => tf.data.TensorDataset(interlinguaSentences).asInstanceOf[TFMonolingualDataset]).next()._2
-    sender() ! AgentTranslateFromInterlinguaResponse(id, translatedSentences)
   }
 }
 
 object Agent {
   def props(
-      language: Language,
-      languageVocab: Vocabulary,
-      interlinguaVocab: Vocabulary,
+      language1: (Language, Vocabulary),
+      language2: (Language, Vocabulary),
       model: (Language, Vocabulary, Language, Vocabulary) => Model,
       requestManagerType: RequestManager.Type = RequestManager.Hash
-  ): Props = Props(new Agent(language, languageVocab, interlinguaVocab, model, requestManagerType))
+  ): Props = Props(new Agent(language1, language2, model, requestManagerType))
 
   case class RequestInformation(
       requester: ActorRef,
-      sentences: (Tensor, Tensor),
+      dataset: ParallelDataset,
       trainStopCriteria: Option[StopCriteria])
 }

@@ -33,11 +33,8 @@ class PairwiseTranslator protected (
 ) extends Translator(model) {
   protected val models: mutable.Map[(Language, Language), Model] = mutable.Map.empty
 
-  override def train[T <: ParallelDataset[T]](
-      dataset: ParallelDataset[T],
-      stopCriteria: StopCriteria
-  )(languagePairs: Set[(Language, Language)] = dataset.languagePairs): Unit = {
-    languagePairs.foreach {
+  override def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
+    dataset.languagePairs(includeReversed = true).foreach {
       case (srcLanguage, tgtLanguage) =>
         val currentModel = models.getOrElseUpdate(
           (srcLanguage, tgtLanguage),
@@ -48,10 +45,10 @@ class PairwiseTranslator protected (
     }
   }
 
-  override def translate[T <: ParallelDataset[T]](
+  override def translate(
       srcLanguage: Language,
       tgtLanguage: Language,
-      dataset: ParallelDataset[T]
+      dataset: ParallelDataset
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
     val currentModel = models.getOrElseUpdate(
       (srcLanguage, tgtLanguage),

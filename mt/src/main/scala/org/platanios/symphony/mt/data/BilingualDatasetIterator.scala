@@ -25,18 +25,16 @@ import java.util.concurrent.atomic.AtomicBoolean
   *
   * This iterator creates a TensorFlow dataset for `dataset` and a session that loads it and iterates over its elements.
   *
-  * @param  dataset    Dataset from which to construct this iterator.
-  * @param  language1  First language.
-  * @param  language2  Second language.
-  * @param  dataConfig Data configuration to use.
+  * @param  dataset   Dataset from which to construct this iterator.
+  * @param  language1 First language.
+  * @param  language2 Second language.
   *
   * @author Emmanouil Antonios Platanios
   */
-class BilingualDatasetIterator[T <: ParallelDataset[T]] protected (
-    val dataset: ParallelDataset[T],
+class BilingualDatasetIterator protected (
+    val dataset: ParallelDataset,
     val language1: Language,
     val language2: Language,
-    val dataConfig: DataConfig,
     val repeat: Boolean = true,
     val isEval: Boolean = false
 ) extends Iterator[((Tensor, Tensor), (Tensor, Tensor))] {
@@ -50,8 +48,7 @@ class BilingualDatasetIterator[T <: ParallelDataset[T]] protected (
       ((Output, Output), (Output, Output)),
       ((DataType, DataType), (DataType, DataType)),
       ((Shape, Shape), (Shape, Shape))] = tf.createWith(graph) {
-    tf.data.iteratorFromDataset(
-      dataset.filterTypes(Train).toTFBilingual(language1, language2, dataConfig, repeat, isEval))
+    tf.data.iteratorFromDataset(dataset.toTFBilingual(language1, language2, repeat, isEval))
   }
 
   protected val initOp    : Op                                   = tf.createWith(graph)(iterator.initializer)
@@ -72,14 +69,13 @@ class BilingualDatasetIterator[T <: ParallelDataset[T]] protected (
 }
 
 object BilingualDatasetIterator {
-  def apply[T <: ParallelDataset[T]](
-      dataset: ParallelDataset[T],
+  def apply(
+      dataset: ParallelDataset,
       language1: Language,
       language2: Language,
-      dataConfig: DataConfig,
       repeat: Boolean = true,
       isEval: Boolean = false
-  ): BilingualDatasetIterator[T] = {
-    new BilingualDatasetIterator[T](dataset, language1, language2, dataConfig, repeat, isEval)
+  ): BilingualDatasetIterator = {
+    new BilingualDatasetIterator(dataset, language1, language2, repeat, isEval)
   }
 }

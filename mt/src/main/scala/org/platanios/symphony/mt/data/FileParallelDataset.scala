@@ -27,12 +27,12 @@ import better.files.File
 class FileParallelDataset protected (
     override val name: String,
     override val vocabulary: Map[Language, Vocabulary],
-    override val dataConfig: DataConfig,
+    val dataConfig: DataConfig,
     val files: Map[Language, Seq[File]],
     val fileTypes: Seq[DatasetType] = null,
     val fileKeys: Seq[String] = null
-) extends ParallelDataset[FileParallelDataset] {
-  override def filterLanguages(languages: Language*): FileParallelDataset = {
+) extends ParallelDataset {
+  override def filterLanguages(languages: Language*): ParallelDataset = {
     languages.foreach(checkSupportsLanguage)
     FileParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
@@ -40,7 +40,7 @@ class FileParallelDataset protected (
       files.filterKeys(languages.contains), fileTypes, fileKeys)
   }
 
-  override def filterTypes(types: DatasetType*): FileParallelDataset = {
+  override def filterTypes(types: DatasetType*): ParallelDataset = {
     val filteredGroupedFiles = files.mapValues(_.zip(fileTypes).filter(f => types.contains(f._2)).map(_._1))
     val filteredFileTypes = fileTypes.filter(types.contains)
     val filteredFileKeys = fileKeys.zip(fileTypes).filter(f => types.contains(f._2)).map(_._1)
@@ -49,7 +49,7 @@ class FileParallelDataset protected (
       filteredGroupedFiles, filteredFileTypes, filteredFileKeys)
   }
 
-  override def filterKeys(keys: String*): FileParallelDataset = {
+  override def filterKeys(keys: String*): ParallelDataset = {
     require(fileKeys.nonEmpty, "Cannot filter a parallel dataset by file key when it contains no file keys.")
     val filteredGroupedFiles = files.mapValues(_.zip(fileKeys).filter(f => keys.contains(f._2)).map(_._1))
     val filteredFileTypes = fileKeys.zip(fileTypes).filter(f => keys.contains(f._1)).map(_._2)
@@ -65,11 +65,10 @@ class FileParallelDataset protected (
     *   - `INT32` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
     *   - `INT32` tensor containing the input sentence lengths, with shape `[batchSize]`.
     *
-    * @param  language   Language for which the TensorFlow dataset is constructed.
-    * @param  dataConfig Data configuration to use (optionally overriding this dataset's configuration).
+    * @param  language Language for which the TensorFlow dataset is constructed.
     * @return Created TensorFlow dataset.
     */
-  override def toTFMonolingual(language: Language, dataConfig: DataConfig = dataConfig): TFMonolingualDataset = {
+  override def toTFMonolingual(language: Language): TFMonolingualDataset = {
     checkSupportsLanguage(language)
 
     val batchSize = dataConfig.inferBatchSize
@@ -106,7 +105,6 @@ class FileParallelDataset protected (
   override def toTFBilingual(
       language1: Language,
       language2: Language,
-      dataConfig: DataConfig = dataConfig,
       repeat: Boolean = true,
       isEval: Boolean = false
   ): TFBilingualDataset = {

@@ -23,8 +23,8 @@ import akka.actor.ActorRef
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class TrainScheduler[T <: ParallelDataset[T]](
-    protected val dataset: ParallelDataset[T],
+abstract class TrainScheduler(
+    protected val dataset: ParallelDataset,
     protected val agents: Map[Language, ActorRef]
 ) {
   /** Initializes this train scheduler. This method is always called by the translation system, in order to start

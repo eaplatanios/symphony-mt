@@ -58,7 +58,7 @@ class StateBasedModel[S, SS](
       ((Tensor, Tensor), (Tensor, Tensor)), ((Output, Output), (Output, Output)),
       ((DataType, DataType), (DataType, DataType)), ((Shape, Shape), (Shape, Shape)),
       ((Output, Output), (Output, Output))] = tf.createWithNameScope(name) {
-    val model = learn.Model(
+    val model = learn.Model.supervised(
       input = input,
       layer = inferLayer,
       trainLayer = trainLayer,

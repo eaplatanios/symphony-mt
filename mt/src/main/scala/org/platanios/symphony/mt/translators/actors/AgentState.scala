@@ -29,7 +29,7 @@ import java.io.FileNotFoundException
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class AgentState(language: Language, vocab: Vocabulary)
+case class AgentState(language1: (Language, Vocabulary), language2: (Language, Vocabulary))
 
 object AgentState {
   def save(state: SystemState, file: File): File = {

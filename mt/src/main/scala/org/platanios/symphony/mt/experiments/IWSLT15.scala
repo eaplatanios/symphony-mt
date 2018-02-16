@@ -49,7 +49,7 @@ object IWSLT15 extends App {
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
-    numGPUs = 0,
+    numGPUs = 4,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
@@ -73,14 +73,14 @@ object IWSLT15 extends App {
         env,
         UnidirectionalRNNEncoder(
           cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 32,
+          numUnits = 512,
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
           timeMajor = true),
         UnidirectionalRNNDecoder(
           cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 32,
+          numUnits = 512,
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
@@ -96,15 +96,16 @@ object IWSLT15 extends App {
         learningRateDecaySteps = 12000 * 1 / (3 * 4),
         learningRateDecayStartStep = 12000 * 2 / 3,
         colocateGradientsWithOps = true),
-      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
-      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
-      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
+      // TODO: !!! Find a way to set the number of buckets to 1.
+      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
+      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
+      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
       dataConfig, logConfig)
   }
 
   val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(12000))(languagePairs = Set(srcLang -> tgtLang))
+  translator.train(dataset, StopCriteria.steps(12000))
 
-  val evaluator = BilingualEvaluator(Seq(BLEU()), srcLang, tgtLang, dataset.filterTypes(Test), dataConfig)
+  val evaluator = BilingualEvaluator(Seq(BLEU()), srcLang, tgtLang, dataset.filterTypes(Test))
   println(evaluator.evaluate(translator).values.head.scalar.asInstanceOf[Float])
 }

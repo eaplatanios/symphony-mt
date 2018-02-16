@@ -20,18 +20,17 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.translators.Translator
 import org.platanios.tensorflow.api._
 
-class BilingualEvaluator[T <: ParallelDataset[T]] protected (
+class BilingualEvaluator protected (
     val metrics: Seq[MTMetric],
     val srcLanguage: Language,
     val tgtLanguage: Language,
-    val dataset: ParallelDataset[T],
-    val dataConfig: DataConfig
+    val dataset: ParallelDataset
 ) {
   def evaluate(translator: Translator): Map[String, Tensor] = {
     val graph = Graph()
     val session = Session(graph)
     val values = tf.createWith(graph) {
-      val tfDataset = dataset.toTFBilingual(srcLanguage, tgtLanguage, dataConfig, repeat = false, isEval = true)
+      val tfDataset = dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true)
       val iterator = tf.data.iteratorFromDataset(tfDataset)
       val next = iterator.next()
       val inputs = Seq(next._1._1, next._1._2)
@@ -65,13 +64,12 @@ class BilingualEvaluator[T <: ParallelDataset[T]] protected (
 }
 
 object BilingualEvaluator {
-  def apply[T <: ParallelDataset[T]](
+  def apply(
       metrics: Seq[MTMetric],
       srcLanguage: Language,
       tgtLanguage: Language,
-      dataset: ParallelDataset[T],
-      dataConfig: DataConfig
-  ): BilingualEvaluator[T] = {
-    new BilingualEvaluator(metrics, srcLanguage, tgtLanguage, dataset, dataConfig)
+      dataset: ParallelDataset
+  ): BilingualEvaluator = {
+    new BilingualEvaluator(metrics, srcLanguage, tgtLanguage, dataset)
   }
 }

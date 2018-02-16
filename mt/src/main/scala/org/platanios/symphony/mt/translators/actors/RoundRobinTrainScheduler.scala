@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.{BilingualDatasetIterator, ParallelDataset}
+import org.platanios.symphony.mt.data.{BilingualDatasetIterator, ParallelDataset, TensorParallelDataset}
 import org.platanios.symphony.mt.translators.actors.Messages.{AgentSelfTrainRequest, AgentTrainRequest}
 import org.platanios.tensorflow.api.learn.StopCriteria
 
@@ -27,20 +27,19 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
   * @author Emmanouil Antonios Platanios
   */
-class RoundRobinTrainScheduler[T <: ParallelDataset[T]] protected (
-    override protected val dataset: ParallelDataset[T],
+class RoundRobinTrainScheduler protected (
+    override protected val dataset: ParallelDataset,
     override protected val agents: Map[Language, ActorRef],
     val selfTrainSteps: Long = 0L,
     val trainStepsPerRequest: Long = 10L
-)(implicit sender: ActorRef = Actor.noSender) extends TrainScheduler[T](dataset, agents) {
+)(implicit sender: ActorRef = Actor.noSender) extends TrainScheduler(dataset, agents) {
   protected var completedSteps: Long = 0L
 
   /** Contains the train datasets used by this train scheduler. */
-  protected val datasets: Map[Language, Seq[(Language, BilingualDatasetIterator[T])]] = {
-    val aggregated = dataset.languagePairs.map {
+  protected val datasets: Map[Language, Seq[(Language, BilingualDatasetIterator)]] = {
+    val aggregated = dataset.languagePairs(includeReversed = true).map {
       case (srcLang, tgtLang) =>
-        srcLang -> ((tgtLang, BilingualDatasetIterator(
-          dataset, srcLang, tgtLang, dataset.dataConfig, repeat = true, isEval = false)))
+        srcLang -> ((tgtLang, BilingualDatasetIterator(dataset, srcLang, tgtLang, repeat = true, isEval = false)))
     }
     aggregated.toSeq.groupBy(_._1).mapValues(_.map(_._2))
   }
@@ -67,22 +66,33 @@ class RoundRobinTrainScheduler[T <: ParallelDataset[T]] protected (
       nextIndex = 0
     }
     val nextDataset = dataset(nextIndex)
-    if (completedSteps < selfTrainSteps + 1L)
-      agent ! AgentSelfTrainRequest(nextDataset._2.next()._1, StopCriteria.steps(trainStepsPerRequest))
-    else
-      agent ! AgentTrainRequest(agents(nextDataset._1), nextDataset._2.next(), StopCriteria.steps(trainStepsPerRequest))
+    // TODO: !!! Make this more efficient. Creating new datasets can have an overhead.
+    if (completedSteps < selfTrainSteps + 1L) {
+      agent ! AgentSelfTrainRequest(
+        TensorParallelDataset(
+          "", Map(lang -> this.dataset.vocabulary(lang)), Map(lang -> Seq(nextDataset._2.next()._1))),
+        StopCriteria.steps(trainStepsPerRequest))
+    } else {
+      val tensorsTuple = nextDataset._2.next()
+      val tgtLang = nextDataset._1
+      val vocabularies =  Map(lang -> this.dataset.vocabulary(lang), tgtLang -> this.dataset.vocabulary(tgtLang))
+      val tensors =  Map(lang -> Seq(tensorsTuple._1), tgtLang -> Seq(tensorsTuple._2))
+      agent ! AgentTrainRequest(
+        agents(nextDataset._1), TensorParallelDataset("", vocabularies, tensors),
+        StopCriteria.steps(trainStepsPerRequest))
+    }
   }
 }
 
 object RoundRobinTrainScheduler {
-  def apply[T <: ParallelDataset[T]](
-      dataset: ParallelDataset[T],
+  def apply(
+      dataset: ParallelDataset,
       agents: Map[Language, ActorRef],
       selfTrainSteps: Long = 0L,
       trainStepsPerRequest: Long = 10L
   )(implicit
       sender: ActorRef = Actor.noSender
-  ): RoundRobinTrainScheduler[T] = {
-    new RoundRobinTrainScheduler[T](dataset, agents, selfTrainSteps, trainStepsPerRequest)(sender)
+  ): RoundRobinTrainScheduler = {
+    new RoundRobinTrainScheduler(dataset, agents, selfTrainSteps, trainStepsPerRequest)(sender)
   }
 }

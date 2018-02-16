@@ -99,12 +99,13 @@ object WMT16 extends App {
         learningRateDecaySteps = 340000 * 1 / (2 * 10),
         learningRateDecayStartStep = 340000 * 2,
         colocateGradientsWithOps = true),
-      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
-      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
-      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, dataConfig.copy(numBuckets = 1), repeat = false, isEval = true),
+      // TODO: !!! Find a way to set the number of buckets to 1.
+      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
+      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
+      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
       dataConfig, logConfig)
   }
 
   val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(340000))(languagePairs = Set(srcLang -> tgtLang))
+  translator.train(dataset, StopCriteria.steps(340000))
 }

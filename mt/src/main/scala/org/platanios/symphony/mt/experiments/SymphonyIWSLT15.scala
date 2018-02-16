@@ -66,10 +66,6 @@ object SymphonyIWSLT15 extends App {
     selfTrainSteps = 200L,
     trainStepsPerRequest = 10L)
 
-  //  val trainEvalDataset = () => datasetFiles.createTrainDataset(TRAIN_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
-  //  val devEvalDataset   = () => datasetFiles.createTrainDataset(DEV_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
-  //  val testEvalDataset  = () => datasetFiles.createTrainDataset(TEST_DATASET, repeat = false, dataConfig.copy(numBuckets = 1), isEval = true)
-
   val trainEvalDataset: () => TFBilingualDataset = null
   val devEvalDataset  : () => TFBilingualDataset = null
   val testEvalDataset : () => TFBilingualDataset = null
@@ -117,5 +113,5 @@ object SymphonyIWSLT15 extends App {
   }
 
   val translator = SymphonyTranslator(systemConfig, model, "IWSLT-15")
-  translator.train(dataset, StopCriteria.steps(12000))()
+  translator.train(dataset, StopCriteria.steps(12000))
 }

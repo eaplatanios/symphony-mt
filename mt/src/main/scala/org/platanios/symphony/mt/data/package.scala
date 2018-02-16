@@ -26,13 +26,14 @@ package object data {
       ((DataType, DataType), (DataType, DataType)),
       ((Shape, Shape), (Shape, Shape))]
 
-  private[data] def joinMonolingualDatasets(
+  private[mt] def joinMonolingualDatasets(
       datasets: Seq[tf.data.Dataset[Tensor, Output, DataType, Shape]]
   ): tf.data.Dataset[Tensor, Output, DataType, Shape] = {
     datasets.reduce((d1, d2) => d1.concatenate(d2))
   }
 
-  private[data] def joinBilingualDatasets(
+  // TODO: This is actually a monolingual dataset.
+  private[mt] def joinBilingualDatasets(
       datasets: Seq[tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]]
   ): tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)] = {
     datasets.reduce((d1, d2) => d1.concatenate(d2))

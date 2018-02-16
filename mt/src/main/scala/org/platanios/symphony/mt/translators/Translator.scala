@@ -26,15 +26,12 @@ import org.platanios.tensorflow.api.learn.StopCriteria
   * @author Emmanouil Antonios Platanios
   */
 abstract class Translator(val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model) {
-  def train[T <: ParallelDataset[T]](
-      dataset: ParallelDataset[T],
-      stopCriteria: StopCriteria
-  )(languagePairs: Set[(Language, Language)] = dataset.languagePairs): Unit
+  def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit
 
-  def translate[T <: ParallelDataset[T]](
+  def translate(
       srcLanguage: Language,
       tgtLanguage: Language,
-      dataset: ParallelDataset[T]
+      dataset: ParallelDataset
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))]
 
   def translate(

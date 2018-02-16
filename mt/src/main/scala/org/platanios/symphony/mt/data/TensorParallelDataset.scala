@@ -28,11 +28,8 @@ class TensorParallelDataset protected (
     val tensors: Map[Language, Seq[(Tensor, Tensor)]],
     val tensorTypes: Seq[DatasetType] = null,
     val tensorKeys: Seq[String] = null
-) extends ParallelDataset[TensorParallelDataset] {
-  // TODO: !!!
-  override val dataConfig: DataConfig = null
-
-  override def filterLanguages(languages: Language*): TensorParallelDataset = {
+) extends ParallelDataset {
+  override def filterLanguages(languages: Language*): ParallelDataset = {
     languages.foreach(checkSupportsLanguage)
     TensorParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
@@ -40,7 +37,7 @@ class TensorParallelDataset protected (
       tensorTypes, tensorKeys)
   }
 
-  override def filterTypes(types: DatasetType*): TensorParallelDataset = {
+  override def filterTypes(types: DatasetType*): ParallelDataset = {
     require(tensorTypes.nonEmpty, "Cannot filter a parallel dataset by tensor type when it contains no tensor types.")
     val filteredGroupedTensors = tensors.mapValues(_.zip(tensorTypes).filter(f => types.contains(f._2)).map(_._1))
     val filteredFileTypes = tensorTypes.filter(types.contains)
@@ -50,7 +47,7 @@ class TensorParallelDataset protected (
       filteredFileTypes, filteredFileKeys)
   }
 
-  override def filterKeys(keys: String*): TensorParallelDataset = {
+  override def filterKeys(keys: String*): ParallelDataset = {
     require(tensorKeys.nonEmpty, "Cannot filter a parallel dataset by tensor key when it contains no tensor keys.")
     val filteredGroupedTensors = tensors.mapValues(_.zip(tensorKeys).filter(f => keys.contains(f._2)).map(_._1))
     val filteredTensorTypes = tensorKeys.zip(tensorTypes).filter(f => keys.contains(f._1)).map(_._2)
@@ -66,41 +63,17 @@ class TensorParallelDataset protected (
     *   - `INT32` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
     *   - `INT32` tensor containing the input sentence lengths, with shape `[batchSize]`.
     *
-    * @param  language   Language for which the TensorFlow dataset is constructed.
-    * @param  dataConfig Data configuration to use (optionally overriding this dataset's configuration).
+    * @param  language Language for which the TensorFlow dataset is constructed.
     * @return Created TensorFlow dataset.
     */
-  override def toTFMonolingual(language: Language, dataConfig: DataConfig = dataConfig): TFMonolingualDataset = {
+  override def toTFMonolingual(language: Language): TFMonolingualDataset = {
     checkSupportsLanguage(language)
-
-    val batchSize = dataConfig.inferBatchSize
-    val vocabTable = vocabulary(language).lookupTable()
-    val srcEosId = vocabTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-
-    val batchingFn = (dataset: TFMonolingualDataset) => {
-      dataset.dynamicPaddedBatch(
-        batchSize,
-        // The first entry represents the source line rows, which are unknown-length vectors.
-        // The last entry is the source row size, which is a scalar.
-        (Shape(-1), Shape.scalar()),
-        // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
-        // not generally need to do this since later on we will be masking out calculations past
-        // the true sequence.
-        (srcEosId, tf.zeros(INT32, Shape.scalar())))
-    }
-
-    val datasetJoined = joinBilingualDatasets(tensors(language).map(tf.data.TensorSlicesDataset(_)))
-    val datasetBeforeBatching = datasetJoined
-    // TODO: Enforce length checks and cropping.
-    // TODO: Check if the tensor is string-valued.
-
-    batchingFn(datasetBeforeBatching)
+    joinBilingualDatasets(tensors(language).map(tf.data.TensorSlicesDataset(_)))
   }
 
   override def toTFBilingual(
       language1: Language,
       language2: Language,
-      dataConfig: DataConfig = dataConfig,
       repeat: Boolean = true,
       isEval: Boolean = false
   ): TFBilingualDataset = ???

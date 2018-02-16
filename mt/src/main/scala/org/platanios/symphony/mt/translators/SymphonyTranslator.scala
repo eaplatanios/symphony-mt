@@ -39,18 +39,14 @@ class SymphonyTranslator protected (
     actorSystem.actorOf(actors.System.props(systemConfig, model), s"System$name")
   }
 
-  override def train[T <: ParallelDataset[T]](
-      dataset: ParallelDataset[T],
-      stopCriteria: StopCriteria
-  )(languagePairs: Set[(Language, Language)] = dataset.languagePairs): Unit = {
-    // TODO: Use the language pairs argument.
-    system ! SystemTrainRequest(dataset)
+  override def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
+    system ! SystemTrainRequest(dataset, stopCriteria)
   }
 
-  override def translate[T <: ParallelDataset[T]](
+  override def translate(
       srcLanguage: Language,
       tgtLanguage: Language,
-      dataset: ParallelDataset[T]
+      dataset: ParallelDataset
   ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = ???
 }
 

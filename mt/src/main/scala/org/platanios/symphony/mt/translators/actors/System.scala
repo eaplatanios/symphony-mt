@@ -16,11 +16,12 @@
 package org.platanios.symphony.mt.translators.actors
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.data.ParallelDataset
+import org.platanios.symphony.mt.data.{ParallelDataset, TensorParallelDataset}
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.translators.actors.Messages._
 import org.platanios.symphony.mt.vocabulary._
 import org.platanios.tensorflow.api.Tensor
+import org.platanios.tensorflow.api.learn.StopCriteria
 
 import akka.actor._
 import better.files._
@@ -32,7 +33,7 @@ import scala.collection.mutable
 /**
   * @author Emmanouil Antonios Platanios
   */
-class System[T <: ParallelDataset[T]](
+class System protected (
     val config: SystemConfig,
     protected val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model,
     protected val requestManagerType: RequestManager.Type = RequestManager.Hash
@@ -69,8 +70,7 @@ class System[T <: ParallelDataset[T]](
   protected val agents: mutable.Map[Language, ActorRef] = mutable.HashMap.empty[Language, ActorRef]
 
   // Initialize the agents map from the current system state (in case it's been loaded from a file).
-  systemState.agents.foreach(agentState =>
-    agentState.language -> createAgent(agentState.language, agentState.vocab, cleanWorkingDir = false))
+  systemState.agents.foreach(agentState => createAgent(agentState.language1, cleanWorkingDir = false))
 
   /** Used for messages that map to stored request information. */
   protected var uniqueIdCounter: Long = 0L
@@ -81,7 +81,7 @@ class System[T <: ParallelDataset[T]](
   }
 
   // TODO: Make this configurable.
-  protected var trainScheduler: TrainScheduler[T] = _
+  protected var trainScheduler: TrainScheduler = _
 
   override def preStart(): Unit = log.info("Translation system started.")
   override def postStop(): Unit = log.info("Translation system stopped.")
@@ -89,86 +89,88 @@ class System[T <: ParallelDataset[T]](
   override def receive: Receive = {
     case Type =>
       sender() ! SystemActor
-    case SystemTrainRequest(dataset) =>
-      processSystemTrainRequest(dataset.asInstanceOf[ParallelDataset[T]])
+    case SystemTrainRequest(dataset, stopCriteria) =>
+      processSystemTrainRequest(dataset, stopCriteria)
     case AgentSelfTrainResponse() =>
       trainScheduler.onTrainResponse(sender())
     case AgentTrainResponse() =>
       trainScheduler.onTrainResponse(sender())
-    case SystemTranslateRequest(srcLang, tgtLang, sentences) =>
-      processSystemTranslateRequest(sender(), srcLang, tgtLang, sentences)
-    case AgentTranslateToInterlinguaResponse(id, sentences) =>
-      processAgentTranslateToInterlinguaResponse(id, sentences)
-    case AgentTranslateFromInterlinguaResponse(id, sentences) =>
-      processAgentTranslateFromInterlinguaResponse(id, sentences)
+    case SystemTranslateRequest(srcLanguage, tgtLanguage, dataset) =>
+      processSystemTranslateRequest(srcLanguage, tgtLanguage, dataset)
+    case AgentTranslateResponse(id, language, sentences) =>
+      processAgentTranslateResponse(id, language, sentences)
   }
 
-  protected def processSystemTrainRequest(dataset: ParallelDataset[T]): Unit = {
+  protected def processSystemTrainRequest(
+      dataset: ParallelDataset,
+      stopCriteria: StopCriteria // TODO: !!! Use the stop criteria.
+  ): Unit = {
     dataset.vocabulary.foreach {
       case (lang, vocab) => agents.getOrElseUpdate(lang, {
-        val agent = createAgent(lang, vocab, cleanWorkingDir = true)
-        systemState = systemState.copy(agents = systemState.agents :+ AgentState(lang, vocab))
+        val agent = createAgent(lang -> vocab, cleanWorkingDir = true)
+        systemState = systemState.copy(agents = systemState.agents :+
+            AgentState(lang -> vocab, interlingua -> systemState.interlinguaVocab))
         SystemState.save(systemState, systemStateFile)
         agent
       })
     }
     // TODO: Make this configurable.
     trainScheduler = RoundRobinTrainScheduler(
-      dataset, agents.toMap, 
-      selfTrainSteps = config.selfTrainSteps, 
+      dataset, agents.toMap,
+      selfTrainSteps = config.selfTrainSteps,
       trainStepsPerRequest = config.trainStepsPerRequest)
     trainScheduler.initialize()
   }
 
   @throws[IllegalArgumentException]
   protected def processSystemTranslateRequest(
-      sender: ActorRef,
-      srcLang: Language,
-      tgtLang: Language,
-      sentences: (Tensor, Tensor)
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      dataset: ParallelDataset
   ): Unit = {
-    requestManager.set(uniqueIdCounter, System.RequestInformation(sender, srcLang, tgtLang, sentences))
-    if (!agents.contains(srcLang))
-      throw new IllegalArgumentException(s"No training data have been provided for language '$srcLang'.")
-    if (!agents.contains(tgtLang))
-      throw new IllegalArgumentException(s"No training data have been provided for language '$tgtLang'.")
-    agents(srcLang) ! AgentTranslateToInterlinguaRequest(uniqueIdCounter, sentences)
+    requestManager.set(uniqueIdCounter, System.RequestInformation(sender(), srcLanguage, tgtLanguage, dataset))
+    if (!agents.contains(srcLanguage))
+      throw new IllegalArgumentException(s"No training data have been provided for language '$srcLanguage'.")
+    if (!agents.contains(tgtLanguage))
+      throw new IllegalArgumentException(s"No training data have been provided for language '$tgtLanguage'.")
+    agents(srcLanguage) ! AgentTranslateRequest(uniqueIdCounter, srcLanguage, interlingua, dataset)
     uniqueIdCounter += 1
   }
 
   @throws[IllegalArgumentException]
-  protected def processAgentTranslateToInterlinguaResponse(id: Long, sentences: (Tensor, Tensor)): Unit = {
+  protected def processAgentTranslateResponse(
+      id: Long,
+      language: Language,
+      sentences: Iterator[(Tensor, Tensor)]
+  ): Unit = {
     requestManager.get(id, remove = false) match {
-      case Some(System.RequestInformation(_, _, tgtLang, _)) =>
-        if (!agents.contains(tgtLang))
-          throw new IllegalArgumentException(s"No training data have been provided for language '$tgtLang'.")
-        agents(tgtLang) ! AgentTranslateFromInterlinguaRequest(id, sentences)
+      case Some(System.RequestInformation(requester, srcLanguage, tgtLanguage, dataset)) if language == tgtLanguage =>
+        requester ! SystemTranslateResponse(srcLanguage, tgtLanguage, dataset, sentences)
+      case Some(System.RequestInformation(_, _, tgtLanguage, _)) =>
+        if (!agents.contains(tgtLanguage))
+          throw new IllegalArgumentException(s"No training data have been provided for language '$tgtLanguage'.")
+        // TODO: !!! Make this more efficient. Creating new datasets can have an overhead.
+        agents(tgtLanguage) ! AgentTranslateRequest(id, interlingua, tgtLanguage, TensorParallelDataset(
+          "", Map(interlingua -> systemState.interlinguaVocab), Map(interlingua -> sentences.toSeq)))
       case None => log.warning(
-        s"Ignoring translate-to-interlingua response with ID '$id' " +
-            s"because no relevant stored information was found.")
+        s"Ignoring agent translate response with ID '$id' because no relevant stored information was found.")
     }
   }
 
-  protected def processAgentTranslateFromInterlinguaResponse(id: Long, sentences: (Tensor, Tensor)): Unit = {
-    requestManager.get(id, remove = false) match {
-      case Some(System.RequestInformation(requester, srcLang, tgtLang, srcSentences)) =>
-        requester ! SystemTranslateResponse(srcLang, tgtLang, srcSentences, sentences)
-      case None => log.warning(
-        s"Ignoring translate-from-interlingua response with ID '$id' " +
-            s"because no relevant stored information was found.")
-    }
-  }
-
-  protected def createAgent(lang: Language, vocab: Vocabulary, cleanWorkingDir: Boolean = false): ActorRef = {
-    val workingDir = agentsWorkingDir / lang.abbreviation
+  protected def createAgent(
+      language: (Language, Vocabulary),
+      cleanWorkingDir: Boolean = false
+  ): ActorRef = {
+    val languagePair = s"${language._1.abbreviation}-${interlingua.abbreviation}"
+    val workingDir = agentsWorkingDir / languagePair
     if (cleanWorkingDir && workingDir.exists)
       workingDir.delete()
     workingDir.createIfNotExists(asDirectory = true, createParents = true)
-    agents.getOrElseUpdate(lang, context.actorOf(
+    agents.getOrElseUpdate(language._1, context.actorOf(
       Agent.props(
-        lang, vocab, systemState.interlinguaVocab,
+        language, interlingua -> systemState.interlinguaVocab,
         model(_, _, _, _, config.env.copy(workingDir = workingDir.path)),
-        requestManagerType), s"translation-agent-${lang.abbreviation}"))
+        requestManagerType), s"translation-agent-$languagePair"))
   }
 }
 
@@ -185,7 +187,7 @@ object System {
 
   case class RequestInformation(
       requester: ActorRef,
-      srcLang: Language,
+      srcLanguage: Language,
       tgtLanguage: Language,
-      sentences: (Tensor, Tensor))
+      dataset: ParallelDataset)
 }
