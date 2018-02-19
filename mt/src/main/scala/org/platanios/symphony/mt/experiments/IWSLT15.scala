@@ -21,7 +21,7 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.evaluation.{BLEU, BilingualEvaluator}
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
-import org.platanios.symphony.mt.models.attention.LuongAttention
+import org.platanios.symphony.mt.models.attention.LuongRNNAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.translators.PairwiseTranslator
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -84,7 +84,7 @@ object IWSLT15 extends App {
           numLayers = 2,
           residual = false,
           dropout = Some(0.2f),
-          attention = Some(LuongAttention(scaled = true)),
+          attention = Some(LuongRNNAttention(scaled = true)),
           outputAttention = true,
           timeMajor = true,
           beamWidth = 10),

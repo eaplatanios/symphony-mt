@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.StateBasedModel
-import org.platanios.symphony.mt.models.attention.Attention
+import org.platanios.symphony.mt.models.attention.RNNAttention
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -36,7 +36,7 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
     val residual: Boolean = false,
     val dropout: Option[Float] = None,
     val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-    val attention: Option[Attention[AS, ASS]] = None,
+    val attention: Option[RNNAttention[AS, ASS]] = None,
     val outputAttention: Boolean = true,
     override val timeMajor: Boolean = false,
     // Inference
@@ -106,7 +106,7 @@ object UnidirectionalRNNDecoder {
       residual: Boolean = false,
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-      attention: Option[Attention[AS, ASS]] = None,
+      attention: Option[RNNAttention[AS, ASS]] = None,
       outputAttention: Boolean = false,
       timeMajor: Boolean = false,
       // Inference

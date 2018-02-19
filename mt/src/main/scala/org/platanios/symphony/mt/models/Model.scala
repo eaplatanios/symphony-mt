@@ -36,8 +36,8 @@ abstract class Model protected (
     val tgtLang: Language,
     val tgtVocab: Vocabulary
 ) {
-  val dataConfig : DataConfig  = DataConfig()
-  val logConfig  : LogConfig   = LogConfig()
+  val dataConfig: DataConfig = DataConfig()
+  val logConfig : LogConfig  = LogConfig()
 
   val trainEvalDataset: () => TFBilingualDataset = null
   val devEvalDataset  : () => TFBilingualDataset = null

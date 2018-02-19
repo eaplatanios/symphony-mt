@@ -25,11 +25,11 @@ import org.platanios.tensorflow.api.ops.variables.{ConstantInitializer, ZerosIni
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class BahdanauAttention(
+case class BahdanauRNNAttention(
     normalized: Boolean = false,
     probabilityFn: (Output) => Output = tf.softmax(_, name = "Probability"),
     scoreMask: Float = Float.NegativeInfinity
-) extends Attention[Output, Shape] {
+) extends RNNAttention[Output, Shape] {
   override def create[S, SS](
       cell: RNNCell[Output, Shape, S, SS],
       memory: Output,

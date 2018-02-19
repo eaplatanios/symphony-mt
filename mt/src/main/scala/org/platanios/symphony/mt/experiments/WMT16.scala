@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language, LogConfig}
 import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
-import org.platanios.symphony.mt.models.attention.BahdanauAttention
+import org.platanios.symphony.mt.models.attention.BahdanauRNNAttention
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
 import org.platanios.symphony.mt.translators.PairwiseTranslator
@@ -85,7 +85,7 @@ object WMT16 extends App {
           numUnits = 1024,
           numLayers = 1 + 3, // Number of encoder bidirectional and unidirectional layers
           numResLayers = 2,
-          attention = BahdanauAttention(normalized = true),
+          attention = BahdanauRNNAttention(normalized = true),
           dropout = Some(0.2f),
           useNewAttention = true,
           timeMajor = true,

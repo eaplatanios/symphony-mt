@@ -27,11 +27,11 @@ import org.platanios.tensorflow.api.{ops, tf}
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class LuongAttention(
+case class LuongRNNAttention(
     scaled: Boolean = false,
     probabilityFn: (Output) => Output = tf.softmax(_, name = "Probability"),
     scoreMask: Float = Float.NegativeInfinity
-) extends Attention[Output, Shape] {
+) extends RNNAttention[Output, Shape] {
   override def create[S, SS](
       cell: RNNCell[Output, Shape, S, SS],
       memory: Output,

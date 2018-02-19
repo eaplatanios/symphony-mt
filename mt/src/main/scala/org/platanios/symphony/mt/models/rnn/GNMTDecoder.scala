@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.StateBasedModel
-import org.platanios.symphony.mt.models.attention.Attention
+import org.platanios.symphony.mt.models.attention.RNNAttention
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -34,7 +34,7 @@ class GNMTDecoder[S, SS, AS, ASS](
     val numUnits: Int,
     val numLayers: Int,
     val numResLayers: Int,
-    val attention: Attention[AS, ASS],
+    val attention: RNNAttention[AS, ASS],
     val dataType: DataType = FLOAT32,
     val dropout: Option[Float] = None,
     val useNewAttention: Boolean = true,
@@ -96,7 +96,7 @@ object GNMTDecoder {
       numUnits: Int,
       numLayers: Int,
       numResLayers: Int,
-      attention: Attention[AS, ASS],
+      attention: RNNAttention[AS, ASS],
       dataType: DataType = FLOAT32,
       dropout: Option[Float] = None,
       useNewAttention: Boolean = true,
