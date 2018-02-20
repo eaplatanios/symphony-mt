@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.attention
+package org.platanios.symphony.mt.models.rnn.attention
 
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode

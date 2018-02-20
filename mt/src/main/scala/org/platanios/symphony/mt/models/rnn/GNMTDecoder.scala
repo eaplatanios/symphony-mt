@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.StateBasedModel
-import org.platanios.symphony.mt.models.attention.RNNAttention
+import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode

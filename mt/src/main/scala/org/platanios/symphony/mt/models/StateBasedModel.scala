@@ -27,6 +27,7 @@ import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.layers.rnn.cell.{DeviceWrapper, DropoutWrapper, MultiCell, ResidualWrapper}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
+import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 import org.platanios.tensorflow.api.ops.training.optimizers.decay.{Decay, ExponentialDecay}
 
@@ -108,11 +109,10 @@ class StateBasedModel[S, SS](
           mode: Mode
       ): (Output, Output) = {
         // TODO: !!! I need to fix this repetition in TensorFlow for Scala.
-        val encTuple = tf.createWithVariableScope("Encoder") {
-          tf.learn.variableScope("Encoder") {
-            config.encoder.create(config.env, input._1._1, input._1._2, srcVocab, mode)
-          }
+        val encTuple = tf.learn.variableScope("Encoder") {
+          encoder(input._1, mode, "Encoder")
         }
+
         val decTuple = tf.createWithVariableScope("Decoder") {
           tf.learn.variableScope("Decoder") {
             // TODO: Handle this shift more efficiently.
@@ -139,11 +139,10 @@ class StateBasedModel[S, SS](
         // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
         srcVocab.lookupTable()
 
-        val encTuple = tf.createWithVariableScope("Encoder") {
-          tf.learn.variableScope("Encoder") {
-            config.encoder.create(config.env, input._1, input._2, srcVocab, mode)
-          }
+        val encTuple = tf.learn.variableScope("Encoder") {
+          encoder(input, mode, "Encoder")
         }
+
         val decTuple = tf.createWithVariableScope("Decoder") {
           tf.learn.variableScope("Decoder") {
             config.decoder.create(
@@ -187,6 +186,14 @@ class StateBasedModel[S, SS](
         lossValue
       }
     }
+  }
+
+  protected def encoder(
+      input: (Output, Output),
+      mode: Mode,
+      name: String = "Encoder"
+  ): Tuple[Output, Seq[S]] = tf.createWithVariableScope(name) {
+    config.encoder.create(config.env, input._1, input._2, srcVocab, mode)
   }
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
