@@ -44,6 +44,7 @@ case class DataConfig(
     shardIndex: Long = 0,
     numParallelCalls: Int = 4,
     // Vocabulary
+    paddingToken: String = Vocabulary.PADDING_TOKEN,
+    unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
     beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
-    endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN,
-    unknownToken: String = Vocabulary.UNKNOWN_TOKEN)
+    endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN)
