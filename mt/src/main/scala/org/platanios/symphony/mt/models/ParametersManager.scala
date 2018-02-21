@@ -20,12 +20,24 @@ import org.platanios.tensorflow.api._
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait ParameterManager {
-  def create(name: String, dataType: DataType, shape: Shape, forceVariable: Boolean = false): Output
+trait ParametersManager {
+  def get(
+      name: String,
+      dataType: DataType,
+      shape: Shape,
+      variableInitializer: tf.VariableInitializer = null,
+      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
+  ): Output
 }
 
-case object DefaultParameterManager extends ParameterManager {
-  override def create(name: String, dataType: DataType, shape: Shape, forceVariable: Boolean = false): Output = {
-    tf.variable(name, dataType, shape).value
+case object DefaultParametersManager extends ParametersManager {
+  override def get(
+      name: String,
+      dataType: DataType,
+      shape: Shape,
+      variableInitializer: tf.VariableInitializer = null,
+      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
+  ): Output = {
+    tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value
   }
 }

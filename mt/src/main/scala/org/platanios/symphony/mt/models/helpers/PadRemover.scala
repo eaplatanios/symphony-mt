@@ -31,7 +31,7 @@ import scala.language.postfixOps
   *
   * @author Emmanouil Antonios Platanios
   */
-case class PaddingRemover(padMask: Output, name: String = "PaddingRemover") {
+case class PadRemover(padMask: Output, name: String = "PadRemover") {
   /** `nonPadIndices` contains coordinates of zero rows (as `padMask` may be `FLOAT32`, checking zero equality is done
     * with `|x| < epsilon`, with `epsilon = 1e-9` as standard. Here padMask contains only positive values and so the
     * absolute value is not needed. */
@@ -58,7 +58,7 @@ case class PaddingRemover(padMask: Output, name: String = "PaddingRemover") {
     *               `originAxisSizeCompressed <= originAxisSize`.
     * @return Tensor with shape `[originAxisSize, ...]`.
     */
-  def add(value: Output): Output = tf.createWithNameScope(s"$name/Add") {
-    tf.scatterND(nonPadIndices, value, tf.concatenate(Seq(originAxisSize, tf.shape(value)(1 ::)), axis = 0))
+  def restore(value: Output): Output = tf.createWithNameScope(s"$name/Add") {
+    tf.scatterND(nonPadIndices, value, tf.concatenate(Seq(originAxisSize, tf.shape(value)(1 ::))))
   }
 }

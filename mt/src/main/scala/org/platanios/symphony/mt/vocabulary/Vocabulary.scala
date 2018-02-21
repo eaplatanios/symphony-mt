@@ -77,20 +77,17 @@ object Vocabulary {
   ): Vocabulary = {
     val check = Vocabulary.check(
       file, checkSpecialTokens, directory,
-      dataConfig.paddingToken, dataConfig.unknownToken,
-      dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
+      dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
     check match {
       case None => throw new IllegalArgumentException(s"Could not load the vocabulary file located at '$file'.")
       case Some((size, path)) => Vocabulary(path, size)
     }
   }
 
-  val PADDING_TOKEN          : String = "<pad>"
   val UNKNOWN_TOKEN          : String = "<unk>"
   val BEGIN_OF_SEQUENCE_TOKEN: String = "<s>"
   val END_OF_SEQUENCE_TOKEN  : String = "</s>"
-  val PADDING_TOKEN_ID       : Int    = 0
-  val UNKNOWN_TOKEN_ID       : Int    = 1
+  val UNKNOWN_TOKEN_ID       : Int    = 0
 
   /** Checks if the specified vocabulary file exists and if it does, checks that special tokens are being used
     * correctly. If not, this method can optionally create a new file by prepending the appropriate tokens to the
@@ -106,7 +103,6 @@ object Vocabulary {
     *                              check fails. Defaults to the current directory in which `file` is located, meaning
     *                              that if the special tokens check fails, `file` will be replaced with the appended
     *                              vocabulary file.
-    * @param  paddingToken         Special token for padding tokens. Defaults to `<pad>`.
     * @param  unknownToken         Special token for unknown tokens. Defaults to `<unk>`.
     * @param  beginOfSequenceToken Special token for the beginning of a sequence. Defaults to `<s>`.
     * @param  endOfSequenceToken   Special token for the end of a sequence. Defaults to `</s>`.
@@ -116,7 +112,6 @@ object Vocabulary {
       file: File,
       checkSpecialTokens: Boolean = true,
       directory: File = null,
-      paddingToken: String = PADDING_TOKEN,
       unknownToken: String = UNKNOWN_TOKEN,
       beginOfSequenceToken: String = BEGIN_OF_SEQUENCE_TOKEN,
       endOfSequenceToken: String = END_OF_SEQUENCE_TOKEN
@@ -139,14 +134,13 @@ object Vocabulary {
         // Verify that the loaded vocabulary using the right special tokens.
         // If it does not, use those tokens and generate a new vocabulary file.
         assert(tokens.lengthCompare(3) >= 0, "The loaded vocabulary must contain at least three tokens.")
-        if (tokens(0) != paddingToken ||
-            tokens(1) != unknownToken ||
-            tokens(2) != beginOfSequenceToken ||
-            tokens(3) != endOfSequenceToken) {
+        if (tokens(0) != unknownToken ||
+            tokens(1) != beginOfSequenceToken ||
+            tokens(2) != endOfSequenceToken) {
           logger.info(
-            s"The first 4 vocabulary tokens [${tokens(0)}, ${tokens(1)}, ${tokens(2)}, ${tokens(3)}] " +
-                s"are not equal to [$paddingToken, $unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
-          tokens.prepend(paddingToken, unknownToken, beginOfSequenceToken, endOfSequenceToken)
+            s"The first 4 vocabulary tokens [${tokens(0)}, ${tokens(1)}, ${tokens(2)}] " +
+                s"are not equal to [$unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
+          tokens.prepend(unknownToken, beginOfSequenceToken, endOfSequenceToken)
           val newFile = if (directory != null) directory.sibling(file.name) else file
           logger.info(s"Creating fixed vocabulary file at '$newFile'.")
           val writer = newFile.newBufferedWriter(StandardCharsets.UTF_8)
