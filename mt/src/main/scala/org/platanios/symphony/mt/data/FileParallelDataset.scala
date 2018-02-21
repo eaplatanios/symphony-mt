@@ -73,7 +73,6 @@ class FileParallelDataset protected (
 
     val batchSize = dataConfig.inferBatchSize
     val vocabTable = vocabulary(language).lookupTable()
-    val bosId = vocabTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
     val eosId = vocabTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
     val batchingFn = (dataset: TFMonolingualDataset) => {
@@ -97,8 +96,6 @@ class FileParallelDataset protected (
         // Convert the word strings to IDs. Word strings that are not in the vocabulary
         // get the lookup table's default value.
         .map(d => tf.cast(vocabTable.lookup(d), INT32))
-        // Add BOS and EOS symbols.
-        .map(d => tf.concatenate(Seq(bosId(NewAxis), d, eosId(NewAxis))), name = "Map/AddBosEosSymbols")
         // Add sequence lengths.
         .map(d => (d, tf.size(d, INT32)))
 
@@ -118,9 +115,7 @@ class FileParallelDataset protected (
     val tgtVocabTable = vocabulary(language2).lookupTable()
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
     val actualBufferSize = if (dataConfig.bufferSize == -1L) 1000 * batchSize else dataConfig.bufferSize
-    val srcBosId = srcVocabTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
     val srcEosId = srcVocabTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-    val tgtBosId = tgtVocabTable.lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
     val tgtEosId = tgtVocabTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
     val srcDataset = joinTensorDatasets(
@@ -183,13 +178,6 @@ class FileParallelDataset protected (
                 tf.cast(srcVocabTable.lookup(d._1), INT32),
                 tf.cast(tgtVocabTable.lookup(d._2), INT32)),
             dataConfig.numParallelCalls, name = "Map/VocabularyLookup")
-          .prefetch(actualBufferSize)
-          // Add BOS and EOS symbols.
-          .map(
-            d => (
-                tf.concatenate(Seq(srcBosId(NewAxis), d._1, srcEosId(NewAxis))),
-                tf.concatenate(Seq(tgtBosId(NewAxis), d._2, tgtEosId(NewAxis)))),
-            dataConfig.numParallelCalls, name = "Map/AddBosEosSymbols")
           .prefetch(actualBufferSize)
           // Add sequence lengths.
           .map(
