@@ -116,12 +116,15 @@ class StateBasedModel[S, SS](
 
         val decTuple = tf.createWithVariableScope("Decoder") {
           tf.learn.variableScope("Decoder") {
+            // TODO: Handle this shift more efficiently.
             // Shift the target sequence one step forward so the decoder learns to output the next word.
-            val tgtSequence = Common.shift2DRight(input._2._1, Some(
-              tgtVocab.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken))
-                  .cast(INT32).expandDims(0).expandDims(0).tile(tf.stack(Seq(tf.shape(input._2._1)(0), 1)))))
+            val tgtBosId = tgtVocab.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+            val tgtSequence = tf.concatenate(Seq(
+              tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtBosId),
+              input._2._1), axis = 1)
+            val tgtSequenceLength = input._2._2 + 1
             config.decoder.create(config.env, encTuple, input._1._2, tgtVocab, dataConfig.tgtMaxLength,
-              dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence, input._2._2, mode)
+              dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength, mode)
           }
         }
         (decTuple.sequences, decTuple.sequenceLengths)
@@ -171,15 +174,15 @@ class StateBasedModel[S, SS](
           input: ((Output, Output), (Output, Output)),
           mode: Mode
       ): Output = tf.createWithNameScope("Loss") {
-//        // TODO: Handle this shift more efficiently.
-//        // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
-//        // word used as input, rather than the previous predicted word.
-//        val tgtEosId = tgtVocab.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-//        val tgtSequence = tf.concatenate(Seq(
-//          input._2._1,
-//          tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
-//        val tgtSequenceLength = input._2._2 + 1
-        val lossValue = loss(input._1._1, input._2._1, input._2._2)
+        // TODO: Handle this shift more efficiently.
+        // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
+        // word used as input, rather than the previous predicted word.
+        val tgtEosId = tgtVocab.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+        val tgtSequence = tf.concatenate(Seq(
+          input._2._1,
+          tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
+        val tgtSequenceLength = input._2._2 + 1
+        val lossValue = loss(input._1._1, tgtSequence, tgtSequenceLength + 1)
         tf.summary.scalar("Loss", lossValue)
         lossValue
       }
