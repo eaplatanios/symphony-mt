@@ -182,7 +182,7 @@ class StateBasedModel[S, SS](
           input._2._1,
           tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
         val tgtSequenceLength = input._2._2 + 1
-        val lossValue = loss(input._1._1, tgtSequence, tgtSequenceLength + 1)
+        val lossValue = loss(input._1._1, tgtSequence, tgtSequenceLength)
         tf.summary.scalar("Loss", lossValue)
         lossValue
       }
