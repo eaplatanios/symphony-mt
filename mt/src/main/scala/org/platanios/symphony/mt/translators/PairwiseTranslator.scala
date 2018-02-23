@@ -29,9 +29,9 @@ import scala.collection.mutable
   */
 class PairwiseTranslator protected (
     val env: Environment,
-    override val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model
+    override val model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model[_]
 ) extends Translator(model) {
-  protected val models: mutable.Map[(Language, Language), Model] = mutable.Map.empty
+  protected val models: mutable.Map[(Language, Language), Model[_]] = mutable.Map.empty
 
   override def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
     dataset.languagePairs(includeReversed = true).foreach {
@@ -62,7 +62,7 @@ class PairwiseTranslator protected (
 object PairwiseTranslator {
   def apply(
       env: Environment,
-      model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model
+      model: (Language, Vocabulary, Language, Vocabulary, Environment) => Model[_]
   ): PairwiseTranslator = {
     new PairwiseTranslator(env, model)
   }

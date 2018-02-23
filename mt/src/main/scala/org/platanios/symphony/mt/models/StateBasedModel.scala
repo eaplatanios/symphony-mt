@@ -15,264 +15,117 @@
 
 package org.platanios.symphony.mt.models
 
-import org.platanios.symphony.mt.{Environment, Language, LogConfig}
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric}
-import org.platanios.symphony.mt.models.helpers.Common
-import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
-import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
-import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
-import org.platanios.tensorflow.api.learn.layers.rnn.cell.{DeviceWrapper, DropoutWrapper, MultiCell, ResidualWrapper}
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.learn.Mode
+import org.platanios.tensorflow.api.learn.layers.rnn.cell._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
-import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
-import org.platanios.tensorflow.api.ops.training.optimizers.decay.{Decay, ExponentialDecay}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 class StateBasedModel[S, SS](
     override val name: String = "Model",
-    override val srcLang: Language,
-    override val srcVocab: Vocabulary,
-    override val tgtLang: Language,
-    override val tgtVocab: Vocabulary,
-    val config: StateBasedModel.Config[S, SS],
+    override val srcLanguage: Language,
+    override val srcVocabulary: Vocabulary,
+    override val tgtLanguage: Language,
+    override val tgtVocabulary: Vocabulary,
+    override val dataConfig: DataConfig,
+    override val config: StateBasedModel.Config[S, SS],
+    override val optConfig: Model.OptConfig,
+    override val logConfig : Model.LogConfig  = Model.LogConfig(),
     override val trainEvalDataset: () => TFBilingualDataset = null,
     override val devEvalDataset: () => TFBilingualDataset = null,
-    override val testEvalDataset: () => TFBilingualDataset = null,
-    override val dataConfig: DataConfig = DataConfig(),
-    override val logConfig: LogConfig = LogConfig()
+    override val testEvalDataset: () => TFBilingualDataset = null
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Model(name, srcLang, srcVocab, tgtLang, tgtVocab) {
-  // Create the input and the train input parts of the model.
-  protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
-  protected val trainInput = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
+) extends Model[(Tuple[Output, Seq[S]], Output)](
+  name, srcLanguage, srcVocabulary, tgtLanguage, tgtVocabulary, dataConfig, config, optConfig, logConfig,
+  trainEvalDataset, devEvalDataset, testEvalDataset
+) {
+  // TODO: Make this use the parameters manager.
 
-  protected val estimator: tf.learn.Estimator[
-      (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
-      ((Tensor, Tensor), (Tensor, Tensor)), ((Output, Output), (Output, Output)),
-      ((DataType, DataType), (DataType, DataType)), ((Shape, Shape), (Shape, Shape)),
-      ((Output, Output), (Output, Output))] = tf.createWithNameScope(name) {
-    val model = learn.Model.supervised(
-      input = input,
-      layer = inferLayer,
-      trainLayer = trainLayer,
-      trainInput = trainInput,
-      loss = lossLayer,
-      optimizer = optimizer,
-      clipGradients = tf.learn.ClipGradientsByGlobalNorm(config.maxGradNorm),
-      colocateGradientsWithOps = config.colocateGradientsWithOps)
-    val summariesDir = config.env.workingDir.resolve("summaries")
-
-    // Create estimator hooks
-    var hooks = Set[tf.learn.Hook](
-      // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
-      tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-      tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
-      tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
-
-    // Add logging hooks
-    if (logConfig.logLossSteps > 0)
-      hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
-    if (logConfig.logTrainEvalSteps > 0 && trainEvalDataset != null)
-      hooks += tf.learn.Evaluator(
-        log = true, summariesDir, trainEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logTrainEvalSteps),
-        triggerAtEnd = true, name = "TrainEvaluator")
-    if (logConfig.logDevEvalSteps > 0 && devEvalDataset != null)
-      hooks += tf.learn.Evaluator(
-        log = true, summariesDir, devEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logDevEvalSteps),
-        triggerAtEnd = true, name = "DevEvaluator")
-    if (logConfig.logTestEvalSteps > 0 && testEvalDataset != null)
-      hooks += tf.learn.Evaluator(
-        log = true, summariesDir, testEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logTestEvalSteps),
-        triggerAtEnd = true, name = "TestEvaluator")
-
-    // Create estimator
-    tf.learn.InMemoryEstimator(
-      model,
-      tf.learn.Configuration(Some(config.env.workingDir), randomSeed = config.env.randomSeed),
-      trainHooks = hooks)
-  }
-
-  private final def trainLayer: Layer[((Output, Output), (Output, Output)), (Output, Output)] = {
-    new Layer[((Output, Output), (Output, Output)), (Output, Output)](name) {
-      override val layerType: String = "TrainLayer"
-
-      override protected def _forward(
-          input: ((Output, Output), (Output, Output)),
-          mode: Mode
-      ): (Output, Output) = {
-        // TODO: !!! I need to fix this repetition in TensorFlow for Scala.
-        val encTuple = tf.learn.variableScope("Encoder") {
-          encoder(input._1, mode, "Encoder")
-        }
-
-        val decTuple = tf.createWithVariableScope("Decoder") {
-          tf.learn.variableScope("Decoder") {
-            // TODO: Handle this shift more efficiently.
-            // Shift the target sequence one step forward so the decoder learns to output the next word.
-            val tgtBosId = tgtVocab.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
-            val tgtSequence = tf.concatenate(Seq(
-              tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtBosId),
-              input._2._1), axis = 1)
-            val tgtSequenceLength = input._2._2 + 1
-            config.decoder.create(config.env, encTuple, input._1._2, tgtVocab, dataConfig.tgtMaxLength,
-              dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength, mode)
-          }
-        }
-        (decTuple.sequences, decTuple.sequenceLengths)
-      }
+  override protected def encoder(input: (Output, Output), mode: Mode): (Tuple[Output, Seq[S]], Output) = {
+    tf.learn.variableScope("Encoder") {
+      (config.encoder.create(config.env, input._1, input._2, srcVocabulary, mode), input._2)
     }
   }
 
-  private final def inferLayer: Layer[(Output, Output), (Output, Output)] = {
-    new Layer[(Output, Output), (Output, Output)](name) {
-      override val layerType: String = "InferLayer"
-
-      override protected def _forward(input: (Output, Output), mode: Mode): (Output, Output) = {
-        // TODO: The following line is weirdly needed in order to properly initialize the lookup table.
-        srcVocab.lookupTable()
-
-        val encTuple = tf.learn.variableScope("Encoder") {
-          encoder(input, mode, "Encoder")
-        }
-
-        val decTuple = tf.createWithVariableScope("Decoder") {
-          tf.learn.variableScope("Decoder") {
-            config.decoder.create(
-              config.env, encTuple, input._2, tgtVocab, dataConfig.tgtMaxLength,
-              dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, null, null, mode)
-          }
-        }
+  override protected def decoder(
+      input: Option[(Output, Output)],
+      state: Option[(Tuple[Output, Seq[S]], Output)],
+      mode: Mode
+  ): (Output, Output) = tf.learn.variableScope("Decoder") {
+    // TODO: What if the state is `None`?
+    input match {
+      case Some(inputSequences) =>
+        // TODO: Handle this shift more efficiently.
+        // Shift the target sequence one step forward so the decoder learns to output the next word.
+        val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+        val tgtSequence = tf.concatenate(Seq(
+          tf.fill(INT32, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
+          inputSequences._1), axis = 1)
+        val tgtSequenceLength = inputSequences._2 + 1
+        val output = config.decoder.create(config.env, state.get._1, state.get._2, tgtVocabulary,
+          dataConfig.tgtMaxLength, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence,
+          tgtSequenceLength, mode)
+        (output.sequences, output.sequenceLengths)
+      case None =>
+        val output = config.decoder.create(
+          config.env, state.get._1, state.get._2, tgtVocabulary, dataConfig.tgtMaxLength,
+          dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, null, null, mode)
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
         // when using beam search.
         val outputSequence = {
           if (config.timeMajor)
-            decTuple.sequences.transpose()
-          else if (decTuple.sequences.rank == 3)
-            decTuple.sequences.transpose(Tensor(2, 0, 1))
+            output.sequences.transpose()
+          else if (output.sequences.rank == 3)
+            output.sequences.transpose(Tensor(2, 0, 1))
           else
-            decTuple.sequences
+            output.sequences
         }
-        (outputSequence(---, 0 :: -1), decTuple.sequenceLengths - 1)
-      }
+        (outputSequence(---, 0 :: -1), output.sequenceLengths - 1)
     }
-  }
-
-  private final def lossLayer: Layer[((Output, Output), (Output, Output)), Output] = {
-    new Layer[((Output, Output), (Output, Output)), Output](name) {
-      override val layerType: String = "Loss"
-
-      override protected def _forward(
-          input: ((Output, Output), (Output, Output)),
-          mode: Mode
-      ): Output = tf.createWithNameScope("Loss") {
-        // TODO: Handle this shift more efficiently.
-        // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
-        // word used as input, rather than the previous predicted word.
-        val tgtEosId = tgtVocab.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-        val tgtSequence = tf.concatenate(Seq(
-          input._2._1,
-          tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
-        val tgtSequenceLength = input._2._2 + 1
-        val lossValue = loss(input._1._1, tgtSequence, tgtSequenceLength)
-        tf.summary.scalar("Loss", lossValue)
-        lossValue
-      }
-    }
-  }
-
-  protected def encoder(
-      input: (Output, Output),
-      mode: Mode,
-      name: String = "Encoder"
-  ): Tuple[Output, Seq[S]] = tf.createWithVariableScope(name) {
-    config.encoder.create(config.env, input._1, input._2, srcVocab, mode)
-  }
-
-  protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
-    val maxTime = tf.shape(targetSequences)(1)
-    val transposedTargetSequences = if (config.timeMajor) targetSequences.transpose() else targetSequences
-    val crossEntropy = tf.sparseSoftmaxCrossEntropy(predictedSequences, transposedTargetSequences)
-    val weights = tf.sequenceMask(targetSequenceLengths, maxTime, predictedSequences.dataType)
-    val transposedWeights = if (config.timeMajor) weights.transpose() else weights
-    tf.sum(crossEntropy * transposedWeights) / tf.size(targetSequenceLengths).cast(FLOAT32)
-  }
-
-  protected def optimizer: tf.train.Optimizer = {
-    val decay = ExponentialDecay(
-      config.learningRateDecayRate,
-      config.learningRateDecaySteps,
-      staircase = true,
-      config.learningRateDecayStartStep)
-    config.optimizer(config.learningRateInitial, decay)
-  }
-
-  override def train(dataset: () => TFBilingualDataset, stopCriteria: StopCriteria): Unit = {
-    estimator.train(dataset, stopCriteria)
-  }
-
-  override def infer(dataset: () => TFMonolingualDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
-    estimator.infer(dataset)
-  }
-
-  override def evaluate(
-      dataset: () => TFBilingualDataset,
-      metrics: Seq[MTMetric],
-      maxSteps: Long = -1L,
-      saveSummaries: Boolean = true,
-      name: String = null
-  ): Seq[Tensor] = {
-    estimator.evaluate(dataset, metrics, maxSteps, saveSummaries, name)
   }
 }
 
 object StateBasedModel {
   def apply[S, SS](
       name: String = "Model",
-      srcLang: Language,
-      srcVocab: Vocabulary,
-      tgtLang: Language,
-      tgtVocab: Vocabulary,
+      srcLanguage: Language,
+      srcVocabulary: Vocabulary,
+      tgtLanguage: Language,
+      tgtVocabulary: Vocabulary,
+      dataConfig: DataConfig,
       config: StateBasedModel.Config[S, SS],
+      optConfig: Model.OptConfig,
+      logConfig: Model.LogConfig,
       trainEvalDataset: () => TFBilingualDataset = null,
       devEvalDataset: () => TFBilingualDataset = null,
-      testEvalDataset: () => TFBilingualDataset = null,
-      dataConfig: DataConfig = DataConfig(),
-      logConfig: LogConfig = LogConfig()
+      testEvalDataset: () => TFBilingualDataset = null
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): StateBasedModel[S, SS] = {
     new StateBasedModel[S, SS](
-      name, srcLang, srcVocab, tgtLang, tgtVocab, config,
-      trainEvalDataset, devEvalDataset, testEvalDataset,
-      dataConfig, logConfig)(evS, evSDropout)
+      name, srcLanguage, srcVocabulary, tgtLanguage, tgtVocabulary, dataConfig, config, optConfig, logConfig,
+      trainEvalDataset, devEvalDataset, testEvalDataset)(evS, evSDropout)
   }
 
   class Config[S, SS] protected (
-      val env: Environment,
+      override val env: Environment,
       // Model
       val encoder: RNNEncoder[S, SS],
       val decoder: RNNDecoder[S, SS],
-      val timeMajor: Boolean = false,
-      // Training
-      val maxGradNorm: Float = 5.0f,
-      val optimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
-      val learningRateInitial: Float = 1.0f,
-      val learningRateDecayRate: Float = 1.0f,
-      val learningRateDecaySteps: Int = 10000,
-      val learningRateDecayStartStep: Int = 0,
-      val colocateGradientsWithOps: Boolean = true,
-      val summarySteps: Int = 100,
-      val checkpointSteps: Int = 1000)
+      override val timeMajor: Boolean = false,
+      override val summarySteps: Int = 100,
+      override val checkpointSteps: Int = 1000
+  ) extends Model.Config(env, timeMajor, summarySteps, checkpointSteps)
 
   object Config {
     def apply[S, SS](
@@ -281,20 +134,10 @@ object StateBasedModel {
         encoder: RNNEncoder[S, SS],
         decoder: RNNDecoder[S, SS],
         timeMajor: Boolean = false,
-        // Training
-        maxGradNorm: Float = 5.0f,
-        optimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
-        learningRateInitial: Float = 1.0f,
-        learningRateDecayRate: Float = 1.0f,
-        learningRateDecaySteps: Int = 10000,
-        learningRateDecayStartStep: Int = 0,
-        colocateGradientsWithOps: Boolean = true,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config[S, SS] = {
-      new Config[S, SS](
-        env, encoder, decoder, timeMajor, maxGradNorm, optimizer, learningRateInitial, learningRateDecayRate,
-        learningRateDecaySteps, learningRateDecayStartStep, colocateGradientsWithOps, summarySteps, checkpointSteps)
+      new Config[S, SS](env, encoder, decoder, timeMajor, summarySteps, checkpointSteps)
     }
   }
 

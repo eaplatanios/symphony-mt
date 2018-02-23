@@ -15,19 +15,19 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.{Environment, Language, LogConfig}
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
-import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.{Model, StateBasedModel}
+import org.platanios.symphony.mt.models.rnn._
+import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention
 import org.platanios.symphony.mt.translators.PairwiseTranslator
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
 import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
-import java.nio.file.{Path, Paths}
 
-import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention
+import java.nio.file.{Path, Paths}
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -55,22 +55,26 @@ object WMT16 extends App {
     swapMemory = true,
     randomSeed = Some(10))
 
-  val logConfig = LogConfig(
+  val optConfig = Model.OptConfig(
+    maxGradNorm = 5.0f,
+    optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
+    learningRateInitial = 1.0f,
+    learningRateDecayRate = 0.5f,
+    learningRateDecaySteps = 340000 * 1 / (2 * 10),
+    learningRateDecayStartStep = 340000 * 2,
+    colocateGradientsWithOps = true)
+
+  val logConfig = Model.LogConfig(
     logLossSteps = 100,
     logTrainEvalSteps = -1)
 
-  def model(
-      srcLang: Language,
-      srcVocab: Vocabulary,
-      tgtLang: Language,
-      tgtVocab: Vocabulary,
-      env: Environment
-  ): Model = {
+  def model(srcLang: Language, srcVocab: Vocabulary, tgtLang: Language, tgtVocab: Vocabulary, env: Environment) = {
     StateBasedModel(
       name = "Model",
-      srcLang = srcLang, srcVocab = srcVocab,
-      tgtLang = tgtLang, tgtVocab = tgtVocab,
-      StateBasedModel.Config(
+      srcLanguage = srcLang, srcVocabulary = srcVocab,
+      tgtLanguage = tgtLang, tgtVocabulary = tgtVocab,
+      dataConfig = dataConfig,
+      config = StateBasedModel.Config(
         env,
         GNMTEncoder(
           cell = BasicLSTM(forgetBias = 1.0f),
@@ -91,19 +95,13 @@ object WMT16 extends App {
           timeMajor = true,
           beamWidth = 10,
           lengthPenaltyWeight = 1.0f),
-        timeMajor = true,
-        maxGradNorm = 5.0f,
-        optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
-        learningRateInitial = 1.0f,
-        learningRateDecayRate = 0.5f,
-        learningRateDecaySteps = 340000 * 1 / (2 * 10),
-        learningRateDecayStartStep = 340000 * 2,
-        colocateGradientsWithOps = true),
+        timeMajor = true),
+      optConfig = optConfig,
+      logConfig = logConfig,
       // TODO: !!! Find a way to set the number of buckets to 1.
       trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
       devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-      dataConfig, logConfig)
+      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true))
   }
 
   val translator = PairwiseTranslator(env, model)
