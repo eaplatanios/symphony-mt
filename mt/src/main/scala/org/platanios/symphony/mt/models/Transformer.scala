@@ -102,87 +102,90 @@ class Transformer protected (
       state: Option[Transformer.State],
       mode: Mode
   ): (Output, Output) = {
-    // TODO: !!! Inference time.
-
     val cache: Option[Seq[Attention.Cache]] = None // TODO: !!!
+    input match {
+      case Some(inputSequences) =>
+        // TODO: Handle this shift more efficiently.
+        // Shift the target sequence one step forward so the decoder learns to output the next word.
+        val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+        val inputTokens = tf.concatenate(Seq(
+          tf.fill(INT32, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
+          inputSequences._1), axis = 1)
+        val inputLengths = inputSequences._2 + 1
+        val inputMaxLength = tf.shape(inputTokens)(1)
 
-    // TODO: Handle this shift more efficiently.
-    // Shift the target sequence one step forward so the decoder learns to output the next word.
-    val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
-    val inputTokens = tf.concatenate(Seq(
-      tf.fill(INT32, tf.stack(Seq(tf.shape(input.get._1)(0), 1)))(tgtBosId),
-      input.get._1), axis = 1)
-    val inputLengths = input.get._2 + 1
-    val inputMaxLength = tf.shape(inputTokens)(1)
+        // Obtain token embeddings for the input sequence.
+        val embeddings = parametersManager.get("Embeddings", FLOAT32, Shape(tgtVocabulary.size, config.hiddenSize))
+        val embeddedInputs = tf.embeddingLookup(embeddings, inputTokens)
 
-    // Obtain token embeddings for the input sequence.
-    val embeddings = parametersManager.get("Embeddings", FLOAT32, Shape(tgtVocabulary.size, config.hiddenSize))
-    val embeddedInputs = tf.embeddingLookup(embeddings, inputTokens)
+        // Perform some pre-processing to the token embeddings sequence.
+        val padding = tf.sequenceMask(inputLengths, inputMaxLength, dataType = FLOAT32, name = "Padding")
+        var decoderSelfAttentionBias = config.attentionPrependMode(padding)
+        if (config.useSelfAttentionProximityBias)
+          decoderSelfAttentionBias += Attention.attentionBiasProximal(inputMaxLength)
+        var decoderInput = config.positionEmbeddings.addTo(embeddedInputs)
+        if (mode.isTraining)
+          decoderInput = tf.dropout(decoderInput, 1.0f - config.postPositionEmbeddingsDropout)
 
-    // Perform some pre-processing to the token embeddings sequence.
-    val padding = tf.sequenceMask(inputLengths, inputMaxLength, dataType = FLOAT32, name = "Padding")
-    var decoderSelfAttentionBias = config.attentionPrependMode(padding)
-    if (config.useSelfAttentionProximityBias)
-      decoderSelfAttentionBias += Attention.attentionBiasProximal(inputMaxLength)
-    var decoderInput = config.positionEmbeddings.addTo(embeddedInputs)
-    if (mode.isTraining)
-      decoderInput = tf.dropout(decoderInput, 1.0f - config.postPositionEmbeddingsDropout)
-
-    // Add the multi-head attention and the feed-forward layers.
-    // TODO: What about the padding remover?
-    var x = decoderInput
-    var y = x
-    (0 until config.decoderNumLayers).foreach(layer => {
-      tf.createWithVariableScope(s"Layer$layer") {
-        tf.createWithVariableScope("SelfAttention") {
-          val queryAntecedent = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
-          y = Attention.multiHeadAttention(
-            queryAntecedent = queryAntecedent,
-            memoryAntecedent = queryAntecedent,
-            bias = decoderSelfAttentionBias,
-            totalKeysDepth = config.attentionKeysDepth,
-            totalValuesDepth = config.attentionValuesDepth,
-            outputsDepth = config.hiddenSize,
-            numHeads = config.attentionNumHeads,
-            attention = config.decoderSelfAttention,
-            cache = cache.map(_ (layer)),
-            name = "MultiHeadAttention")(mode, parametersManager)
-          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
-        }
-        state.foreach(encOutput => {
-          // TODO: Add caching.
-          tf.createWithVariableScope("EncoderDecoderAttention") {
-            val queryAntecedent = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
-            y = Attention.multiHeadAttention(
-              queryAntecedent = queryAntecedent,
-              memoryAntecedent = encOutput.output,
-              bias = encOutput.encoderDecoderAttentionBias,
-              totalKeysDepth = config.attentionKeysDepth,
-              totalValuesDepth = config.attentionValuesDepth,
-              outputsDepth = config.hiddenSize,
-              numHeads = config.attentionNumHeads,
-              attention = config.decoderSelfAttention,
-              name = "MultiHeadAttention")(mode, parametersManager)
-            x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+        // Add the multi-head attention and the feed-forward layers.
+        // TODO: What about the padding remover?
+        var x = decoderInput
+        var y = x
+        (0 until config.decoderNumLayers).foreach(layer => {
+          tf.createWithVariableScope(s"Layer$layer") {
+            tf.createWithVariableScope("SelfAttention") {
+              val queryAntecedent = LayerProcessor.layerPreprocess(
+                x, config.layerPreprocessors)(mode, parametersManager)
+              y = Attention.multiHeadAttention(
+                queryAntecedent = queryAntecedent,
+                memoryAntecedent = queryAntecedent,
+                bias = decoderSelfAttentionBias,
+                totalKeysDepth = config.attentionKeysDepth,
+                totalValuesDepth = config.attentionValuesDepth,
+                outputsDepth = config.hiddenSize,
+                numHeads = config.attentionNumHeads,
+                attention = config.decoderSelfAttention,
+                cache = cache.map(_ (layer)),
+                name = "MultiHeadAttention")(mode, parametersManager)
+              x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+            }
+            state.foreach(encOutput => {
+              // TODO: Add caching.
+              tf.createWithVariableScope("EncoderDecoderAttention") {
+                val queryAntecedent = LayerProcessor.layerPreprocess(
+                  x, config.layerPreprocessors)(mode, parametersManager)
+                y = Attention.multiHeadAttention(
+                  queryAntecedent = queryAntecedent,
+                  memoryAntecedent = encOutput.output,
+                  bias = encOutput.encoderDecoderAttentionBias,
+                  totalKeysDepth = config.attentionKeysDepth,
+                  totalValuesDepth = config.attentionValuesDepth,
+                  outputsDepth = config.hiddenSize,
+                  numHeads = config.attentionNumHeads,
+                  attention = config.decoderSelfAttention,
+                  name = "MultiHeadAttention")(mode, parametersManager)
+                x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+              }
+            })
+            tf.createWithVariableScope("FeedForward") {
+              val xx = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
+              y = config.encoderFeedForwardLayer(xx, None)(mode, parametersManager)
+              x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+            }
           }
         })
-        tf.createWithVariableScope("FeedForward") {
-          val xx = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
-          y = config.encoderFeedForwardLayer(xx, None)(mode, parametersManager)
-          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
-        }
-      }
-    })
 
-    // If normalization is done during layer preprocessing, then it should also be done on the output, since the output
-    // can grow very large, being the sum of a whole stack of unnormalized layer outputs.
-    var decoderOutput = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
+        // If normalization is done during layer preprocessing, then it should also be done on the output, since the
+        // output can grow very large, being the sum of a whole stack of unnormalized layer outputs.
+        var decoderOutput = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
 
-    val w = parametersManager.get(
-      "DecoderOutputProjectionWeights", decoderOutput.dataType, Shape(decoderOutput.shape(-1), tgtVocabulary.size))
-    decoderOutput = tf.linear(decoderOutput, w)
+        val w = parametersManager.get(
+          "DecoderOutputProjectionWeights", decoderOutput.dataType, Shape(decoderOutput.shape(-1), tgtVocabulary.size))
+        decoderOutput = tf.linear(decoderOutput, w)
 
-    (decoderOutput, inputLengths)
+        (decoderOutput, inputLengths)
+      case None => ??? // TODO: !!! Inference time.
+    }
   }
 }
 
