@@ -184,7 +184,7 @@ class Transformer protected (
         decoderOutput = tf.linear(decoderOutput, w)
 
         (decoderOutput, inputLengths)
-      case None => ??? // TODO: !!! Inference time.
+      case None => (state.get.output, state.get.encoderDecoderAttentionBias) // TODO: !!! Inference time.
     }
   }
 }
