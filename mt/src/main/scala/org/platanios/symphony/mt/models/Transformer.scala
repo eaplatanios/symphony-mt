@@ -160,11 +160,11 @@ class Transformer protected (
       val decoderInput = embeddedTargets + tf.slice(
         positionalEmbeddings,
         tf.stack(Seq(zero, step, zero)),
-        tf.stack(Seq(one, step + one, config.hiddenSize)))
+        tf.stack(Seq(one, one, config.hiddenSize)))
       val decoderBias = tf.slice(
         decoderSelfAttentionBias,
         tf.stack(Seq(zero, zero, step, zero)),
-        tf.stack(Seq(one, one, step + one, step + one)))
+        tf.stack(Seq(one, one, one, step + one)))
       val decoderOutput = decode(decoderInput, decoderBias, Some(state), Some(cache), mode).squeeze(Seq(1))
       val output = tf.linear(decoderOutput, w)
       (output, cache)
@@ -332,18 +332,19 @@ object Transformer {
           i, currentIDs, State(encoderOutput._1, encoderOutput._2),
           cache.map(c => Attention.Cache(c._1, c._2)))
         // TODO: Add support for sampling with temperature.
-        val nextIDs = tf.argmax(logits, axes = -1)
+        var nextIDs = tf.argmax(logits, axes = -1, outputDataType = INT32)
         val nextFinished = tf.logicalOr(finished, tf.equal(nextIDs, endOfSequenceID))
-        val nextDecodedIDs = tf.concatenate(Seq(decodedIDs._1, nextIDs(::, NewAxis)), axis = 1)
+        nextIDs = nextIDs(::, NewAxis)
+        val nextDecodedIDs = tf.concatenate(Seq(decodedIDs._1, nextIDs), axis = 1)
         val nextDecodedLengths = decodedIDs._2 + tf.logicalNot(nextFinished)
         (i + 1, nextFinished, nextIDs, (nextDecodedIDs, nextDecodedLengths),
             encoderOutput, nextCache.map(c => (c.k, c.v)))
       }
 
-      val decodedIDs = tf.zeros(INT64, tf.stack(Seq(batchSize, 0)))
+      val decodedIDs = tf.zeros(INT32, tf.stack(Seq(batchSize, 0)))
       val decodedLengths = tf.zeros(INT32, batchSize(NewAxis))
       val finished = tf.fill(BOOLEAN, batchSize.expandDims(0))(false)
-      val ids = tf.zeros(INT64, tf.stack(Seq(batchSize, 1)))
+      val ids = tf.zeros(INT32, tf.stack(Seq(batchSize, 1)))
       val (_, _, _, finalDecodedIds, _, _) = tf.whileLoop(
         (lv: LoopVariables) => tf.logicalAnd(lv._1 < decodingLength, tf.logicalNot(tf.all(lv._2))),
         (lv: LoopVariables) => bodyFn(lv),
