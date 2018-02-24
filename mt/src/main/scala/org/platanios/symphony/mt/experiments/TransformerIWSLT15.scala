@@ -20,12 +20,13 @@ import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.evaluation.{BLEU, BilingualEvaluator}
-import org.platanios.symphony.mt.models.attention._
 import org.platanios.symphony.mt.models.{Model, Transformer}
+import org.platanios.symphony.mt.models.attention._
+import org.platanios.symphony.mt.models.helpers.NoamSchedule
 import org.platanios.symphony.mt.translators.PairwiseTranslator
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
-import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
+import org.platanios.tensorflow.api.ops.training.optimizers.Adam
 
 import java.nio.file.{Path, Paths}
 
@@ -55,13 +56,9 @@ object TransformerIWSLT15 extends App {
     randomSeed = Some(10))
 
   val optConfig = Model.OptConfig(
-    maxGradNorm = 5.0f,
-    optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
-    learningRateInitial = 1.0f,
-    learningRateDecayRate = 0.5f,
-    learningRateDecaySteps = 12000 * 1 / (3 * 4),
-    learningRateDecayStartStep = 12000 * 2 / 3,
-    colocateGradientsWithOps = true)
+    optimizer = () => Adam(
+      0.1f, NoamSchedule(warmUpSteps = 4000, hiddenSize = 16),
+      beta1 = 0.9f, beta2 = 0.98f, learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(
     logLossSteps = 100,

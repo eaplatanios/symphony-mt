@@ -25,7 +25,6 @@ import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
-import org.platanios.tensorflow.api.ops.training.optimizers.decay.{Decay, ExponentialDecay}
 
 // TODO: Move embeddings initializer to the configuration.
 // TODO: Add support for optimizer schedules (e.g., Adam for first 1000 steps and then SGD with a different learning rate.
@@ -70,7 +69,7 @@ abstract class Model[S] protected (
       trainLayer = trainLayer,
       trainInput = trainInput,
       loss = lossLayer,
-      optimizer = optimizer,
+      optimizer = optConfig.optimizer,
       clipGradients = tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm),
       colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
     val summariesDir = config.env.workingDir.resolve("summaries")
@@ -205,15 +204,6 @@ abstract class Model[S] protected (
     val transposedWeights = if (config.timeMajor) weights.transpose() else weights
     tf.sum(crossEntropy * transposedWeights) / tf.size(targetSequenceLengths).cast(FLOAT32)
   }
-
-  protected def optimizer: tf.train.Optimizer = {
-    val decay = ExponentialDecay(
-      optConfig.learningRateDecayRate,
-      optConfig.learningRateDecaySteps,
-      staircase = true,
-      optConfig.learningRateDecayStartStep)
-    optConfig.optimizer(optConfig.learningRateInitial, decay)
-  }
 }
 
 object Model {
@@ -236,26 +226,16 @@ object Model {
 
   class OptConfig protected (
       val maxGradNorm: Float,
-      val optimizer: (Float, Decay) => Optimizer,
-      val learningRateInitial: Float,
-      val learningRateDecayRate: Float,
-      val learningRateDecaySteps: Int,
-      val learningRateDecayStartStep: Int,
+      val optimizer: () => Optimizer,
       val colocateGradientsWithOps: Boolean)
 
   object OptConfig {
     def apply(
         maxGradNorm: Float = 5.0f,
-        optimizer: (Float, Decay) => Optimizer = GradientDescent(_, _, learningRateSummaryTag = "LearningRate"),
-        learningRateInitial: Float = 1.0f,
-        learningRateDecayRate: Float = 1.0f,
-        learningRateDecaySteps: Int = 10000,
-        learningRateDecayStartStep: Int = 0,
+        optimizer: () => Optimizer = () => GradientDescent(1.0f, learningRateSummaryTag = "LearningRate"),
         colocateGradientsWithOps: Boolean = true
     ): OptConfig = {
-      new OptConfig(
-        maxGradNorm, optimizer, learningRateInitial, learningRateDecayRate, learningRateDecaySteps,
-        learningRateDecayStartStep, colocateGradientsWithOps)
+      new OptConfig(maxGradNorm, optimizer, colocateGradientsWithOps)
     }
   }
 
