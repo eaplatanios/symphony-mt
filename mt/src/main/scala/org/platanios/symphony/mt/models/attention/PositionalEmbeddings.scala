@@ -23,6 +23,7 @@ import org.platanios.tensorflow.api._
 trait PositionalEmbeddings {
   // TODO: !!! Add name to positional embeddings.
 
+  def get(length: Output, depth: Output): Output
   def addTo(input: Output, positions: Option[Output] = None): Output
 }
 
@@ -186,6 +187,10 @@ class FixedSinusoidPositionalEmbeddings protected (
     val minScale: Float = 1.0f,
     val maxScale: Float = 1.0e4f
 ) extends PositionalEmbeddings {
+  override def get(length: Output, depth: Output): Output = {
+    PositionalEmbeddings.positionalEmbeddings1D(length, depth, minScale, maxScale)
+  }
+
   override def addTo(input: Output, positions: Option[Output] = None): Output = {
     positions match {
       case Some(p) => PositionalEmbeddings.addPositionalEmbeddings1DGivenPositions(input, p, minScale, maxScale)

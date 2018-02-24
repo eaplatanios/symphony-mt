@@ -26,13 +26,13 @@ trait DecodeHelper[E, CacheType] {
   def decode(
       encoderOutput: E,
       decodingFn: (Output, Output, E, CacheType) => (Output, CacheType),
-      decodingLength: Int,
+      decodingLength: Output,
       endOfSequenceID: Output
   ): DecodeHelper.Result
 }
 
 object DecodeHelper {
-  case class Result(outputs: Output, scores: Option[Output] = None)
+  case class Result(outputs: (Output, Output), scores: Option[Output] = None)
 
   /** Returns the shape of `value`, with the inner dimensions set to unknown size. */
   def stateShapeInvariants(value: Output): Shape = {

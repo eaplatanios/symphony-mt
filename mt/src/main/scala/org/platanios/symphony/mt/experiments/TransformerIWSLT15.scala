@@ -42,7 +42,8 @@ object TransformerIWSLT15 extends App {
     workingDir = Paths.get("temp").resolve("data"),
     numBuckets = 5,
     srcMaxLength = 50,
-    tgtMaxLength = 50)
+    tgtMaxLength = 50,
+    trainBatchSize = 1024)
 
   val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLang, tgtLang, dataConfig).load()
 
@@ -75,32 +76,32 @@ object TransformerIWSLT15 extends App {
       config = Transformer.Config(
         env = env,
         useSelfAttentionProximityBias = false,
-        positionEmbeddings = FixedSinusoidPositionalEmbeddings(1.0f, 1e4f),
+        positionalEmbeddings = FixedSinusoidPositionalEmbeddings(1.0f, 1e4f),
         postPositionEmbeddingsDropout = 0.1f,
         layerPreprocessors = Seq(
           Normalize(LayerNormalization(), 1e-6f)),
         layerPostprocessors = Seq(
           Dropout(0.9f, broadcastAxes = Set(1)),
           AddResidualConnection),
-        hiddenSize = 128,
+        hiddenSize = 256,
         encoderNumLayers = 2,
         encoderSelfAttention = DotProductAttention(0.1f, Set.empty, "EncoderSelfAttention"),
-        encoderFeedForwardLayer = DenseReLUDenseFeedForwardLayer(512, 128, 0.0f, Set.empty, "EncoderFeedForward"),
+        encoderFeedForwardLayer = DenseReLUDenseFeedForwardLayer(1024, 256, 0.0f, Set.empty, "EncoderFeedForward"),
         decoderNumLayers = 2,
         decoderSelfAttention = DotProductAttention(0.1f, Set.empty, "DecoderSelfAttention"),
-        attentionKeysDepth = 128,
-        attentionValuesDepth = 128,
+        attentionKeysDepth = 256,
+        attentionValuesDepth = 256,
         attentionNumHeads = 4,
         attentionDropoutRate = 0.1f,
         attentionDropoutBroadcastAxes = Set.empty,
         attentionPrependMode = AttentionPrependInputsMaskedAttention,
-        usePadRemover = true),
+        usePadRemover = false),
       optConfig = optConfig,
-      logConfig = logConfig)
-    // TODO: !!! Find a way to set the number of buckets to 1.
-    //      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-    //      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-    //      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true))
+      logConfig = logConfig,
+      // TODO: !!! Find a way to set the number of buckets to 1.
+      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
+      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
+      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true))
   }
 
   val translator = PairwiseTranslator(env, model)
