@@ -57,7 +57,12 @@ abstract class Model[S] protected (
   protected val trainInput = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
 
   // TODO: Make this configurable.
-  val parametersManager: ParametersManager = DefaultParametersManager
+  val parametersManager: ParametersManager = {
+    DefaultParametersManager(tf.VarianceScalingInitializer(
+      1.0f,
+      tf.VarianceScalingInitializer.FanAverageScalingMode,
+      tf.VarianceScalingInitializer.UniformDistribution))
+  }
 
   protected val estimator: tf.learn.Estimator[
       (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),

@@ -30,12 +30,14 @@ trait ParametersManager {
   ): Output
 }
 
-case object DefaultParametersManager extends ParametersManager {
+case class DefaultParametersManager(
+    variableInitializer: tf.VariableInitializer = null
+) extends ParametersManager {
   override def get(
       name: String,
       dataType: DataType,
       shape: Shape,
-      variableInitializer: tf.VariableInitializer = null,
+      variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   ): Output = {
     tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value

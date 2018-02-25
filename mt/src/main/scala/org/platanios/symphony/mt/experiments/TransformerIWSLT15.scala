@@ -57,7 +57,7 @@ object TransformerIWSLT15 extends App {
 
   val optConfig = Model.OptConfig(
     optimizer = Adam(
-      0.1f, NoamSchedule(warmUpSteps = 4000, hiddenSize = 16),
+      0.0002f, NoamSchedule(warmUpSteps = 4000, hiddenSize = 16),
       beta1 = 0.9f, beta2 = 0.98f, learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(
