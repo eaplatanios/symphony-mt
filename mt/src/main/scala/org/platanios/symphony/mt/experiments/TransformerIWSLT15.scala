@@ -57,8 +57,8 @@ object TransformerIWSLT15 extends App {
 
   val optConfig = Model.OptConfig(
     optimizer = Adam(
-      0.0002f, NoamSchedule(warmUpSteps = 4000, hiddenSize = 16),
-      beta1 = 0.9f, beta2 = 0.98f, learningRateSummaryTag = "LearningRate"))
+      0.0002, NoamSchedule(warmUpSteps = 4000, hiddenSize = 256),
+      beta1 = 0.9, beta2 = 0.98, learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(
     logLossSteps = 100,
@@ -79,7 +79,7 @@ object TransformerIWSLT15 extends App {
         layerPreprocessors = Seq(
           Normalize(LayerNormalization(), 1e-6f)),
         layerPostprocessors = Seq(
-          Dropout(0.9f, broadcastAxes = Set(1)),
+          Dropout(0.1f, broadcastAxes = Set(1)),
           AddResidualConnection),
         hiddenSize = 256,
         encoderNumLayers = 2,

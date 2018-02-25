@@ -61,7 +61,8 @@ class NoamSchedule protected (
   }
 
   private[this] def schedule(initialValue: Output, step: Output, warmUpSteps: Output, hiddenSize: Output): Output = {
-    5000.0f * (hiddenSize ** -0.5f) * tf.minimum((step + 1) * (warmUpSteps ** -1.5f), (step + 1) ** -0.5f)
+    initialValue * 5000.0f * (hiddenSize ** -0.5f) *
+        tf.minimum((step + 1) * (warmUpSteps ** -1.5f), (step + 1) ** -0.5f)
   }
 }
 

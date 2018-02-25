@@ -202,7 +202,7 @@ abstract class Model[S] protected (
   protected def decoder(input: Option[(Output, Output)], state: Option[S], mode: Mode): (Output, Output)
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
-    val (lossSum, weightsSum) = Common.paddedCrossEntropy(
+    val (lossSum, _) = Common.paddedCrossEntropy(
       predictedSequences, targetSequences, targetSequenceLengths, config.labelSmoothing, timeMajor = config.timeMajor)
     lossSum / tf.size(targetSequenceLengths).cast(FLOAT32)
   }
