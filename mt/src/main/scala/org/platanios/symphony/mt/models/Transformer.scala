@@ -171,9 +171,9 @@ class Transformer protected (
     }
 
     val tgtEosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-    val decodeHelperResult = decodeHelper.decode(state, decodingFn, tgtMaxLength + 1, tgtEosId)
+    val decodeHelperResult = decodeHelper.decode(state, decodingFn, tgtMaxLength, tgtEosId)
 
-    (decodeHelperResult.outputs._1(---, 0 :: -1), decodeHelperResult.outputs._2 - 1)
+    decodeHelperResult.outputs
   }
 
   protected def decode(
