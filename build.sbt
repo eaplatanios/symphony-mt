@@ -92,11 +92,7 @@ lazy val mt = (project in file("./mt"))
         "org.apache.commons" % "commons-compress" % "1.15",
         "org.eclipse.jgit" % "org.eclipse.jgit" % "4.9.2.201712150930-r",
         "com.typesafe.akka" %% "akka-actor" % "2.5.9",
-        "com.typesafe.akka" %% "akka-testkit" % "2.5.9" % Test,
-        "io.circe" %% "circe-core" % "0.9.1",
-        "io.circe" %% "circe-generic" % "0.9.1",
-        "io.circe" %% "circe-parser" % "0.9.1",
-        "io.circe" %% "circe-yaml" % "0.6.1"))
+        "com.typesafe.akka" %% "akka-testkit" % "2.5.9" % Test))
 
 lazy val noPublishSettings = Seq(
   publish := Unit,
