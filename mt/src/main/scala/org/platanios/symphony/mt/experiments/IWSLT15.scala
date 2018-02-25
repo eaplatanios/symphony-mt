@@ -57,7 +57,7 @@ object IWSLT15 extends App {
 
   val optConfig = Model.OptConfig(
     maxGradNorm = 5.0f,
-    optimizer = () => GradientDescent(
+    optimizer = GradientDescent(
       1.0f, ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
       learningRateSummaryTag = "LearningRate"))
 
@@ -90,6 +90,7 @@ object IWSLT15 extends App {
           outputAttention = true,
           timeMajor = true,
           beamWidth = 10),
+        labelSmoothing = 0.0f,
         timeMajor = true),
       optConfig = optConfig,
       logConfig = logConfig,

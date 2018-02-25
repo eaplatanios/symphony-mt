@@ -259,6 +259,7 @@ object Transformer {
 
   case class Config(
       override val env: Environment,
+      override val labelSmoothing: Float,
       useSelfAttentionProximityBias: Boolean,
       positionalEmbeddings: PositionalEmbeddings,
       postPositionEmbeddingsDropout: Float,
@@ -279,10 +280,13 @@ object Transformer {
       usePadRemover: Boolean = true,
       override val summarySteps: Int = 100,
       override val checkpointSteps: Int = 1000
-  ) extends Model.Config(env, timeMajor = false, summarySteps = summarySteps, checkpointSteps = checkpointSteps)
+  ) extends Model.Config(
+    env, labelSmoothing, timeMajor = false,
+    summarySteps = summarySteps, checkpointSteps = checkpointSteps)
 
   val defaultConfig: Config = Config(
     env = null,
+    labelSmoothing = 0.1f,
     useSelfAttentionProximityBias = false,
     positionalEmbeddings = FixedSinusoidPositionalEmbeddings(1.0f, 1e4f),
     postPositionEmbeddingsDropout = 0.1f,

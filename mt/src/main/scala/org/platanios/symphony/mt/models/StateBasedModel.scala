@@ -119,13 +119,14 @@ object StateBasedModel {
 
   class Config[S, SS] protected (
       override val env: Environment,
+      override val labelSmoothing: Float,
       // Model
       val encoder: RNNEncoder[S, SS],
       val decoder: RNNDecoder[S, SS],
       override val timeMajor: Boolean = false,
       override val summarySteps: Int = 100,
       override val checkpointSteps: Int = 1000
-  ) extends Model.Config(env, timeMajor, summarySteps, checkpointSteps)
+  ) extends Model.Config(env, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
 
   object Config {
     def apply[S, SS](
@@ -134,10 +135,11 @@ object StateBasedModel {
         encoder: RNNEncoder[S, SS],
         decoder: RNNDecoder[S, SS],
         timeMajor: Boolean = false,
+        labelSmoothing: Float = 0.1f,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config[S, SS] = {
-      new Config[S, SS](env, encoder, decoder, timeMajor, summarySteps, checkpointSteps)
+      new Config[S, SS](env, labelSmoothing, encoder, decoder, timeMajor, summarySteps, checkpointSteps)
     }
   }
 

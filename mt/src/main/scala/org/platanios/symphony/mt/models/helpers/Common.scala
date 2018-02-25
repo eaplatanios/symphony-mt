@@ -174,12 +174,13 @@ object Common {
     * @param  labels Labels tensor.
     * @return Tuple containing the padded `logits` and `labels` tensors.
     */
-  def padWithZeros(logits: Output, labels: Output): (Output, Output) = {
+  def padToSameLengthWithZeros(logits: Output, labels: Output): (Output, Output) = {
     tf.createWithNameScope("PadWithZeros") {
       var processed = padToSameLength(logits, labels)
       var processedLogits = processed._1
       var processedLabels = processed._2
       if (processedLabels.rank == 3) {
+        // 2-D labels case.
         processed = padToSameLength(processedLogits, processedLabels, axis = 2)
         processedLogits = processed._1
         processedLabels = processed._2
@@ -251,9 +252,8 @@ object Common {
 
   /** Computes the cross-entropy loss between `logits` and `labels` using label smoothing to limit over-confidence.
     *
-    * @param  logits         Tensor with shape `[batchSize, ?, ?, ?, vocabSize]`.
-    * @param  labels         Tensor with shape `[batchSize, ?, ?, ?]`.
-    * @param  vocabSize      Scalar tensor representing the size of the vocabulary.
+    * @param  logits         Tensor with shape `[batchSize, ..., vocabSize]`.
+    * @param  labels         Tensor with shape `[batchSize, ...]`.
     * @param  labelSmoothing Value used to determine on and off values for label smoothing. If `gaussian` is `true`,
     *                        `confidence = 1.0f - labelSmoothing` is the variance of the gaussian distribution.
     * @param  gaussian       If `true`, a Gaussian distribution will be used for label smoothing.
@@ -262,13 +262,13 @@ object Common {
   def smoothingCrossEntropy(
       logits: Output,
       labels: Output,
-      vocabSize: Output,
-      labelSmoothing: Float,
+      labelSmoothing: Float = 0.0f,
       gaussian: Boolean = false
   ): Output = {
     tf.createWithNameScope("SmoothingCrossEntropy") {
-      // Low confidence is given to all non-true labels, uniformly.
+      val vocabSize = tf.shape(logits)(-1)
       val vocabSizeMinusOne = (vocabSize - 1).cast(FLOAT32)
+      // Low confidence is given to all non-true labels, uniformly.
       val confidence = 1.0f - labelSmoothing
       val lowConfidence = (1.0f - confidence) / vocabSizeMinusOne
       // The normalizing constant is the best cross-entropy value with soft targets.
@@ -299,11 +299,11 @@ object Common {
   /** Computes the cross-entropy loss between `logits` and `labels` using label smoothing to limit over-confidence,
     * while assuming that `0` labels correspond to padding.
     *
-    * @param  logits         Tensor with shape `[batchSize, ?, ?, ?, vocabSize]`.
-    * @param  labels         Tensor with shape `[batchSize, ?, ?, ?]`.
+    * @param  logits         Tensor with shape `[batchSize, ..., vocabSize]`.
+    * @param  labels         Tensor with shape `[batchSize, ...]`.
+    * @param  labelLengths   Tensor with shape `[batchSize]`, containing the lengths of the target sequences.
     * @param  labelSmoothing Value used to determine on and off values for label smoothing. If `gaussian` is `true`,
     *                        `confidence = 1.0f - labelSmoothing` is the variance of the gaussian distribution.
-    * @param  weightsFn      Function that maps from labels to weights for the loss computation.
     * @param  sum            If `true`, the individual sample cross-entropies and weights are summed before returned.
     * @param  gaussian       If `true`, a Gaussian distribution will be used for label smoothing.
     * @return Tuple containing the cross-entropy tensor and the weights tensor.
@@ -311,29 +311,24 @@ object Common {
   def paddedCrossEntropy(
       logits: Output,
       labels: Output,
-      labelSmoothing: Float,
-      weightsFn: (Output) => Output,
+      labelLengths: Output,
+      labelSmoothing: Float = 0.0f,
       sum: Boolean = true,
-      gaussian: Boolean = false
+      gaussian: Boolean = false,
+      timeMajor: Boolean = false
   ): (Output, Output) = {
     // TODO: Factored padded cross-entropy.
     tf.createWithNameScope("PaddedCrossEntropy") {
-      val vocabSize = tf.shape(logits)(-1)
-      val (processedLogits, processedLabels) = {
-        if (logits.rank == 2) {
-          // Deal with the case where we did not insert extra dimensions due to TPU issues. No pad-to-same-length
-          // happens in this case. TODO: TPU
-          (logits, tf.reshape(labels, Shape(-1)))
-        } else {
-          padWithZeros(logits, labels)
-        }
-      }
-      val crossEntropy = smoothingCrossEntropy(processedLogits, processedLabels, vocabSize, labelSmoothing, gaussian)
-      val weights = weightsFn(processedLabels)
+      val maxLength = tf.shape(labels)(1)
+      // val (processedLogits, processedLabels) = padToSameLengthWithZeros(logits, labels)
+      val transposedLabels = if (timeMajor) labels.transpose() else labels
+      val crossEntropy = smoothingCrossEntropy(logits, transposedLabels, labelSmoothing, gaussian)
+      val weights = tf.sequenceMask(labelLengths, maxLength, logits.dataType)
+      val transposedWeights = if (timeMajor) weights.transpose() else weights
       if (!sum)
-        (crossEntropy * weights, weights)
+        (crossEntropy * transposedWeights, transposedWeights)
       else
-        (tf.sum(crossEntropy * weights), tf.sum(weights))
+        (tf.sum(crossEntropy * transposedWeights), tf.sum(transposedWeights))
     }
   }
 

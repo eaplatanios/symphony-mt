@@ -56,7 +56,7 @@ object TransformerIWSLT15 extends App {
     randomSeed = Some(10))
 
   val optConfig = Model.OptConfig(
-    optimizer = () => Adam(
+    optimizer = Adam(
       0.1f, NoamSchedule(warmUpSteps = 4000, hiddenSize = 16),
       beta1 = 0.9f, beta2 = 0.98f, learningRateSummaryTag = "LearningRate"))
 
@@ -72,6 +72,7 @@ object TransformerIWSLT15 extends App {
       dataConfig = dataConfig,
       config = Transformer.Config(
         env = env,
+        labelSmoothing = 0.1f,
         useSelfAttentionProximityBias = false,
         positionalEmbeddings = FixedSinusoidPositionalEmbeddings(1.0f, 1e4f),
         postPositionEmbeddingsDropout = 0.1f,

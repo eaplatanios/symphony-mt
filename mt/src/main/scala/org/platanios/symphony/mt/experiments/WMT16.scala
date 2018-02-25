@@ -58,7 +58,7 @@ object WMT16 extends App {
 
   val optConfig = Model.OptConfig(
     maxGradNorm = 5.0f,
-    optimizer = () => GradientDescent(
+    optimizer = GradientDescent(
       1.0f, ExponentialDecay(decayRate = 0.5f, decaySteps = 340000 * 1 / (2 * 10), startStep = 340000 / 2),
       learningRateSummaryTag = "LearningRate"))
 
@@ -93,6 +93,7 @@ object WMT16 extends App {
           timeMajor = true,
           beamWidth = 10,
           lengthPenaltyWeight = 1.0f),
+        labelSmoothing = 0.0f,
         timeMajor = true),
       optConfig = optConfig,
       logConfig = logConfig,

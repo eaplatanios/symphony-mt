@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric}
+import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -195,20 +196,17 @@ abstract class Model[S] protected (
     */
   protected def decoder(input: Option[(Output, Output)], state: Option[S], mode: Mode): (Output, Output)
 
-
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
-    val maxTime = tf.shape(targetSequences)(1)
-    val transposedTargetSequences = if (config.timeMajor) targetSequences.transpose() else targetSequences
-    val crossEntropy = tf.sparseSoftmaxCrossEntropy(predictedSequences, transposedTargetSequences)
-    val weights = tf.sequenceMask(targetSequenceLengths, maxTime, predictedSequences.dataType)
-    val transposedWeights = if (config.timeMajor) weights.transpose() else weights
-    tf.sum(crossEntropy * transposedWeights) / tf.size(targetSequenceLengths).cast(FLOAT32)
+    val (lossSum, weightsSum) = Common.paddedCrossEntropy(
+      predictedSequences, targetSequences, targetSequenceLengths, config.labelSmoothing, timeMajor = config.timeMajor)
+    lossSum / weightsSum.cast(FLOAT32)
   }
 }
 
 object Model {
   class Config protected (
       val env: Environment,
+      val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
       val checkpointSteps: Int)
@@ -216,23 +214,24 @@ object Model {
   object Config {
     def apply(
         env: Environment,
+        labelSmoothing: Float = 0.0f,
         timeMajor: Boolean = false,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config = {
-      new Config(env, timeMajor, summarySteps, checkpointSteps)
+      new Config(env, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
     }
   }
 
   class OptConfig protected (
       val maxGradNorm: Float,
-      val optimizer: () => Optimizer,
+      val optimizer: Optimizer,
       val colocateGradientsWithOps: Boolean)
 
   object OptConfig {
     def apply(
         maxGradNorm: Float = 5.0f,
-        optimizer: () => Optimizer = () => GradientDescent(1.0f, learningRateSummaryTag = "LearningRate"),
+        optimizer: Optimizer = GradientDescent(1.0f, learningRateSummaryTag = "LearningRate"),
         colocateGradientsWithOps: Boolean = true
     ): OptConfig = {
       new OptConfig(maxGradNorm, optimizer, colocateGradientsWithOps)
