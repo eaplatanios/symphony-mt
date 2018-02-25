@@ -56,13 +56,9 @@ class NoamSchedule protected (
       val stepValue = tf.cast(step.get.value, value.dataType)
       val warmUpStepsValue = tf.constant(warmUpSteps, value.dataType)
       val hiddenSizeValue = tf.constant(hiddenSize, value.dataType)
-      schedule(value, stepValue, warmUpStepsValue, hiddenSizeValue)
+      value * 5000.0f * (hiddenSizeValue ** -0.5f) *
+          tf.minimum((stepValue + 1) * (warmUpStepsValue ** -1.5f), (stepValue + 1) ** -0.5f)
     }
-  }
-
-  private[this] def schedule(initialValue: Output, step: Output, warmUpSteps: Output, hiddenSize: Output): Output = {
-    initialValue * 5000.0f * (hiddenSize ** -0.5f) *
-        tf.minimum((step + 1) * (warmUpSteps ** -1.5f), (step + 1) ** -0.5f)
   }
 }
 
