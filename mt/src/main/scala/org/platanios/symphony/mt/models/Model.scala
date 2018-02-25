@@ -199,7 +199,7 @@ abstract class Model[S] protected (
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
     val (lossSum, weightsSum) = Common.paddedCrossEntropy(
       predictedSequences, targetSequences, targetSequenceLengths, config.labelSmoothing, timeMajor = config.timeMajor)
-    lossSum / weightsSum.cast(FLOAT32)
+    lossSum / tf.size(targetSequenceLengths).cast(FLOAT32)
   }
 }
 
