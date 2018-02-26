@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.StateBasedModel
+import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -43,24 +43,22 @@ class UnidirectionalRNNEncoder[S, SS](
       env: Environment,
       srcSequences: Output,
       srcSequenceLengths: Output,
-      srcVocab: Vocabulary,
-      mode: Mode
-  ): Tuple[Output, Seq[S]] = {
+      srcVocab: Vocabulary
+  )(mode: Mode, parametersManager: ParametersManager): Tuple[Output, Seq[S]] = {
     // Time-major transpose
     val transposedSequences = if (timeMajor) srcSequences.transpose() else srcSequences
 
     // Embeddings
-    val embeddings = StateBasedModel.embeddings(dataType, srcVocab.size, numUnits, "Embeddings")
+    val embeddings = RNNModel.embeddings(dataType, srcVocab.size, numUnits, "Embeddings")
     val embeddedSequences = tf.embeddingLookup(embeddings, transposedSequences)
 
     // RNN
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
-    val uniCell = StateBasedModel.multiCell(
-      cell, numUnits, dataType, numLayers, numResLayers, dropout,
-      residualFn, 0, env.numGPUs, env.firstGPU, env.randomSeed, "MultiUniCell")
-    val createdCell = uniCell.createCell(mode, embeddedSequences.shape)
+    val uniCell = RNNModel.multiCell(
+      cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers, numResLayers, dropout,
+      residualFn, 0, env.numGPUs, env.firstGPU, env.randomSeed, "MultiUniCell")(mode, parametersManager)
     tf.dynamicRNN(
-      createdCell, embeddedSequences, null, timeMajor, env.parallelIterations, env.swapMemory, srcSequenceLengths,
+      uniCell, embeddedSequences, null, timeMajor, env.parallelIterations, env.swapMemory, srcSequenceLengths,
       "UnidirectionalLayers")
   }
 }

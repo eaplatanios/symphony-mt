@@ -21,21 +21,20 @@ import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.learn.layers.rnn.cell._
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-class StateBasedModel[S, SS](
-    override val name: String = "Model",
+class RNNModel[S, SS](
+    override val name: String = "RNNModel",
     override val srcLanguage: Language,
     override val srcVocabulary: Vocabulary,
     override val tgtLanguage: Language,
     override val tgtVocabulary: Vocabulary,
     override val dataConfig: DataConfig,
-    override val config: StateBasedModel.Config[S, SS],
+    override val config: RNNModel.Config[S, SS],
     override val optConfig: Model.OptConfig,
     override val logConfig : Model.LogConfig  = Model.LogConfig(),
     override val trainEvalDataset: () => TFBilingualDataset = null,
@@ -51,16 +50,14 @@ class StateBasedModel[S, SS](
   // TODO: Make this use the parameters manager.
 
   override protected def encoder(input: (Output, Output), mode: Mode): (Tuple[Output, Seq[S]], Output) = {
-    tf.learn.variableScope("Encoder") {
-      (config.encoder.create(config.env, input._1, input._2, srcVocabulary, mode), input._2)
-    }
+    (config.encoder.create(config.env, input._1, input._2, srcVocabulary)(mode, parametersManager), input._2)
   }
 
   override protected def decoder(
       input: Option[(Output, Output)],
       state: Option[(Tuple[Output, Seq[S]], Output)],
       mode: Mode
-  ): (Output, Output) = tf.learn.variableScope("Decoder") {
+  ): (Output, Output) = {
     // TODO: What if the state is `None`?
     input match {
       case Some(inputSequences) =>
@@ -73,12 +70,12 @@ class StateBasedModel[S, SS](
         val tgtSequenceLength = inputSequences._2 + 1
         val output = config.decoder.create(config.env, state.get._1, state.get._2, tgtVocabulary,
           dataConfig.tgtMaxLength, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence,
-          tgtSequenceLength, mode)
+          tgtSequenceLength)(mode, parametersManager)
         (output.sequences, output.sequenceLengths)
       case None =>
         val output = config.decoder.create(
           config.env, state.get._1, state.get._2, tgtVocabulary, dataConfig.tgtMaxLength,
-          dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, null, null, mode)
+          dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, null, null)(mode, parametersManager)
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
         // when using beam search.
         val outputSequence = {
@@ -94,15 +91,15 @@ class StateBasedModel[S, SS](
   }
 }
 
-object StateBasedModel {
+object RNNModel {
   def apply[S, SS](
-      name: String = "Model",
+      name: String = "RNNModel",
       srcLanguage: Language,
       srcVocabulary: Vocabulary,
       tgtLanguage: Language,
       tgtVocabulary: Vocabulary,
       dataConfig: DataConfig,
-      config: StateBasedModel.Config[S, SS],
+      config: RNNModel.Config[S, SS],
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
       trainEvalDataset: () => TFBilingualDataset = null,
@@ -111,13 +108,13 @@ object StateBasedModel {
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): StateBasedModel[S, SS] = {
-    new StateBasedModel[S, SS](
+  ): RNNModel[S, SS] = {
+    new RNNModel[S, SS](
       name, srcLanguage, srcVocabulary, tgtLanguage, tgtVocabulary, dataConfig, config, optConfig, logConfig,
       trainEvalDataset, devEvalDataset, testEvalDataset)(evS, evSDropout)
   }
 
-  class Config[S, SS] protected (
+  class Config[S, SS] protected(
       override val env: Environment,
       override val labelSmoothing: Float,
       // Model
@@ -158,26 +155,40 @@ object StateBasedModel {
 
   private[models] def cell[S, SS](
       cellCreator: Cell[S, SS],
+      numInputs: Int,
       numUnits: Int,
       dataType: DataType,
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = None,
-      device: Option[String] = None,
+      device: String = "",
       seed: Option[Int] = None,
       name: String
-  )(implicit
+  )(mode: Mode, parametersManager: ParametersManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): tf.learn.RNNCell[Output, Shape, S, SS] = tf.learn.variableScope(name) {
-    var createdCell = cellCreator.create(name, numUnits, dataType)
-    createdCell = dropout.map(p => DropoutWrapper("Dropout", createdCell, 1.0f - p, seed = seed)).getOrElse(createdCell)
-    createdCell = residualFn.map(ResidualWrapper("Residual", createdCell, _)).getOrElse(createdCell)
-    createdCell = device.map(DeviceWrapper("Device", createdCell, _)).getOrElse(createdCell)
-    createdCell
+  ): tf.RNNCell[Output, Shape, S, SS] = tf.createWithVariableScope(name) {
+    tf.createWith(device = device) {
+      // Create the main RNN cell.
+      var createdCell = cellCreator.create(name, numInputs, numUnits, dataType)(mode, parametersManager)
+
+      // Apply dropout.
+      createdCell = dropout.map(p => {
+        if (!mode.isTraining)
+          createdCell
+        else
+          tf.DropoutWrapper(createdCell, 1.0f - p, seed = seed, name = "Dropout")
+      }).getOrElse(createdCell)
+
+      // Add residual connections.
+      createdCell = residualFn.map(tf.ResidualWrapper(createdCell, _)).getOrElse(createdCell)
+
+      createdCell
+    }
   }
 
   private[models] def cells[S, SS](
       cellCreator: Cell[S, SS],
+      numInputs: Int,
       numUnits: Int,
       dataType: DataType,
       numLayers: Int,
@@ -189,19 +200,22 @@ object StateBasedModel {
       firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
-  )(implicit
+  )(mode: Mode, parametersManager: ParametersManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): Seq[tf.learn.RNNCell[Output, Shape, S, SS]] = tf.learn.variableScope(name) {
-    (0 until numLayers).map(i => {
-      cell(
-        cellCreator, numUnits, dataType, dropout, if (i >= numLayers - numResidualLayers) residualFn else None,
-        Some(device(i + baseGPU, numGPUs, firstGPU)), seed, s"Cell$i")
+  ): Seq[tf.RNNCell[Output, Shape, S, SS]] = tf.createWithVariableScope(name) {
+    (0 until numLayers).foldLeft(Seq.empty[tf.RNNCell[Output, Shape, S, SS]])((cells, i) => {
+      val cellNumInputs = if (i == 0) numInputs else cells(i - 1).outputShape(-1)
+      cells :+ cell(
+        cellCreator, cellNumInputs, numUnits, dataType, dropout,
+        if (i >= numLayers - numResidualLayers) residualFn else None,
+        device(i + baseGPU, numGPUs, firstGPU), seed, s"Cell$i")(mode, parametersManager)
     })
   }
 
   private[models] def multiCell[S, SS](
       cellCreator: Cell[S, SS],
+      numInputs: Int,
       numUnits: Int,
       dataType: DataType,
       numLayers: Int,
@@ -213,12 +227,12 @@ object StateBasedModel {
       firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
-  )(implicit
+  )(mode: Mode, parametersManager: ParametersManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): tf.learn.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {
-    MultiCell(name, cells(
-      cellCreator, numUnits, dataType, numLayers, numResidualLayers, dropout,
-      residualFn, baseGPU, numGPUs, firstGPU, seed, name))
+  ): tf.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {
+    tf.MultiCell(cells(
+      cellCreator, numInputs, numUnits, dataType, numLayers, numResidualLayers, dropout,
+      residualFn, baseGPU, numGPUs, firstGPU, seed, name)(mode, parametersManager), name)
   }
 }

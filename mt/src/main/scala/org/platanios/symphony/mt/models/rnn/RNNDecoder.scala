@@ -16,13 +16,13 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.Decoder
+import org.platanios.symphony.mt.models.{Decoder, ParametersManager}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
-import org.platanios.tensorflow.api.ops.rnn.cell.{RNNCell, Tuple}
+import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSearchDecoder, GooglePenalty}
 
 /**
@@ -47,9 +47,8 @@ abstract class RNNDecoder[S, SS](
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
       tgtSequences: Output = null,
-      tgtSequenceLengths: Output = null,
-      mode: Mode
-  ): RNNDecoder.Output
+      tgtSequenceLengths: Output = null
+  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output
 
   protected def decode[DS, DSS](
       env: Environment,
@@ -58,19 +57,18 @@ abstract class RNNDecoder[S, SS](
       tgtSequenceLengths: Output,
       initialState: DS,
       embeddings: Variable,
-      cell: RNNCell[Output, Shape, DS, DSS],
+      cell: tf.RNNCell[Output, Shape, DS, DSS],
       tgtVocab: Vocabulary,
       tgtMaxLength: Int,
       beginOfSequenceToken: String,
-      endOfSequenceToken: String,
-      mode: Mode
-  )(implicit
+      endOfSequenceToken: String
+  )(mode: Mode, parametersManager: ParametersManager)(implicit
       evS: WhileLoopVariable.Aux[DS, DSS]
   ): RNNDecoder.Output = {
-    val outputWeights = tf.variable(
+    val outputWeights = parametersManager.get(
       "OutWeights", embeddings.dataType, Shape(cell.outputShape(-1), tgtVocab.size),
       tf.RandomUniformInitializer(-0.1f, 0.1f))
-    val outputLayer = (logits: Output) => tf.linear(logits, outputWeights.value)
+    val outputLayer = (logits: Output) => tf.linear(logits, outputWeights)
     if (mode.isTraining) {
       // Time-major transpose
       val transposedSequences = if (timeMajor) tgtSequences.transpose() else tgtSequences

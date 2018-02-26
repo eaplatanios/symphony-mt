@@ -15,11 +15,9 @@
 
 package org.platanios.symphony.mt.models.rnn.attention
 
+import org.platanios.symphony.mt.models.ParametersManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.Shape
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.learn.layers.rnn.cell.RNNCell
-import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
 
@@ -28,16 +26,15 @@ import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, Att
   */
 abstract class RNNAttention[AS, ASS](implicit evAS: WhileLoopVariable.Aux[AS, ASS]) {
   def create[S, SS](
-      cell: RNNCell[Output, Shape, S, SS],
+      cell: tf.RNNCell[Output, Shape, S, SS],
       memory: Output,
       memorySequenceLengths: Output,
       numUnits: Int,
       inputSequencesLastAxisSize: Int,
       initialState: S,
       useAttentionLayer: Boolean,
-      outputAttention: Boolean,
-      mode: Mode
-  )(implicit
+      outputAttention: Boolean
+  )(mode: Mode, parametersManager: ParametersManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, AS, ASS], AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]])

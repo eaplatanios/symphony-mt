@@ -34,7 +34,6 @@ trait Decoder[O] {
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
       tgtSequences: Output = null,
-      tgtSequenceLengths: Output = null,
-      mode: Mode
-  ): RNNDecoder.Output
+      tgtSequenceLengths: Output = null
+  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output
 }

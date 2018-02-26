@@ -15,9 +15,9 @@
 
 package org.platanios.symphony.mt.models.rnn.attention
 
+import org.platanios.symphony.mt.models.ParametersManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.learn.layers.rnn.cell.RNNCell
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
 import org.platanios.tensorflow.api.ops.variables.{ConstantInitializer, ZerosInitializer}
@@ -31,33 +31,33 @@ case class BahdanauRNNAttention(
     scoreMask: Float = Float.NegativeInfinity
 ) extends RNNAttention[Output, Shape] {
   override def create[S, SS](
-      cell: RNNCell[Output, Shape, S, SS],
+      cell: tf.RNNCell[Output, Shape, S, SS],
       memory: Output,
       memorySequenceLengths: Output,
       numUnits: Int,
       inputSequencesLastAxisSize: Int,
       initialState: S,
       useAttentionLayer: Boolean,
-      outputAttention: Boolean,
-      mode: Mode
-  )(implicit
+      outputAttention: Boolean
+  )(mode: Mode, parametersManager: ParametersManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
+      evSDropout: tf.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, Output, Shape], AttentionWrapperState[S, SS, Seq[Output], Seq[Shape]]) = {
     tf.createWithVariableScope("BahdanauAttention") {
-      val memoryWeights = tf.variable("MemoryWeights", memory.dataType, Shape(numUnits, numUnits), null)
-      val queryWeights = tf.variable("QueryWeights", memory.dataType, Shape(numUnits, numUnits), null)
-      val scoreWeights = tf.variable("ScoreWeights", memory.dataType, Shape(numUnits), null)
+      val dataType = memory.dataType
+      val memoryWeights = parametersManager.get("MemoryWeights", dataType, Shape(numUnits, numUnits))
+      val queryWeights = parametersManager.get("QueryWeights", dataType, Shape(numUnits, numUnits))
+      val scoreWeights = parametersManager.get("ScoreWeights", dataType, Shape(numUnits))
       val (normFactor, normBias) = {
         if (normalized) {
-          (tf.variable("Factor", memory.dataType, Shape.scalar(), ConstantInitializer(Math.sqrt(1.0f / numUnits))).value,
-              tf.variable("Bias", memory.dataType, Shape(numUnits), ZerosInitializer).value)
+          (parametersManager.get("Factor", dataType, Shape(), ConstantInitializer(math.sqrt(1.0f / numUnits).toFloat)),
+              parametersManager.get("Bias", dataType, Shape(numUnits), ZerosInitializer))
         } else {
           (null, null)
         }
       }
       val attention = tf.BahdanauAttention(
-        memory, memoryWeights.value, queryWeights.value, scoreWeights.value, memorySequenceLengths, normFactor, normBias,
+        memory, memoryWeights, queryWeights, scoreWeights, memorySequenceLengths, normFactor, normBias,
         probabilityFn, scoreMask, "Attention")
       val attentionWeights = {
         if (useAttentionLayer)
@@ -66,10 +66,9 @@ case class BahdanauRNNAttention(
         else
           null
       }
-      val createdCell = cell.createCell(mode, Shape(inputSequencesLastAxisSize + numUnits))
       val attentionCell = tf.AttentionWrapperCell(
-        createdCell, Seq(attention), attentionWeights, outputAttention = outputAttention)
-      (attentionCell, attentionCell.initialState(initialState, memory.dataType))
+        cell, Seq(attention), attentionWeights, outputAttention = outputAttention)
+      (attentionCell, attentionCell.initialState(initialState, dataType))
     }
   }
 }

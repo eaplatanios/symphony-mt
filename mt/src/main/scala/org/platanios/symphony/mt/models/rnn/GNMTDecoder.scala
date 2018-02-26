@@ -16,14 +16,14 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.StateBasedModel
+import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
-import org.platanios.tensorflow.api.ops.rnn.cell.{RNNCell, Tuple}
+import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 import org.platanios.tensorflow.api.ops.seq2seq.decoders.BeamSearchDecoder
 
 /**
@@ -57,19 +57,18 @@ class GNMTDecoder[S, SS, AS, ASS](
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
       tgtSequences: Output = null,
-      tgtSequenceLengths: Output = null,
-      mode: Mode
-  ): RNNDecoder.Output = {
+      tgtSequenceLengths: Output = null
+  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = StateBasedModel.embeddings(dataType, tgtVocab.size, numUnits, "Embeddings")
+    val embeddings = RNNModel.embeddings(dataType, tgtVocab.size, numUnits, "Embeddings")
 
     // RNN cells
-    val cells = StateBasedModel.cells(
-      cell, numUnits, dataType, numLayers, numResLayers, dropout,
-      Some(GNMTDecoder.residualFn[Output, Shape]), 0, env.numGPUs, env.firstGPU, env.randomSeed, "Cells")
+    val cells = RNNModel.cells(
+      cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout,
+      Some(GNMTDecoder.residualFn[Output, Shape]), 0, env.numGPUs, env.firstGPU, env.randomSeed,
+      "Cells")(mode, parametersManager)
 
     // Attention
-    val bottomCell = cells.head
     var initialState = encoderTuple.state
     var memory = if (timeMajor) encoderTuple.output.transpose(Tensor(1, 0, 2)) else encoderTuple.output
     var memorySequenceLengths = srcSequenceLengths
@@ -80,13 +79,12 @@ class GNMTDecoder[S, SS, AS, ASS](
       memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, beamWidth)
     }
     val (attentionCell, attentionInitialState) = attention.create[S, SS](
-      bottomCell, memory, memorySequenceLengths, numUnits, numUnits, initialState.head, useAttentionLayer = false,
-      outputAttention = false, mode)
-    val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](
-      attentionCell, cells.tail.map(_.createCell(mode, Shape(2 * numUnits))), useNewAttention)
+      cells.head, memory, memorySequenceLengths, numUnits, numUnits, initialState.head, useAttentionLayer = false,
+      outputAttention = false)(mode, parametersManager)
+    val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](attentionCell, cells.tail, useNewAttention)
     decode(
       env, srcSequenceLengths, tgtSequences, tgtSequenceLengths, (attentionInitialState, initialState.tail),
-      embeddings, multiCell, tgtVocab, tgtMaxLength, beginOfSequenceToken, endOfSequenceToken, mode)
+      embeddings, multiCell, tgtVocab, tgtMaxLength, beginOfSequenceToken, endOfSequenceToken)(mode, parametersManager)
   }
 }
 
@@ -150,13 +148,13 @@ object GNMTDecoder {
     */
   class MultiCell[S, SS, AS, ASS](
       val attentionCell: AttentionWrapperCell[S, SS, AS, ASS],
-      val cells: Seq[RNNCell[Output, Shape, S, SS]],
+      val cells: Seq[tf.RNNCell[Output, Shape, S, SS]],
       val useNewAttention: Boolean = false,
       val name: String = "GNMTMultiCell"
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evAS: WhileLoopVariable.Aux[AS, ASS]
-  ) extends RNNCell[
+  ) extends tf.RNNCell[
       Output, Shape,
       (AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]], Seq[S]),
       ((SS, Shape, Shape, Seq[Shape], Seq[Shape], Seq[ASS]), Seq[SS])] {
@@ -191,7 +189,7 @@ object GNMTDecoder {
   object MultiCell {
     def apply[S, SS, AS, ASS](
         attentionCell: AttentionWrapperCell[S, SS, AS, ASS],
-        cells: Seq[RNNCell[Output, Shape, S, SS]],
+        cells: Seq[tf.RNNCell[Output, Shape, S, SS]],
         useNewAttention: Boolean = false,
         name: String = "GNMTMultiCell"
     )(implicit

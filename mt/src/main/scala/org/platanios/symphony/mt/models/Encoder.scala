@@ -24,5 +24,10 @@ import org.platanios.tensorflow.api.Output
   * @author Emmanouil Antonios Platanios
   */
 trait Encoder[O] {
-  def create(env: Environment, srcSequences: Output, srcSequenceLengths: Output, srcVocab: Vocabulary, mode: Mode): O
+  def create(
+      env: Environment,
+      srcSequences: Output,
+      srcSequenceLengths: Output,
+      srcVocab: Vocabulary
+  )(mode: Mode, parametersManager: ParametersManager): O
 }

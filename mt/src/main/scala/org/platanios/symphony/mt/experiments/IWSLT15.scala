@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.evaluation.{BLEU, BilingualEvaluator}
-import org.platanios.symphony.mt.models.{Model, StateBasedModel}
+import org.platanios.symphony.mt.models.{Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
 import org.platanios.symphony.mt.translators.PairwiseTranslator
@@ -66,12 +66,12 @@ object IWSLT15 extends App {
     logTrainEvalSteps = -1)
 
   def model(srcLang: Language, srcVocab: Vocabulary, tgtLang: Language, tgtVocab: Vocabulary, env: Environment) = {
-    StateBasedModel(
+    RNNModel(
       name = "Model",
       srcLanguage = srcLang, srcVocabulary = srcVocab,
       tgtLanguage = tgtLang, tgtVocabulary = tgtVocab,
       dataConfig = dataConfig,
-      config = StateBasedModel.Config(
+      config = RNNModel.Config(
         env,
         UnidirectionalRNNEncoder(
           cell = BasicLSTM(forgetBias = 1.0f),

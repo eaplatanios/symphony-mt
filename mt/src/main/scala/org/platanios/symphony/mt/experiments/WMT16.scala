@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
-import org.platanios.symphony.mt.models.{Model, StateBasedModel}
+import org.platanios.symphony.mt.models.{Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention
 import org.platanios.symphony.mt.translators.PairwiseTranslator
@@ -67,12 +67,12 @@ object WMT16 extends App {
     logTrainEvalSteps = -1)
 
   def model(srcLang: Language, srcVocab: Vocabulary, tgtLang: Language, tgtVocab: Vocabulary, env: Environment) = {
-    StateBasedModel(
+    RNNModel(
       name = "Model",
       srcLanguage = srcLang, srcVocabulary = srcVocab,
       tgtLanguage = tgtLang, tgtVocabulary = tgtVocab,
       dataConfig = dataConfig,
-      config = StateBasedModel.Config(
+      config = RNNModel.Config(
         env,
         GNMTEncoder(
           cell = BasicLSTM(forgetBias = 1.0f),
