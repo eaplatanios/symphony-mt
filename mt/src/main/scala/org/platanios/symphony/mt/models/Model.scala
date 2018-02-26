@@ -48,6 +48,8 @@ abstract class Model[S] protected (
     val devEvalDataset: () => TFBilingualDataset = null,
     val testEvalDataset: () => TFBilingualDataset = null
 ) {
+  protected val parametersManager: ParametersManager = config.parametersManager
+
   /** Each input consists of a tuple containing:
     *   - The language ID. TODO: !!!
     *   - A tensor containing a padded batch of sentences consisting of word IDs.
@@ -55,14 +57,6 @@ abstract class Model[S] protected (
     */
   protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
   protected val trainInput = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
-
-  // TODO: Make this configurable.
-  val parametersManager: ParametersManager = {
-    DefaultParametersManager(tf.VarianceScalingInitializer(
-      1.0f,
-      tf.VarianceScalingInitializer.FanAverageScalingMode,
-      tf.VarianceScalingInitializer.UniformDistribution))
-  }
 
   protected val estimator: tf.learn.Estimator[
       (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
@@ -211,6 +205,7 @@ abstract class Model[S] protected (
 object Model {
   class Config protected (
       val env: Environment,
+      val parametersManager: ParametersManager,
       val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
@@ -219,12 +214,16 @@ object Model {
   object Config {
     def apply(
         env: Environment,
+        parametersManager: ParametersManager = DefaultParametersManager(tf.VarianceScalingInitializer(
+          1.0f,
+          tf.VarianceScalingInitializer.FanAverageScalingMode,
+          tf.VarianceScalingInitializer.UniformDistribution)),
         labelSmoothing: Float = 0.0f,
         timeMajor: Boolean = false,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config = {
-      new Config(env, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+      new Config(env, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
     }
   }
 

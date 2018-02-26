@@ -278,10 +278,14 @@ object Transformer {
       attentionDropoutBroadcastAxes: Set[Int],
       attentionPrependMode: AttentionPrependMode,
       usePadRemover: Boolean = true,
+      override val parametersManager: ParametersManager = DefaultParametersManager(tf.VarianceScalingInitializer(
+        1.0f,
+        tf.VarianceScalingInitializer.FanAverageScalingMode,
+        tf.VarianceScalingInitializer.UniformDistribution)),
       override val summarySteps: Int = 100,
       override val checkpointSteps: Int = 1000
   ) extends Model.Config(
-    env, labelSmoothing, timeMajor = false,
+    env, parametersManager, labelSmoothing, timeMajor = false,
     summarySteps = summarySteps, checkpointSteps = checkpointSteps)
 
   val defaultConfig: Config = Config(

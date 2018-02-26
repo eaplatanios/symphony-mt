@@ -120,10 +120,14 @@ object RNNModel {
       // Model
       val encoder: RNNEncoder[S, SS],
       val decoder: RNNDecoder[S, SS],
+      override val parametersManager: ParametersManager = DefaultParametersManager(tf.VarianceScalingInitializer(
+        1.0f,
+        tf.VarianceScalingInitializer.FanAverageScalingMode,
+        tf.VarianceScalingInitializer.UniformDistribution)),
       override val timeMajor: Boolean = false,
       override val summarySteps: Int = 100,
       override val checkpointSteps: Int = 1000
-  ) extends Model.Config(env, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+  ) extends Model.Config(env, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
 
   object Config {
     def apply[S, SS](
@@ -131,12 +135,17 @@ object RNNModel {
         // Model
         encoder: RNNEncoder[S, SS],
         decoder: RNNDecoder[S, SS],
+        parametersManager: ParametersManager = DefaultParametersManager(tf.VarianceScalingInitializer(
+          1.0f,
+          tf.VarianceScalingInitializer.FanAverageScalingMode,
+          tf.VarianceScalingInitializer.UniformDistribution)),
         timeMajor: Boolean = false,
         labelSmoothing: Float = 0.1f,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config[S, SS] = {
-      new Config[S, SS](env, labelSmoothing, encoder, decoder, timeMajor, summarySteps, checkpointSteps)
+      new Config[S, SS](
+        env, labelSmoothing, encoder, decoder, parametersManager, timeMajor, summarySteps, checkpointSteps)
     }
   }
 
