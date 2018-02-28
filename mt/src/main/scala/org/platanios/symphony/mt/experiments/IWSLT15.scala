@@ -26,7 +26,7 @@ import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
 import org.platanios.symphony.mt.translators.PairwiseTranslator
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.learn.StopCriteria
-import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
+import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, YellowFin}
 import org.platanios.tensorflow.api.ops.training.optimizers.schedules.ExponentialDecay
 
 import java.nio.file.{Path, Paths}
@@ -57,9 +57,10 @@ object IWSLT15 extends App {
 
   val optConfig = Model.OptConfig(
     maxGradNorm = 5.0f,
-    optimizer = GradientDescent(
-      1.0f, ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
-      learningRateSummaryTag = "LearningRate"))
+//    optimizer = GradientDescent(
+//      1.0f, ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
+//      learningRateSummaryTag = "LearningRate"),
+    optimizer = YellowFin(learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(
     logLossSteps = 100,
