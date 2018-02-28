@@ -48,7 +48,7 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
     evAS: WhileLoopVariable.Aux[AS, ASS]
 ) extends RNNDecoder[S, SS](timeMajor, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)(evS, evSDropout) {
-  override def create(
+  override def create[I](
       env: Environment,
       encoderTuple: Tuple[Output, Seq[S]],
       srcSequenceLengths: Output,
@@ -58,7 +58,7 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): RNNDecoder.Output = {
     // Embeddings
     val embeddings = RNNModel.embeddings(dataType, tgtVocab.size, numUnits, "Embeddings")
 

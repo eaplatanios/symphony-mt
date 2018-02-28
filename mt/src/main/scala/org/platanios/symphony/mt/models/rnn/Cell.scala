@@ -25,21 +25,21 @@ import org.platanios.tensorflow.api.types.DataType
   * @author Emmanouil Antonios Platanios
   */
 trait Cell[S, SS] {
-  def create(
+  def create[I](
       name: String,
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager): RNNCell[Output, Shape, S, SS]
+  )(mode: Mode, parametersManager: ParametersManager[I]): RNNCell[Output, Shape, S, SS]
 }
 
 case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, Shape] {
-  override def create(
+  override def create[I](
       name: String,
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager): RNNCell[Output, Shape, Output, Shape] = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): RNNCell[Output, Shape, Output, Shape] = {
     val gateKernel = parametersManager.get("Gate/Weights", dataType, Shape(numInputs + numUnits, 2 * numUnits))
     val gateBias = parametersManager.get("Gate/Bias", dataType, Shape(2 * numUnits), tf.ZerosInitializer)
     val candidateKernel = parametersManager.get("Candidate/Weights", dataType, Shape(numInputs + numUnits, numUnits))
@@ -50,12 +50,12 @@ case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, S
 
 case class BasicLSTM(forgetBias: Float = 1.0f, activation: Output => Output = tf.tanh(_))
     extends Cell[LSTMState, (Shape, Shape)] {
-  override def create(
+  override def create[I](
       name: String,
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager): BasicLSTMCell = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): BasicLSTMCell = {
     val kernel = parametersManager.get("Weights", dataType, Shape(numInputs + numUnits, 4 * numUnits))
     val bias = parametersManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
     BasicLSTMCell(kernel, bias, activation, forgetBias, name)
@@ -70,12 +70,12 @@ case class LSTM(
     projectionClip: Float = -1,
     activation: Output => Output = tf.tanh(_)
 ) extends Cell[LSTMState, (Shape, Shape)] {
-  override def create(
+  override def create[I](
       name: String,
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager): LSTMCell = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): LSTMCell = {
     val hiddenDepth = if (projectionSize != -1) projectionSize else numUnits
     val kernel = parametersManager.get("Weights", dataType, Shape(numInputs + hiddenDepth, 4 * numUnits))
     val bias = parametersManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)

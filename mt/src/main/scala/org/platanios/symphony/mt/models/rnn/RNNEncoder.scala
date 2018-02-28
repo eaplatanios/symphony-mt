@@ -30,10 +30,10 @@ abstract class RNNEncoder[S, SS]()(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Encoder[Tuple[Output, Seq[S]]] {
-  override def create(
+  override def create[I](
       env: Environment,
       srcSequences: Output,
       srcSequenceLengths: Output,
       srcVocab: Vocabulary
-  )(mode: Mode, parametersManager: ParametersManager): Tuple[Output, Seq[S]]
+  )(mode: Mode, parametersManager: ParametersManager[I]): Tuple[Output, Seq[S]]
 }

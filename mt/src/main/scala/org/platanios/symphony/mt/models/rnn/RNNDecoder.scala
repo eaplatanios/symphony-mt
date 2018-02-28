@@ -38,7 +38,7 @@ abstract class RNNDecoder[S, SS](
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Decoder[Tuple[Output, Seq[S]]] {
-  def create(
+  def create[I](
       env: Environment,
       encoderTuple: Tuple[Output, Seq[S]],
       srcSequenceLengths: Output,
@@ -48,9 +48,9 @@ abstract class RNNDecoder[S, SS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output
+  )(mode: Mode, parametersManager: ParametersManager[I]): RNNDecoder.Output
 
-  protected def decode[DS, DSS](
+  protected def decode[I, DS, DSS](
       env: Environment,
       srcSequenceLengths: Output,
       tgtSequences: Output,
@@ -62,7 +62,7 @@ abstract class RNNDecoder[S, SS](
       tgtMaxLength: Int,
       beginOfSequenceToken: String,
       endOfSequenceToken: String
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
       evS: WhileLoopVariable.Aux[DS, DSS]
   ): RNNDecoder.Output = {
     val outputWeights = parametersManager.get(

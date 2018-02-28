@@ -25,20 +25,20 @@ import org.platanios.tensorflow.api.learn.Mode
   */
 trait LayerProcessor {
   @throws[IllegalArgumentException]
-  def apply(
+  def apply[I](
       value: Output,
       previousValue: Option[Output],
       name: String = "LayerProcessor"
-  )(mode: Mode, parametersManager: ParametersManager): Output
+  )(mode: Mode, parametersManager: ParametersManager[I]): Output
 }
 
 case object AddResidualConnection extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply(
+  override def apply[I](
       value: Output,
       previousValue: Option[Output],
       name: String = "AddResidualConnection"
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
     previousValue match {
       case Some(v) => value + v
       case None => throw new IllegalArgumentException(
@@ -49,11 +49,11 @@ case object AddResidualConnection extends LayerProcessor {
 
 case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply(
+  override def apply[I](
       value: Output,
       previousValue: Option[Output],
       name: String = "Normalize"
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
     normalization(value, epsilon = epsilon, name = name)(mode, parametersManager)
   }
 }
@@ -64,11 +64,11 @@ case class Dropout(
     broadcastAxes: Set[Int] = Set.empty
 ) extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply(
+  override def apply[I](
       value: Output,
       previousValue: Option[Output],
       name: String = "Normalize"
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
     if (mode.isTraining)
       Common.dropoutWithBroadcastAxes(value, 1.0f - dropoutRate, scaleOutput, broadcastAxes)
     else
@@ -85,10 +85,10 @@ object LayerProcessor {
     * @param  parametersManager Parameter manager to use, if parameters are required.
     * @return Processed layer input.
     */
-  def layerPreprocess(
+  def layerPreprocess[I](
       input: Output,
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
     processors.foldLeft(input) {
       case (value, processor) => processor(value, None)(mode, parametersManager)
     }
@@ -103,11 +103,11 @@ object LayerProcessor {
     * @param  parametersManager Parameter manager to use, if parameters are required.
     * @return Processed layer output.
     */
-  def layerPostprocess(
+  def layerPostprocess[I](
       input: Output,
       output: Output,
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
     processors.foldLeft(output) {
       case (value, processor) => processor(value, Some(input))(mode, parametersManager)
     }

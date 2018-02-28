@@ -48,7 +48,7 @@ class GNMTDecoder[S, SS, AS, ASS](
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
     evAS: WhileLoopVariable.Aux[AS, ASS]
 ) extends RNNDecoder[S, SS](timeMajor, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)(evS, evSDropout) {
-  override def create(
+  override def create[I](
       env: Environment,
       encoderTuple: Tuple[Output, Seq[S]],
       srcSequenceLengths: Output,
@@ -58,7 +58,7 @@ class GNMTDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): RNNDecoder.Output = {
     // Embeddings
     val embeddings = RNNModel.embeddings(dataType, tgtVocab.size, numUnits, "Embeddings")
 
@@ -78,7 +78,7 @@ class GNMTDecoder[S, SS, AS, ASS](
       memory = BeamSearchDecoder.tileForBeamSearch(memory, beamWidth)
       memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, beamWidth)
     }
-    val (attentionCell, attentionInitialState) = attention.create[S, SS](
+    val (attentionCell, attentionInitialState) = attention.create[I, S, SS](
       cells.head, memory, memorySequenceLengths, numUnits, numUnits, initialState.head, useAttentionLayer = false,
       outputAttention = false)(mode, parametersManager)
     val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](attentionCell, cells.tail, useNewAttention)

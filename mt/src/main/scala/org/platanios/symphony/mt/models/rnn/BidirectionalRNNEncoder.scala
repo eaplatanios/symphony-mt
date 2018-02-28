@@ -39,12 +39,12 @@ class BidirectionalRNNEncoder[S, SS](
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends RNNEncoder[S, SS]()(evS, evSDropout) {
-  override def create(
+  override def create[I](
       env: Environment,
       srcSequences: Output,
       srcSequenceLengths: Output,
       srcVocab: Vocabulary
-  )(mode: Mode, parametersManager: ParametersManager): Tuple[Output, Seq[S]] = {
+  )(mode: Mode, parametersManager: ParametersManager[I]): Tuple[Output, Seq[S]] = {
     // Time-major transpose
     val transposedSequences = if (timeMajor) srcSequences.transpose() else srcSequences
 

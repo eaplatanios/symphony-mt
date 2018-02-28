@@ -43,12 +43,12 @@ class DotProductAttention protected (
     * @param  parametersManager Parameter manager to use, if parameters are required.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
-  override def apply(
+  override def apply[I](
       q: Output,
       k: Output,
       v: Output,
       bias: Option[Output]
-  )(mode: Mode, parametersManager: ParametersManager): Output = tf.createWithNameScope(name) {
+  )(mode: Mode, parametersManager: ParametersManager[I]): Output = tf.createWithNameScope(name) {
     // `logits` shape: [batchSize, numHeads, queryLength, memoryLength]
     var logits = tf.matmul(q, k, transposeB = true)
     bias.foreach(logits += _)

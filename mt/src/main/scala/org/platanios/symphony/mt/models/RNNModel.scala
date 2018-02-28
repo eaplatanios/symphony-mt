@@ -120,10 +120,11 @@ object RNNModel {
       // Model
       val encoder: RNNEncoder[S, SS],
       val decoder: RNNDecoder[S, SS],
-      override val parametersManager: ParametersManager = DefaultParametersManager(tf.VarianceScalingInitializer(
-        1.0f,
-        tf.VarianceScalingInitializer.FanAverageScalingMode,
-        tf.VarianceScalingInitializer.UniformDistribution)),
+      override val parametersManager: ParametersManager[Seq[Language]] = DefaultParametersManager(
+        tf.VarianceScalingInitializer(
+          1.0f,
+          tf.VarianceScalingInitializer.FanAverageScalingMode,
+          tf.VarianceScalingInitializer.UniformDistribution)),
       override val timeMajor: Boolean = false,
       override val summarySteps: Int = 100,
       override val checkpointSteps: Int = 1000
@@ -135,10 +136,11 @@ object RNNModel {
         // Model
         encoder: RNNEncoder[S, SS],
         decoder: RNNDecoder[S, SS],
-        parametersManager: ParametersManager = DefaultParametersManager(tf.VarianceScalingInitializer(
-          1.0f,
-          tf.VarianceScalingInitializer.FanAverageScalingMode,
-          tf.VarianceScalingInitializer.UniformDistribution)),
+        parametersManager: ParametersManager[Seq[Language]] = DefaultParametersManager(
+          tf.VarianceScalingInitializer(
+            1.0f,
+            tf.VarianceScalingInitializer.FanAverageScalingMode,
+            tf.VarianceScalingInitializer.UniformDistribution)),
         timeMajor: Boolean = false,
         labelSmoothing: Float = 0.1f,
         summarySteps: Int = 100,
@@ -162,7 +164,7 @@ object RNNModel {
       s"/device:GPU:${firstGPU + (layerIndex % (numGPUs - firstGPU))}"
   }
 
-  private[models] def cell[S, SS](
+  private[models] def cell[I, S, SS](
       cellCreator: Cell[S, SS],
       numInputs: Int,
       numUnits: Int,
@@ -172,7 +174,7 @@ object RNNModel {
       device: String = "",
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.RNNCell[Output, Shape, S, SS] = tf.createWithVariableScope(name) {
@@ -195,7 +197,7 @@ object RNNModel {
     }
   }
 
-  private[models] def cells[S, SS](
+  private[models] def cells[I, S, SS](
       cellCreator: Cell[S, SS],
       numInputs: Int,
       numUnits: Int,
@@ -209,7 +211,7 @@ object RNNModel {
       firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): Seq[tf.RNNCell[Output, Shape, S, SS]] = tf.createWithVariableScope(name) {
@@ -222,7 +224,7 @@ object RNNModel {
     })
   }
 
-  private[models] def multiCell[S, SS](
+  private[models] def multiCell[I, S, SS](
       cellCreator: Cell[S, SS],
       numInputs: Int,
       numUnits: Int,
@@ -236,7 +238,7 @@ object RNNModel {
       firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {

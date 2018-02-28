@@ -25,7 +25,7 @@ import org.platanios.tensorflow.api.ops.Output
   * @author Emmanouil Antonios Platanios
   */
 trait Decoder[O] {
-  def create(
+  def create[I](
       env: Environment,
       encoderTuple: O,
       srcSequenceLengths: Output,
@@ -35,5 +35,5 @@ trait Decoder[O] {
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output
+  )(mode: Mode, parametersManager: ParametersManager[I]): RNNDecoder.Output
 }

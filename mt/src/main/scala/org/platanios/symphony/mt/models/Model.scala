@@ -48,7 +48,7 @@ abstract class Model[S] protected (
     val devEvalDataset: () => TFBilingualDataset = null,
     val testEvalDataset: () => TFBilingualDataset = null
 ) {
-  protected val parametersManager: ParametersManager = config.parametersManager
+  protected val parametersManager: ParametersManager[Seq[Language]] = config.parametersManager
 
   /** Each input consists of a tuple containing:
     *   - The language ID. TODO: !!!
@@ -205,7 +205,7 @@ abstract class Model[S] protected (
 object Model {
   class Config protected (
       val env: Environment,
-      val parametersManager: ParametersManager,
+      val parametersManager: ParametersManager[Seq[Language]],
       val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
@@ -214,10 +214,11 @@ object Model {
   object Config {
     def apply(
         env: Environment,
-        parametersManager: ParametersManager = DefaultParametersManager(tf.VarianceScalingInitializer(
-          1.0f,
-          tf.VarianceScalingInitializer.FanAverageScalingMode,
-          tf.VarianceScalingInitializer.UniformDistribution)),
+        parametersManager: ParametersManager[Seq[Language]] = DefaultParametersManager(
+          tf.VarianceScalingInitializer(
+            1.0f,
+            tf.VarianceScalingInitializer.FanAverageScalingMode,
+            tf.VarianceScalingInitializer.UniformDistribution)),
         labelSmoothing: Float = 0.0f,
         timeMajor: Boolean = false,
         summarySteps: Int = 100,

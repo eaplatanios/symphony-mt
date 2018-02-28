@@ -25,9 +25,7 @@ import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
 import org.platanios.symphony.mt.translators.PairwiseTranslator
 import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.tensorflow.api.learn.StopCriteria
-import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, YellowFin}
-import org.platanios.tensorflow.api.ops.training.optimizers.schedules.ExponentialDecay
+import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
 
@@ -57,10 +55,9 @@ object IWSLT15 extends App {
 
   val optConfig = Model.OptConfig(
     maxGradNorm = 5.0f,
-//    optimizer = GradientDescent(
-//      1.0f, ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
-//      learningRateSummaryTag = "LearningRate"),
-    optimizer = YellowFin(learningRateSummaryTag = "LearningRate"))
+    optimizer = tf.train.GradientDescent(
+      1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
+      learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(
     logLossSteps = 100,
@@ -102,7 +99,7 @@ object IWSLT15 extends App {
   }
 
   val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(12000))
+  translator.train(dataset, tf.learn.StopCriteria.steps(12000))
 
   val evaluator = BilingualEvaluator(Seq(BLEU()), srcLang, tgtLang, dataset.filterTypes(Test))
   println(evaluator.evaluate(translator).values.head.scalar.asInstanceOf[Float])

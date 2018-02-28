@@ -25,7 +25,7 @@ import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, Att
   * @author Emmanouil Antonios Platanios
   */
 abstract class RNNAttention[AS, ASS](implicit evAS: WhileLoopVariable.Aux[AS, ASS]) {
-  def create[S, SS](
+  def create[I, S, SS](
       cell: tf.RNNCell[Output, Shape, S, SS],
       memory: Output,
       memorySequenceLengths: Output,
@@ -34,7 +34,7 @@ abstract class RNNAttention[AS, ASS](implicit evAS: WhileLoopVariable.Aux[AS, AS
       initialState: S,
       useAttentionLayer: Boolean,
       outputAttention: Boolean
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, AS, ASS], AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]])

@@ -30,7 +30,7 @@ case class BahdanauRNNAttention(
     probabilityFn: (Output) => Output = tf.softmax(_, name = "Probability"),
     scoreMask: Float = Float.NegativeInfinity
 ) extends RNNAttention[Output, Shape] {
-  override def create[S, SS](
+  override def create[I, S, SS](
       cell: tf.RNNCell[Output, Shape, S, SS],
       memory: Output,
       memorySequenceLengths: Output,
@@ -39,7 +39,7 @@ case class BahdanauRNNAttention(
       initialState: S,
       useAttentionLayer: Boolean,
       outputAttention: Boolean
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: tf.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, Output, Shape], AttentionWrapperState[S, SS, Seq[Output], Seq[Shape]]) = {

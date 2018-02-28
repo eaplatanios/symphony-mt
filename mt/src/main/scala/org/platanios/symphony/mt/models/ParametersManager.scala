@@ -20,26 +20,33 @@ import org.platanios.tensorflow.api._
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait ParametersManager {
+trait ParametersManager[I] {
   def get(
       name: String,
       dataType: DataType,
       shape: Shape,
       variableInitializer: tf.VariableInitializer = null,
-      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
+      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable,
+      information: Option[I] = None
   ): Output
+
+  def withInformation(information: I): ParametersManager[I]
 }
 
-case class DefaultParametersManager(
-    variableInitializer: tf.VariableInitializer = null
-) extends ParametersManager {
+case class DefaultParametersManager[I](
+    variableInitializer: tf.VariableInitializer = null,
+    information: Option[I] = None
+) extends ParametersManager[I] {
   override def get(
       name: String,
       dataType: DataType,
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
-      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
+      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable,
+      information: Option[I] = this.information
   ): Output = {
     tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value
   }
+
+  override def withInformation(information: I): ParametersManager[I] = this.copy(information = Some(information))
 }
