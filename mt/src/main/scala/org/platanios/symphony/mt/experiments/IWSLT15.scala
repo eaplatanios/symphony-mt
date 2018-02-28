@@ -38,6 +38,7 @@ object IWSLT15 extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
+    loaderVocab = MergedVocabularies,
     numBuckets = 5,
     srcMaxLength = 50,
     tgtMaxLength = 50)
