@@ -17,8 +17,10 @@ package org.platanios.symphony.mt.evaluation
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.translators.Translator
+import org.platanios.symphony.mt.models.Model
 import org.platanios.tensorflow.api._
+
+// TODO: Is this really necessary now that we removed the translators interface?
 
 class BilingualEvaluator protected (
     val metrics: Seq[MTMetric],
@@ -26,7 +28,7 @@ class BilingualEvaluator protected (
     val tgtLanguage: Language,
     val dataset: ParallelDataset
 ) {
-  def evaluate(translator: Translator): Map[String, Tensor] = {
+  def evaluate(model: Model[_]): Map[String, Tensor] = {
     val graph = Graph()
     val session = Session(graph)
     val values = tf.createWith(graph) {
@@ -36,7 +38,7 @@ class BilingualEvaluator protected (
       val inputs = Seq(next._1._1, next._1._2)
       val prediction = tf.callback(
         (inputs: Seq[Tensor]) => {
-          val output = translator.translate(
+          val output = model.translate(
             srcLanguage -> dataset.vocabulary(srcLanguage),
             tgtLanguage -> dataset.vocabulary(tgtLanguage),
             (inputs(0), inputs(1))).next()._2

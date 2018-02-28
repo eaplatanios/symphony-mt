@@ -23,10 +23,7 @@ import org.platanios.symphony.mt.evaluation.{BLEU, BilingualEvaluator}
 import org.platanios.symphony.mt.models.{Model, Transformer}
 import org.platanios.symphony.mt.models.attention._
 import org.platanios.symphony.mt.models.helpers.NoamSchedule
-import org.platanios.symphony.mt.translators.PairwiseTranslator
-import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.tensorflow.api.learn.StopCriteria
-import org.platanios.tensorflow.api.ops.training.optimizers.Adam
+import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
 
@@ -36,8 +33,8 @@ import java.nio.file.{Path, Paths}
 object TransformerIWSLT15 extends App {
   val workingDir: Path = Paths.get("temp").resolve("transformer")
 
-  val srcLang: Language = english
-  val tgtLang: Language = vietnamese
+  val srcLanguage: Language = english
+  val tgtLanguage: Language = vietnamese
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
@@ -46,17 +43,17 @@ object TransformerIWSLT15 extends App {
     tgtMaxLength = 50,
     trainBatchSize = 1024)
 
-  val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLang, tgtLang, dataConfig).load()
+  val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
 
   val env = Environment(
-    workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+    workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
     numGPUs = 4,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
 
   val optConfig = Model.OptConfig(
-    optimizer = Adam(
+    optimizer = tf.train.Adam(
       0.0002, NoamSchedule(warmUpSteps = 4000, hiddenSize = 256),
       beta1 = 0.9, beta2 = 0.98, learningRateSummaryTag = "LearningRate"))
 
@@ -64,47 +61,46 @@ object TransformerIWSLT15 extends App {
     logLossSteps = 100,
     logTrainEvalSteps = -1)
 
-  def model(srcLang: Language, srcVocab: Vocabulary, tgtLang: Language, tgtVocab: Vocabulary, env: Environment) = {
-    Transformer(
-      name = "Model",
-      srcLanguage = srcLang, srcVocabulary = srcVocab,
-      tgtLanguage = tgtLang, tgtVocabulary = tgtVocab,
-      dataConfig = dataConfig,
-      config = Transformer.Config(
-        env = env,
-        labelSmoothing = 0.1f,
-        useSelfAttentionProximityBias = false,
-        positionalEmbeddings = FixedSinusoidPositionalEmbeddings(1.0f, 1e4f),
-        postPositionEmbeddingsDropout = 0.1f,
-        layerPreprocessors = Seq(
-          Normalize(LayerNormalization(), 1e-6f)),
-        layerPostprocessors = Seq(
-          Dropout(0.1f, broadcastAxes = Set(1)),
-          AddResidualConnection),
-        hiddenSize = 256,
-        encoderNumLayers = 2,
-        encoderSelfAttention = DotProductAttention(0.1f, Set.empty, "EncoderSelfAttention"),
-        encoderFeedForwardLayer = DenseReLUDenseFeedForwardLayer(1024, 256, 0.0f, Set.empty, "EncoderFeedForward"),
-        decoderNumLayers = 2,
-        decoderSelfAttention = DotProductAttention(0.1f, Set.empty, "DecoderSelfAttention"),
-        attentionKeysDepth = 256,
-        attentionValuesDepth = 256,
-        attentionNumHeads = 4,
-        attentionDropoutRate = 0.1f,
-        attentionDropoutBroadcastAxes = Set.empty,
-        attentionPrependMode = AttentionPrependInputsMaskedAttention,
-        usePadRemover = false),
-      optConfig = optConfig,
-      logConfig = logConfig,
-      // TODO: !!! Find a way to set the number of buckets to 1.
-      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true))
-  }
+  val model = Transformer(
+    name = "Model",
+    srcLanguage = srcLanguage,
+    srcVocabulary = dataset.vocabulary(srcLanguage),
+    tgtLanguage = tgtLanguage,
+    tgtVocabulary = dataset.vocabulary(tgtLanguage),
+    dataConfig = dataConfig,
+    config = Transformer.Config(
+      env = env,
+      labelSmoothing = 0.1f,
+      useSelfAttentionProximityBias = false,
+      positionalEmbeddings = FixedSinusoidPositionalEmbeddings(1.0f, 1e4f),
+      postPositionEmbeddingsDropout = 0.1f,
+      layerPreprocessors = Seq(
+        Normalize(LayerNormalization(), 1e-6f)),
+      layerPostprocessors = Seq(
+        Dropout(0.1f, broadcastAxes = Set(1)),
+        AddResidualConnection),
+      hiddenSize = 256,
+      encoderNumLayers = 2,
+      encoderSelfAttention = DotProductAttention(0.1f, Set.empty, "EncoderSelfAttention"),
+      encoderFeedForwardLayer = DenseReLUDenseFeedForwardLayer(1024, 256, 0.0f, Set.empty, "EncoderFeedForward"),
+      decoderNumLayers = 2,
+      decoderSelfAttention = DotProductAttention(0.1f, Set.empty, "DecoderSelfAttention"),
+      attentionKeysDepth = 256,
+      attentionValuesDepth = 256,
+      attentionNumHeads = 4,
+      attentionDropoutRate = 0.1f,
+      attentionDropoutBroadcastAxes = Set.empty,
+      attentionPrependMode = AttentionPrependInputsMaskedAttention,
+      usePadRemover = false),
+    optConfig = optConfig,
+    logConfig = logConfig,
+    // TODO: !!! Find a way to set the number of buckets to 1.
+    trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
+    devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
+    testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true))
 
-  val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(12000))
+  model.train(dataset, tf.learn.StopCriteria.steps(12000))
 
-  val evaluator = BilingualEvaluator(Seq(BLEU()), srcLang, tgtLang, dataset.filterTypes(Test))
-  println(evaluator.evaluate(translator).values.head.scalar.asInstanceOf[Float])
+  val evaluator = BilingualEvaluator(Seq(BLEU()), srcLanguage, tgtLanguage, dataset.filterTypes(Test))
+  println(evaluator.evaluate(model).values.head.scalar.asInstanceOf[Float])
 }

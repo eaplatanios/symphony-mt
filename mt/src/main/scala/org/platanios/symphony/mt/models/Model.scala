@@ -64,14 +64,8 @@ abstract class Model[S] protected (
       ((DataType, DataType), (DataType, DataType)), ((Shape, Shape), (Shape, Shape)),
       ((Output, Output), (Output, Output))] = tf.createWithNameScope(name) {
     val model = learn.Model.supervised(
-      input = input,
-      layer = inferLayer,
-      trainLayer = trainLayer,
-      trainInput = trainInput,
-      loss = lossLayer,
-      optimizer = optConfig.optimizer,
-      clipGradients = tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm),
-      colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
+      input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
+      tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm), optConfig.colocateGradientsWithOps)
     val summariesDir = config.env.workingDir.resolve("summaries")
 
     // Create estimator hooks
@@ -103,22 +97,42 @@ abstract class Model[S] protected (
     tf.learn.InMemoryEstimator(model, estimatorConfig, trainHooks = hooks)
   }
 
-  def train(dataset: () => TFBilingualDataset, stopCriteria: StopCriteria): Unit = {
-    estimator.train(dataset, stopCriteria)
+  def train(
+      dataset: ParallelDataset,
+      stopCriteria: StopCriteria
+  ): Unit = {
+    val data = () => dataset.filterTypes(Train).toTFBilingual(srcLanguage, tgtLanguage, repeat = true)
+    estimator.train(data, stopCriteria)
   }
 
-  def infer(dataset: () => TFMonolingualDataset): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
-    estimator.infer(dataset)
+  def translate(
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      dataset: ParallelDataset
+  ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
+    val data = () => dataset.toTFMonolingual(srcLanguage)
+    estimator.infer(data)
+  }
+
+  def translate(
+      srcLanguage: (Language, Vocabulary),
+      tgtLanguage: (Language, Vocabulary),
+      input: (Tensor, Tensor)
+  ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
+    translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
+      name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
+      tensors = Map(srcLanguage._1 -> Seq(input))))
   }
 
   def evaluate(
-      dataset: () => TFBilingualDataset,
+      dataset: ParallelDataset,
       metrics: Seq[MTMetric],
       maxSteps: Long = -1L,
       saveSummaries: Boolean = true,
       name: String = null
   ): Seq[Tensor] = {
-    estimator.evaluate(dataset, metrics, maxSteps, saveSummaries, name)
+    val data = () => dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = true)
+    estimator.evaluate(data, metrics, maxSteps, saveSummaries, name)
   }
 
   protected def trainLayer: Layer[((Output, Output), (Output, Output)), (Output, Output)] = {

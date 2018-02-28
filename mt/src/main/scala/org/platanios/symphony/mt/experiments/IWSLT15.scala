@@ -23,8 +23,6 @@ import org.platanios.symphony.mt.evaluation.{BLEU, BilingualEvaluator}
 import org.platanios.symphony.mt.models.{Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
-import org.platanios.symphony.mt.translators.PairwiseTranslator
-import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
@@ -35,8 +33,8 @@ import java.nio.file.{Path, Paths}
 object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp").resolve("pairwise")
 
-  val srcLang: Language = english
-  val tgtLang: Language = vietnamese
+  val srcLanguage: Language = english
+  val tgtLanguage: Language = vietnamese
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
@@ -44,10 +42,10 @@ object IWSLT15 extends App {
     srcMaxLength = 50,
     tgtMaxLength = 50)
 
-  val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLang, tgtLang, dataConfig).load()
+  val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
 
   val env = Environment(
-    workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+    workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
     numGPUs = 1,
     parallelIterations = 32,
     swapMemory = true,
@@ -63,44 +61,43 @@ object IWSLT15 extends App {
     logLossSteps = 100,
     logTrainEvalSteps = -1)
 
-  def model(srcLang: Language, srcVocab: Vocabulary, tgtLang: Language, tgtVocab: Vocabulary, env: Environment) = {
-    RNNModel(
-      name = "Model",
-      srcLanguage = srcLang, srcVocabulary = srcVocab,
-      tgtLanguage = tgtLang, tgtVocabulary = tgtVocab,
-      dataConfig = dataConfig,
-      config = RNNModel.Config(
-        env,
-        UnidirectionalRNNEncoder(
-          cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 512,
-          numLayers = 2,
-          residual = false,
-          dropout = Some(0.2f),
-          timeMajor = true),
-        UnidirectionalRNNDecoder(
-          cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 512,
-          numLayers = 2,
-          residual = false,
-          dropout = Some(0.2f),
-          attention = Some(LuongRNNAttention(scaled = true)),
-          outputAttention = true,
-          timeMajor = true,
-          beamWidth = 10),
-        labelSmoothing = 0.0f,
+  val model = RNNModel(
+    name = "Model",
+    srcLanguage = srcLanguage,
+    srcVocabulary = dataset.vocabulary(srcLanguage),
+    tgtLanguage = tgtLanguage,
+    tgtVocabulary = dataset.vocabulary(tgtLanguage),
+    dataConfig = dataConfig,
+    config = RNNModel.Config(
+      env,
+      UnidirectionalRNNEncoder(
+        cell = BasicLSTM(forgetBias = 1.0f),
+        numUnits = 512,
+        numLayers = 2,
+        residual = false,
+        dropout = Some(0.2f),
         timeMajor = true),
-      optConfig = optConfig,
-      logConfig = logConfig,
-      // TODO: !!! Find a way to set the number of buckets to 1.
-      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true))
-  }
+      UnidirectionalRNNDecoder(
+        cell = BasicLSTM(forgetBias = 1.0f),
+        numUnits = 512,
+        numLayers = 2,
+        residual = false,
+        dropout = Some(0.2f),
+        attention = Some(LuongRNNAttention(scaled = true)),
+        outputAttention = true,
+        timeMajor = true,
+        beamWidth = 10),
+      labelSmoothing = 0.0f,
+      timeMajor = true),
+    optConfig = optConfig,
+    logConfig = logConfig,
+    // TODO: !!! Find a way to set the number of buckets to 1.
+    trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
+    devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
+    testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true))
 
-  val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, tf.learn.StopCriteria.steps(12000))
+  model.train(dataset, tf.learn.StopCriteria.steps(12000))
 
-  val evaluator = BilingualEvaluator(Seq(BLEU()), srcLang, tgtLang, dataset.filterTypes(Test))
-  println(evaluator.evaluate(translator).values.head.scalar.asInstanceOf[Float])
+  val evaluator = BilingualEvaluator(Seq(BLEU()), srcLanguage, tgtLanguage, dataset.filterTypes(Test))
+  println(evaluator.evaluate(model).values.head.scalar.asInstanceOf[Float])
 }

@@ -22,11 +22,7 @@ import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
 import org.platanios.symphony.mt.models.{Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention
-import org.platanios.symphony.mt.translators.PairwiseTranslator
-import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.tensorflow.api.learn.StopCriteria
-import org.platanios.tensorflow.api.ops.training.optimizers.GradientDescent
-import org.platanios.tensorflow.api.ops.training.optimizers.schedules.ExponentialDecay
+import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
 
@@ -36,8 +32,8 @@ import java.nio.file.{Path, Paths}
 object WMT16 extends App {
   val workingDir: Path = Paths.get("temp")
 
-  val srcLang: Language = german
-  val tgtLang: Language = english
+  val srcLanguage: Language = german
+  val tgtLanguage: Language = english
 
   val dataConfig = DataConfig(
     workingDir = workingDir.resolve("data"),
@@ -47,10 +43,10 @@ object WMT16 extends App {
     srcMaxLength = 50,
     tgtMaxLength = 50)
 
-  val dataset: FileParallelDataset = WMT16DatasetLoader(srcLang, tgtLang, dataConfig).load()
+  val dataset: FileParallelDataset = WMT16DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
 
   val env = Environment(
-    workingDir = workingDir.resolve(s"${srcLang.abbreviation}-${tgtLang.abbreviation}"),
+    workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
     numGPUs = 4,
     parallelIterations = 32,
     swapMemory = true,
@@ -58,51 +54,50 @@ object WMT16 extends App {
 
   val optConfig = Model.OptConfig(
     maxGradNorm = 5.0f,
-    optimizer = GradientDescent(
-      1.0f, ExponentialDecay(decayRate = 0.5f, decaySteps = 340000 * 1 / (2 * 10), startStep = 340000 / 2),
+    optimizer = tf.train.GradientDescent(
+      1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 340000 * 1 / (2 * 10), startStep = 340000 / 2),
       learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(
     logLossSteps = 100,
     logTrainEvalSteps = -1)
 
-  def model(srcLang: Language, srcVocab: Vocabulary, tgtLang: Language, tgtVocab: Vocabulary, env: Environment) = {
-    RNNModel(
-      name = "Model",
-      srcLanguage = srcLang, srcVocabulary = srcVocab,
-      tgtLanguage = tgtLang, tgtVocabulary = tgtVocab,
-      dataConfig = dataConfig,
-      config = RNNModel.Config(
-        env,
-        GNMTEncoder(
-          cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 1024,
-          numBiLayers = 1,
-          numUniLayers = 3,
-          numUniResLayers = 2,
-          dropout = Some(0.2f),
-          timeMajor = true),
-        GNMTDecoder(
-          cell = BasicLSTM(forgetBias = 1.0f),
-          numUnits = 1024,
-          numLayers = 1 + 3, // Number of encoder bidirectional and unidirectional layers
-          numResLayers = 2,
-          attention = BahdanauRNNAttention(normalized = true),
-          dropout = Some(0.2f),
-          useNewAttention = true,
-          timeMajor = true,
-          beamWidth = 10,
-          lengthPenaltyWeight = 1.0f),
-        labelSmoothing = 0.0f,
+  val model = RNNModel(
+    name = "Model",
+    srcLanguage = srcLanguage,
+    srcVocabulary = dataset.vocabulary(srcLanguage),
+    tgtLanguage = tgtLanguage,
+    tgtVocabulary = dataset.vocabulary(tgtLanguage),
+    dataConfig = dataConfig,
+    config = RNNModel.Config(
+      env,
+      GNMTEncoder(
+        cell = BasicLSTM(forgetBias = 1.0f),
+        numUnits = 1024,
+        numBiLayers = 1,
+        numUniLayers = 3,
+        numUniResLayers = 2,
+        dropout = Some(0.2f),
         timeMajor = true),
-      optConfig = optConfig,
-      logConfig = logConfig,
-      // TODO: !!! Find a way to set the number of buckets to 1.
-      trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-      devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true),
-      testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLang, tgtLang, repeat = false, isEval = true))
-  }
+      GNMTDecoder(
+        cell = BasicLSTM(forgetBias = 1.0f),
+        numUnits = 1024,
+        numLayers = 1 + 3, // Number of encoder bidirectional and unidirectional layers
+        numResLayers = 2,
+        attention = BahdanauRNNAttention(normalized = true),
+        dropout = Some(0.2f),
+        useNewAttention = true,
+        timeMajor = true,
+        beamWidth = 10,
+        lengthPenaltyWeight = 1.0f),
+      labelSmoothing = 0.0f,
+      timeMajor = true),
+    optConfig = optConfig,
+    logConfig = logConfig,
+    // TODO: !!! Find a way to set the number of buckets to 1.
+    trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
+    devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
+    testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true))
 
-  val translator = PairwiseTranslator(env, model)
-  translator.train(dataset, StopCriteria.steps(340000))
+  model.train(dataset, tf.learn.StopCriteria.steps(340000))
 }
