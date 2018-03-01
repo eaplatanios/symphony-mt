@@ -67,38 +67,35 @@ abstract class Model[S] protected (
       tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm), optConfig.colocateGradientsWithOps)
     val summariesDir = config.env.workingDir.resolve("summaries")
 
-    // Create estimator hooks
+    // Create estimator hooks.
     var hooks = Set[tf.learn.Hook](
       // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
       tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
       tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
 
-    // Add logging hooks
+    // Add logging hooks.
     if (logConfig.logLossSteps > 0)
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
     if (logConfig.logEvalSteps > 0) {
       for (datasetType <- Seq(Train, Dev, Test)) {
         val datasets = evalDatasets.map(d => (d._1, d._2.filterTypes(datasetType))).filter(_._2.nonEmpty)
         if (datasets.nonEmpty) {
-          datasets.foreach(d => {
-            val dataset = () => Model.createTrainDataset(Seq(d._2), languageIds, repeat = false, isEval = true)
-            hooks += tf.learn.Evaluator(
-              log = true, summariesDir, dataset, Seq(BLEU()), StepHookTrigger(logConfig.logEvalSteps),
-              triggerAtEnd = true, name = s"Evaluation/$datasetType/${d._1}")
-          })
+          hooks += tf.learn.Evaluator(
+            log = true, summariesDir, Model.createEvalDatasets(datasets, languageIds), Seq(BLEU()),
+            StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = s"Eval/$datasetType")
         }
       }
     }
 
-    val estimatorConfig = tf.learn.Configuration(Some(config.env.workingDir), randomSeed = config.env.randomSeed)
-
-    // Create estimator
-    tf.learn.InMemoryEstimator(model, estimatorConfig, trainHooks = hooks)
+    // Create estimator.
+    tf.learn.InMemoryEstimator(
+      model, tf.learn.Configuration(Some(config.env.workingDir), randomSeed = config.env.randomSeed),
+      trainHooks = hooks)
   }
 
   def train(datasets: Seq[ParallelDataset], stopCriteria: StopCriteria): Unit = {
-    estimator.train(() => Model.createTrainDataset(datasets, languageIds), stopCriteria)
+    estimator.train(Model.createTrainDataset(datasets, languageIds), stopCriteria)
   }
 
   def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
@@ -110,7 +107,7 @@ abstract class Model[S] protected (
       tgtLanguage: Language,
       dataset: ParallelDataset
   ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
-    estimator.infer(() => Model.createInputDataset(srcLanguage, tgtLanguage, dataset, languageIds))
+    estimator.infer(Model.createInputDataset(srcLanguage, tgtLanguage, dataset, languageIds))
   }
 
   def translate(
@@ -123,17 +120,15 @@ abstract class Model[S] protected (
       tensors = Map(srcLanguage._1 -> Seq(input))))
   }
 
-  def evaluate(
-      datasets: Seq[ParallelDataset],
-      metrics: Seq[MTMetric],
-      maxSteps: Long = -1L,
-      saveSummaries: Boolean = true,
-      name: String = null
-  ): Seq[Tensor] = {
-    estimator.evaluate(
-      () => Model.createTrainDataset(datasets, languageIds, repeat = false, isEval = true), metrics, maxSteps,
-      saveSummaries, name)
-  }
+//  def evaluate(
+//      datasets: Seq[(String, ParallelDataset)],
+//      metrics: Seq[MTMetric],
+//      maxSteps: Long = -1L,
+//      saveSummaries: Boolean = true,
+//      name: String = null
+//  ): Seq[Tensor] = {
+//    estimator.evaluate(Model.createEvalDatasets(datasets, languageIds), metrics, maxSteps, saveSummaries, name)
+//  }
 
   protected def trainLayer: Layer[((Output, Output, Output, Output), (Output, Output)), (Output, Output, Output)] = {
     new Layer[((Output, Output, Output, Output), (Output, Output)), (Output, Output, Output)](name) {
@@ -305,7 +300,7 @@ object Model {
       tgtLanguage: Language,
       dataset: ParallelDataset,
       languageIds: Map[Language, Int]
-  ): TFInputDataset = {
+  ): () => TFInputDataset = () => {
     dataset.toTFMonolingual(srcLanguage)
         .map(
           d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d._1, d._2),
@@ -318,7 +313,7 @@ object Model {
       languageIds: Map[Language, Int],
       repeat: Boolean = true,
       isEval: Boolean = false
-  ): TFTrainDataset = {
+  ): () => TFTrainDataset = () => {
     val processedDatasets: Seq[TFTrainDataset] = datasets
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))
         .flatMap(d => d.languagePairs().map(_ -> d))
@@ -334,5 +329,26 @@ object Model {
                 .asInstanceOf[TFTrainDataset]
         }
     processedDatasets.reduce((d1, d2) => d1.concatenate(d2))
+  }
+
+  private[Model] def createEvalDatasets(
+      datasets: Seq[(String, ParallelDataset)],
+      languageIds: Map[Language, Int]
+  ): Seq[(String, () => TFTrainDataset)] = {
+    datasets
+        .map(d => (d._1, d._2.filterLanguages(languageIds.keys.toSeq: _*)))
+        .flatMap(d => d._2.languagePairs().map(l => (d._1, l) -> d._2))
+        .map {
+          case ((name, (srcLanguage, tgtLanguage)), dataset) =>
+            (s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}",
+                () => dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true)
+                    .map(
+                      d => ((
+                          tf.constant(languageIds(srcLanguage)),
+                          tf.constant(languageIds(tgtLanguage)),
+                          d._1._1, d._1._2), d._2),
+                      name = s"AddTrainLanguageIDs$srcLanguage$tgtLanguage")
+                    .asInstanceOf[TFTrainDataset])
+        }
   }
 }
