@@ -17,7 +17,6 @@ package org.platanios.symphony.mt.vocabulary
 
 import org.platanios.symphony.mt.Language
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.TensorArray
 
 import scala.collection.mutable
 
@@ -44,7 +43,7 @@ class Vocabularies protected (
       tf.variable(s"${l._1.name}", FLOAT32, Shape(l._2.size, embeddingsSize), embeddingsInitializer).value).toSeq
   }
 
-  protected val projections: mutable.Map[Int, TensorArray] = mutable.Map.empty[Int, TensorArray]
+  protected val projections: mutable.Map[Int, Seq[Output]] = mutable.Map.empty[Int, Seq[Output]]
 
   def lookupTable(languageId: Output): (Output) => Output = (keys: Output) => {
     val predicates = lookupTables.zip(languageIds).map {
@@ -63,17 +62,16 @@ class Vocabularies protected (
   }
 
   def projection(inputSize: Int, languageId: Output): Output = {
-    projections.getOrElseUpdate(inputSize, {
+    val projectionsForSize = projections.getOrElseUpdate(inputSize, {
       val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-      var ta = TensorArray.create(
-        vocabularies.size, FLOAT32, clearAfterRead = false, inferShape = false, elementShape = Shape(inputSize, -1))
-      languages.zipWithIndex.foreach {
-        case ((l, v), i) => ta = ta.write(
-          i, tf.variable(s"${l.name}/OutWeights", FLOAT32, Shape(inputSize, v.size), weightsInitializer),
-          name = s"${l.name}/OutWeights/Write")
-      }
-      ta
-    }).read(languageId)
+      languages.map(l =>
+        tf.variable(s"${l._1.name}/OutWeights", FLOAT32, Shape(inputSize, l._2.size), weightsInitializer).value).toSeq
+    })
+    val predicates = projectionsForSize.zip(languageIds).map {
+      case (projs, langId) => (tf.equal(languageId, langId), () => projs)
+    }
+    val default = () => projectionsForSize.head
+    tf.cases(predicates, default)
   }
 }
 
