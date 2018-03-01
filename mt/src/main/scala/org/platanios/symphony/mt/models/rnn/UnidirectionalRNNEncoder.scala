@@ -15,9 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
-import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -33,33 +32,29 @@ class UnidirectionalRNNEncoder[S, SS](
     val dataType: DataType = FLOAT32,
     val residual: Boolean = false,
     val dropout: Option[Float] = None,
-    val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-    val timeMajor: Boolean = false
+    val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends RNNEncoder[S, SS]()(evS, evSDropout) {
-  override def create[I](
-      env: Environment,
+  override def create(
+      config: RNNModel.Config[_, _],
+      vocabularies: Vocabularies,
+      srcLanguage: Output,
+      tgtLanguage: Output,
       srcSequences: Output,
-      srcSequenceLengths: Output,
-      srcVocab: Vocabulary
-  )(mode: Mode, parametersManager: ParametersManager[I]): Tuple[Output, Seq[S]] = {
-    // Time-major transpose
-    val transposedSequences = if (timeMajor) srcSequences.transpose() else srcSequences
-
-    // Embeddings
-    val embeddings = RNNModel.embeddings(dataType, srcVocab.size, numUnits, "Embeddings")
-    val embeddedSequences = tf.embeddingLookup(embeddings, transposedSequences)
-
-    // RNN
+      srcSequenceLengths: Output
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Tuple[Output, Seq[S]] = {
+    val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
+    val embeddedSequences = tf.embeddingLookup(vocabularies.embeddings(srcLanguage), transposedSequences)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = RNNModel.multiCell(
       cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers, numResLayers, dropout,
-      residualFn, 0, env.numGPUs, env.firstGPU, env.randomSeed, "MultiUniCell")(mode, parametersManager)
+      residualFn, 0, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
+      "MultiUniCell")(mode, parametersManager)
     tf.dynamicRNN(
-      uniCell, embeddedSequences, null, timeMajor, env.parallelIterations, env.swapMemory, srcSequenceLengths,
-      "UnidirectionalLayers")
+      uniCell, embeddedSequences, null, config.timeMajor, config.env.parallelIterations, config.env.swapMemory,
+      srcSequenceLengths, "UnidirectionalLayers")
   }
 }
 
@@ -71,13 +66,12 @@ object UnidirectionalRNNEncoder {
       dataType: DataType = FLOAT32,
       residual: Boolean = false,
       dropout: Option[Float] = None,
-      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-      timeMajor: Boolean = false
+      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): UnidirectionalRNNEncoder[S, SS] = {
     new UnidirectionalRNNEncoder[S, SS](
-      cell, numUnits, numLayers, dataType, residual, dropout, residualFn, timeMajor)(evS, evSDropout)
+      cell, numUnits, numLayers, dataType, residual, dropout, residualFn)(evS, evSDropout)
   }
 }

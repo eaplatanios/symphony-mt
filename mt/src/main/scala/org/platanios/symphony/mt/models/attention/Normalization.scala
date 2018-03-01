@@ -23,33 +23,33 @@ import org.platanios.tensorflow.api.learn.Mode
   * @author Emmanouil Antonios Platanios
   */
 trait Normalization {
-  def apply[I](
+  def apply(
       input: Output,
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(mode: Mode, parametersManager: ParametersManager[I]): Output
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output
 }
 
 /** Applies no normalization to the input tensor. */
 case object NoNormalization extends Normalization {
-  override def apply[I](
+  override def apply(
       input: Output,
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "NoNormalization"
-  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
     input
   }
 }
 
 case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable) extends Normalization {
-  override def apply[I](
+  override def apply(
       input: Output,
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "LayerNormalization"
-  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
     val numFilters = depth.getOrElse(input.shape(-1))
     tf.createWithVariableScope(name, reuse) {
       val scale = parametersManager.get("Scale", input.dataType, Shape(numFilters), tf.OnesInitializer)
@@ -64,23 +64,23 @@ case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVaria
 
 // TODO: !!!
 case object BatchNormalization extends Normalization {
-  override def apply[I](
+  override def apply(
       input: Output,
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "BatchNormalization"
-  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
     ???
   }
 }
 
 case object NoamNormalization extends Normalization {
-  override def apply[I](
+  override def apply(
       input: Output,
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "NoamNormalization"
-  )(mode: Mode, parametersManager: ParametersManager[I]): Output = tf.createWithNameScope(name) {
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = tf.createWithNameScope(name) {
     tf.l2Normalize(input, input.rank - 1, epsilon) * tf.sqrt(tf.constant(input.shape(-1), FLOAT32))
   }
 }

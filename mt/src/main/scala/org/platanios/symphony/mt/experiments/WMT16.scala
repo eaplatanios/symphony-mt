@@ -58,27 +58,22 @@ object WMT16 extends App {
       1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 340000 * 1 / (2 * 10), startStep = 340000 / 2),
       learningRateSummaryTag = "LearningRate"))
 
-  val logConfig = Model.LogConfig(
-    logLossSteps = 100,
-    logTrainEvalSteps = -1)
+  val logConfig = Model.LogConfig(logLossSteps = 100)
 
   val model = RNNModel(
     name = "Model",
-    srcLanguage = srcLanguage,
-    srcVocabulary = dataset.vocabulary(srcLanguage),
-    tgtLanguage = tgtLanguage,
-    tgtVocabulary = dataset.vocabulary(tgtLanguage),
+    languages = Map(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
+      embeddingsSize = 1024,
       GNMTEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
         numUnits = 1024,
         numBiLayers = 1,
         numUniLayers = 3,
         numUniResLayers = 2,
-        dropout = Some(0.2f),
-        timeMajor = true),
+        dropout = Some(0.2f)),
       GNMTDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
         numUnits = 1024,
@@ -86,18 +81,17 @@ object WMT16 extends App {
         numResLayers = 2,
         attention = BahdanauRNNAttention(normalized = true),
         dropout = Some(0.2f),
-        useNewAttention = true,
-        timeMajor = true,
-        beamWidth = 10,
-        lengthPenaltyWeight = 1.0f),
+        useNewAttention = true),
       labelSmoothing = 0.0f,
-      timeMajor = true),
+      timeMajor = true,
+      beamWidth = 10,
+      lengthPenaltyWeight = 1.0f),
     optConfig = optConfig,
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
-    trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
-    devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
-    testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true))
+    evalDatasets = Seq(
+      ("WMT-16", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
+      ("WMT-16", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
   model.train(dataset, tf.learn.StopCriteria.steps(340000))
 }

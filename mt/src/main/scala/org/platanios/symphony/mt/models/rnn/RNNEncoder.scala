@@ -15,11 +15,10 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.{Encoder, ParametersManager}
-import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.tensorflow.api.learn.Mode
+import org.platanios.symphony.mt.models.{Encoder, ParametersManager, RNNModel}
+import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
@@ -30,10 +29,12 @@ abstract class RNNEncoder[S, SS]()(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Encoder[Tuple[Output, Seq[S]]] {
-  override def create[I](
-      env: Environment,
+  override def create(
+      config: RNNModel.Config[_, _],
+      vocabularies: Vocabularies,
+      srcLanguage: Output,
+      tgtLanguage: Output,
       srcSequences: Output,
-      srcSequenceLengths: Output,
-      srcVocab: Vocabulary
-  )(mode: Mode, parametersManager: ParametersManager[I]): Tuple[Output, Seq[S]]
+      srcSequenceLengths: Output
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Tuple[Output, Seq[S]]
 }

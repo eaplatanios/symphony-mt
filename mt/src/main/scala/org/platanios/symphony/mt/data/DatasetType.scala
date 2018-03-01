@@ -18,12 +18,22 @@ package org.platanios.symphony.mt.data
 /**
   * @author Emmanouil Antonios Platanios
   */
-sealed trait DatasetType
+sealed trait DatasetType {
+  override def toString: String
+}
 
 object DatasetType {
   def types: Set[DatasetType] = Set(Train, Dev, Test)
 }
 
-case object Train extends DatasetType
-case object Dev extends DatasetType
-case object Test extends DatasetType
+case object Train extends DatasetType {
+  override def toString: String = "Train"
+}
+
+case object Dev extends DatasetType {
+  override def toString: String = "Dev"
+}
+
+case object Test extends DatasetType {
+  override def toString: String = "Test"
+}

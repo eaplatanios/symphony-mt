@@ -15,9 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.{Decoder, ParametersManager}
-import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.symphony.mt.models.{Decoder, ParametersManager, RNNModel}
+import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
@@ -28,88 +27,75 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSear
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class RNNDecoder[S, SS](
-    val timeMajor: Boolean = false,
-    // Inference
-    val beamWidth: Int = 10,
-    val lengthPenaltyWeight: Float = 0.0f,
-    val decoderMaxLengthFactor: Float = 2.0f
-)(implicit
+abstract class RNNDecoder[S, SS]()(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Decoder[Tuple[Output, Seq[S]]] {
-  def create[I](
-      env: Environment,
-      encoderTuple: Tuple[Output, Seq[S]],
-      srcSequenceLengths: Output,
-      tgtVocab: Vocabulary,
-      tgtMaxLength: Int,
+) extends Decoder[(Tuple[Output, Seq[S]], Output, Output)] {
+  def create(
+      config: RNNModel.Config[_, _],
+      vocabularies: Vocabularies,
+      srcLanguage: Output,
+      tgtLanguage: Output,
+      encoderState: (Tuple[Output, Seq[S]], Output, Output),
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager[I]): RNNDecoder.Output
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): RNNDecoder.Output
 
-  protected def decode[I, DS, DSS](
-      env: Environment,
+  protected def decode[DS, DSS](
+      config: RNNModel.Config[_, _],
+      vocabularies: Vocabularies,
       srcSequenceLengths: Output,
+      tgtLanguage: Output,
       tgtSequences: Output,
       tgtSequenceLengths: Output,
       initialState: DS,
-      embeddings: Variable,
+      embeddings: Output,
       cell: tf.RNNCell[Output, Shape, DS, DSS],
-      tgtVocab: Vocabulary,
-      tgtMaxLength: Int,
+      tgtMaxLength: Output,
       beginOfSequenceToken: String,
       endOfSequenceToken: String
-  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
+  )(mode: Mode, parametersManager: ParametersManager[_, _])(implicit
       evS: WhileLoopVariable.Aux[DS, DSS]
   ): RNNDecoder.Output = {
-    val outputWeights = parametersManager.get(
-      "OutWeights", embeddings.dataType, Shape(cell.outputShape(-1), tgtVocab.size),
-      tf.RandomUniformInitializer(-0.1f, 0.1f))
+    val outputWeights = vocabularies.projection(cell.outputShape(-1), tgtLanguage)
     val outputLayer = (logits: Output) => tf.linear(logits, outputWeights)
     if (mode.isTraining) {
       // Time-major transpose
-      val transposedSequences = if (timeMajor) tgtSequences.transpose() else tgtSequences
+      val transposedSequences = if (config.timeMajor) tgtSequences.transpose() else tgtSequences
       val embeddedSequences = tf.embeddingLookup(embeddings, transposedSequences)
 
       // Decoder RNN
-      val helper = BasicDecoder.TrainingHelper(embeddedSequences, tgtSequenceLengths, timeMajor)
+      val helper = BasicDecoder.TrainingHelper(embeddedSequences, tgtSequenceLengths, config.timeMajor)
       val decoder = BasicDecoder(cell, initialState, helper, outputLayer)
       val tuple = decoder.decode(
-        outputTimeMajor = timeMajor, parallelIterations = env.parallelIterations,
-        swapMemory = env.swapMemory)
+        outputTimeMajor = config.timeMajor, parallelIterations = config.env.parallelIterations,
+        swapMemory = config.env.swapMemory)
       RNNDecoder.Output(tuple._1.rnnOutput, tuple._3)
     } else {
       // Decoder embeddings
       val embeddingFn = (o: Output) => tf.embeddingLookup(embeddings, o)
-      val tgtVocabLookupTable = tgtVocab.lookupTable()
+      val tgtVocabLookupTable = vocabularies.lookupTable(tgtLanguage)
       val tgtBosID = tgtVocabLookupTable.lookup(tf.constant(beginOfSequenceToken)).cast(INT32)
       val tgtEosID = tgtVocabLookupTable.lookup(tf.constant(endOfSequenceToken)).cast(INT32)
-      val maxDecodingLength = {
-        if (tgtMaxLength != -1)
-          tf.constant(tgtMaxLength)
-        else
-          tf.round(tf.max(tf.max(srcSequenceLengths)) * decoderMaxLengthFactor).cast(INT32)
-      }
 
       // Decoder RNN
-      if (beamWidth > 1) {
+      if (config.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
           cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(srcSequenceLengths)(0).expandDims(0))(tgtBosID),
-          tgtEosID, beamWidth, GooglePenalty(lengthPenaltyWeight), outputLayer)
+          tgtEosID, config.beamWidth, GooglePenalty(config.lengthPenaltyWeight), outputLayer)
         val tuple = decoder.decode(
-          outputTimeMajor = timeMajor, maximumIterations = maxDecodingLength,
-          parallelIterations = env.parallelIterations, swapMemory = env.swapMemory)
+          outputTimeMajor = config.timeMajor, maximumIterations = tgtMaxLength,
+          parallelIterations = config.env.parallelIterations, swapMemory = config.env.swapMemory)
         RNNDecoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
       } else {
         val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
           embeddingFn, tf.fill(INT32, tf.shape(srcSequenceLengths)(0).expandDims(0))(tgtBosID), tgtEosID)
         val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer)
         val tuple = decoder.decode(
-          outputTimeMajor = timeMajor, maximumIterations = maxDecodingLength,
-          parallelIterations = env.parallelIterations, swapMemory = env.swapMemory)
+          outputTimeMajor = config.timeMajor, maximumIterations = tgtMaxLength,
+          parallelIterations = config.env.parallelIterations, swapMemory = config.env.swapMemory)
         RNNDecoder.Output(tuple._1.sample, tuple._3)
       }
     }

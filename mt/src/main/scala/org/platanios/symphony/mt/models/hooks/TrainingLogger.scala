@@ -48,10 +48,11 @@ case class TrainingLogger(
     formatter: (Option[Double], Long, Float, Float, Option[Double]) => String = null,
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
-    (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
-    ((Tensor, Tensor), (Tensor, Tensor)), ((Output, Output), (Output, Output)),
-    ((DataType, DataType), (DataType, DataType)), ((Shape, Shape), (Shape, Shape)),
-    ((Output, Output), (Output, Output))]
+    (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
+    (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape), (Output, Output),
+    ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor)), ((Output, Output, Output, Output), (Output, Output)),
+    ((DataType, DataType, DataType, DataType), (DataType, DataType)), ((Shape, Shape, Shape, Shape), (Shape, Shape)),
+    ((Output, Output, Output, Output), (Output, Output))]
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 

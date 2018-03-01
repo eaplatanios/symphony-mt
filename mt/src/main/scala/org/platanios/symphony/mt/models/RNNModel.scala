@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.models
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
-import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.symphony.mt.vocabulary.{Vocabularies, Vocabulary}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -29,33 +29,40 @@ import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
   */
 class RNNModel[S, SS](
     override val name: String = "RNNModel",
-    override val srcLanguage: Language,
-    override val srcVocabulary: Vocabulary,
-    override val tgtLanguage: Language,
-    override val tgtVocabulary: Vocabulary,
+    override val languages: Map[Language, Vocabulary],
     override val dataConfig: DataConfig,
     override val config: RNNModel.Config[S, SS],
     override val optConfig: Model.OptConfig,
     override val logConfig : Model.LogConfig  = Model.LogConfig(),
-    override val trainEvalDataset: () => TFBilingualDataset = null,
-    override val devEvalDataset: () => TFBilingualDataset = null,
-    override val testEvalDataset: () => TFBilingualDataset = null
+    override val evalDatasets: Seq[(String, ParallelDataset)] = Seq.empty
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Model[(Tuple[Output, Seq[S]], Output)](
-  name, srcLanguage, srcVocabulary, tgtLanguage, tgtVocabulary, dataConfig, config, optConfig, logConfig,
-  trainEvalDataset, devEvalDataset, testEvalDataset
+) extends Model[(Tuple[Output, Seq[S]], Output, Output)](
+  name, languages, dataConfig, config, optConfig, logConfig, evalDatasets
 ) {
   // TODO: Make this use the parameters manager.
 
-  override protected def encoder(input: (Output, Output), mode: Mode): (Tuple[Output, Seq[S]], Output) = {
-    (config.encoder.create(config.env, input._1, input._2, srcVocabulary)(mode, parametersManager), input._2)
+  override protected def encoder(
+      input: (Output, Output, Output, Output),
+      vocabularies: Vocabularies,
+      mode: Mode
+  ): (Tuple[Output, Seq[S]], Output, Output) = {
+    val maxDecodingLength = {
+      if (dataConfig.tgtMaxLength != -1)
+        tf.constant(dataConfig.tgtMaxLength)
+      else
+        tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT32)
+    }
+    (config.encoder.create(config, vocabularies, input._1, input._2, input._3, input._4)(mode, parametersManager),
+        input._4, maxDecodingLength)
   }
 
   override protected def decoder(
+      encoderInput: (Output, Output, Output, Output),
+      vocabularies: Vocabularies,
       input: Option[(Output, Output)],
-      state: Option[(Tuple[Output, Seq[S]], Output)],
+      state: Option[(Tuple[Output, Seq[S]], Output, Output)],
       mode: Mode
   ): (Output, Output) = {
     // TODO: What if the state is `None`?
@@ -63,18 +70,20 @@ class RNNModel[S, SS](
       case Some(inputSequences) =>
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step forward so the decoder learns to output the next word.
-        val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+        val tgtBosId = vocabularies.lookupTable(encoderInput._2)
+            .lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
         val tgtSequence = tf.concatenate(Seq(
           tf.fill(INT32, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
           inputSequences._1), axis = 1)
         val tgtSequenceLength = inputSequences._2 + 1
-        val output = config.decoder.create(config.env, state.get._1, state.get._2, tgtVocabulary,
-          dataConfig.tgtMaxLength, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence,
+        val output = config.decoder.create(
+          config, vocabularies, encoderInput._1, encoderInput._2, state.get,
+          dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, tgtSequence,
           tgtSequenceLength)(mode, parametersManager)
         (output.sequences, output.sequenceLengths)
       case None =>
         val output = config.decoder.create(
-          config.env, state.get._1, state.get._2, tgtVocabulary, dataConfig.tgtMaxLength,
+          config, vocabularies, encoderInput._1, encoderInput._2, state.get,
           dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken, null, null)(mode, parametersManager)
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
         // when using beam search.
@@ -94,49 +103,49 @@ class RNNModel[S, SS](
 object RNNModel {
   def apply[S, SS](
       name: String = "RNNModel",
-      srcLanguage: Language,
-      srcVocabulary: Vocabulary,
-      tgtLanguage: Language,
-      tgtVocabulary: Vocabulary,
+      languages: Map[Language, Vocabulary],
       dataConfig: DataConfig,
       config: RNNModel.Config[S, SS],
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      trainEvalDataset: () => TFBilingualDataset = null,
-      devEvalDataset: () => TFBilingualDataset = null,
-      testEvalDataset: () => TFBilingualDataset = null
+      evalDatasets: Seq[(String, ParallelDataset)] = Seq.empty
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): RNNModel[S, SS] = {
-    new RNNModel[S, SS](
-      name, srcLanguage, srcVocabulary, tgtLanguage, tgtVocabulary, dataConfig, config, optConfig, logConfig,
-      trainEvalDataset, devEvalDataset, testEvalDataset)(evS, evSDropout)
+    new RNNModel[S, SS](name, languages, dataConfig, config, optConfig, logConfig, evalDatasets)(evS, evSDropout)
   }
 
   class Config[S, SS] protected(
       override val env: Environment,
+      override val embeddingsSize: Int,
       override val labelSmoothing: Float,
       // Model
       val encoder: RNNEncoder[S, SS],
       val decoder: RNNDecoder[S, SS],
-      override val parametersManager: ParametersManager[Seq[Language]] = DefaultParametersManager(
+      override val parametersManager: ParametersManager[Seq[Language], (Output, Output)] = DefaultParametersManager(
         tf.VarianceScalingInitializer(
           1.0f,
           tf.VarianceScalingInitializer.FanAverageScalingMode,
           tf.VarianceScalingInitializer.UniformDistribution)),
       override val timeMajor: Boolean = false,
       override val summarySteps: Int = 100,
-      override val checkpointSteps: Int = 1000
-  ) extends Model.Config(env, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+      override val checkpointSteps: Int = 1000,
+      // Inference
+      val beamWidth: Int,
+      val lengthPenaltyWeight: Float,
+      val decoderMaxLengthFactor: Float
+  ) extends Model.Config(
+    env, embeddingsSize, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
 
   object Config {
     def apply[S, SS](
         env: Environment,
+        embeddingsSize: Int,
         // Model
         encoder: RNNEncoder[S, SS],
         decoder: RNNDecoder[S, SS],
-        parametersManager: ParametersManager[Seq[Language]] = DefaultParametersManager(
+        parametersManager: ParametersManager[Seq[Language], (Output, Output)] = DefaultParametersManager(
           tf.VarianceScalingInitializer(
             1.0f,
             tf.VarianceScalingInitializer.FanAverageScalingMode,
@@ -144,10 +153,15 @@ object RNNModel {
         timeMajor: Boolean = false,
         labelSmoothing: Float = 0.1f,
         summarySteps: Int = 100,
-        checkpointSteps: Int = 1000
+        checkpointSteps: Int = 1000,
+        // Inference
+        beamWidth: Int = 10,
+        lengthPenaltyWeight: Float = 0.0f,
+        decoderMaxLengthFactor: Float = 2.0f
     ): Config[S, SS] = {
       new Config[S, SS](
-        env, labelSmoothing, encoder, decoder, parametersManager, timeMajor, summarySteps, checkpointSteps)
+        env, embeddingsSize, labelSmoothing, encoder, decoder, parametersManager, timeMajor, summarySteps,
+        checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)
     }
   }
 
@@ -164,7 +178,7 @@ object RNNModel {
       s"/device:GPU:${firstGPU + (layerIndex % (numGPUs - firstGPU))}"
   }
 
-  private[models] def cell[I, S, SS](
+  private[models] def cell[S, SS](
       cellCreator: Cell[S, SS],
       numInputs: Int,
       numUnits: Int,
@@ -174,7 +188,7 @@ object RNNModel {
       device: String = "",
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
+  )(mode: Mode, parametersManager: ParametersManager[_, _])(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.RNNCell[Output, Shape, S, SS] = tf.createWithVariableScope(name) {
@@ -197,7 +211,7 @@ object RNNModel {
     }
   }
 
-  private[models] def cells[I, S, SS](
+  private[models] def cells[S, SS](
       cellCreator: Cell[S, SS],
       numInputs: Int,
       numUnits: Int,
@@ -211,7 +225,7 @@ object RNNModel {
       firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
+  )(mode: Mode, parametersManager: ParametersManager[_, _])(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): Seq[tf.RNNCell[Output, Shape, S, SS]] = tf.createWithVariableScope(name) {
@@ -224,7 +238,7 @@ object RNNModel {
     })
   }
 
-  private[models] def multiCell[I, S, SS](
+  private[models] def multiCell[S, SS](
       cellCreator: Cell[S, SS],
       numInputs: Int,
       numUnits: Int,
@@ -238,7 +252,7 @@ object RNNModel {
       firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager[I])(implicit
+  )(mode: Mode, parametersManager: ParametersManager[_, _])(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {

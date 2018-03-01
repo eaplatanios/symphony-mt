@@ -32,6 +32,9 @@ class FileParallelDataset protected (
     val fileTypes: Seq[DatasetType] = null,
     val fileKeys: Seq[String] = null
 ) extends ParallelDataset {
+  override def isEmpty: Boolean = files.head._2.isEmpty
+  override def nonEmpty: Boolean = !isEmpty
+
   override def filterLanguages(languages: Language*): ParallelDataset = {
     languages.foreach(checkSupportsLanguage)
     FileParallelDataset(

@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric}
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
-import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.symphony.mt.vocabulary.{Vocabularies, Vocabulary}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
@@ -36,33 +36,32 @@ import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Op
   */
 abstract class Model[S] protected (
     val name: String,
-    val srcLanguage: Language,
-    val srcVocabulary: Vocabulary,
-    val tgtLanguage: Language,
-    val tgtVocabulary: Vocabulary,
+    val languages: Map[Language, Vocabulary],
     val dataConfig: DataConfig,
     val config: Model.Config,
     val optConfig: Model.OptConfig,
     val logConfig: Model.LogConfig = Model.LogConfig(),
-    val trainEvalDataset: () => TFBilingualDataset = null,
-    val devEvalDataset: () => TFBilingualDataset = null,
-    val testEvalDataset: () => TFBilingualDataset = null
+    val evalDatasets: Seq[(String, ParallelDataset)] = Seq.empty
 ) {
-  protected val parametersManager: ParametersManager[Seq[Language]] = config.parametersManager
+  protected val languageIds: Map[Language, Int] = languages.keys.zipWithIndex.toMap
+
+  protected val parametersManager: ParametersManager[Seq[Language], (Output, Output)] = config.parametersManager
 
   /** Each input consists of a tuple containing:
-    *   - The language ID. TODO: !!!
-    *   - A tensor containing a padded batch of sentences consisting of word IDs.
+    *   - The source language ID.
+    *   - The target language ID.
+    *   - A tensor containing a padded batch of sentences consisting of word IDs, in the source language.
     *   - A tensor containing the sentence lengths for the aforementioned padded batch.
     */
-  protected val input      = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
+  protected val input      = Input((INT32, INT32, INT32, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
   protected val trainInput = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
 
   protected val estimator: tf.learn.Estimator[
-      (Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape), (Output, Output),
-      ((Tensor, Tensor), (Tensor, Tensor)), ((Output, Output), (Output, Output)),
-      ((DataType, DataType), (DataType, DataType)), ((Shape, Shape), (Shape, Shape)),
-      ((Output, Output), (Output, Output))] = tf.createWithNameScope(name) {
+      (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
+      (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape), (Output, Output, Output),
+      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor)), ((Output, Output, Output, Output), (Output, Output)),
+      ((DataType, DataType, DataType, DataType), (DataType, DataType)), ((Shape, Shape, Shape, Shape), (Shape, Shape)),
+      ((Output, Output, Output), (Output, Output))] = tf.createWithNameScope(name) {
     val model = learn.Model.supervised(
       input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
       tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm), optConfig.colocateGradientsWithOps)
@@ -78,18 +77,19 @@ abstract class Model[S] protected (
     // Add logging hooks
     if (logConfig.logLossSteps > 0)
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
-    if (logConfig.logTrainEvalSteps > 0 && trainEvalDataset != null)
-      hooks += tf.learn.Evaluator(
-        log = true, summariesDir, trainEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logTrainEvalSteps),
-        triggerAtEnd = true, name = "TrainEvaluator")
-    if (logConfig.logDevEvalSteps > 0 && devEvalDataset != null)
-      hooks += tf.learn.Evaluator(
-        log = true, summariesDir, devEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logDevEvalSteps),
-        triggerAtEnd = true, name = "DevEvaluator")
-    if (logConfig.logTestEvalSteps > 0 && testEvalDataset != null)
-      hooks += tf.learn.Evaluator(
-        log = true, summariesDir, testEvalDataset, Seq(BLEU()), StepHookTrigger(logConfig.logTestEvalSteps),
-        triggerAtEnd = true, name = "TestEvaluator")
+    if (logConfig.logEvalSteps > 0) {
+      for (datasetType <- Seq(Train, Dev, Test)) {
+        val datasets = evalDatasets.map(d => (d._1, d._2.filterTypes(datasetType))).filter(_._2.nonEmpty)
+        if (datasets.nonEmpty) {
+          datasets.foreach(d => {
+            val dataset = () => Model.createTrainDataset(Seq(d._2), languageIds, repeat = false, isEval = true)
+            hooks += tf.learn.Evaluator(
+              log = true, summariesDir, dataset, Seq(BLEU()), StepHookTrigger(logConfig.logEvalSteps),
+              triggerAtEnd = true, name = s"Evaluation/$datasetType/${d._1}")
+          })
+        }
+      }
+    }
 
     val estimatorConfig = tf.learn.Configuration(Some(config.env.workingDir), randomSeed = config.env.randomSeed)
 
@@ -97,91 +97,99 @@ abstract class Model[S] protected (
     tf.learn.InMemoryEstimator(model, estimatorConfig, trainHooks = hooks)
   }
 
-  def train(
-      dataset: ParallelDataset,
-      stopCriteria: StopCriteria
-  ): Unit = {
-    val data = () => dataset.filterTypes(Train).toTFBilingual(srcLanguage, tgtLanguage, repeat = true)
-    estimator.train(data, stopCriteria)
+  def train(datasets: Seq[ParallelDataset], stopCriteria: StopCriteria): Unit = {
+    estimator.train(() => Model.createTrainDataset(datasets, languageIds), stopCriteria)
+  }
+
+  def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
+    train(Seq(dataset), stopCriteria)
   }
 
   def translate(
       srcLanguage: Language,
       tgtLanguage: Language,
       dataset: ParallelDataset
-  ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
-    val data = () => dataset.toTFMonolingual(srcLanguage)
-    estimator.infer(data)
+  ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
+    estimator.infer(() => Model.createInputDataset(srcLanguage, tgtLanguage, dataset, languageIds))
   }
 
   def translate(
       srcLanguage: (Language, Vocabulary),
       tgtLanguage: (Language, Vocabulary),
       input: (Tensor, Tensor)
-  ): Iterator[((Tensor, Tensor), (Tensor, Tensor))] = {
+  ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
     translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
       name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
       tensors = Map(srcLanguage._1 -> Seq(input))))
   }
 
   def evaluate(
-      dataset: ParallelDataset,
+      datasets: Seq[ParallelDataset],
       metrics: Seq[MTMetric],
       maxSteps: Long = -1L,
       saveSummaries: Boolean = true,
       name: String = null
   ): Seq[Tensor] = {
-    val data = () => dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = true)
-    estimator.evaluate(data, metrics, maxSteps, saveSummaries, name)
+    estimator.evaluate(
+      () => Model.createTrainDataset(datasets, languageIds, repeat = false, isEval = true), metrics, maxSteps,
+      saveSummaries, name)
   }
 
-  protected def trainLayer: Layer[((Output, Output), (Output, Output)), (Output, Output)] = {
-    new Layer[((Output, Output), (Output, Output)), (Output, Output)](name) {
+  protected def trainLayer: Layer[((Output, Output, Output, Output), (Output, Output)), (Output, Output, Output)] = {
+    new Layer[((Output, Output, Output, Output), (Output, Output)), (Output, Output, Output)](name) {
       override val layerType: String = "TrainLayer"
 
       override protected def _forward(
-          input: ((Output, Output), (Output, Output)),
+          input: ((Output, Output, Output, Output), (Output, Output)),
           mode: Mode
-      ): (Output, Output) = {
-        val state = tf.createWithVariableScope("Encoder")(encoder(input._1, mode))
-        val output = tf.createWithVariableScope("Decoder")(decoder(Some(input._2), Some(state), mode))
-        output
+      ): (Output, Output, Output) = {
+        parametersManager.initialize(Some(languages.keys.toSeq))
+        parametersManager.setContext((input._1._1, input._1._2))
+        val vocabularies = Vocabularies(languages, config.embeddingsSize)
+        val state = tf.createWithVariableScope("Encoder")(encoder(input._1, vocabularies, mode))
+        val output = tf.createWithVariableScope("Decoder") {
+          decoder(input._1, vocabularies, Some(input._2), Some(state), mode)
+        }
+        (input._1._2, output._1, output._2)
       }
     }
   }
 
-  protected def inferLayer: Layer[(Output, Output), (Output, Output)] = {
-    new Layer[(Output, Output), (Output, Output)](name) {
+  protected def inferLayer: Layer[(Output, Output, Output, Output), (Output, Output, Output)] = {
+    new Layer[(Output, Output, Output, Output), (Output, Output, Output)](name) {
       override val layerType: String = "InferLayer"
 
-      override protected def _forward(input: (Output, Output), mode: Mode): (Output, Output) = {
-        // TODO: The following line is weirdly needed in order to properly initialize the lookup tables.
-        srcVocabulary.lookupTable()
-        tgtVocabulary.lookupTable()
-        val state = tf.createWithVariableScope("Encoder")(encoder(input, mode))
-        val output = tf.createWithVariableScope("Decoder")(decoder(None, Some(state), mode))
-        output
+      override protected def _forward(input: (Output, Output, Output, Output), mode: Mode): (Output, Output, Output) = {
+        parametersManager.initialize(Some(languages.keys.toSeq))
+        parametersManager.setContext((input._1, input._2))
+        val vocabularies = Vocabularies(languages, config.embeddingsSize)
+        val state = tf.createWithVariableScope("Encoder")(encoder(input, vocabularies, mode))
+        val output = tf.createWithVariableScope("Decoder")(decoder(input, vocabularies, None, Some(state), mode))
+        (input._2, output._1, output._2)
       }
     }
   }
 
-  protected def lossLayer: Layer[((Output, Output), (Output, Output)), Output] = {
-    new Layer[((Output, Output), (Output, Output)), Output](name) {
+  protected def lossLayer: Layer[((Output, Output, Output), (Output, Output)), Output] = {
+    new Layer[((Output, Output, Output), (Output, Output)), Output](name) {
       override val layerType: String = "Loss"
 
       override protected def _forward(
-          input: ((Output, Output), (Output, Output)),
+          input: ((Output, Output, Output), (Output, Output)),
           mode: Mode
       ): Output = tf.createWithNameScope("Loss") {
+        // TODO: Recreating the vocabularies here may be inefficient.
+        val vocabularies = Vocabularies(languages, config.embeddingsSize)
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
         // word used as input, rather than the previous predicted word.
-        val tgtEosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+        val tgtEosId = vocabularies.lookupTable(input._1._1)
+            .lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
         val tgtSequence = tf.concatenate(Seq(
           input._2._1,
           tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
         val tgtSequenceLength = input._2._2 + 1
-        val lossValue = loss(input._1._1, tgtSequence, tgtSequenceLength)
+        val lossValue = loss(input._1._2, tgtSequence, tgtSequenceLength)
         tf.summary.scalar("Loss", lossValue)
         lossValue
       }
@@ -190,24 +198,32 @@ abstract class Model[S] protected (
 
   /**
     *
-    * @param  input   Tuple containing two tensors:
-    *                 - `INT32` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
-    *                 - `INT32` tensor with shape `[batchSize]`, containing the sequence lengths.
+    * @param  input        Tuple containing two tensors:
+    *                        - `INT32` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
+    *                        - `INT32` tensor with shape `[batchSize]`, containing the sequence lengths.
+    * @param  vocabularies
     * @param  mode    Current learning mode (e.g., training or evaluation).
     * @return   Tuple containing two tensors:
     *           - Encoder output, with shape `[batchSize, inputLength, hiddenSize]`.
     *           - Encoder-decoder attention bias and mask weights, with shape `[batchSize, inputLength]`.
     */
-  protected def encoder(input: (Output, Output), mode: Mode): S
+  protected def encoder(
+      input: (Output, Output, Output, Output),
+      vocabularies: Vocabularies,
+      mode: Mode
+  ): S
 
   /**
     *
-    * @param input
-    * @param state
-    * @param mode
     * @return Tensor with shape `[batchSize, length, 1, hiddenSize]`.
     */
-  protected def decoder(input: Option[(Output, Output)], state: Option[S], mode: Mode): (Output, Output)
+  protected def decoder(
+      encoderInput: (Output, Output, Output, Output),
+      vocabularies: Vocabularies,
+      input: Option[(Output, Output)],
+      state: Option[S],
+      mode: Mode
+  ): (Output, Output)
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
     val (lossSum, _) = Common.paddedCrossEntropy(
@@ -217,9 +233,10 @@ abstract class Model[S] protected (
 }
 
 object Model {
-  class Config protected (
+  class Config protected(
       val env: Environment,
-      val parametersManager: ParametersManager[Seq[Language]],
+      val embeddingsSize: Int,
+      val parametersManager: ParametersManager[Seq[Language], (Output, Output)],
       val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
@@ -228,7 +245,8 @@ object Model {
   object Config {
     def apply(
         env: Environment,
-        parametersManager: ParametersManager[Seq[Language]] = DefaultParametersManager(
+        embeddingsSize: Int,
+        parametersManager: ParametersManager[Seq[Language], (Output, Output)] = DefaultParametersManager(
           tf.VarianceScalingInitializer(
             1.0f,
             tf.VarianceScalingInitializer.FanAverageScalingMode,
@@ -238,11 +256,11 @@ object Model {
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config = {
-      new Config(env, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+      new Config(env, embeddingsSize, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
     }
   }
 
-  class OptConfig protected (
+  class OptConfig protected(
       val maxGradNorm: Float,
       val optimizer: Optimizer,
       val colocateGradientsWithOps: Boolean)
@@ -257,22 +275,64 @@ object Model {
     }
   }
 
-  class LogConfig protected (
+  class LogConfig protected(
       val logLossSteps: Int,
       val logEvalBatchSize: Int,
-      val logTrainEvalSteps: Int,
-      val logDevEvalSteps: Int,
-      val logTestEvalSteps: Int)
+      val logEvalSteps: Int)
 
   object LogConfig {
     def apply(
         logLossSteps: Int = 100,
         logEvalBatchSize: Int = 512,
-        logTrainEvalSteps: Int = 1000,
-        logDevEvalSteps: Int = 1000,
-        logTestEvalSteps: Int = 1000
+        logEvalSteps: Int = 1000
     ): LogConfig = {
-      new LogConfig(logLossSteps, logEvalBatchSize, logTrainEvalSteps, logDevEvalSteps, logTestEvalSteps)
+      new LogConfig(logLossSteps, logEvalBatchSize, logEvalSteps)
     }
+  }
+
+  type TFInputDataset = tf.data.Dataset[
+      (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
+      (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape)]
+
+  type TFTrainDataset = tf.data.Dataset[
+      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor)),
+      ((Output, Output, Output, Output), (Output, Output)),
+      ((DataType, DataType, DataType, DataType), (DataType, DataType)),
+      ((Shape, Shape, Shape, Shape), (Shape, Shape))]
+
+  private[Model] def createInputDataset(
+      srcLanguage: Language,
+      tgtLanguage: Language,
+      dataset: ParallelDataset,
+      languageIds: Map[Language, Int]
+  ): TFInputDataset = {
+    dataset.toTFMonolingual(srcLanguage)
+        .map(
+          d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d._1, d._2),
+          name = s"AddInputLanguageIDs$srcLanguage$tgtLanguage")
+        .asInstanceOf[TFInputDataset]
+  }
+
+  private[Model] def createTrainDataset(
+      datasets: Seq[ParallelDataset],
+      languageIds: Map[Language, Int],
+      repeat: Boolean = true,
+      isEval: Boolean = false
+  ): TFTrainDataset = {
+    val processedDatasets: Seq[TFTrainDataset] = datasets
+        .map(_.filterLanguages(languageIds.keys.toSeq: _*))
+        .flatMap(d => d.languagePairs().map(_ -> d))
+        .map {
+          case ((srcLanguage, tgtLanguage), dataset) =>
+            dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = repeat, isEval = isEval)
+                .map(
+                  d => ((
+                      tf.constant(languageIds(srcLanguage)),
+                      tf.constant(languageIds(tgtLanguage)),
+                      d._1._1, d._1._2), d._2),
+                  name = s"AddTrainLanguageIDs$srcLanguage$tgtLanguage")
+                .asInstanceOf[TFTrainDataset]
+        }
+    processedDatasets.reduce((d1, d2) => d1.concatenate(d2))
   }
 }

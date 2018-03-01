@@ -15,12 +15,12 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
-import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
+import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 import org.platanios.tensorflow.api.ops.seq2seq.decoders.BeamSearchDecoder
@@ -37,69 +37,64 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
     val dropout: Option[Float] = None,
     val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
     val attention: Option[RNNAttention[AS, ASS]] = None,
-    val outputAttention: Boolean = true,
-    override val timeMajor: Boolean = false,
-    // Inference
-    override val beamWidth: Int = 10,
-    override val lengthPenaltyWeight: Float = 0.0f,
-    override val decoderMaxLengthFactor: Float = 2.0f
+    val outputAttention: Boolean = true
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
     evAS: WhileLoopVariable.Aux[AS, ASS]
-) extends RNNDecoder[S, SS](timeMajor, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)(evS, evSDropout) {
-  override def create[I](
-      env: Environment,
-      encoderTuple: Tuple[Output, Seq[S]],
-      srcSequenceLengths: Output,
-      tgtVocab: Vocabulary,
-      tgtMaxLength: Int,
+) extends RNNDecoder[S, SS]()(evS, evSDropout) {
+  override def create(
+      config: RNNModel.Config[_, _],
+      vocabularies: Vocabularies,
+      srcLanguage: Output,
+      tgtLanguage: Output,
+      encoderState: (Tuple[Output, Seq[S]], Output, Output),
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager[I]): RNNDecoder.Output = {
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = RNNModel.embeddings(dataType, tgtVocab.size, numUnits, "Embeddings")
+    val embeddings = vocabularies.embeddings(tgtLanguage)
 
     // RNN cell
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = attention match {
       case None =>
         RNNModel.multiCell(
-          cell, numUnits, numUnits, dataType, numLayers, numResLayers, dropout,
-          residualFn, 0, env.numGPUs, env.firstGPU, env.randomSeed, "MultiUniCell")(mode, parametersManager)
+          cell, numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, 0,
+          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiUniCell")(mode, parametersManager)
       case Some(_) =>
         RNNModel.multiCell(
-          cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout,
-          residualFn, 0, env.numGPUs, env.firstGPU, env.randomSeed, "MultiUniCell")(mode, parametersManager)
+          cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, 0,
+          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiUniCell")(mode, parametersManager)
     }
 
     // Use attention if necessary and create the decoder RNN
-    var initialState = encoderTuple.state
-    var memory = if (timeMajor) encoderTuple.output.transpose(Tensor(1, 0, 2)) else encoderTuple.output
-    var memorySequenceLengths = srcSequenceLengths
-    if (beamWidth > 1 && !mode.isTraining) {
+    var initialState = encoderState._1.state
+    var memory = if (config.timeMajor) encoderState._1.output.transpose(Tensor(1, 0, 2)) else encoderState._1.output
+    var memorySequenceLengths = encoderState._2
+    if (config.beamWidth > 1 && !mode.isTraining) {
       // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
-      initialState = BeamSearchDecoder.tileForBeamSearch(initialState, beamWidth)
-      memory = BeamSearchDecoder.tileForBeamSearch(memory, beamWidth)
-      memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, beamWidth)
+      initialState = BeamSearchDecoder.tileForBeamSearch(initialState, config.beamWidth)
+      memory = BeamSearchDecoder.tileForBeamSearch(memory, config.beamWidth)
+      memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, config.beamWidth)
     }
 
     attention match {
       case None =>
         decode(
-          env, srcSequenceLengths, tgtSequences, tgtSequenceLengths, initialState,
-          embeddings, uniCell, tgtVocab, tgtMaxLength,
-          beginOfSequenceToken, endOfSequenceToken)(mode, parametersManager)
+          config, vocabularies, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths, initialState,
+          embeddings, uniCell, encoderState._3, beginOfSequenceToken, endOfSequenceToken)(mode, parametersManager)
       case Some(attentionCreator) =>
         val (attentionCell, attentionInitialState) = attentionCreator.create(
-          uniCell, memory, memorySequenceLengths, numUnits, numUnits, initialState, useAttentionLayer = true,
+          srcLanguage, tgtLanguage, uniCell, memory, memorySequenceLengths,
+          numUnits, numUnits, initialState, useAttentionLayer = true,
           outputAttention = outputAttention)(mode, parametersManager)
         decode(
-          env, srcSequenceLengths, tgtSequences, tgtSequenceLengths, attentionInitialState,
-          embeddings, attentionCell, tgtVocab, tgtMaxLength,
-          beginOfSequenceToken, endOfSequenceToken)(mode, parametersManager)
+          config, vocabularies, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
+          attentionInitialState, embeddings, attentionCell, encoderState._3, beginOfSequenceToken,
+          endOfSequenceToken)(mode, parametersManager)
     }
   }
 }
@@ -114,19 +109,14 @@ object UnidirectionalRNNDecoder {
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
       attention: Option[RNNAttention[AS, ASS]] = None,
-      outputAttention: Boolean = false,
-      timeMajor: Boolean = false,
-      // Inference
-      beamWidth: Int = 10,
-      lengthPenaltyWeight: Float = 0.0f,
-      decoderMaxLengthFactor: Float = 2.0f
+      outputAttention: Boolean = false
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S],
       evAS: WhileLoopVariable.Aux[AS, ASS]
   ): UnidirectionalRNNDecoder[S, SS, AS, ASS] = {
     new UnidirectionalRNNDecoder[S, SS, AS, ASS](
-      cell, numUnits, numLayers, dataType, residual, dropout, residualFn, attention, outputAttention, timeMajor,
-      beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)(evS, evSDropout, evAS)
+      cell, numUnits, numLayers, dataType, residual, dropout, residualFn, attention,
+      outputAttention)(evS, evSDropout, evAS)
   }
 }

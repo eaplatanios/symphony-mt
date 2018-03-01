@@ -22,5 +22,5 @@ import org.platanios.tensorflow.api.ops.metrics.Metric
   * @author Emmanouil Antonios Platanios
   */
 package object evaluation {
-  type MTMetric = Metric[((Output, Output), (Output, Output)), Output]
+  type MTMetric = Metric[((Output, Output, Output), (Output, Output)), Output]
 }

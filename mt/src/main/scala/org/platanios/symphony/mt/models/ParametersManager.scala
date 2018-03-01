@@ -15,38 +15,60 @@
 
 package org.platanios.symphony.mt.models
 
+import org.platanios.symphony.mt.Language
 import org.platanios.tensorflow.api._
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait ParametersManager[I] {
+trait ParametersManager[I, C] {
+  protected var context: Option[C] = None
+
+  def initialize(information: Option[I] = None): Unit
+
+  def getContext: Option[C] = this.context
+  def setContext(context: C): Unit = this.context = Some(context)
+  def resetContext(): Unit = this.context = None
+
   def get(
       name: String,
       dataType: DataType,
       shape: Shape,
       variableInitializer: tf.VariableInitializer = null,
-      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable,
-      information: Option[I] = None
+      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   ): Output
-
-  def withInformation(information: I): ParametersManager[I]
 }
 
-case class DefaultParametersManager[I](
-    variableInitializer: tf.VariableInitializer = null,
-    information: Option[I] = None
-) extends ParametersManager[I] {
+case class DefaultParametersManager[I, C](
+    variableInitializer: tf.VariableInitializer = null
+) extends ParametersManager[I, C] {
+  override def initialize(information: Option[I]): Unit = ()
+
   override def get(
       name: String,
       dataType: DataType,
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
-      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable,
-      information: Option[I] = this.information
+      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   ): Output = {
     tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value
   }
+}
 
-  override def withInformation(information: I): ParametersManager[I] = this.copy(information = Some(information))
+case class PerLanguagePairParametersManager(
+    variableInitializer: tf.VariableInitializer = null
+) extends ParametersManager[Seq[Language], (Output, Output)] {
+  override def initialize(information: Option[Seq[Language]]): Unit = {
+    ???
+  }
+
+  override def get(
+      name: String,
+      dataType: DataType,
+      shape: Shape,
+      variableInitializer: tf.VariableInitializer = variableInitializer,
+      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
+  ): Output = {
+    tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value
+  }
 }

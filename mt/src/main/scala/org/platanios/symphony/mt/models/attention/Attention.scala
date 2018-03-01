@@ -36,12 +36,12 @@ trait Attention {
     * @param  parametersManager Parameter manager to use, if parameters are required.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
-  def apply[I](
+  def apply(
       q: Output,
       k: Output,
       v: Output,
       bias: Option[Output]
-  )(mode: Mode, parametersManager: ParametersManager[I]): Output
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output
 
   // TODO: Add support for saving weights.
   // TODO: Add support for image summaries for the weights.
@@ -227,7 +227,7 @@ object Attention {
     * @param  parametersManager Parameter manager to use, if parameters are required.
     * @return Tuple containing the queries, keys, and values tensors.
     */
-  def computeQKV[I](
+  def computeQKV(
       queryAntecedent: Output,
       memoryAntecedent: Output,
       totalKeysDepth: Int,
@@ -236,7 +236,7 @@ object Attention {
       kvNumFilters: Int = 1,
       qPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
       kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding
-  )(mode: Mode, parametersManager: ParametersManager[I]): (Output, Output, Output) = {
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): (Output, Output, Output) = {
 
     def compute(input: Output, depth: Int, numFilters: Int, paddingMode: tf.ConvPaddingMode, name: String): Output = {
       tf.createWithVariableScope(name) {
@@ -286,7 +286,7 @@ object Attention {
     *                                  if a cache is provided, but no `bias` is provided.
     */
   @throws[IllegalArgumentException]
-  def multiHeadAttention[I](
+  def multiHeadAttention(
       queryAntecedent: Output,
       memoryAntecedent: Output,
       bias: Output,
@@ -301,7 +301,7 @@ object Attention {
       kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
       cache: Option[Cache] = None,
       name: String = "MultiHeadAttention"
-  )(mode: Mode, parametersManager: ParametersManager[I]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.createWithVariableScope(name) {

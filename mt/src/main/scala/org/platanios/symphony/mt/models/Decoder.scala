@@ -15,9 +15,8 @@
 
 package org.platanios.symphony.mt.models
 
-import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.rnn.RNNDecoder
-import org.platanios.symphony.mt.vocabulary.Vocabulary
+import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 
@@ -25,15 +24,15 @@ import org.platanios.tensorflow.api.ops.Output
   * @author Emmanouil Antonios Platanios
   */
 trait Decoder[O] {
-  def create[I](
-      env: Environment,
-      encoderTuple: O,
-      srcSequenceLengths: Output,
-      tgtVocab: Vocabulary,
-      tgtMaxLength: Int,
+  def create(
+      config: RNNModel.Config[_, _],
+      vocabularies: Vocabularies,
+      srcLanguage: Output,
+      tgtLanguage: Output,
+      encoderState: O,
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager[I]): RNNDecoder.Output
+  )(mode: Mode, parametersManager: ParametersManager[_, _]): RNNDecoder.Output
 }

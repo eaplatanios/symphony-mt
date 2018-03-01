@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
-import org.platanios.symphony.mt.evaluation.{BLEU, BilingualEvaluator}
+import org.platanios.symphony.mt.evaluation.BLEU
 import org.platanios.symphony.mt.models.{Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
@@ -58,26 +58,21 @@ object IWSLT15 extends App {
       1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
       learningRateSummaryTag = "LearningRate"))
 
-  val logConfig = Model.LogConfig(
-    logLossSteps = 100,
-    logTrainEvalSteps = -1)
+  val logConfig = Model.LogConfig(logLossSteps = 100)
 
   val model = RNNModel(
     name = "Model",
-    srcLanguage = srcLanguage,
-    srcVocabulary = dataset.vocabulary(srcLanguage),
-    tgtLanguage = tgtLanguage,
-    tgtVocabulary = dataset.vocabulary(tgtLanguage),
+    languages = Map(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
+      embeddingsSize = 512,
       UnidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
         numUnits = 512,
         numLayers = 2,
         residual = false,
-        dropout = Some(0.2f),
-        timeMajor = true),
+        dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
         numUnits = 512,
@@ -85,20 +80,19 @@ object IWSLT15 extends App {
         residual = false,
         dropout = Some(0.2f),
         attention = Some(LuongRNNAttention(scaled = true)),
-        outputAttention = true,
-        timeMajor = true,
-        beamWidth = 10),
+        outputAttention = true),
       labelSmoothing = 0.0f,
-      timeMajor = true),
+      timeMajor = true,
+      beamWidth = 10),
     optConfig = optConfig,
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
-    trainEvalDataset = () => dataset.filterTypes(Train).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
-    devEvalDataset = () => dataset.filterTypes(Dev).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true),
-    testEvalDataset = () => dataset.filterTypes(Test).toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true))
+    evalDatasets = Seq(
+      ("IWSLT-15", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
+      ("IWSLT-15", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
   model.train(dataset, tf.learn.StopCriteria.steps(12000))
 
-  val evaluator = BilingualEvaluator(Seq(BLEU()), srcLanguage, tgtLanguage, dataset.filterTypes(Test))
-  println(evaluator.evaluate(model).values.head.scalar.asInstanceOf[Float])
+  // val evaluator = BilingualEvaluator(Seq(BLEU()), srcLanguage, tgtLanguage, dataset.filterTypes(Test))
+  // println(evaluator.evaluate(model).values.head.scalar.asInstanceOf[Float])
 }

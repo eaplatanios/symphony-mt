@@ -45,6 +45,9 @@ trait ParallelDataset {
       pairs.toSet
   }
 
+  def isEmpty: Boolean
+  def nonEmpty: Boolean
+
   def filterLanguages(languages: Language*): ParallelDataset
   def filterTypes(fileTypes: DatasetType*): ParallelDataset
   def filterKeys(keys: String*): ParallelDataset
