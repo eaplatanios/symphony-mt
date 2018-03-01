@@ -83,8 +83,11 @@ abstract class Model[S] protected (
         datasets ++= evalDatasets.map(d => (s"${d._1}/$datasetType", d._2.filterTypes(datasetType)))
       datasets = datasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
+        val batchSize = dataConfig.evaluateBatchSize
+        val prefetchBufferSize = if (dataConfig.bufferSize == -1L) 1024L * batchSize else dataConfig.bufferSize
         hooks += tf.learn.Evaluator(
-          log = true, summariesDir, Model.createEvalDatasets(datasets, languageIds), Seq(BLEU()),
+          log = true, summariesDir, Model.createEvalDatasets(
+            datasets, languageIds, prefetchBufferSize = prefetchBufferSize), Seq(BLEU()),
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
@@ -96,7 +99,10 @@ abstract class Model[S] protected (
   }
 
   def train(datasets: Seq[ParallelDataset], stopCriteria: StopCriteria): Unit = {
-    estimator.train(Model.createTrainDataset(datasets, languageIds), stopCriteria)
+    val batchSize = dataConfig.trainBatchSize
+    val prefetchBufferSize = if (dataConfig.bufferSize == -1L) 1024L * batchSize else dataConfig.bufferSize
+    estimator.train(Model.createTrainDataset(
+      datasets, languageIds, repeat = true, isEval = false, prefetchBufferSize = prefetchBufferSize), stopCriteria)
   }
 
   def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
@@ -312,7 +318,8 @@ object Model {
       datasets: Seq[ParallelDataset],
       languageIds: Map[Language, Int],
       repeat: Boolean = true,
-      isEval: Boolean = false
+      isEval: Boolean = false,
+      prefetchBufferSize: Long = 1024L
   ): () => TFTrainDataset = () => {
     val processedDatasets: Seq[TFTrainDataset] = datasets
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))
@@ -328,12 +335,13 @@ object Model {
                   name = s"AddTrainLanguageIDs$srcLanguage$tgtLanguage")
                 .asInstanceOf[TFTrainDataset]
         }
-    processedDatasets.reduce((d1, d2) => d1.concatenate(d2))
+    processedDatasets.reduce((d1, d2) => d1.concatenate(d2)).prefetch(prefetchBufferSize)
   }
 
   private[Model] def createEvalDatasets(
       datasets: Seq[(String, ParallelDataset)],
-      languageIds: Map[Language, Int]
+      languageIds: Map[Language, Int],
+      prefetchBufferSize: Long = 1024L
   ): Seq[(String, () => TFTrainDataset)] = {
     datasets
         .map(d => (d._1, d._2.filterLanguages(languageIds.keys.toSeq: _*)))
@@ -349,7 +357,7 @@ object Model {
                             tf.constant(languageIds(tgtLanguage)),
                             d._1._1, d._1._2), d._2),
                         name = s"AddTrainLanguageIDs$srcLanguage$tgtLanguage")
-                      .asInstanceOf[TFTrainDataset]
+                      .asInstanceOf[TFTrainDataset].prefetch(prefetchBufferSize)
                 })
         }
   }

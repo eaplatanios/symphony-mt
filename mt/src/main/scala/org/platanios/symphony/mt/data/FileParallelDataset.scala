@@ -117,7 +117,7 @@ class FileParallelDataset protected (
     val srcVocabTable = vocabulary(language1).lookupTable()
     val tgtVocabTable = vocabulary(language2).lookupTable()
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
-    val actualBufferSize = if (dataConfig.bufferSize == -1L) 1000 * batchSize else dataConfig.bufferSize
+    val actualBufferSize = if (dataConfig.bufferSize == -1L) 1024L * batchSize else dataConfig.bufferSize
     val srcEosId = srcVocabTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
     val tgtEosId = tgtVocabTable.lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
@@ -144,7 +144,7 @@ class FileParallelDataset protected (
           .drop(dataConfig.dropCount)
           .transform(d => {
             if (repeat)
-              d.repeat().prefetch(actualBufferSize)
+              d.repeat()
             else
               d
           })
@@ -153,7 +153,6 @@ class FileParallelDataset protected (
           .map(
             d => (tf.stringSplit(d._1(NewAxis)).values, tf.stringSplit(d._2(NewAxis)).values),
             name = "Map/StringSplit")
-          .prefetch(actualBufferSize)
           // Filter zero length input sequences and sequences exceeding the maximum length.
           .filter(d => tf.logicalAnd(tf.size(d._1) > 0, tf.size(d._2) > 0), "Filter/NonZeroLength")
           // Crop based on the maximum allowed sequence lengths.
@@ -161,15 +160,15 @@ class FileParallelDataset protected (
             if (dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1)
               d.map(
                 dd => (dd._1(0 :: dataConfig.srcMaxLength), dd._2(0 :: dataConfig.tgtMaxLength)),
-                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+                dataConfig.numParallelCalls, name = "Map/MaxLength")
             else if (dataConfig.srcMaxLength != -1)
               d.map(
                 dd => (dd._1(0 :: dataConfig.srcMaxLength), dd._2),
-                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+                dataConfig.numParallelCalls, name = "Map/MaxLength")
             else if (dataConfig.tgtMaxLength != -1)
               d.map(
                 dd => (dd._1, dd._2(0 :: dataConfig.tgtMaxLength)),
-                dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
+                dataConfig.numParallelCalls, name = "Map/MaxLength")
             else
               d
           })
@@ -180,15 +179,13 @@ class FileParallelDataset protected (
                 tf.cast(srcVocabTable.lookup(d._1), INT32),
                 tf.cast(tgtVocabTable.lookup(d._2), INT32)),
             dataConfig.numParallelCalls, name = "Map/VocabularyLookup")
-          .prefetch(actualBufferSize)
           // Add sequence lengths.
           .map(
             d => ((d._1, tf.size(d._1, INT32)), (d._2, tf.size(d._2, INT32))), dataConfig.numParallelCalls,
             name = "Map/AddLengths")
-          .prefetch(actualBufferSize)
 
     if (dataConfig.numBuckets == 1) {
-      batchingFn(datasetBeforeBucketing)
+      batchingFn(datasetBeforeBucketing).prefetch(actualBufferSize)
     } else {
       // Calculate the bucket width by using the maximum source sequence length, if provided. Pairs with length
       // [0, bucketWidth) go to bucket 0, length [bucketWidth, 2 * bucketWidth) go to bucket 1, etc. Pairs with length
@@ -212,7 +209,7 @@ class FileParallelDataset protected (
         batchingFn(pair._2)
       }
 
-      datasetBeforeBucketing.groupByWindow(keyFn, reduceFn, _ => batchSize)
+      datasetBeforeBucketing.groupByWindow(keyFn, reduceFn, _ => batchSize).prefetch(actualBufferSize)
     }
   }
 }
