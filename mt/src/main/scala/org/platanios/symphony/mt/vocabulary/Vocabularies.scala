@@ -32,14 +32,28 @@ class Vocabularies protected (
 
   protected val (lookupTables, lookupTableHandles, defaultValues, wordEmbeddings) = {
     tf.createWithNameScope("Vocabularies") {
+      val numLanguages = tf.constant(vocabularies.size)
       val lookupTables = vocabularies.map(_.lookupTable())
-      val lookupTableHandles = tf.stack(lookupTables.map(_.handle), name = "LookupTableHandles")
-      val defaultValues = tf.stack(lookupTables.map(_.defaultValue), name = "DefaultValues")
+      val lookupTableHandles = tf.createWithNameScope("LookupTables/Handles") {
+        var ta = TensorArray.create(
+          numLanguages, RESOURCE, clearAfterRead = false, inferShape = false, elementShape = Shape())
+        languages.keys.zip(lookupTables).zipWithIndex.foreach {
+          case ((l, lt), i) => ta = ta.write(i, lt.handle, name = s"${l.name}/Write")
+        }
+        ta
+      }
+      val defaultValues = tf.createWithNameScope("LookupTables/DefaultValues") {
+        var ta = TensorArray.create(
+          numLanguages, INT64, clearAfterRead = false, inferShape = false, elementShape = Shape())
+        languages.keys.zip(lookupTables).zipWithIndex.foreach {
+          case ((l, lt), i) => ta = ta.write(i, lt.defaultValue, name = s"${l.name}/Write")
+        }
+        ta
+      }
       val embeddings = tf.createWithNameScope("Embeddings") {
         val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
         var ta = TensorArray.create(
-          vocabularies.size, FLOAT32, clearAfterRead = false, inferShape = false,
-          elementShape = Shape(-1, embeddingsSize))
+          numLanguages, FLOAT32, clearAfterRead = false, inferShape = false, elementShape = Shape(-1, embeddingsSize))
         languages.zipWithIndex.foreach {
           case ((l, v), i) => ta = ta.write(
             i, tf.variable(l.name, FLOAT32, Shape(v.size, embeddingsSize), embeddingsInitializer).value,
@@ -54,8 +68,8 @@ class Vocabularies protected (
   protected val projections: mutable.Map[Int, TensorArray] = mutable.Map.empty[Int, TensorArray]
 
   def lookupTable(languageId: Output): Vocabularies.Table = {
-    val handle = lookupTableHandles.gather(languageId)
-    val defaultValue = defaultValues.gather(languageId)
+    val handle = lookupTableHandles.read(languageId)
+    val defaultValue = defaultValues.read(languageId)
     Vocabularies.Table(handle, defaultValue)
   }
 
