@@ -179,8 +179,7 @@ abstract class Model[S] protected (
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
         // word used as input, rather than the previous predicted word.
-        val tgtEosId = vocabularies.lookupTable(input._1._1)
-            .lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+        val tgtEosId = vocabularies.lookupTable(input._1._1)(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
         val tgtSequence = tf.concatenate(Seq(
           input._2._1,
           tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)

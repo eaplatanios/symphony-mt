@@ -28,52 +28,39 @@ class Vocabularies protected (
     val languages: Map[Language, Vocabulary],
     val embeddingsSize: Int
 ) {
-  val vocabularies: Seq[Vocabulary] = languages.values.toSeq
+  lazy val vocabularies: Seq[Vocabulary] = languages.values.toSeq
 
-  protected val (lookupTables, lookupTableHandles, defaultValues, wordEmbeddings) = {
-    tf.createWithNameScope("Vocabularies") {
-      val numLanguages = tf.constant(vocabularies.size)
-      val lookupTables = vocabularies.map(_.lookupTable())
-      val lookupTableHandles = tf.createWithNameScope("LookupTables/Handles") {
-        var ta = TensorArray.create(
-          numLanguages, RESOURCE, clearAfterRead = false, inferShape = false, elementShape = Shape())
-        languages.keys.zip(lookupTables).zipWithIndex.foreach {
-          case ((l, lt), i) => ta = ta.write(i, lt.handle, name = s"${l.name}/Write")
-        }
-        ta
-      }
-      val defaultValues = tf.createWithNameScope("LookupTables/DefaultValues") {
-        var ta = TensorArray.create(
-          numLanguages, INT64, clearAfterRead = false, inferShape = false, elementShape = Shape())
-        languages.keys.zip(lookupTables).zipWithIndex.foreach {
-          case ((l, lt), i) => ta = ta.write(i, lt.defaultValue, name = s"${l.name}/Write")
-        }
-        ta
-      }
-      val embeddings = tf.createWithNameScope("Embeddings") {
-        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-        var ta = TensorArray.create(
-          numLanguages, FLOAT32, clearAfterRead = false, inferShape = false, elementShape = Shape(-1, embeddingsSize))
-        languages.zipWithIndex.foreach {
-          case ((l, v), i) => ta = ta.write(
-            i, tf.variable(l.name, FLOAT32, Shape(v.size, embeddingsSize), embeddingsInitializer).value,
-            name = s"${l.name}/Write")
-        }
-        ta
-      }
-      (lookupTables, lookupTableHandles, defaultValues, embeddings)
-    }
+  protected lazy val languageIds: Seq[Output] = tf.createWithNameScope("Vocabularies/LanguageIDs") {
+    languages.keys.zipWithIndex.map(l => tf.constant(l._2, name = s"${l._1}ID")).toSeq
+  }
+
+  protected lazy val lookupTables: Seq[tf.HashTable] = tf.createWithNameScope("Vocabularies/LookupTables") {
+    vocabularies.map(_.lookupTable())
+  }
+
+  protected lazy val wordEmbeddings: Seq[Output] = tf.createWithNameScope("Vocabularies/WordEmbeddings") {
+    val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+    languages.map(l =>
+      tf.variable(s"${l._1.name}", FLOAT32, Shape(l._2.size, embeddingsSize), embeddingsInitializer).value).toSeq
   }
 
   protected val projections: mutable.Map[Int, TensorArray] = mutable.Map.empty[Int, TensorArray]
 
-  def lookupTable(languageId: Output): Vocabularies.Table = {
-    val handle = lookupTableHandles.read(languageId)
-    val defaultValue = defaultValues.read(languageId)
-    Vocabularies.Table(handle, defaultValue)
+  def lookupTable(languageId: Output): (Output) => Output = (keys: Output) => {
+    val predicates = lookupTables.zip(languageIds).map {
+      case (table, langId) => (tf.equal(languageId, langId), () => table.lookup(keys))
+    }
+    val default = () => lookupTables.head.lookup(keys)
+    tf.cases(predicates, default)
   }
 
-  def embeddings(languageId: Output): Output = wordEmbeddings.read(languageId, name = "Embeddings/Read")
+  def embeddings(languageId: Output): Output = {
+    val predicates = wordEmbeddings.zip(languageIds).map {
+      case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
+    }
+    val default = () => wordEmbeddings.head
+    tf.cases(predicates, default)
+  }
 
   def projection(inputSize: Int, languageId: Output): Output = {
     projections.getOrElseUpdate(inputSize, {

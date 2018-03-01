@@ -70,8 +70,8 @@ class RNNModel[S, SS](
       case Some(inputSequences) =>
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step forward so the decoder learns to output the next word.
-        val tgtBosId = vocabularies.lookupTable(encoderInput._2)
-            .lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+        val tgtBosId = vocabularies
+            .lookupTable(encoderInput._2)(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
         val tgtSequence = tf.concatenate(Seq(
           tf.fill(INT32, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
           inputSequences._1), axis = 1)

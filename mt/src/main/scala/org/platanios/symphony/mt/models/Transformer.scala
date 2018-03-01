@@ -49,7 +49,7 @@
 //
 //    // Obtain token embeddings for the input sequence.
 //    val embeddings = parametersManager.get("Embeddings", FLOAT32, Shape(srcVocabulary.size, config.hiddenSize))
-//    val embeddedInputs = tf.embeddingLookup(embeddings, inputTokens)
+//    val embeddedInputs = embeddings.gather(inputTokens)
 //
 //    // Perform some pre-processing to the token embeddings sequence.
 //    val padding = tf.sequenceMask(inputLengths, inputMaxLength, dataType = FLOAT32, name = "Padding")
@@ -115,7 +115,7 @@
 //        val inputMaxLength = tf.shape(inputTokens)(1)
 //
 //        // Obtain token embeddings for the input sequence.
-//        val embeddedInputs = tf.embeddingLookup(embeddings, inputTokens)
+//        val embeddedInputs = embeddings.gather(inputTokens)
 //
 //        // Perform some pre-processing to the token embeddings sequence.
 //        val padding = tf.sequenceMask(inputLengths, inputMaxLength, dataType = FLOAT32, name = "Padding")
@@ -156,7 +156,7 @@
 //        state: Transformer.State,
 //        cache: Seq[Attention.Cache]
 //    ): (Output, Seq[Attention.Cache]) = {
-//      val embeddedTargets = tf.embeddingLookup(tgtEmbeddings, currentIDs)
+//      val embeddedTargets = tgtEmbeddings.gather(currentIDs)
 //      val decoderInput = embeddedTargets + tf.slice(
 //        positionalEmbeddings,
 //        tf.stack(Seq(zero, step, zero)),

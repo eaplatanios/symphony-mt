@@ -46,7 +46,7 @@ class UnidirectionalRNNEncoder[S, SS](
       srcSequenceLengths: Output
   )(mode: Mode, parametersManager: ParametersManager[_, _]): Tuple[Output, Seq[S]] = {
     val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
-    val embeddedSequences = tf.embeddingLookup(vocabularies.embeddings(srcLanguage), transposedSequences)
+    val embeddedSequences = vocabularies.embeddings(srcLanguage).gather(transposedSequences)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = RNNModel.multiCell(
       cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers, numResLayers, dropout,
