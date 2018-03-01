@@ -155,7 +155,7 @@ class FileParallelDataset protected (
             name = "Map/StringSplit")
           .prefetch(actualBufferSize)
           // Filter zero length input sequences and sequences exceeding the maximum length.
-          .filter(d => tf.logicalAnd(tf.size(d._1) > 0, tf.size(d._2) > 0))
+          .filter(d => tf.logicalAnd(tf.size(d._1) > 0, tf.size(d._2) > 0), "Filter/NonZeroLength")
           // Crop based on the maximum allowed sequence lengths.
           .transform(d => {
             if (dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1)
@@ -172,7 +172,6 @@ class FileParallelDataset protected (
                 dataConfig.numParallelCalls, name = "Map/MaxLength").prefetch(actualBufferSize)
             else
               d
-
           })
           // Convert the word strings to IDs. Word strings that are not in the vocabulary
           // get the lookup table's default value.

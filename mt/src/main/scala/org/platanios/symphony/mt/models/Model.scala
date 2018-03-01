@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric}
+import org.platanios.symphony.mt.evaluation.BLEU
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.vocabulary.{Vocabularies, Vocabulary}
@@ -78,13 +78,14 @@ abstract class Model[S] protected (
     if (logConfig.logLossSteps > 0)
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
     if (logConfig.logEvalSteps > 0) {
-      for (datasetType <- Seq(Train, Dev, Test)) {
-        val datasets = evalDatasets.map(d => (d._1, d._2.filterTypes(datasetType))).filter(_._2.nonEmpty)
-        if (datasets.nonEmpty) {
-          hooks += tf.learn.Evaluator(
-            log = true, summariesDir, Model.createEvalDatasets(datasets, languageIds), Seq(BLEU()),
-            StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = s"Eval/$datasetType")
-        }
+      var datasets = Seq.empty[(String, ParallelDataset)]
+      for (datasetType <- Seq(Train, Dev, Test))
+        datasets ++= evalDatasets.map(d => (s"${d._1}/$datasetType", d._2.filterTypes(datasetType)))
+      datasets = datasets.filter(_._2.nonEmpty)
+      if (datasets.nonEmpty) {
+        hooks += tf.learn.Evaluator(
+          log = true, summariesDir, Model.createEvalDatasets(datasets, languageIds), Seq(BLEU()),
+          StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
 
@@ -341,14 +342,16 @@ object Model {
         .map {
           case ((name, (srcLanguage, tgtLanguage)), dataset) =>
             (s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}",
-                () => dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true)
-                    .map(
-                      d => ((
-                          tf.constant(languageIds(srcLanguage)),
-                          tf.constant(languageIds(tgtLanguage)),
-                          d._1._1, d._1._2), d._2),
-                      name = s"AddTrainLanguageIDs$srcLanguage$tgtLanguage")
-                    .asInstanceOf[TFTrainDataset])
+                () => {
+                  dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true)
+                      .map(
+                        d => ((
+                            tf.constant(languageIds(srcLanguage)),
+                            tf.constant(languageIds(tgtLanguage)),
+                            d._1._1, d._1._2), d._2),
+                        name = s"AddTrainLanguageIDs$srcLanguage$tgtLanguage")
+                      .asInstanceOf[TFTrainDataset]
+                })
         }
   }
 }
