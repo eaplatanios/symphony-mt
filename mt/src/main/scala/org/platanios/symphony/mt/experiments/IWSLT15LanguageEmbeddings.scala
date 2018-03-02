@@ -15,22 +15,21 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.{Environment, Language}
+import java.nio.file.{Path, Paths}
+
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
-import org.platanios.symphony.mt.models.{DefaultParametersManager, Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
-
+import org.platanios.symphony.mt.models.{LanguageEmbeddingsPairParametersManager, Model, RNNModel}
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
-
-import java.nio.file.{Path, Paths}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-object IWSLT15 extends App {
+object IWSLT15LanguageEmbeddings extends App {
   val workingDir: Path = Paths.get("temp").resolve("pairwise")
 
   val srcLanguage: Language = english
@@ -81,11 +80,7 @@ object IWSLT15 extends App {
         dropout = Some(0.2f),
         attention = Some(LuongRNNAttention(scaled = true)),
         outputAttention = true),
-      parametersManager = DefaultParametersManager(
-        tf.VarianceScalingInitializer(
-          1.0f,
-          tf.VarianceScalingInitializer.FanAverageScalingMode,
-          tf.VarianceScalingInitializer.UniformDistribution)),
+      parametersManager = LanguageEmbeddingsPairParametersManager(512),
       labelSmoothing = 0.0f,
       timeMajor = true,
       beamWidth = 10),
