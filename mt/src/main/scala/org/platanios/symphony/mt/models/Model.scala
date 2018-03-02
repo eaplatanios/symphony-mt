@@ -310,7 +310,7 @@ object Model {
     dataset.toTFMonolingual(srcLanguage)
         .map(
           d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d._1, d._2),
-          name = s"AddInputLanguageIDs$srcLanguage$tgtLanguage")
+          name = s"AddInputLanguageIDs")
         .asInstanceOf[TFInputDataset]
   }
 
@@ -321,23 +321,21 @@ object Model {
       isEval: Boolean = false,
       prefetchBufferSize: Long = 1024L
   ): () => TFTrainDataset = () => {
-    tf.createWith(device = null) {
-      val processedDatasets: Seq[TFTrainDataset] = datasets
-          .map(_.filterLanguages(languageIds.keys.toSeq: _*))
-          .flatMap(d => d.languagePairs().map(_ -> d))
-          .map {
-            case ((srcLanguage, tgtLanguage), dataset) =>
-              dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = repeat, isEval = isEval)
-                  .map(
-                    d => ((
-                        tf.constant(languageIds(srcLanguage)),
-                        tf.constant(languageIds(tgtLanguage)),
-                        d._1._1, d._1._2), d._2),
-                    name = s"AddTrainLanguageIDs$srcLanguage$tgtLanguage")
-                  .asInstanceOf[TFTrainDataset]
-          }
-      processedDatasets.reduce((d1, d2) => d1.concatenate(d2)).prefetch(prefetchBufferSize)
-    }
+    val processedDatasets: Seq[TFTrainDataset] = datasets
+        .map(_.filterLanguages(languageIds.keys.toSeq: _*))
+        .flatMap(d => d.languagePairs().map(_ -> d))
+        .map {
+          case ((srcLanguage, tgtLanguage), dataset) =>
+            dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = repeat, isEval = isEval)
+                .map(
+                  d => ((
+                      tf.constant(languageIds(srcLanguage)),
+                      tf.constant(languageIds(tgtLanguage)),
+                      d._1._1, d._1._2), d._2),
+                  name = "AddTrainLanguageIDs")
+                .asInstanceOf[TFTrainDataset]
+        }
+    processedDatasets.reduce((d1, d2) => d1.concatenate(d2)).prefetch(prefetchBufferSize)
   }
 
   private[Model] def createEvalDatasets(
@@ -345,24 +343,22 @@ object Model {
       languageIds: Map[Language, Int],
       prefetchBufferSize: Long = 1024L
   ): Seq[(String, () => TFTrainDataset)] = {
-    tf.createWith(device = null) {
-      datasets
-          .map(d => (d._1, d._2.filterLanguages(languageIds.keys.toSeq: _*)))
-          .flatMap(d => d._2.languagePairs().map(l => (d._1, l) -> d._2))
-          .map {
-            case ((name, (srcLanguage, tgtLanguage)), dataset) =>
-              (s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}",
-                  () => {
-                    dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true)
-                        .map(
-                          d => ((
-                              tf.constant(languageIds(srcLanguage)),
-                              tf.constant(languageIds(tgtLanguage)),
-                              d._1._1, d._1._2), d._2),
-                          name = s"AddTrainLanguageIDs$srcLanguage$tgtLanguage")
-                        .asInstanceOf[TFTrainDataset].prefetch(prefetchBufferSize)
-                  })
-          }
-    }
+    datasets
+        .map(d => (d._1, d._2.filterLanguages(languageIds.keys.toSeq: _*)))
+        .flatMap(d => d._2.languagePairs().map(l => (d._1, l) -> d._2))
+        .map {
+          case ((name, (srcLanguage, tgtLanguage)), dataset) =>
+            (s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}",
+                () => {
+                  dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true)
+                      .map(
+                        d => ((
+                            tf.constant(languageIds(srcLanguage)),
+                            tf.constant(languageIds(tgtLanguage)),
+                            d._1._1, d._1._2), d._2),
+                        name = "AddTrainLanguageIDs")
+                      .asInstanceOf[TFTrainDataset].prefetch(prefetchBufferSize)
+                })
+        }
   }
 }

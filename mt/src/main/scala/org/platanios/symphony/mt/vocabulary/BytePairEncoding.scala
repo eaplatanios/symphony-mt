@@ -17,6 +17,8 @@ package org.platanios.symphony.mt.vocabulary
 
 import scala.collection.mutable
 
+// TODO: !!! This is incomplete.
+
 /** Use byte pair encoding (BPE) to learn a variable-length encoding of the vocabulary in a text.
   * Unlike the original BPE, it does not compress the plain text, but can be used to reduce the vocabulary of a text to
   * a configurable number of symbols, with only a small increase in the number of tokens.

@@ -1,4 +1,5 @@
 -Xmx8G
 -Xms1G
 -Xss2M
+-XX:MaxDirectMemorySize=16384M
 -XX:MaxMetaspaceSize=1024M
