@@ -266,7 +266,9 @@ object Inputs {
     }
 
     parallelDataset
-        .map(d => ((srcLanguage, tgtLanguage, d._1._1, d._1._2), dataConfig.numParallelCalls, d._2))
+        .map(
+          d => ((srcLanguage, tgtLanguage, d._1._1, d._1._2), d._2), dataConfig.numParallelCalls,
+          name = "AddLanguageIDs")
         .prefetch(bufferSize)
         .asInstanceOf[TFTrainDataset]
   }
