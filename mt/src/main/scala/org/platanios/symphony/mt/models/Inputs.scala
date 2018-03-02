@@ -62,6 +62,7 @@ object Inputs {
     val languageIds = languages.keys.zipWithIndex.toMap
     // TODO: Recreating the vocabularies here may be inefficient.
     val vocabularies = Vocabularies(languages, config.embeddingsSize)
+    val bufferSize = if (dataConfig.bufferSize == -1L) 1024L else dataConfig.bufferSize
 
     val filteredDatasets = datasets.map(_.filterLanguages(languageIds.keys.toSeq: _*))
     val numParallelFiles = filteredDatasets.map(_.languagePairs().size).sum // TODO: Not correct.
@@ -86,6 +87,7 @@ object Inputs {
     filesDataset
         .shuffle(numParallelFiles)
         .parallelInterleave(d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles)
+        .prefetch(bufferSize)
   }
 
   def createEvalDatasets(
@@ -235,7 +237,7 @@ object Inputs {
 
     val parallelDataset = {
       if (dataConfig.numBuckets == 1) {
-        batchingFn(datasetBeforeBucketing).prefetch(bufferSize)
+        batchingFn(datasetBeforeBucketing)
       } else {
         // Calculate the bucket width by using the maximum source sequence length, if provided. Pairs with length
         // [0, bucketWidth) go to bucket 0, length [bucketWidth, 2 * bucketWidth) go to bucket 1, etc. Pairs with length
@@ -259,12 +261,13 @@ object Inputs {
           batchingFn(pair._2)
         }
 
-        datasetBeforeBucketing.groupByWindow(keyFn, reduceFn, _ => batchSize).prefetch(bufferSize)
+        datasetBeforeBucketing.groupByWindow(keyFn, reduceFn, _ => batchSize)
       }
     }
 
     parallelDataset
-        .map(d => ((srcLanguage, tgtLanguage, d._1._1, d._1._2), d._2))
+        .map(d => ((srcLanguage, tgtLanguage, d._1._1, d._1._2), dataConfig.numParallelCalls, d._2))
+        .prefetch(bufferSize)
         .asInstanceOf[TFTrainDataset]
   }
 }
