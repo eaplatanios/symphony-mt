@@ -34,7 +34,7 @@ class RNNModel[S, SS](
     override val config: RNNModel.Config[S, SS],
     override val optConfig: Model.OptConfig,
     override val logConfig : Model.LogConfig  = Model.LogConfig(),
-    override val evalDatasets: Seq[(String, ParallelDataset)] = Seq.empty
+    override val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -108,7 +108,7 @@ object RNNModel {
       config: RNNModel.Config[S, SS],
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, ParallelDataset)] = Seq.empty
+      evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]

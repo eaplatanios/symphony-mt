@@ -51,22 +51,4 @@ trait ParallelDataset {
   def filterLanguages(languages: Language*): ParallelDataset
   def filterTypes(fileTypes: DatasetType*): ParallelDataset
   def filterKeys(keys: String*): ParallelDataset
-
-  /** Creates and returns a TensorFlow dataset, for the specified language.
-    *
-    * Each element of that dataset is a tuple containing:
-    *   - `INT32` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
-    *   - `INT32` tensor containing the input sentence lengths, with shape `[batchSize]`.
-    *
-    * @param  language Language for which the TensorFlow dataset is constructed.
-    * @return Created TensorFlow dataset.
-    */
-  def toTFMonolingual(language: Language): TFMonolingualDataset
-
-  def toTFBilingual(
-      language1: Language,
-      language2: Language,
-      repeat: Boolean = true,
-      isEval: Boolean = false
-  ): TFBilingualDataset
 }

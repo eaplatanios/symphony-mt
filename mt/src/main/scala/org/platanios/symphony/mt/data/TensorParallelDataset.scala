@@ -32,7 +32,7 @@ class TensorParallelDataset protected (
   override def isEmpty: Boolean = tensors.head._2.isEmpty
   override def nonEmpty: Boolean = !isEmpty
 
-  override def filterLanguages(languages: Language*): ParallelDataset = {
+  override def filterLanguages(languages: Language*): TensorParallelDataset = {
     languages.foreach(checkSupportsLanguage)
     TensorParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
@@ -40,7 +40,7 @@ class TensorParallelDataset protected (
       tensorTypes, tensorKeys)
   }
 
-  override def filterTypes(types: DatasetType*): ParallelDataset = {
+  override def filterTypes(types: DatasetType*): TensorParallelDataset = {
     require(tensorTypes.nonEmpty, "Cannot filter a parallel dataset by tensor type when it contains no tensor types.")
     val filteredGroupedTensors = tensors.mapValues(_.zip(tensorTypes).filter(f => types.contains(f._2)).map(_._1))
     val filteredFileTypes = tensorTypes.filter(types.contains)
@@ -50,7 +50,7 @@ class TensorParallelDataset protected (
       filteredFileTypes, filteredFileKeys)
   }
 
-  override def filterKeys(keys: String*): ParallelDataset = {
+  override def filterKeys(keys: String*): TensorParallelDataset = {
     require(tensorKeys.nonEmpty, "Cannot filter a parallel dataset by tensor key when it contains no tensor keys.")
     val filteredGroupedTensors = tensors.mapValues(_.zip(tensorKeys).filter(f => keys.contains(f._2)).map(_._1))
     val filteredTensorTypes = tensorKeys.zip(tensorTypes).filter(f => keys.contains(f._1)).map(_._2)
@@ -58,33 +58,6 @@ class TensorParallelDataset protected (
     TensorParallelDataset(
       s"$name/${keys.mkString("-")}", vocabulary, filteredGroupedTensors,
       filteredTensorTypes, filteredTensorsKeys)
-  }
-
-  /** Creates and returns a TensorFlow dataset, for the specified language.
-    *
-    * Each element of that dataset is a tuple containing:
-    *   - `INT32` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
-    *   - `INT32` tensor containing the input sentence lengths, with shape `[batchSize]`.
-    *
-    * @param  language Language for which the TensorFlow dataset is constructed.
-    * @return Created TensorFlow dataset.
-    */
-  override def toTFMonolingual(language: Language): TFMonolingualDataset = {
-    checkSupportsLanguage(language)
-    joinTensorPairDatasets(tensors(language).map(tf.data.TensorDataset(_)))
-  }
-
-  override def toTFBilingual(
-      language1: Language,
-      language2: Language,
-      repeat: Boolean = true,
-      isEval: Boolean = false
-  ): TFBilingualDataset = {
-    checkSupportsLanguage(language1)
-    checkSupportsLanguage(language2)
-    val dataset1 = joinTensorPairDatasets(tensors(language1).map(tf.data.TensorDataset(_)))
-    val dataset2 = joinTensorPairDatasets(tensors(language2).map(tf.data.TensorDataset(_)))
-    dataset1.zip(dataset2)
   }
 }
 

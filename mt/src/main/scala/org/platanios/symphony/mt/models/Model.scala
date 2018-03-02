@@ -41,7 +41,7 @@ abstract class Model[S] protected (
     val config: Model.Config,
     val optConfig: Model.OptConfig,
     val logConfig: Model.LogConfig = Model.LogConfig(),
-    val evalDatasets: Seq[(String, ParallelDataset)] = Seq.empty
+    val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty
 ) {
   protected val languageIds: Map[Language, Int] = languages.keys.zipWithIndex.toMap
 
@@ -78,16 +78,13 @@ abstract class Model[S] protected (
     if (logConfig.logLossSteps > 0)
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
     if (logConfig.logEvalSteps > 0) {
-      var datasets = Seq.empty[(String, ParallelDataset)]
+      var datasets = Seq.empty[(String, FileParallelDataset)]
       for (datasetType <- Seq(Train, Dev, Test))
         datasets ++= evalDatasets.map(d => (s"${d._1}/$datasetType", d._2.filterTypes(datasetType)))
       datasets = datasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
-        val batchSize = dataConfig.evaluateBatchSize
-        val prefetchBufferSize = if (dataConfig.bufferSize == -1L) 1024L * batchSize else dataConfig.bufferSize
         hooks += tf.learn.Evaluator(
-          log = true, summariesDir, Model.createEvalDatasets(
-            datasets, languageIds, prefetchBufferSize = prefetchBufferSize), Seq(BLEU()),
+          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages), Seq(BLEU()),
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
@@ -98,35 +95,33 @@ abstract class Model[S] protected (
       trainHooks = hooks)
   }
 
-  def train(datasets: Seq[ParallelDataset], stopCriteria: StopCriteria): Unit = {
-    val batchSize = dataConfig.trainBatchSize
-    val prefetchBufferSize = if (dataConfig.bufferSize == -1L) 1024L * batchSize else dataConfig.bufferSize
-    estimator.train(Model.createTrainDataset(
-      datasets, languageIds, repeat = true, isEval = false, prefetchBufferSize = prefetchBufferSize), stopCriteria)
+  def train(datasets: Seq[FileParallelDataset], stopCriteria: StopCriteria): Unit = {
+    estimator.train(Inputs.createTrainDataset(
+      dataConfig, config, datasets, languages, repeat = true, isEval = false), stopCriteria)
   }
 
-  def train(dataset: ParallelDataset, stopCriteria: StopCriteria): Unit = {
+  def train(dataset: FileParallelDataset, stopCriteria: StopCriteria): Unit = {
     train(Seq(dataset), stopCriteria)
   }
 
   def translate(
       srcLanguage: Language,
       tgtLanguage: Language,
-      dataset: ParallelDataset
+      dataset: FileParallelDataset
   ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
-    estimator.infer(Model.createInputDataset(srcLanguage, tgtLanguage, dataset, languageIds))
+    estimator.infer(Inputs.createInputDataset(dataConfig, config, dataset, srcLanguage, tgtLanguage, languages))
   }
 
-  def translate(
-      srcLanguage: (Language, Vocabulary),
-      tgtLanguage: (Language, Vocabulary),
-      input: (Tensor, Tensor)
-  ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
-    translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
-      name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
-      tensors = Map(srcLanguage._1 -> Seq(input))))
-  }
-
+//  def translate(
+//      srcLanguage: (Language, Vocabulary),
+//      tgtLanguage: (Language, Vocabulary),
+//      input: (Tensor, Tensor)
+//  ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
+//    translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
+//      name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
+//      tensors = Map(srcLanguage._1 -> Seq(input))))
+//  }
+//
 //  def evaluate(
 //      datasets: Seq[(String, ParallelDataset)],
 //      metrics: Seq[MTMetric],
@@ -147,6 +142,7 @@ abstract class Model[S] protected (
       ): (Output, Output, Output) = {
         parametersManager.initialize(Some(languages.keys.toSeq))
         parametersManager.setContext((input._1._1, input._1._2))
+        // TODO: Recreating the vocabularies here may be inefficient.
         val vocabularies = Vocabularies(languages, config.embeddingsSize)
         val state = tf.createWithVariableScope("Encoder")(encoder(input._1, vocabularies, mode))
         val output = tf.createWithVariableScope("Decoder") {
@@ -164,6 +160,7 @@ abstract class Model[S] protected (
       override protected def _forward(input: (Output, Output, Output, Output), mode: Mode): (Output, Output, Output) = {
         parametersManager.initialize(Some(languages.keys.toSeq))
         parametersManager.setContext((input._1, input._2))
+        // TODO: Recreating the vocabularies here may be inefficient.
         val vocabularies = Vocabularies(languages, config.embeddingsSize)
         val state = tf.createWithVariableScope("Encoder")(encoder(input, vocabularies, mode))
         val output = tf.createWithVariableScope("Decoder")(decoder(input, vocabularies, None, Some(state), mode))
@@ -289,76 +286,5 @@ object Model {
     ): LogConfig = {
       new LogConfig(logLossSteps, logEvalBatchSize, logEvalSteps)
     }
-  }
-
-  type TFInputDataset = tf.data.Dataset[
-      (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
-      (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape)]
-
-  type TFTrainDataset = tf.data.Dataset[
-      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor)),
-      ((Output, Output, Output, Output), (Output, Output)),
-      ((DataType, DataType, DataType, DataType), (DataType, DataType)),
-      ((Shape, Shape, Shape, Shape), (Shape, Shape))]
-
-  private[Model] def createInputDataset(
-      srcLanguage: Language,
-      tgtLanguage: Language,
-      dataset: ParallelDataset,
-      languageIds: Map[Language, Int]
-  ): () => TFInputDataset = () => {
-    dataset.toTFMonolingual(srcLanguage)
-        .map(
-          d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d._1, d._2),
-          name = s"AddInputLanguageIDs")
-        .asInstanceOf[TFInputDataset]
-  }
-
-  private[Model] def createTrainDataset(
-      datasets: Seq[ParallelDataset],
-      languageIds: Map[Language, Int],
-      repeat: Boolean = true,
-      isEval: Boolean = false,
-      prefetchBufferSize: Long = 1024L
-  ): () => TFTrainDataset = () => {
-    val processedDatasets: Seq[TFTrainDataset] = datasets
-        .map(_.filterLanguages(languageIds.keys.toSeq: _*))
-        .flatMap(d => d.languagePairs().map(_ -> d))
-        .map {
-          case ((srcLanguage, tgtLanguage), dataset) =>
-            dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = repeat, isEval = isEval)
-                .map(
-                  d => ((
-                      tf.constant(languageIds(srcLanguage)),
-                      tf.constant(languageIds(tgtLanguage)),
-                      d._1._1, d._1._2), d._2),
-                  name = "AddTrainLanguageIDs")
-                .asInstanceOf[TFTrainDataset]
-        }
-    processedDatasets.reduce((d1, d2) => d1.concatenate(d2)).prefetch(prefetchBufferSize)
-  }
-
-  private[Model] def createEvalDatasets(
-      datasets: Seq[(String, ParallelDataset)],
-      languageIds: Map[Language, Int],
-      prefetchBufferSize: Long = 1024L
-  ): Seq[(String, () => TFTrainDataset)] = {
-    datasets
-        .map(d => (d._1, d._2.filterLanguages(languageIds.keys.toSeq: _*)))
-        .flatMap(d => d._2.languagePairs().map(l => (d._1, l) -> d._2))
-        .map {
-          case ((name, (srcLanguage, tgtLanguage)), dataset) =>
-            (s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}",
-                () => {
-                  dataset.toTFBilingual(srcLanguage, tgtLanguage, repeat = false, isEval = true)
-                      .map(
-                        d => ((
-                            tf.constant(languageIds(srcLanguage)),
-                            tf.constant(languageIds(tgtLanguage)),
-                            d._1._1, d._1._2), d._2),
-                        name = "AddTrainLanguageIDs")
-                      .asInstanceOf[TFTrainDataset].prefetch(prefetchBufferSize)
-                })
-        }
   }
 }

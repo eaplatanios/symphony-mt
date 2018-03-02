@@ -15,26 +15,29 @@
 
 package org.platanios.symphony.mt
 
-import org.platanios.tensorflow.api.{DataType, Output, Shape, Tensor, tf}
+import org.platanios.tensorflow.api._
 
-package object data {
-  type TFMonolingualDataset = tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]
+/**
+  * @author Emmanouil Antonios Platanios
+  */
+package object models {
+  type TFSentencesDataset = tf.data.Dataset[
+      (Tensor, Tensor), (Output, Output),
+      (DataType, DataType), (Shape, Shape)]
 
-  type TFBilingualDataset = tf.data.Dataset[
+  type TFSentencePairsDataset = tf.data.Dataset[
       ((Tensor, Tensor), (Tensor, Tensor)),
       ((Output, Output), (Output, Output)),
       ((DataType, DataType), (DataType, DataType)),
       ((Shape, Shape), (Shape, Shape))]
 
-  private[mt] def joinTensorDatasets(
-      datasets: Seq[tf.data.Dataset[Tensor, Output, DataType, Shape]]
-  ): tf.data.Dataset[Tensor, Output, DataType, Shape] = {
-    datasets.reduce((d1, d2) => d1.concatenate(d2))
-  }
+  type TFInputDataset = tf.data.Dataset[
+      (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
+      (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape)]
 
-  private[mt] def joinTensorPairDatasets(
-      datasets: Seq[tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)]]
-  ): tf.data.Dataset[(Tensor, Tensor), (Output, Output), (DataType, DataType), (Shape, Shape)] = {
-    datasets.reduce((d1, d2) => d1.concatenate(d2))
-  }
+  type TFTrainDataset = tf.data.Dataset[
+      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor)),
+      ((Output, Output, Output, Output), (Output, Output)),
+      ((DataType, DataType, DataType, DataType), (DataType, DataType)),
+      ((Shape, Shape, Shape, Shape), (Shape, Shape))]
 }
