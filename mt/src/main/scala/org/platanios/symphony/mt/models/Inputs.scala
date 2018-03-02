@@ -57,7 +57,8 @@ object Inputs {
       datasets: Seq[FileParallelDataset],
       languages: Map[Language, Vocabulary],
       repeat: Boolean = true,
-      isEval: Boolean = false
+      isEval: Boolean = false,
+      languagePairs: Option[Set[(Language, Language)]] = None
   ): () => TFTrainDataset = () => {
     val languageIds = languages.keys.zipWithIndex.toMap
     // TODO: Recreating the vocabularies here may be inefficient.
@@ -69,7 +70,10 @@ object Inputs {
 
     // Each element in `filesDataset` is a tuple: (srcLanguage, tgtLanguage, srcFile, tgtFile).
     val filesDataset = filteredDatasets
-        .flatMap(d => d.languagePairs().map(_ -> d))
+        .flatMap(d => {
+          val currentLanguagePairs = d.languagePairs()
+          languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(_ -> d)
+        })
         .map {
           case ((srcLanguage, tgtLanguage), dataset) =>
             val srcFiles: Tensor = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString())
@@ -102,7 +106,9 @@ object Inputs {
         .map {
           case ((name, (srcLanguage, tgtLanguage)), dataset) =>
             (s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}",
-                createTrainDataset(dataConfig, config, Seq(dataset), languages, repeat = false, isEval = true))
+                createTrainDataset(
+                  dataConfig, config, Seq(dataset), languages, repeat = false, isEval = true,
+                  languagePairs = Some(Set((srcLanguage, tgtLanguage)))))
         }
   }
 
