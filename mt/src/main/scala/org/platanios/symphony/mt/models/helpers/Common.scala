@@ -392,7 +392,7 @@ object Common {
       reluDropoutRate: Float = 0.0f,
       reluDropoutBroadcastAxes: Set[Int] = Set.empty,
       name: String = "DenseReLUDense"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = tf.createWithVariableScope(name) {
+  )(mode: Mode, parametersManager: ParametersManager): Output = tf.createWithVariableScope(name) {
     val weights1 = parametersManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
     val bias1 = parametersManager.get("Dense1/Bias", input.dataType, Shape(filterSize))
     var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")

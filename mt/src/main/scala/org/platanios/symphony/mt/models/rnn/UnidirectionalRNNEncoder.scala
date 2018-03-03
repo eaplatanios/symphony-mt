@@ -16,7 +16,6 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
-import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -39,14 +38,13 @@ class UnidirectionalRNNEncoder[S, SS](
 ) extends RNNEncoder[S, SS]()(evS, evSDropout) {
   override def create(
       config: RNNModel.Config[_, _],
-      vocabularies: Vocabularies,
       srcLanguage: Output,
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Tuple[Output, Seq[S]] = {
+  )(mode: Mode, parametersManager: ParametersManager): Tuple[Output, Seq[S]] = {
     val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
-    val embeddedSequences = vocabularies.embeddings(srcLanguage).gather(transposedSequences)
+    val embeddedSequences = parametersManager.wordEmbeddings(srcLanguage).gather(transposedSequences)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = RNNModel.multiCell(
       cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers, numResLayers, dropout,

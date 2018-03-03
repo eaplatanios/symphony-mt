@@ -48,7 +48,7 @@ class DotProductAttention protected (
       k: Output,
       v: Output,
       bias: Option[Output]
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = tf.createWithNameScope(name) {
+  )(mode: Mode, parametersManager: ParametersManager): Output = tf.createWithNameScope(name) {
     // `logits` shape: [batchSize, numHeads, queryLength, memoryLength]
     var logits = tf.matmul(q, k, transposeB = true)
     bias.foreach(logits += _)

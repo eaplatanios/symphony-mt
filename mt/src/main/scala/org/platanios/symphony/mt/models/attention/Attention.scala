@@ -41,7 +41,7 @@ trait Attention {
       k: Output,
       v: Output,
       bias: Option[Output]
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output
+  )(mode: Mode, parametersManager: ParametersManager): Output
 
   // TODO: Add support for saving weights.
   // TODO: Add support for image summaries for the weights.
@@ -236,7 +236,7 @@ object Attention {
       kvNumFilters: Int = 1,
       qPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
       kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): (Output, Output, Output) = {
+  )(mode: Mode, parametersManager: ParametersManager): (Output, Output, Output) = {
 
     def compute(input: Output, depth: Int, numFilters: Int, paddingMode: tf.ConvPaddingMode, name: String): Output = {
       tf.createWithVariableScope(name) {
@@ -301,7 +301,7 @@ object Attention {
       kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
       cache: Option[Cache] = None,
       name: String = "MultiHeadAttention"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.createWithVariableScope(name) {

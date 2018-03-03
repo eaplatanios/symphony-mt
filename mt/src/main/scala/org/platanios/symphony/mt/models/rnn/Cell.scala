@@ -30,7 +30,7 @@ trait Cell[S, SS] {
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): RNNCell[Output, Shape, S, SS]
+  )(mode: Mode, parametersManager: ParametersManager): RNNCell[Output, Shape, S, SS]
 }
 
 case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, Shape] {
@@ -39,7 +39,7 @@ case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, S
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): RNNCell[Output, Shape, Output, Shape] = {
+  )(mode: Mode, parametersManager: ParametersManager): RNNCell[Output, Shape, Output, Shape] = {
     val gateKernel = parametersManager.get("Gate/Weights", dataType, Shape(numInputs + numUnits, 2 * numUnits))
     val gateBias = parametersManager.get("Gate/Bias", dataType, Shape(2 * numUnits), tf.ZerosInitializer)
     val candidateKernel = parametersManager.get("Candidate/Weights", dataType, Shape(numInputs + numUnits, numUnits))
@@ -55,7 +55,7 @@ case class BasicLSTM(forgetBias: Float = 1.0f, activation: Output => Output = tf
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): BasicLSTMCell = {
+  )(mode: Mode, parametersManager: ParametersManager): BasicLSTMCell = {
     val kernel = parametersManager.get("Weights", dataType, Shape(numInputs + numUnits, 4 * numUnits))
     val bias = parametersManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
     BasicLSTMCell(kernel, bias, activation, forgetBias, name)
@@ -75,7 +75,7 @@ case class LSTM(
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): LSTMCell = {
+  )(mode: Mode, parametersManager: ParametersManager): LSTMCell = {
     val hiddenDepth = if (projectionSize != -1) projectionSize else numUnits
     val kernel = parametersManager.get("Weights", dataType, Shape(numInputs + hiddenDepth, 4 * numUnits))
     val bias = parametersManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)

@@ -17,7 +17,6 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
-import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
@@ -45,7 +44,6 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
 ) extends RNNDecoder[S, SS]()(evS, evSDropout) {
   override def create(
       config: RNNModel.Config[_, _],
-      vocabularies: Vocabularies,
       srcLanguage: Output,
       tgtLanguage: Output,
       encoderState: (Tuple[Output, Seq[S]], Output, Output),
@@ -53,9 +51,9 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): RNNDecoder.Output = {
+  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = vocabularies.embeddings(tgtLanguage)
+    val embeddings = parametersManager.wordEmbeddings(tgtLanguage)
 
     // RNN cell
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
@@ -84,7 +82,7 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
     attention match {
       case None =>
         decode(
-          config, vocabularies, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths, initialState,
+          config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths, initialState,
           embeddings, uniCell, encoderState._3, beginOfSequenceToken, endOfSequenceToken)(mode, parametersManager)
       case Some(attentionCreator) =>
         val (attentionCell, attentionInitialState) = attentionCreator.create(
@@ -92,7 +90,7 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
           numUnits, numUnits, initialState, useAttentionLayer = true,
           outputAttention = outputAttention)(mode, parametersManager)
         decode(
-          config, vocabularies, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
+          config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
           attentionInitialState, embeddings, attentionCell, encoderState._3, beginOfSequenceToken,
           endOfSequenceToken)(mode, parametersManager)
     }

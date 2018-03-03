@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.vocabulary.{Vocabularies, Vocabulary}
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
 /**
@@ -30,17 +30,14 @@ object Inputs {
       dataset: FileParallelDataset,
       srcLanguage: Language,
       tgtLanguage: Language,
-      languages: Map[Language, Vocabulary]
+      languages: Seq[(Language, Vocabulary)]
   ): () => TFInputDataset = () => {
-    val languageIds = languages.keys.zipWithIndex.toMap
-    // TODO: Recreating the vocabularies here may be inefficient.
-    val vocabularies = Vocabularies(languages, config.embeddingsSize)
+    val languageIds = languages.map(_._1).zipWithIndex.toMap
 
     val files: Tensor = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString())
     val numFiles = files.size
 
-    val inputDatasetCreator: (Output, Output, Output) => TFInputDataset =
-      createSingleInputDataset(dataConfig, config, vocabularies)
+    val inputDatasetCreator: (Output, Output, Output) => TFInputDataset = createSingleInputDataset(dataConfig, config)
 
     tf.data.TensorSlicesDataset(files)
         .map(
@@ -55,14 +52,12 @@ object Inputs {
       dataConfig: DataConfig,
       config: Model.Config,
       datasets: Seq[FileParallelDataset],
-      languages: Map[Language, Vocabulary],
+      languages: Seq[(Language, Vocabulary)],
       repeat: Boolean = true,
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
   ): () => TFTrainDataset = () => {
-    val languageIds = languages.keys.zipWithIndex.toMap
-    // TODO: Recreating the vocabularies here may be inefficient.
-    val vocabularies = Vocabularies(languages, config.embeddingsSize)
+    val languageIds = languages.map(_._1).zipWithIndex.toMap
     val bufferSize = if (dataConfig.bufferSize == -1L) 1024L else dataConfig.bufferSize
 
     val filteredDatasets = datasets.map(_.filterLanguages(languageIds.keys.toSeq: _*))
@@ -86,7 +81,7 @@ object Inputs {
         }.reduce((d1, d2) => d1.concatenate(d2))
 
     val parallelDatasetCreator: (Output, Output, Output, Output) => TFTrainDataset =
-      createSingleParallelDataset(dataConfig, config, vocabularies, repeat, isEval)
+      createSingleParallelDataset(dataConfig, config, repeat, isEval)
 
     filesDataset
         .shuffle(numParallelFiles)
@@ -98,10 +93,10 @@ object Inputs {
       dataConfig: DataConfig,
       config: Model.Config,
       datasets: Seq[(String, FileParallelDataset)],
-      languages: Map[Language, Vocabulary]
+      languages: Seq[(Language, Vocabulary)]
   ): Seq[(String, () => TFTrainDataset)] = {
     datasets
-        .map(d => (d._1, d._2.filterLanguages(languages.keys.toSeq: _*)))
+        .map(d => (d._1, d._2.filterLanguages(languages.map(_._1).toSeq: _*)))
         .flatMap(d => d._2.languagePairs().map(l => (d._1, l) -> d._2))
         .map {
           case ((name, (srcLanguage, tgtLanguage)), dataset) =>
@@ -125,11 +120,10 @@ object Inputs {
     */
   private[this] def createSingleInputDataset(
       dataConfig: DataConfig,
-      config: Model.Config,
-      vocabularies: Vocabularies
+      config: Model.Config
   )(srcLanguage: Output, tgtLanguage: Output, file: Output): TFInputDataset = {
     val batchSize = dataConfig.inferBatchSize
-    val srcVocabLookup = vocabularies.lookupTable(srcLanguage)
+    val srcVocabLookup = config.parametersManager.lookupTable(srcLanguage)
     val eosId = srcVocabLookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
     val batchingFn = (dataset: TFSentencesDataset) => {
@@ -163,7 +157,6 @@ object Inputs {
   private[this] def createSingleParallelDataset(
       dataConfig: DataConfig,
       config: Model.Config,
-      vocabularies: Vocabularies,
       repeat: Boolean,
       isEval: Boolean
   )(
@@ -175,8 +168,8 @@ object Inputs {
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
     val bufferSize = if (dataConfig.bufferSize == -1L) 1024L * batchSize else dataConfig.bufferSize
 
-    val srcVocabLookup = vocabularies.lookupTable(srcLanguage)
-    val tgtVocabLookup = vocabularies.lookupTable(tgtLanguage)
+    val srcVocabLookup = config.parametersManager.lookupTable(srcLanguage)
+    val tgtVocabLookup = config.parametersManager.lookupTable(tgtLanguage)
     val srcEosId = srcVocabLookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
     val tgtEosId = tgtVocabLookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 

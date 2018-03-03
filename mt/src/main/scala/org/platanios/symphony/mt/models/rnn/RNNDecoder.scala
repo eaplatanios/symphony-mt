@@ -16,7 +16,6 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.models.{Decoder, ParametersManager, RNNModel}
-import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
@@ -33,7 +32,6 @@ abstract class RNNDecoder[S, SS]()(implicit
 ) extends Decoder[(Tuple[Output, Seq[S]], Output, Output)] {
   def create(
       config: RNNModel.Config[_, _],
-      vocabularies: Vocabularies,
       srcLanguage: Output,
       tgtLanguage: Output,
       encoderState: (Tuple[Output, Seq[S]], Output, Output),
@@ -41,11 +39,10 @@ abstract class RNNDecoder[S, SS]()(implicit
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): RNNDecoder.Output
+  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output
 
   protected def decode[DS, DSS](
       config: RNNModel.Config[_, _],
-      vocabularies: Vocabularies,
       srcSequenceLengths: Output,
       tgtLanguage: Output,
       tgtSequences: Output,
@@ -56,10 +53,10 @@ abstract class RNNDecoder[S, SS]()(implicit
       tgtMaxLength: Output,
       beginOfSequenceToken: String,
       endOfSequenceToken: String
-  )(mode: Mode, parametersManager: ParametersManager[_, _])(implicit
+  )(mode: Mode, parametersManager: ParametersManager)(implicit
       evS: WhileLoopVariable.Aux[DS, DSS]
   ): RNNDecoder.Output = {
-    val outputWeights = vocabularies.projection(cell.outputShape(-1), tgtLanguage)
+    val outputWeights = parametersManager.getProjectionToWords(cell.outputShape(-1), tgtLanguage)
     val outputLayer = (logits: Output) => tf.linear(logits, outputWeights)
     if (mode.isTraining) {
       // Time-major transpose
@@ -76,7 +73,7 @@ abstract class RNNDecoder[S, SS]()(implicit
     } else {
       // Decoder embeddings
       val embeddingFn = (o: Output) => embeddings.gather(o)
-      val tgtVocabLookupTable = vocabularies.lookupTable(tgtLanguage)
+      val tgtVocabLookupTable = parametersManager.lookupTable(tgtLanguage)
       val tgtBosID = tgtVocabLookupTable(tf.constant(beginOfSequenceToken)).cast(INT32)
       val tgtEosID = tgtVocabLookupTable(tf.constant(endOfSequenceToken)).cast(INT32)
 

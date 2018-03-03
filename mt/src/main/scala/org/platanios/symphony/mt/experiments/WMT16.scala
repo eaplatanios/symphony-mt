@@ -19,9 +19,10 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
-import org.platanios.symphony.mt.models.{Model, RNNModel}
+import org.platanios.symphony.mt.models.{Model, ParametersManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention
+
 import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
@@ -62,11 +63,16 @@ object WMT16 extends App {
 
   val model = RNNModel(
     name = "Model",
-    languages = Map(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
+    languages = Seq(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
-      embeddingsSize = 1024,
+      ParametersManager(
+        wordEmbeddingsSize = 1024,
+        tf.VarianceScalingInitializer(
+          1.0f,
+          tf.VarianceScalingInitializer.FanAverageScalingMode,
+          tf.VarianceScalingInitializer.UniformDistribution)),
       GNMTEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
         numUnits = 1024,

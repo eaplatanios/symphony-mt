@@ -61,11 +61,17 @@ object IWSLT15LanguageEmbeddings extends App {
 
   val model = RNNModel(
     name = "Model",
-    languages = Map(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
+    languages = Seq(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
-      embeddingsSize = 512,
+      LanguageEmbeddingsPairParametersManager(
+        languageEmbeddingsSize = 512,
+        wordEmbeddingsSize = 512,
+        tf.VarianceScalingInitializer(
+          1.0f,
+          tf.VarianceScalingInitializer.FanAverageScalingMode,
+          tf.VarianceScalingInitializer.UniformDistribution)),
       UnidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
         numUnits = 512,
@@ -80,7 +86,6 @@ object IWSLT15LanguageEmbeddings extends App {
         dropout = Some(0.2f),
         attention = Some(LuongRNNAttention(scaled = true)),
         outputAttention = true),
-      parametersManager = LanguageEmbeddingsPairParametersManager(512),
       labelSmoothing = 0.0f,
       timeMajor = true,
       beamWidth = 10),

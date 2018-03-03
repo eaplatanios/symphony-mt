@@ -16,38 +16,90 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.TRAINING
+import org.platanios.tensorflow.api.ops.FunctionGraph
 
 import scala.collection.mutable
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait ParametersManager[I, C] {
-  protected var context: Option[C] = None
+class ParametersManager protected (
+    val wordEmbeddingsSize: Int,
+    val variableInitializer: tf.VariableInitializer = null
+) {
+  protected var languages: Seq[(Language, Vocabulary)] = _
 
-  def initialize(information: Option[I] = None): Unit
+  protected val languageIds   : mutable.Map[Graph, Seq[Output]]       = mutable.HashMap.empty
+  protected val lookupTables  : mutable.Map[Graph, Seq[tf.HashTable]] = mutable.HashMap.empty
+  protected val wordEmbeddings: mutable.Map[Graph, Seq[Output]]       = mutable.HashMap.empty
 
-  def getContext: Option[C] = this.context
-  def setContext(context: C): Unit = this.context = Some(context)
+  protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, Seq[Output]]] = mutable.Map.empty
+
+  protected var context: Option[(Output, Output)] = None
+
+  protected def currentGraph: Graph = {
+    var graph = tf.currentGraph
+    while (graph.isInstanceOf[FunctionGraph])
+      graph = graph.asInstanceOf[FunctionGraph].outerGraph
+    graph
+  }
+
+  protected def removeGraph(graph: Graph): Unit = {
+    languageIds -= graph
+    lookupTables -= graph
+    wordEmbeddings -= graph
+    projectionsToWords -= graph
+  }
+
+  def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
+    languageIds.keys.filter(_.isClosed).foreach(removeGraph)
+    // TODO: !!! Clear graphs at some point.
+    this.languages = languages
+    val graph = currentGraph
+    if (!languageIds.contains(graph)) {
+      languageIds += graph -> tf.createWithNameScope("ParametersManager/LanguageIDs") {
+        languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = s"${l._1}ID"))
+      }
+    }
+    if (!lookupTables.contains(graph)) {
+      lookupTables += graph -> tf.createWithNameScope("ParametersManager/LookupTables") {
+        languages.map(_._2).map(_.lookupTable())
+      }
+    }
+    if (!wordEmbeddings.contains(graph)) {
+      wordEmbeddings += graph -> tf.createWithNameScope("ParametersManager/WordEmbeddings") {
+        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+        languages.map(l =>
+          tf.variable(s"${l._1.name}", FLOAT32, Shape(l._2.size, wordEmbeddingsSize), embeddingsInitializer).value)
+      }
+    }
+  }
+
+  def lookupTable(languageId: Output): (Output) => Output = (keys: Output) => {
+    val graph = currentGraph
+    val predicates = lookupTables(graph).zip(languageIds(graph)).map {
+      case (table, langId) => (tf.equal(languageId, langId), () => table.lookup(keys))
+    }
+    val default = () => lookupTables(graph).head.lookup(keys)
+    tf.cases(predicates, default)
+  }
+
+  def wordEmbeddings(languageId: Output): Output = {
+    val graph = currentGraph
+    val predicates = wordEmbeddings(graph).zip(languageIds(graph)).map {
+      case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
+    }
+    val default = () => wordEmbeddings(graph).head
+    tf.cases(predicates, default)
+  }
+
+  def getContext: Option[(Output, Output)] = this.context
+  def setContext(context: (Output, Output)): Unit = this.context = Some(context)
   def resetContext(): Unit = this.context = None
 
   def get(
-      name: String,
-      dataType: DataType,
-      shape: Shape,
-      variableInitializer: tf.VariableInitializer = null,
-      variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  ): Output
-}
-
-case class DefaultParametersManager[I, C](
-    variableInitializer: tf.VariableInitializer = null
-) extends ParametersManager[I, C] {
-  override def initialize(information: Option[I]): Unit = ()
-
-  override def get(
       name: String,
       dataType: DataType,
       shape: Shape,
@@ -56,21 +108,56 @@ case class DefaultParametersManager[I, C](
   ): Output = {
     tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value
   }
+
+  def getProjectionToWords(inputSize: Int, languageId: Output): Output = {
+    val graph = currentGraph
+    val projectionsForSize = projectionsToWords
+        .getOrElseUpdate(graph, mutable.HashMap.empty)
+        .getOrElseUpdate(inputSize, {
+          val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+          languages.map(l =>
+            tf.variable(s"${l._1.name}/OutWeights", FLOAT32, Shape(inputSize, l._2.size), weightsInitializer).value)
+        })
+    val predicates = projectionsForSize.zip(languageIds(graph)).map {
+      case (projections, langId) => (tf.equal(languageId, langId), () => projections)
+    }
+    val default = () => projectionsForSize.head
+    tf.cases(predicates, default)
+  }
 }
 
-case class LanguageEmbeddingsPairParametersManager(
-    languageEmbeddingsSize: Int,
-    variableInitializer: tf.VariableInitializer = null
-) extends ParametersManager[Seq[Language], (Output, Output)] {
-  protected var languageEmbeddings: Output                      = _
-  protected val parameters        : mutable.Map[String, Output] = mutable.HashMap.empty[String, Output]
+object ParametersManager {
+  def apply(wordEmbeddingsSize: Int, variableInitializer: tf.VariableInitializer = null): ParametersManager = {
+    new ParametersManager(wordEmbeddingsSize, variableInitializer)
+  }
+}
 
-  override def initialize(information: Option[Seq[Language]]): Unit = {
-    val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-    languageEmbeddings = tf.variable(
-      s"LanguageEmbeddings", FLOAT32, Shape(information.get.length, languageEmbeddingsSize),
-      initializer = embeddingsInitializer).value
-    parameters.clear()
+class LanguageEmbeddingsPairParametersManager protected (
+    val languageEmbeddingsSize: Int,
+    override val wordEmbeddingsSize: Int,
+    override val variableInitializer: tf.VariableInitializer = null
+) extends ParametersManager(wordEmbeddingsSize, variableInitializer) {
+  protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
+  protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
+
+  override protected def removeGraph(graph: Graph): Unit = {
+    super.removeGraph(graph)
+    languageEmbeddings -= graph
+    parameters -= graph
+  }
+
+  override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
+    // TODO: !!! Clear graphs at some point.
+    super.initialize(languages)
+    val graph = currentGraph
+    if (!languageEmbeddings.contains(graph)) {
+      languageEmbeddings += graph -> tf.createWithNameScope("ParametersManager/LanguageEmbeddings") {
+        val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+        tf.variable(
+          "LanguageEmbeddings", FLOAT32, Shape(languages.length, languageEmbeddingsSize),
+          initializer = embeddingsInitializer).value
+      }
+    }
   }
 
   override def get(
@@ -80,11 +167,13 @@ case class LanguageEmbeddingsPairParametersManager(
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   ): Output = {
+    val graph = currentGraph
     val variableScopeName = tf.currentVariableScope.name
     val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
 
     def create(): Output = tf.createWithVariableScope(name) {
-      val embeddings = languageEmbeddings.gather(tf.stack(Seq(context.get._1, context.get._2))).reshape(Shape(1, -1))
+      val languagePair = tf.stack(Seq(context.get._1, context.get._2))
+      val embeddings = languageEmbeddings(graph).gather(languagePair).reshape(Shape(1, -1))
       val weights = tf.variable("Dense/Weights", FLOAT32, Shape(2 * languageEmbeddingsSize, shape.numElements.toInt))
       val bias = tf.variable("Dense/Bias", FLOAT32, Shape(shape.numElements.toInt))
       val parameters = tf.linear(embeddings, weights, bias, "Dense")
@@ -92,13 +181,29 @@ case class LanguageEmbeddingsPairParametersManager(
     }
 
     variableReuse match {
-      case tf.ReuseExistingVariableOnly => parameters(fullName)
+      case tf.ReuseExistingVariableOnly => parameters.getOrElseUpdate(graph, mutable.Map.empty)(fullName)
       case tf.CreateNewVariableOnly =>
         // TODO: Kind of hacky.
         val created = create()
-        parameters += created.op.inputs(0).name -> created
+        parameters.getOrElseUpdate(graph, mutable.Map.empty) += created.op.inputs(0).name -> created
         created
-      case tf.ReuseOrCreateNewVariable => parameters.getOrElseUpdate(fullName, create())
+      case tf.ReuseOrCreateNewVariable =>
+        parameters
+            .getOrElseUpdate(graph, mutable.Map.empty)
+            .getOrElseUpdate(fullName, create())
     }
+  }
+}
+
+object LanguageEmbeddingsPairParametersManager {
+  def apply(
+      languageEmbeddingsSize: Int,
+      wordEmbeddingsSize: Int,
+      variableInitializer: tf.VariableInitializer = null
+  ): LanguageEmbeddingsPairParametersManager = {
+    new LanguageEmbeddingsPairParametersManager(
+      languageEmbeddingsSize,
+      wordEmbeddingsSize,
+      variableInitializer)
   }
 }

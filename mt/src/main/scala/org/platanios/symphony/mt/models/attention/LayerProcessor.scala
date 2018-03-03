@@ -29,7 +29,7 @@ trait LayerProcessor {
       value: Output,
       previousValue: Option[Output],
       name: String = "LayerProcessor"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output
+  )(mode: Mode, parametersManager: ParametersManager): Output
 }
 
 case object AddResidualConnection extends LayerProcessor {
@@ -38,7 +38,7 @@ case object AddResidualConnection extends LayerProcessor {
       value: Output,
       previousValue: Option[Output],
       name: String = "AddResidualConnection"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     previousValue match {
       case Some(v) => value + v
       case None => throw new IllegalArgumentException(
@@ -53,7 +53,7 @@ case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) exte
       value: Output,
       previousValue: Option[Output],
       name: String = "Normalize"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     normalization(value, epsilon = epsilon, name = name)(mode, parametersManager)
   }
 }
@@ -68,7 +68,7 @@ case class Dropout(
       value: Output,
       previousValue: Option[Output],
       name: String = "Normalize"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     if (mode.isTraining)
       Common.dropoutWithBroadcastAxes(value, 1.0f - dropoutRate, scaleOutput, broadcastAxes)
     else
@@ -88,7 +88,7 @@ object LayerProcessor {
   def layerPreprocess(
       input: Output,
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     processors.foldLeft(input) {
       case (value, processor) => processor(value, None)(mode, parametersManager)
     }
@@ -107,7 +107,7 @@ object LayerProcessor {
       input: Output,
       output: Output,
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     processors.foldLeft(output) {
       case (value, processor) => processor(value, Some(input))(mode, parametersManager)
     }

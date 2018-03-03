@@ -17,7 +17,6 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
-import org.platanios.symphony.mt.vocabulary.Vocabularies
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
@@ -45,7 +44,6 @@ class GNMTDecoder[S, SS, AS, ASS](
 ) extends RNNDecoder[S, SS]()(evS, evSDropout) {
   override def create(
       config: RNNModel.Config[_, _],
-      vocabularies: Vocabularies,
       srcLanguage: Output,
       tgtLanguage: Output,
       encoderState: (Tuple[Output, Seq[S]], Output, Output),
@@ -53,9 +51,9 @@ class GNMTDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): RNNDecoder.Output = {
+  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = vocabularies.embeddings(tgtLanguage)
+    val embeddings = parametersManager.wordEmbeddings(tgtLanguage)
 
     // RNN cells
     val cells = RNNModel.cells(
@@ -78,7 +76,7 @@ class GNMTDecoder[S, SS, AS, ASS](
       numUnits, initialState.head, useAttentionLayer = false, outputAttention = false)(mode, parametersManager)
     val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](attentionCell, cells.tail, useNewAttention)
     decode(
-      config, vocabularies, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
+      config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
       (attentionInitialState, initialState.tail), embeddings, multiCell, encoderState._3,
       beginOfSequenceToken, endOfSequenceToken)(mode, parametersManager)
   }

@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
-import org.platanios.symphony.mt.models.{DefaultParametersManager, Model, RNNModel}
+import org.platanios.symphony.mt.models.{ParametersManager, Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
 
@@ -47,7 +47,7 @@ object IWSLT15 extends App {
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
-    numGPUs = 1,
+    numGPUs = 0,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
@@ -62,30 +62,30 @@ object IWSLT15 extends App {
 
   val model = RNNModel(
     name = "Model",
-    languages = Map(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
+    languages = Seq(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
-      embeddingsSize = 512,
+      ParametersManager(
+        wordEmbeddingsSize = 32,
+        tf.VarianceScalingInitializer(
+          1.0f,
+          tf.VarianceScalingInitializer.FanAverageScalingMode,
+          tf.VarianceScalingInitializer.UniformDistribution)),
       UnidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 32,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 32,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f),
         attention = Some(LuongRNNAttention(scaled = true)),
         outputAttention = true),
-      parametersManager = DefaultParametersManager(
-        tf.VarianceScalingInitializer(
-          1.0f,
-          tf.VarianceScalingInitializer.FanAverageScalingMode,
-          tf.VarianceScalingInitializer.UniformDistribution)),
       labelSmoothing = 0.0f,
       timeMajor = true,
       beamWidth = 10),

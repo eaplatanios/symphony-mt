@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.evaluation.BLEU
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
-import org.platanios.symphony.mt.vocabulary.{Vocabularies, Vocabulary}
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
@@ -36,16 +36,16 @@ import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Op
   */
 abstract class Model[S] protected (
     val name: String,
-    val languages: Map[Language, Vocabulary],
+    val languages: Seq[(Language, Vocabulary)],
     val dataConfig: DataConfig,
     val config: Model.Config,
     val optConfig: Model.OptConfig,
     val logConfig: Model.LogConfig = Model.LogConfig(),
     val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty
 ) {
-  protected val languageIds: Map[Language, Int] = languages.keys.zipWithIndex.toMap
+  protected val languageIds: Map[Language, Int] = languages.map(_._1).zipWithIndex.toMap
 
-  protected val parametersManager: ParametersManager[Seq[Language], (Output, Output)] = config.parametersManager
+  protected val parametersManager: ParametersManager = config.parametersManager
 
   /** Each input consists of a tuple containing:
     *   - The source language ID.
@@ -140,14 +140,10 @@ abstract class Model[S] protected (
           input: ((Output, Output, Output, Output), (Output, Output)),
           mode: Mode
       ): (Output, Output, Output) = {
-        parametersManager.initialize(Some(languages.keys.toSeq))
+        parametersManager.initialize(languages)
         parametersManager.setContext((input._1._1, input._1._2))
-        // TODO: Recreating the vocabularies here may be inefficient.
-        val vocabularies = Vocabularies(languages, config.embeddingsSize)
-        val state = tf.createWithVariableScope("Encoder")(encoder(input._1, vocabularies, mode))
-        val output = tf.createWithVariableScope("Decoder") {
-          decoder(input._1, vocabularies, Some(input._2), Some(state), mode)
-        }
+        val state = tf.createWithVariableScope("Encoder")(encoder(input._1, mode))
+        val output = tf.createWithVariableScope("Decoder")(decoder(input._1, Some(input._2), Some(state), mode))
         (input._1._2, output._1, output._2)
       }
     }
@@ -158,12 +154,10 @@ abstract class Model[S] protected (
       override val layerType: String = "InferLayer"
 
       override protected def _forward(input: (Output, Output, Output, Output), mode: Mode): (Output, Output, Output) = {
-        parametersManager.initialize(Some(languages.keys.toSeq))
+        parametersManager.initialize(languages)
         parametersManager.setContext((input._1, input._2))
-        // TODO: Recreating the vocabularies here may be inefficient.
-        val vocabularies = Vocabularies(languages, config.embeddingsSize)
-        val state = tf.createWithVariableScope("Encoder")(encoder(input, vocabularies, mode))
-        val output = tf.createWithVariableScope("Decoder")(decoder(input, vocabularies, None, Some(state), mode))
+        val state = tf.createWithVariableScope("Encoder")(encoder(input, mode))
+        val output = tf.createWithVariableScope("Decoder")(decoder(input, None, Some(state), mode))
         (input._2, output._1, output._2)
       }
     }
@@ -177,15 +171,14 @@ abstract class Model[S] protected (
           input: ((Output, Output, Output), (Output, Output)),
           mode: Mode
       ): Output = tf.createWithNameScope("Loss") {
-        // TODO: Recreating the vocabularies here may be inefficient.
-        val vocabularies = Vocabularies(languages, config.embeddingsSize)
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
         // word used as input, rather than the previous predicted word.
-        val tgtEosId = vocabularies.lookupTable(input._1._1)(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+        val tgtEosId = parametersManager
+            .lookupTable(input._1._1)(tf.constant(dataConfig.endOfSequenceToken))
+            .cast(INT32)
         val tgtSequence = tf.concatenate(Seq(
-          input._2._1,
-          tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
+          input._2._1, tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
         val tgtSequenceLength = input._2._2 + 1
         val lossValue = loss(input._1._2, tgtSequence, tgtSequenceLength)
         tf.summary.scalar("Loss", lossValue)
@@ -199,7 +192,6 @@ abstract class Model[S] protected (
     * @param  input        Tuple containing two tensors:
     *                        - `INT32` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
     *                        - `INT32` tensor with shape `[batchSize]`, containing the sequence lengths.
-    * @param  vocabularies
     * @param  mode    Current learning mode (e.g., training or evaluation).
     * @return   Tuple containing two tensors:
     *           - Encoder output, with shape `[batchSize, inputLength, hiddenSize]`.
@@ -207,7 +199,6 @@ abstract class Model[S] protected (
     */
   protected def encoder(
       input: (Output, Output, Output, Output),
-      vocabularies: Vocabularies,
       mode: Mode
   ): S
 
@@ -217,7 +208,6 @@ abstract class Model[S] protected (
     */
   protected def decoder(
       encoderInput: (Output, Output, Output, Output),
-      vocabularies: Vocabularies,
       input: Option[(Output, Output)],
       state: Option[S],
       mode: Mode
@@ -231,10 +221,9 @@ abstract class Model[S] protected (
 }
 
 object Model {
-  class Config protected(
+  class Config protected (
       val env: Environment,
-      val embeddingsSize: Int,
-      val parametersManager: ParametersManager[Seq[Language], (Output, Output)],
+      val parametersManager: ParametersManager,
       val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
@@ -243,22 +232,17 @@ object Model {
   object Config {
     def apply(
         env: Environment,
-        embeddingsSize: Int,
-        parametersManager: ParametersManager[Seq[Language], (Output, Output)] = DefaultParametersManager(
-          tf.VarianceScalingInitializer(
-            1.0f,
-            tf.VarianceScalingInitializer.FanAverageScalingMode,
-            tf.VarianceScalingInitializer.UniformDistribution)),
+        parametersManager: ParametersManager,
         labelSmoothing: Float = 0.0f,
         timeMajor: Boolean = false,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config = {
-      new Config(env, embeddingsSize, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+      new Config(env, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
     }
   }
 
-  class OptConfig protected(
+  class OptConfig protected (
       val maxGradNorm: Float,
       val optimizer: Optimizer,
       val colocateGradientsWithOps: Boolean)
@@ -273,7 +257,7 @@ object Model {
     }
   }
 
-  class LogConfig protected(
+  class LogConfig protected (
       val logLossSteps: Int,
       val logEvalBatchSize: Int,
       val logEvalSteps: Int)

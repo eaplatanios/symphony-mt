@@ -28,7 +28,7 @@ trait Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output
+  )(mode: Mode, parametersManager: ParametersManager): Output
 }
 
 /** Applies no normalization to the input tensor. */
@@ -38,7 +38,7 @@ case object NoNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "NoNormalization"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     input
   }
 }
@@ -49,7 +49,7 @@ case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVaria
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "LayerNormalization"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     val numFilters = depth.getOrElse(input.shape(-1))
     tf.createWithVariableScope(name, reuse) {
       val scale = parametersManager.get("Scale", input.dataType, Shape(numFilters), tf.OnesInitializer)
@@ -69,7 +69,7 @@ case object BatchNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "BatchNormalization"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     ???
   }
 }
@@ -80,7 +80,7 @@ case object NoamNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "NoamNormalization"
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = tf.createWithNameScope(name) {
+  )(mode: Mode, parametersManager: ParametersManager): Output = tf.createWithNameScope(name) {
     tf.l2Normalize(input, input.rank - 1, epsilon) * tf.sqrt(tf.constant(input.shape(-1), FLOAT32))
   }
 }

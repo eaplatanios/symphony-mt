@@ -41,7 +41,7 @@ case class BahdanauRNNAttention(
       initialState: S,
       useAttentionLayer: Boolean,
       outputAttention: Boolean
-  )(mode: Mode, parametersManager: ParametersManager[_, _])(implicit
+  )(mode: Mode, parametersManager: ParametersManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: tf.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, Output, Shape], AttentionWrapperState[S, SS, Seq[Output], Seq[Shape]]) = {

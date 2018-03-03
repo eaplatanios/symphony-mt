@@ -29,7 +29,7 @@ trait FeedForwardLayer {
   def apply(
       input: Output,
       paddingRemover: Option[PadRemover]
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output
+  )(mode: Mode, parametersManager: ParametersManager): Output
 }
 
 class DenseReLUDenseFeedForwardLayer protected (
@@ -42,7 +42,7 @@ class DenseReLUDenseFeedForwardLayer protected (
   override def apply(
       input: Output,
       paddingRemover: Option[PadRemover]
-  )(mode: Mode, parametersManager: ParametersManager[_, _]): Output = {
+  )(mode: Mode, parametersManager: ParametersManager): Output = {
     val inputShape = tf.shape(input)
     val processedInput = paddingRemover.map(pr => {
       // Collapse `input` across examples, and remove padding positions.
