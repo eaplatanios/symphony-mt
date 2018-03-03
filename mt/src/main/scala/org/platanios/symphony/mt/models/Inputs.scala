@@ -96,7 +96,7 @@ object Inputs {
       languages: Seq[(Language, Vocabulary)]
   ): Seq[(String, () => TFTrainDataset)] = {
     datasets
-        .map(d => (d._1, d._2.filterLanguages(languages.map(_._1).toSeq: _*)))
+        .map(d => (d._1, d._2.filterLanguages(languages.map(_._1): _*)))
         .flatMap(d => d._2.languagePairs().map(l => (d._1, l) -> d._2))
         .map {
           case ((name, (srcLanguage, tgtLanguage)), dataset) =>

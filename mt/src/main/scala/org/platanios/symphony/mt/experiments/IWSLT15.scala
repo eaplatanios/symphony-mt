@@ -47,7 +47,7 @@ object IWSLT15 extends App {
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
-    numGPUs = 0,
+    numGPUs = 4,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
@@ -67,20 +67,20 @@ object IWSLT15 extends App {
     config = RNNModel.Config(
       env,
       ParametersManager(
-        wordEmbeddingsSize = 32,
+        wordEmbeddingsSize = 512,
         tf.VarianceScalingInitializer(
           1.0f,
           tf.VarianceScalingInitializer.FanAverageScalingMode,
           tf.VarianceScalingInitializer.UniformDistribution)),
-      UnidirectionalRNNEncoder(
+      BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 32,
+        numUnits = 512,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 32,
+        numUnits = 512,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f),
@@ -93,8 +93,8 @@ object IWSLT15 extends App {
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
     evalDatasets = Seq(
-      ("IWSLT-15", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
-      ("IWSLT-15", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
+      ("IWSLT15", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
+      ("IWSLT15", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
   model.train(dataset, tf.learn.StopCriteria.steps(12000))
 

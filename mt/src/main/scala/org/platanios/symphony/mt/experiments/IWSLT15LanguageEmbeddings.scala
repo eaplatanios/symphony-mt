@@ -93,8 +93,8 @@ object IWSLT15LanguageEmbeddings extends App {
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
     evalDatasets = Seq(
-      ("IWSLT-15", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
-      ("IWSLT-15", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
+      ("IWSLT15", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
+      ("IWSLT15", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
   model.train(dataset, tf.learn.StopCriteria.steps(12000))
 

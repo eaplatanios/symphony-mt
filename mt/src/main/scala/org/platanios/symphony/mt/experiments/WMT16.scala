@@ -96,8 +96,8 @@ object WMT16 extends App {
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
     evalDatasets = Seq(
-      ("WMT-16", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
-      ("WMT-16", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
+      ("WMT16", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
+      ("WMT16", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
   model.train(dataset, tf.learn.StopCriteria.steps(340000))
 }
