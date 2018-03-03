@@ -67,12 +67,8 @@ object IWSLT15LanguageEmbeddings extends App {
       env,
       LanguageEmbeddingsPairParametersManager(
         languageEmbeddingsSize = 512,
-        wordEmbeddingsSize = 512,
-        tf.VarianceScalingInitializer(
-          1.0f,
-          tf.VarianceScalingInitializer.FanAverageScalingMode,
-          tf.VarianceScalingInitializer.UniformDistribution)),
-      UnidirectionalRNNEncoder(
+        wordEmbeddingsSize = 512),
+      BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
         numUnits = 512,
         numLayers = 2,
