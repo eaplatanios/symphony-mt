@@ -78,7 +78,7 @@ case class TrainingLogger(
     gradientsNorm = modelInstance.gradientsAndVariables.map(g => tf.globalNorm(g.map(_._1))).orNull
     loss = modelInstance.loss.map(_.cast(FLOAT32))
         .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._2))).orNull
-    srcWordCount = modelInstance.trainInput.map(o => tf.sum(o._1._2)).orNull
+    srcWordCount = modelInstance.trainInput.map(o => tf.sum(o._1._4)).orNull
     tgtWordCount = modelInstance.trainInput.map(o => tf.sum(o._2._2) + tf.size(o._2._2)).orNull
     totalLoss = 0.0f
     totalSrcWordCount = 0L

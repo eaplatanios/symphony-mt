@@ -31,9 +31,9 @@ class ParametersManager protected (
 ) {
   protected var languages: Seq[(Language, Vocabulary)] = _
 
-  protected val languageIds   : mutable.Map[Graph, Seq[Output]]       = mutable.HashMap.empty
-  protected val lookupTables  : mutable.Map[Graph, Seq[tf.HashTable]] = mutable.HashMap.empty
-  protected val wordEmbeddings: mutable.Map[Graph, Seq[Output]]       = mutable.HashMap.empty
+  protected val languageIds   : mutable.Map[Graph, Seq[Output]]       = mutable.Map.empty
+  protected val lookupTables  : mutable.Map[Graph, Seq[tf.HashTable]] = mutable.Map.empty
+  protected val wordEmbeddings: mutable.Map[Graph, Seq[Output]]       = mutable.Map.empty
 
   protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, Seq[Output]]] = mutable.Map.empty
 
@@ -55,7 +55,6 @@ class ParametersManager protected (
 
   def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
     languageIds.keys.filter(_.isClosed).foreach(removeGraph)
-    // TODO: !!! Clear graphs at some point.
     this.languages = languages
     val graph = currentGraph
     if (!languageIds.contains(graph)) {
@@ -147,7 +146,6 @@ class LanguageEmbeddingsPairParametersManager protected (
   }
 
   override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
-    // TODO: !!! Clear graphs at some point.
     super.initialize(languages)
     val graph = currentGraph
     if (!languageEmbeddings.contains(graph)) {
