@@ -38,8 +38,9 @@ case class Vocabulary private[Vocabulary] (file: File, size: Int) {
     *
     * @return Vocabulary lookup table.
     */
-  def lookupTable(): tf.HashTable = {
-    Vocabulary.indexTableFromFile(file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN_ID)
+  def lookupTable(name: String = "IndexTableFromFile"): tf.HashTable = {
+    Vocabulary.indexTableFromFile(
+      file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN_ID, name = name)
   }
 }
 

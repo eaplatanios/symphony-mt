@@ -59,19 +59,19 @@ class ParametersManager protected (
     val graph = currentGraph
     if (!languageIds.contains(graph)) {
       languageIds += graph -> tf.createWithNameScope("ParametersManager/LanguageIDs") {
-        languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = s"${l._1}ID"))
+        languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = l._1.name))
       }
     }
     if (!lookupTables.contains(graph)) {
       lookupTables += graph -> tf.createWithNameScope("ParametersManager/LookupTables") {
-        languages.map(_._2).map(_.lookupTable())
+        languages.map(l => l._2.lookupTable(name = l._1.name))
       }
     }
     if (!wordEmbeddings.contains(graph)) {
       wordEmbeddings += graph -> tf.createWithNameScope("ParametersManager/WordEmbeddings") {
         val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
         languages.map(l =>
-          tf.variable(s"${l._1.name}", FLOAT32, Shape(l._2.size, wordEmbeddingsSize), embeddingsInitializer).value)
+          tf.variable(l._1.name, FLOAT32, Shape(l._2.size, wordEmbeddingsSize), embeddingsInitializer).value)
       }
     }
   }
