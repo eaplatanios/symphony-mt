@@ -42,11 +42,9 @@ object Inputs {
     tf.data.TensorSlicesDataset(files)
         .map(
           d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d),
-          name = "InputAddLanguageIDs")
+          name = "AddLanguageIDs")
         .shuffle(numFiles)
-        .parallelInterleave(
-          d => inputDatasetCreator(d._1, d._2, d._3), cycleLength = numFiles,
-          name = "InputParallelInterleave")
+        .parallelInterleave(d => inputDatasetCreator(d._1, d._2, d._3), cycleLength = numFiles, name = "Interleave")
         .asInstanceOf[TFInputDataset]
   }
 
@@ -79,7 +77,7 @@ object Inputs {
             val tgtFilesDataset = tf.data.TensorSlicesDataset(tgtFiles)
             srcFilesDataset.zip(tgtFilesDataset).map(
               d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d._1, d._2),
-              name = "TrainAddLanguageIDs")
+              name = "AddLanguageIDs")
         }.reduce((d1, d2) => d1.concatenate(d2))
 
     val parallelDatasetCreator: (Output, Output, Output, Output) => TFTrainDataset =
@@ -88,8 +86,7 @@ object Inputs {
     filesDataset
         .shuffle(numParallelFiles)
         .parallelInterleave(
-          d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles,
-          name = "TrainParallelInterleave")
+          d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles, name = "Interleave")
         .prefetch(bufferSize)
   }
 
@@ -274,7 +271,7 @@ object Inputs {
     parallelDataset
         .map(
           d => ((srcLanguage, tgtLanguage, d._1._1, d._1._2), d._2), dataConfig.numParallelCalls,
-          name = "TrainSingleAddLanguageIDs")
+          name = "AddLanguageIDs")
         .prefetch(bufferSize)
         .asInstanceOf[TFTrainDataset]
   }
