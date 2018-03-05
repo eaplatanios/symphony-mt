@@ -42,9 +42,11 @@ object Inputs {
     tf.data.TensorSlicesDataset(files)
         .map(
           d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d),
-          name = "AddLanguageIDs")
+          name = "InputAddLanguageIDs")
         .shuffle(numFiles)
-        .parallelInterleave(d => inputDatasetCreator(d._1, d._2, d._3), cycleLength = numFiles)
+        .parallelInterleave(
+          d => inputDatasetCreator(d._1, d._2, d._3), cycleLength = numFiles,
+          name = "InputParallelInterleave")
         .asInstanceOf[TFInputDataset]
   }
 
@@ -77,7 +79,7 @@ object Inputs {
             val tgtFilesDataset = tf.data.TensorSlicesDataset(tgtFiles)
             srcFilesDataset.zip(tgtFilesDataset).map(
               d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d._1, d._2),
-              name = "AddLanguageIDs")
+              name = "TrainAddLanguageIDs")
         }.reduce((d1, d2) => d1.concatenate(d2))
 
     val parallelDatasetCreator: (Output, Output, Output, Output) => TFTrainDataset =
@@ -85,7 +87,9 @@ object Inputs {
 
     filesDataset
         .shuffle(numParallelFiles)
-        .parallelInterleave(d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles)
+        .parallelInterleave(
+          d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles,
+          name = "TrainParallelInterleave")
         .prefetch(bufferSize)
   }
 
@@ -222,6 +226,7 @@ object Inputs {
             else
               d
           })
+          .prefetch(bufferSize)
           // Convert the word strings to IDs. Word strings that are not in the vocabulary
           // get the lookup table's default value.
           .map(
@@ -229,10 +234,12 @@ object Inputs {
                 tf.cast(srcVocabLookup(d._1), INT32),
                 tf.cast(tgtVocabLookup(d._2), INT32)),
             dataConfig.numParallelCalls, name = "Map/VocabularyLookup")
-              // Add sequence lengths.
-              .map(
+          .prefetch(bufferSize)
+          // Add sequence lengths.
+          .map(
             d => ((d._1, tf.size(d._1, INT32)), (d._2, tf.size(d._2, INT32))), dataConfig.numParallelCalls,
             name = "Map/AddLengths")
+          .prefetch(bufferSize)
 
     val parallelDataset = {
       if (dataConfig.numBuckets == 1) {
@@ -267,7 +274,7 @@ object Inputs {
     parallelDataset
         .map(
           d => ((srcLanguage, tgtLanguage, d._1._1, d._1._2), d._2), dataConfig.numParallelCalls,
-          name = "AddLanguageIDs")
+          name = "TrainSingleAddLanguageIDs")
         .prefetch(bufferSize)
         .asInstanceOf[TFTrainDataset]
   }

@@ -22,6 +22,7 @@ import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.client.SessionConfig
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
@@ -91,7 +92,10 @@ abstract class Model[S] protected (
 
     // Create estimator.
     tf.learn.InMemoryEstimator(
-      model, tf.learn.Configuration(Some(config.env.workingDir), randomSeed = config.env.randomSeed),
+      model, tf.learn.Configuration(
+        workingDir = Some(config.env.workingDir),
+        sessionConfig = Some(SessionConfig(allowSoftPlacement = Some(true))),
+        randomSeed = config.env.randomSeed),
       trainHooks = hooks)
   }
 
