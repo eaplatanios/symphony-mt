@@ -54,17 +54,19 @@ abstract class Model[S] protected (
     *   - A tensor containing a padded batch of sentences consisting of word IDs, in the source language.
     *   - A tensor containing the sentence lengths for the aforementioned padded batch.
     */
-  protected val input      = Input((INT32, INT32, INT32, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
-  protected val trainInput = Input((INT32, INT32), (Shape(-1, -1), Shape(-1)))
+  protected val input      = Input((INT32, INT32, STRING, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
+  protected val trainInput = Input((INT32, STRING, INT32), (Shape(), Shape(-1, -1), Shape(-1)))
 
   protected val estimator: tf.learn.Estimator[
       (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
       (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape), (Output, Output, Output),
-      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor)), ((Output, Output, Output, Output), (Output, Output)),
-      ((DataType, DataType, DataType, DataType), (DataType, DataType)), ((Shape, Shape, Shape, Shape), (Shape, Shape)),
+      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor)),
+      ((Output, Output, Output, Output), (Output, Output, Output)),
+      ((DataType, DataType, DataType, DataType), (DataType, DataType, DataType)),
+      ((Shape, Shape, Shape, Shape), (Shape, Shape, Shape)),
       ((Output, Output, Output), (Output, Output))] = tf.createWithNameScope(name) {
     val model = learn.Model.supervised(
-      input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
+      input, inferLayer, trainLayer, trainInput, trainInputLayer, lossLayer, optConfig.optimizer,
       tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm), optConfig.colocateGradientsWithOps)
     val summariesDir = config.env.workingDir.resolve("summaries")
 
@@ -136,18 +138,35 @@ abstract class Model[S] protected (
 //    estimator.evaluate(Model.createEvalDatasets(datasets, languageIds), metrics, maxSteps, saveSummaries, name)
 //  }
 
-  protected def trainLayer: Layer[((Output, Output, Output, Output), (Output, Output)), (Output, Output, Output)] = {
-    new Layer[((Output, Output, Output, Output), (Output, Output)), (Output, Output, Output)](name) {
+  protected def trainInputLayer: Layer[(Output, Output, Output), (Output, Output)] = {
+    new Layer[(Output, Output, Output), (Output, Output)](name) {
+      override val layerType: String = "InputTrain"
+
+      override protected def _forward(
+          input: (Output, Output, Output),
+          mode: Mode
+      ): (Output, Output) = tf.createWithNameScope("InputTrain") {
+        (mapToWordIds(input._1, input._2), input._3)
+      }
+    }
+  }
+
+  protected def trainLayer: Layer[((Output, Output, Output, Output), (Output, Output, Output)), (Output, Output, Output)] = {
+    new Layer[((Output, Output, Output, Output), (Output, Output, Output)), (Output, Output, Output)](name) {
       override val layerType: String = "TrainLayer"
 
       override protected def _forward(
-          input: ((Output, Output, Output, Output), (Output, Output)),
+          input: ((Output, Output, Output, Output), (Output, Output, Output)),
           mode: Mode
       ): (Output, Output, Output) = {
         parametersManager.initialize(languages)
         parametersManager.setContext((input._1._1, input._1._2))
-        val state = tf.createWithVariableScope("Encoder")(encoder(input._1, mode))
-        val output = tf.createWithVariableScope("Decoder")(decoder(input._1, Some(input._2), Some(state), mode))
+        val srcSequence = mapToWordIds(input._1._1, input._1._3)
+        val tgtSequence = mapToWordIds(input._2._1, input._2._2)
+        val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
+        val tgtMapped = (tgtSequence, input._2._3)
+        val state = tf.createWithVariableScope("Encoder")(encoder(srcMapped, mode))
+        val output = tf.createWithVariableScope("Decoder")(decoder(srcMapped, Some(tgtMapped), Some(state), mode))
         (input._1._2, output._1, output._2)
       }
     }
@@ -160,8 +179,10 @@ abstract class Model[S] protected (
       override protected def _forward(input: (Output, Output, Output, Output), mode: Mode): (Output, Output, Output) = {
         parametersManager.initialize(languages)
         parametersManager.setContext((input._1, input._2))
-        val state = tf.createWithVariableScope("Encoder")(encoder(input, mode))
-        val output = tf.createWithVariableScope("Decoder")(decoder(input, None, Some(state), mode))
+        val srcSequence = mapToWordIds(input._1, input._3)
+        val srcMapped = (input._1, input._2, srcSequence, input._4)
+        val state = tf.createWithVariableScope("Encoder")(encoder(srcMapped, mode))
+        val output = tf.createWithVariableScope("Decoder")(decoder(srcMapped, None, Some(state), mode))
         (input._2, output._1, output._2)
       }
     }
@@ -189,6 +210,10 @@ abstract class Model[S] protected (
         lossValue
       }
     }
+  }
+
+  protected def mapToWordIds(language: Output, wordSequence: Output): Output = {
+    config.parametersManager.lookupTable(language)(wordSequence).cast(INT32)
   }
 
   /**

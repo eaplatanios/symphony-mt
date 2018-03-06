@@ -71,12 +71,14 @@ object Inputs {
         })
         .map {
           case ((srcLanguage, tgtLanguage), dataset) =>
-            val srcFiles: Tensor = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString())
-            val tgtFiles: Tensor = dataset.files(tgtLanguage).map(_.path.toAbsolutePath.toString())
-            val srcFilesDataset = tf.data.TensorSlicesDataset(srcFiles)
-            val tgtFilesDataset = tf.data.TensorSlicesDataset(tgtFiles)
-            srcFilesDataset.zip(tgtFilesDataset).map(
-              d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d._1, d._2),
+            val srcFiles = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString())
+            val tgtFiles = dataset.files(tgtLanguage).map(_.path.toAbsolutePath.toString())
+            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor).repeat()
+            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor).repeat()
+            val srcFilesDataset = tf.data.TensorSlicesDataset(srcFiles: Tensor)
+            val tgtFilesDataset = tf.data.TensorSlicesDataset(tgtFiles: Tensor)
+            srcLanguageDataset.zip(tgtLanguageDataset).zip(srcFilesDataset.zip(tgtFilesDataset)).map(
+              d => (d._1._1, d._1._2, d._2._1, d._2._2),
               name = "AddLanguageIDs")
         }.reduce((d1, d2) => d1.concatenate(d2))
 
@@ -124,8 +126,6 @@ object Inputs {
       config: Model.Config
   )(srcLanguage: Output, tgtLanguage: Output, file: Output): TFInputDataset = {
     val batchSize = dataConfig.inferBatchSize
-    val srcVocabLookup = config.parametersManager.lookupTable(srcLanguage)
-    val eosId = srcVocabLookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
 
     val batchingFn = (dataset: TFSentencesDataset) => {
       dataset.dynamicPaddedBatch(
@@ -136,7 +136,7 @@ object Inputs {
         // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
         // not generally need to do this since later on we will be masking out calculations past
         // the true sequence.
-        (eosId, tf.zeros(INT32, Shape.scalar())))
+        (tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar())))
     }
 
     val dataset = tf.data.DynamicTextLinesDataset(file)
@@ -145,9 +145,6 @@ object Inputs {
         .map(o => tf.stringSplit(o.expandDims(0)).values)
         // Crop based on the maximum allowed sequence length.
         .transform(d => if (dataConfig.srcMaxLength != -1) d.map(dd => dd(0 :: dataConfig.srcMaxLength)) else d)
-        // Convert the word strings to IDs. Word strings that are not in the vocabulary
-        // get the lookup table's default value.
-        .map(d => tf.cast(srcVocabLookup(d), INT32))
         // Add sequence lengths.
         .map(d => (d, tf.size(d, INT32)))
 
@@ -169,11 +166,8 @@ object Inputs {
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
     val bufferSize = if (dataConfig.bufferSize == -1L) 1024L * batchSize else dataConfig.bufferSize
 
-    val srcVocabLookup = config.parametersManager.lookupTable(srcLanguage)
-    val tgtVocabLookup = config.parametersManager.lookupTable(tgtLanguage)
-    val srcEosId = srcVocabLookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-    val tgtEosId = tgtVocabLookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
-
+    val srcLanguageDataset = tf.data.OutputDataset(srcLanguage).repeat()
+    val tgtLanguageDataset = tf.data.OutputDataset(tgtLanguage).repeat()
     val srcDataset = tf.data.DynamicTextLinesDataset(srcFile)
     val tgtDataset = tf.data.DynamicTextLinesDataset(tgtFile)
 
@@ -182,15 +176,16 @@ object Inputs {
         batchSize,
         // The first three entries are the source and target line rows, which are unknown-length vectors.
         // The last two entries are the source and target row sizes, which are scalars.
-        ((Shape(-1), Shape.scalar()), (Shape(-1), Shape.scalar())),
+        ((Shape(), Shape()), ((Shape(-1), Shape()), (Shape(-1), Shape()))),
         // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
         // generally need to do this since later on we will be masking out calculations past the true sequence.
-        ((srcEosId, tf.zeros(INT32, Shape.scalar().toOutput())),
-            (tgtEosId, tf.zeros(INT32, Shape.scalar().toOutput()))))
+        ((tf.zeros(INT32, Shape()), tf.zeros(INT32, Shape())),
+            ((tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar().toOutput())),
+                (tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar().toOutput())))))
     }
 
     val datasetBeforeBucketing =
-      srcDataset.zip(tgtDataset)
+      srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset))
           .shard(dataConfig.numShards, dataConfig.shardIndex)
           .drop(dataConfig.dropCount)
           .transform(d => {
@@ -202,40 +197,32 @@ object Inputs {
           .shuffle(bufferSize)
           // Tokenize by splitting on white spaces.
           .map(
-            d => (tf.stringSplit(d._1(NewAxis)).values, tf.stringSplit(d._2(NewAxis)).values),
+            d => (d._1, (tf.stringSplit(d._2._1(NewAxis)).values, tf.stringSplit(d._2._2(NewAxis)).values)),
             name = "Map/StringSplit")
               // Filter zero length input sequences and sequences exceeding the maximum length.
-              .filter(d => tf.logicalAnd(tf.size(d._1) > 0, tf.size(d._2) > 0), "Filter/NonZeroLength")
+              .filter(d => tf.logicalAnd(tf.size(d._2._1) > 0, tf.size(d._2._2) > 0), "Filter/NonZeroLength")
               // Crop based on the maximum allowed sequence lengths.
               .transform(d => {
             if (dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1)
               d.map(
-                dd => (dd._1(0 :: dataConfig.srcMaxLength), dd._2(0 :: dataConfig.tgtMaxLength)),
+                dd => (dd._1, (dd._2._1(0 :: dataConfig.srcMaxLength), dd._2._2(0 :: dataConfig.tgtMaxLength))),
                 dataConfig.numParallelCalls, name = "Map/MaxLength")
             else if (dataConfig.srcMaxLength != -1)
               d.map(
-                dd => (dd._1(0 :: dataConfig.srcMaxLength), dd._2),
+                dd => (dd._1, (dd._2._1(0 :: dataConfig.srcMaxLength), dd._2._2)),
                 dataConfig.numParallelCalls, name = "Map/MaxLength")
             else if (dataConfig.tgtMaxLength != -1)
               d.map(
-                dd => (dd._1, dd._2(0 :: dataConfig.tgtMaxLength)),
+                dd => (dd._1, (dd._2._1, dd._2._2(0 :: dataConfig.tgtMaxLength))),
                 dataConfig.numParallelCalls, name = "Map/MaxLength")
             else
               d
           })
           .prefetch(bufferSize)
-          // Convert the word strings to IDs. Word strings that are not in the vocabulary
-          // get the lookup table's default value.
-          .map(
-            d => (
-                tf.cast(srcVocabLookup(d._1), INT32),
-                tf.cast(tgtVocabLookup(d._2), INT32)),
-            dataConfig.numParallelCalls, name = "Map/VocabularyLookup")
-          .prefetch(bufferSize)
           // Add sequence lengths.
           .map(
-            d => ((d._1, tf.size(d._1, INT32)), (d._2, tf.size(d._2, INT32))), dataConfig.numParallelCalls,
-            name = "Map/AddLengths")
+            d => (d._1, ((d._2._1, tf.size(d._2._1, INT32)), (d._2._2, tf.size(d._2._2, INT32)))),
+            dataConfig.numParallelCalls, name = "Map/AddLengths")
           .prefetch(bufferSize)
 
     val parallelDataset = {
@@ -252,11 +239,11 @@ object Inputs {
             10
         }
 
-        def keyFn(element: ((Output, Output), (Output, Output))): Output = {
+        def keyFn(element: ((Output, Output), ((Output, Output), (Output, Output)))): Output = {
           // Bucket sequence  pairs based on the length of their source sequence and target sequence.
           val bucketId = tf.maximum(
-            tf.truncateDivide(element._1._2, bucketWidth),
-            tf.truncateDivide(element._2._2, bucketWidth))
+            tf.truncateDivide(element._2._1._2, bucketWidth),
+            tf.truncateDivide(element._2._2._2, bucketWidth))
           tf.minimum(dataConfig.numBuckets, bucketId).cast(INT64)
         }
 
@@ -270,8 +257,8 @@ object Inputs {
 
     parallelDataset
         .map(
-          d => ((srcLanguage, tgtLanguage, d._1._1, d._1._2), d._2), dataConfig.numParallelCalls,
-          name = "AddLanguageIDs")
+          d => ((d._1._1(0), d._1._2(0), d._2._1._1, d._2._1._2), (d._1._2(0), d._2._2._1, d._2._2._2)),
+          dataConfig.numParallelCalls, name = "AddLanguageIDs")
         .prefetch(bufferSize)
         .asInstanceOf[TFTrainDataset]
   }

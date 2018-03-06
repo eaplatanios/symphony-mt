@@ -26,18 +26,18 @@ package object models {
       (DataType, DataType), (Shape, Shape)]
 
   type TFSentencePairsDataset = tf.data.Dataset[
-      ((Tensor, Tensor), (Tensor, Tensor)),
-      ((Output, Output), (Output, Output)),
-      ((DataType, DataType), (DataType, DataType)),
-      ((Shape, Shape), (Shape, Shape))]
+      ((Tensor, Tensor), ((Tensor, Tensor), (Tensor, Tensor))),
+      ((Output, Output), ((Output, Output), (Output, Output))),
+      ((DataType, DataType), ((DataType, DataType), (DataType, DataType))),
+      ((Shape, Shape), ((Shape, Shape), (Shape, Shape)))]
 
   type TFInputDataset = tf.data.Dataset[
       (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
       (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape)]
 
   type TFTrainDataset = tf.data.Dataset[
-      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor)),
-      ((Output, Output, Output, Output), (Output, Output)),
-      ((DataType, DataType, DataType, DataType), (DataType, DataType)),
-      ((Shape, Shape, Shape, Shape), (Shape, Shape))]
+      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor)),
+      ((Output, Output, Output, Output), (Output, Output, Output)),
+      ((DataType, DataType, DataType, DataType), (DataType, DataType, DataType)),
+      ((Shape, Shape, Shape, Shape), (Shape, Shape, Shape))]
 }
