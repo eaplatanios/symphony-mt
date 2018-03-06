@@ -146,6 +146,8 @@ abstract class Model[S] protected (
           input: (Output, Output, Output),
           mode: Mode
       ): (Output, Output) = tf.createWithNameScope("InputTrain") {
+        parametersManager.initialize(languages)
+        parametersManager.setContext((input._1, null))
         (mapToWordIds(input._1, input._2), input._3)
       }
     }
@@ -213,7 +215,7 @@ abstract class Model[S] protected (
   }
 
   protected def mapToWordIds(language: Output, wordSequence: Output): Output = {
-    config.parametersManager.lookupTable(language)(wordSequence).cast(INT32)
+    parametersManager.lookupTable(language)(wordSequence).cast(INT32)
   }
 
   /**
