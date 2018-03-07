@@ -99,5 +99,5 @@ object WMT16 extends App {
       ("WMT16", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
       ("WMT16", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
-  model.train(dataset, tf.learn.StopCriteria.steps(340000))
+  model.train(dataset.filterTypes(Train), tf.learn.StopCriteria.steps(340000))
 }

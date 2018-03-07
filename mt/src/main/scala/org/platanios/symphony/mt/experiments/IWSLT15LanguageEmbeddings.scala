@@ -66,17 +66,17 @@ object IWSLT15LanguageEmbeddings extends App {
     config = RNNModel.Config(
       env,
       LanguageEmbeddingsPairParametersManager(
-        languageEmbeddingsSize = 512,
-        wordEmbeddingsSize = 512),
+        languageEmbeddingsSize = 256,
+        wordEmbeddingsSize = 256),
       BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 256,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 256,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f),
@@ -92,7 +92,7 @@ object IWSLT15LanguageEmbeddings extends App {
       ("IWSLT15", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
       ("IWSLT15", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
-  model.train(dataset, tf.learn.StopCriteria.steps(12000))
+  model.train(dataset.filterTypes(Train), tf.learn.StopCriteria.steps(12000))
 
   // val evaluator = BilingualEvaluator(Seq(BLEU()), srcLanguage, tgtLanguage, dataset.filterTypes(Test))
   // println(evaluator.evaluate(model).values.head.scalar.asInstanceOf[Float])

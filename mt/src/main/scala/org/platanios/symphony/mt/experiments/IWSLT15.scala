@@ -96,7 +96,7 @@ object IWSLT15 extends App {
       ("IWSLT15", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
       ("IWSLT15", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
-  model.train(dataset, tf.learn.StopCriteria.steps(12000))
+  model.train(dataset.filterTypes(Train), tf.learn.StopCriteria.steps(12000))
 
   // val evaluator = BilingualEvaluator(Seq(BLEU()), srcLanguage, tgtLanguage, dataset.filterTypes(Test))
   // println(evaluator.evaluate(model).values.head.scalar.asInstanceOf[Float])
