@@ -65,7 +65,7 @@ object IWSLT15LanguageEmbeddings extends App {
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
-      LanguageEmbeddingsPairParametersManager(
+      LanguageEmbeddingsPairParameterManager(
         languageEmbeddingsSize = 256,
         wordEmbeddingsSize = 256),
       BidirectionalRNNEncoder(
