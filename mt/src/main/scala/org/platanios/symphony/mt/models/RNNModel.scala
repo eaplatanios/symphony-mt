@@ -44,7 +44,7 @@ class RNNModel[S, SS](
   // TODO: Make this use the parameters manager.
 
   override protected def encoder(
-      input: (Output, Output, Output, Output),
+      input: TFBatchWithLanguages,
       mode: Mode
   ): (Tuple[Output, Seq[S]], Output, Output) = {
     val maxDecodingLength = {
@@ -58,11 +58,11 @@ class RNNModel[S, SS](
   }
 
   override protected def decoder(
-      encoderInput: (Output, Output, Output, Output),
-      input: Option[(Output, Output)],
+      encoderInput: TFBatchWithLanguages,
+      input: Option[TFBatch],
       state: Option[(Tuple[Output, Seq[S]], Output, Output)],
       mode: Mode
-  ): (Output, Output) = {
+  ): TFBatch = {
     // TODO: What if the state is `None`?
     input match {
       case Some(inputSequences) =>

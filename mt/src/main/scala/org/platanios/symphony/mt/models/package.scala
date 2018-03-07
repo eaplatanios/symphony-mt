@@ -21,23 +21,41 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 package object models {
-  type TFSentencesDataset = tf.data.Dataset[
-      (Tensor, Tensor), (Output, Output),
-      (DataType, DataType), (Shape, Shape)]
+  type TFBatchWithLanguages = (Output, Output, Output, Output)
+  type TFBatchWithLanguagesT = (Tensor, Tensor, Tensor, Tensor)
+  type TFBatchWithLanguagesD = (DataType, DataType, DataType, DataType)
+  type TFBatchWithLanguagesS = (Shape, Shape, Shape, Shape)
+
+  type TFBatchWithLanguage = (Output, Output, Output)
+  type TFBatchWithLanguageT = (Tensor, Tensor, Tensor)
+  type TFBatchWithLanguageD = (DataType, DataType, DataType)
+  type TFBatchWithLanguageS = (Shape, Shape, Shape)
+
+  type TFBatch = (Output, Output)
+  type TFBatchT = (Tensor, Tensor)
+  type TFBatchD = (DataType, DataType)
+  type TFBatchS = (Shape, Shape)
+
+  type TFLanguagePair = (Output, Output)
+  type TFLanguagePairT = (Tensor, Tensor)
+  type TFLanguagePairD = (DataType, DataType)
+  type TFLanguagePairS = (Shape, Shape)
+
+  type TFSentencesDataset = tf.data.Dataset[TFBatchT, TFBatch, TFBatchD, TFBatchS]
 
   type TFSentencePairsDataset = tf.data.Dataset[
-      ((Tensor, Tensor), ((Tensor, Tensor), (Tensor, Tensor))),
-      ((Output, Output), ((Output, Output), (Output, Output))),
-      ((DataType, DataType), ((DataType, DataType), (DataType, DataType))),
-      ((Shape, Shape), ((Shape, Shape), (Shape, Shape)))]
+      (TFLanguagePairT, (TFBatchT, TFBatchT)),
+      (TFLanguagePair, (TFBatch, TFBatch)),
+      (TFLanguagePairD, (TFBatchD, TFBatchD)),
+      (TFLanguagePairS, (TFBatchS, TFBatchS))]
 
   type TFInputDataset = tf.data.Dataset[
-      (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
-      (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape)]
+      TFBatchWithLanguagesT, TFBatchWithLanguages,
+      TFBatchWithLanguagesD, TFBatchWithLanguagesS]
 
   type TFTrainDataset = tf.data.Dataset[
-      ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor)),
-      ((Output, Output, Output, Output), (Output, Output, Output)),
-      ((DataType, DataType, DataType, DataType), (DataType, DataType, DataType)),
-      ((Shape, Shape, Shape, Shape), (Shape, Shape, Shape))]
+      (TFBatchWithLanguagesT, TFBatchWithLanguageT),
+      (TFBatchWithLanguages, TFBatchWithLanguage),
+      (TFBatchWithLanguagesD, TFBatchWithLanguageD),
+      (TFBatchWithLanguagesS, TFBatchWithLanguageS)]
 }
