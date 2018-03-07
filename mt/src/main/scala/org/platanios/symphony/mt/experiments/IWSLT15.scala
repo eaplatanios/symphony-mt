@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
-import org.platanios.symphony.mt.models.{ParametersManager, Model, RNNModel}
+import org.platanios.symphony.mt.models.{ParameterManager, Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
 
@@ -66,7 +66,7 @@ object IWSLT15 extends App {
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
-      ParametersManager(
+      ParameterManager(
         wordEmbeddingsSize = 512,
         tf.VarianceScalingInitializer(
           1.0f,

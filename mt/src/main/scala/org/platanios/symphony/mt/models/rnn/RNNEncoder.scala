@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{Encoder, ParametersManager, RNNModel}
+import org.platanios.symphony.mt.models.{Encoder, ParameterManager, RNNModel}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -34,5 +34,5 @@ abstract class RNNEncoder[S, SS]()(implicit
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  )(mode: Mode, parametersManager: ParametersManager): Tuple[Output, Seq[S]]
+  )(mode: Mode, parameterManager: ParameterManager): Tuple[Output, Seq[S]]
 }

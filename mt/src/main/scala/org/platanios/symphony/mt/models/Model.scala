@@ -46,7 +46,7 @@ abstract class Model[S] protected (
 ) {
   protected val languageIds: Map[Language, Int] = languages.map(_._1).zipWithIndex.toMap
 
-  protected val parametersManager: ParametersManager = config.parametersManager
+  protected val parameterManager: ParameterManager = config.parameterManager
 
   /** Each input consists of a tuple containing:
     *   - The source language ID.
@@ -143,7 +143,7 @@ abstract class Model[S] protected (
           input: (Output, Output, Output),
           mode: Mode
       ): (Output, Output) = {
-        parametersManager.initialize(languages)
+        parameterManager.initialize(languages)
         tf.createWithNameScope("TrainInputsToWordIDs") {
           (mapToWordIds(input._1, input._2), input._3)
         }
@@ -159,8 +159,8 @@ abstract class Model[S] protected (
           input: (TFBatchWithLanguages, TFBatchWithLanguage),
           mode: Mode
       ): TFBatchWithLanguage = {
-        parametersManager.initialize(languages)
-        parametersManager.setContext((input._1._1, input._1._2))
+        parameterManager.initialize(languages)
+        parameterManager.setContext((input._1._1, input._1._2))
         val srcSequence = mapToWordIds(input._1._1, input._1._3)
         val tgtSequence = mapToWordIds(input._2._1, input._2._2)
         val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
@@ -177,8 +177,8 @@ abstract class Model[S] protected (
       override val layerType: String = "InferLayer"
 
       override protected def _forward(input: TFBatchWithLanguages, mode: Mode): TFBatchWithLanguage = {
-        parametersManager.initialize(languages)
-        parametersManager.setContext((input._1, input._2))
+        parameterManager.initialize(languages)
+        parameterManager.setContext((input._1, input._2))
         val srcSequence = mapToWordIds(input._1, input._3)
         val srcMapped = (input._1, input._2, srcSequence, input._4)
         val state = tf.createWithVariableScope("Encoder")(encoder(srcMapped, mode))
@@ -199,7 +199,7 @@ abstract class Model[S] protected (
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
         // word used as input, rather than the previous predicted word.
-        val tgtEosId = parametersManager
+        val tgtEosId = parameterManager
             .lookupTable(input._1._1)(tf.constant(dataConfig.endOfSequenceToken))
             .cast(INT32)
         val tgtSequence = tf.concatenate(Seq(
@@ -213,7 +213,7 @@ abstract class Model[S] protected (
   }
 
   protected def mapToWordIds(language: Output, wordSequence: Output): Output = {
-    parametersManager.lookupTable(language)(wordSequence).cast(INT32)
+    parameterManager.lookupTable(language)(wordSequence).cast(INT32)
   }
 
   /**
@@ -249,7 +249,7 @@ abstract class Model[S] protected (
 object Model {
   class Config protected (
       val env: Environment,
-      val parametersManager: ParametersManager,
+      val parameterManager: ParameterManager,
       val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
@@ -258,13 +258,13 @@ object Model {
   object Config {
     def apply(
         env: Environment,
-        parametersManager: ParametersManager,
+        parameterManager: ParameterManager,
         labelSmoothing: Float = 0.0f,
         timeMajor: Boolean = false,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config = {
-      new Config(env, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+      new Config(env, parameterManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
     }
   }
 

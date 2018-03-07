@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn.attention
 
-import org.platanios.symphony.mt.models.ParametersManager
+import org.platanios.symphony.mt.models.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -41,19 +41,19 @@ case class BahdanauRNNAttention(
       initialState: S,
       useAttentionLayer: Boolean,
       outputAttention: Boolean
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: tf.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, Output, Shape], AttentionWrapperState[S, SS, Seq[Output], Seq[Shape]]) = {
     tf.createWithVariableScope("BahdanauAttention") {
       val dataType = memory.dataType
-      val memoryWeights = parametersManager.get("MemoryWeights", dataType, Shape(numUnits, numUnits))
-      val queryWeights = parametersManager.get("QueryWeights", dataType, Shape(numUnits, numUnits))
-      val scoreWeights = parametersManager.get("ScoreWeights", dataType, Shape(numUnits))
+      val memoryWeights = parameterManager.get("MemoryWeights", dataType, Shape(numUnits, numUnits))
+      val queryWeights = parameterManager.get("QueryWeights", dataType, Shape(numUnits, numUnits))
+      val scoreWeights = parameterManager.get("ScoreWeights", dataType, Shape(numUnits))
       val (normFactor, normBias) = {
         if (normalized) {
-          (parametersManager.get("Factor", dataType, Shape(), ConstantInitializer(math.sqrt(1.0f / numUnits).toFloat)),
-              parametersManager.get("Bias", dataType, Shape(numUnits), ZerosInitializer))
+          (parameterManager.get("Factor", dataType, Shape(), ConstantInitializer(math.sqrt(1.0f / numUnits).toFloat)),
+              parameterManager.get("Bias", dataType, Shape(numUnits), ZerosInitializer))
         } else {
           (null, null)
         }

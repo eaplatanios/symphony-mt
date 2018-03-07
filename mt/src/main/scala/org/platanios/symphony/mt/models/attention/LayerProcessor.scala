@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.ParametersManager
+import org.platanios.symphony.mt.models.ParameterManager
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -29,7 +29,7 @@ trait LayerProcessor {
       value: Output,
       previousValue: Option[Output],
       name: String = "LayerProcessor"
-  )(mode: Mode, parametersManager: ParametersManager): Output
+  )(mode: Mode, parameterManager: ParameterManager): Output
 }
 
 case object AddResidualConnection extends LayerProcessor {
@@ -38,7 +38,7 @@ case object AddResidualConnection extends LayerProcessor {
       value: Output,
       previousValue: Option[Output],
       name: String = "AddResidualConnection"
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager): Output = {
     previousValue match {
       case Some(v) => value + v
       case None => throw new IllegalArgumentException(
@@ -53,8 +53,8 @@ case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) exte
       value: Output,
       previousValue: Option[Output],
       name: String = "Normalize"
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
-    normalization(value, epsilon = epsilon, name = name)(mode, parametersManager)
+  )(mode: Mode, parameterManager: ParameterManager): Output = {
+    normalization(value, epsilon = epsilon, name = name)(mode, parameterManager)
   }
 }
 
@@ -68,7 +68,7 @@ case class Dropout(
       value: Output,
       previousValue: Option[Output],
       name: String = "Normalize"
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager): Output = {
     if (mode.isTraining)
       Common.dropoutWithBroadcastAxes(value, 1.0f - dropoutRate, scaleOutput, broadcastAxes)
     else
@@ -82,15 +82,15 @@ object LayerProcessor {
     * @param  input             Layer input.
     * @param  processors        Layer processors to apply.
     * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parametersManager Parameter manager to use, if parameters are required.
+    * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Processed layer input.
     */
   def layerPreprocess(
       input: Output,
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager): Output = {
     processors.foldLeft(input) {
-      case (value, processor) => processor(value, None)(mode, parametersManager)
+      case (value, processor) => processor(value, None)(mode, parameterManager)
     }
   }
 
@@ -100,16 +100,16 @@ object LayerProcessor {
     * @param  output            Layer output.
     * @param  processors        Layer processors to apply.
     * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parametersManager Parameter manager to use, if parameters are required.
+    * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Processed layer output.
     */
   def layerPostprocess(
       input: Output,
       output: Output,
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager): Output = {
     processors.foldLeft(output) {
-      case (value, processor) => processor(value, Some(input))(mode, parametersManager)
+      case (value, processor) => processor(value, Some(input))(mode, parameterManager)
     }
   }
 }

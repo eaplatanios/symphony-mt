@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.ParametersManager
+import org.platanios.symphony.mt.models.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.cell._
@@ -30,7 +30,7 @@ trait Cell[S, SS] {
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager): RNNCell[Output, Shape, S, SS]
+  )(mode: Mode, parameterManager: ParameterManager): RNNCell[Output, Shape, S, SS]
 }
 
 case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, Shape] {
@@ -39,11 +39,11 @@ case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, S
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager): RNNCell[Output, Shape, Output, Shape] = {
-    val gateKernel = parametersManager.get("Gate/Weights", dataType, Shape(numInputs + numUnits, 2 * numUnits))
-    val gateBias = parametersManager.get("Gate/Bias", dataType, Shape(2 * numUnits), tf.ZerosInitializer)
-    val candidateKernel = parametersManager.get("Candidate/Weights", dataType, Shape(numInputs + numUnits, numUnits))
-    val candidateBias = parametersManager.get("Candidate/Bias", dataType, Shape(numUnits), tf.ZerosInitializer)
+  )(mode: Mode, parameterManager: ParameterManager): RNNCell[Output, Shape, Output, Shape] = {
+    val gateKernel = parameterManager.get("Gate/Weights", dataType, Shape(numInputs + numUnits, 2 * numUnits))
+    val gateBias = parameterManager.get("Gate/Bias", dataType, Shape(2 * numUnits), tf.ZerosInitializer)
+    val candidateKernel = parameterManager.get("Candidate/Weights", dataType, Shape(numInputs + numUnits, numUnits))
+    val candidateBias = parameterManager.get("Candidate/Bias", dataType, Shape(numUnits), tf.ZerosInitializer)
     GRUCell(gateKernel, gateBias, candidateKernel, candidateBias, activation, name)
   }
 }
@@ -55,9 +55,9 @@ case class BasicLSTM(forgetBias: Float = 1.0f, activation: Output => Output = tf
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager): BasicLSTMCell = {
-    val kernel = parametersManager.get("Weights", dataType, Shape(numInputs + numUnits, 4 * numUnits))
-    val bias = parametersManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
+  )(mode: Mode, parameterManager: ParameterManager): BasicLSTMCell = {
+    val kernel = parameterManager.get("Weights", dataType, Shape(numInputs + numUnits, 4 * numUnits))
+    val bias = parameterManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
     BasicLSTMCell(kernel, bias, activation, forgetBias, name)
   }
 }
@@ -75,15 +75,15 @@ case class LSTM(
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parametersManager: ParametersManager): LSTMCell = {
+  )(mode: Mode, parameterManager: ParameterManager): LSTMCell = {
     val hiddenDepth = if (projectionSize != -1) projectionSize else numUnits
-    val kernel = parametersManager.get("Weights", dataType, Shape(numInputs + hiddenDepth, 4 * numUnits))
-    val bias = parametersManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
+    val kernel = parameterManager.get("Weights", dataType, Shape(numInputs + hiddenDepth, 4 * numUnits))
+    val bias = parameterManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
     val (wfDiag, wiDiag, woDiag) = {
       if (usePeepholes) {
-        val wfDiag = parametersManager.get("Peepholes/ForgetKernelDiag", dataType, Shape(numUnits))
-        val wiDiag = parametersManager.get("Peepholes/InputKernelDiag", dataType, Shape(numUnits))
-        val woDiag = parametersManager.get("Peepholes/OutputKernelDiag", dataType, Shape(numUnits))
+        val wfDiag = parameterManager.get("Peepholes/ForgetKernelDiag", dataType, Shape(numUnits))
+        val wiDiag = parameterManager.get("Peepholes/InputKernelDiag", dataType, Shape(numUnits))
+        val woDiag = parameterManager.get("Peepholes/OutputKernelDiag", dataType, Shape(numUnits))
         (wfDiag, wiDiag, woDiag)
       } else {
         (null, null, null)
@@ -91,7 +91,7 @@ case class LSTM(
     }
     val projectionKernel = {
       if (projectionSize != -1)
-        parametersManager.get("Projection/Weights", dataType, Shape(numUnits, projectionSize))
+        parameterManager.get("Projection/Weights", dataType, Shape(numUnits, projectionSize))
       else
         null
     }

@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.ParametersManager
+import org.platanios.symphony.mt.models.ParameterManager
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -40,7 +40,7 @@ class DotProductAttention protected (
     * @param  v                 Values tensor with shape `[batchSize, ..., length, depth]`.
     * @param  bias              Optional attention bias.
     * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parametersManager Parameter manager to use, if parameters are required.
+    * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
   override def apply(
@@ -48,7 +48,7 @@ class DotProductAttention protected (
       k: Output,
       v: Output,
       bias: Option[Output]
-  )(mode: Mode, parametersManager: ParametersManager): Output = tf.createWithNameScope(name) {
+  )(mode: Mode, parameterManager: ParameterManager): Output = tf.createWithNameScope(name) {
     // `logits` shape: [batchSize, numHeads, queryLength, memoryLength]
     var logits = tf.matmul(q, k, transposeB = true)
     bias.foreach(logits += _)

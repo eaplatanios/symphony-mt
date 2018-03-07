@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
-import org.platanios.symphony.mt.models.{Model, ParametersManager, RNNModel}
+import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention
 
@@ -67,7 +67,7 @@ object WMT16 extends App {
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
-      ParametersManager(
+      ParameterManager(
         wordEmbeddingsSize = 1024,
         tf.VarianceScalingInitializer(
           1.0f,

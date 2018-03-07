@@ -53,7 +53,7 @@ class RNNModel[S, SS](
       else
         tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT32)
     }
-    (config.encoder.create(config, input._1, input._2, input._3, input._4)(mode, parametersManager),
+    (config.encoder.create(config, input._1, input._2, input._3, input._4)(mode, parameterManager),
         input._4, maxDecodingLength)
   }
 
@@ -68,7 +68,7 @@ class RNNModel[S, SS](
       case Some(inputSequences) =>
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step forward so the decoder learns to output the next word.
-        val tgtBosId = config.parametersManager
+        val tgtBosId = config.parameterManager
             .lookupTable(encoderInput._2)(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
         val tgtSequence = tf.concatenate(Seq(
           tf.fill(INT32, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
@@ -76,12 +76,12 @@ class RNNModel[S, SS](
         val tgtSequenceLength = inputSequences._2 + 1
         val output = config.decoder.create(
           config, encoderInput._1, encoderInput._2, state.get, dataConfig.beginOfSequenceToken,
-          dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength)(mode, parametersManager)
+          dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength)(mode, parameterManager)
         (output.sequences, output.sequenceLengths)
       case None =>
         val output = config.decoder.create(
           config, encoderInput._1, encoderInput._2, state.get, dataConfig.beginOfSequenceToken,
-          dataConfig.endOfSequenceToken, null, null)(mode, parametersManager)
+          dataConfig.endOfSequenceToken, null, null)(mode, parameterManager)
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
         // when using beam search.
         val outputSequence = {
@@ -115,7 +115,7 @@ object RNNModel {
 
   class Config[S, SS] protected(
       override val env: Environment,
-      override val parametersManager: ParametersManager,
+      override val parameterManager: ParameterManager,
       override val labelSmoothing: Float,
       // Model
       val encoder: RNNEncoder[S, SS],
@@ -127,12 +127,12 @@ object RNNModel {
       val beamWidth: Int,
       val lengthPenaltyWeight: Float,
       val decoderMaxLengthFactor: Float
-  ) extends Model.Config(env, parametersManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+  ) extends Model.Config(env, parameterManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
 
   object Config {
     def apply[S, SS](
         env: Environment,
-        parametersManager: ParametersManager,
+        parameterManager: ParameterManager,
         // Model
         encoder: RNNEncoder[S, SS],
         decoder: RNNDecoder[S, SS],
@@ -146,7 +146,7 @@ object RNNModel {
         decoderMaxLengthFactor: Float = 2.0f
     ): Config[S, SS] = {
       new Config[S, SS](
-        env, parametersManager, labelSmoothing, encoder, decoder, timeMajor, summarySteps,
+        env, parameterManager, labelSmoothing, encoder, decoder, timeMajor, summarySteps,
         checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)
     }
   }
@@ -174,13 +174,13 @@ object RNNModel {
       device: String = "",
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.RNNCell[Output, Shape, S, SS] = tf.createWithVariableScope(name) {
     tf.createWith(device = device) {
       // Create the main RNN cell.
-      var createdCell = cellCreator.create(name, numInputs, numUnits, dataType)(mode, parametersManager)
+      var createdCell = cellCreator.create(name, numInputs, numUnits, dataType)(mode, parameterManager)
 
       // Apply dropout.
       createdCell = dropout.map(p => {
@@ -211,7 +211,7 @@ object RNNModel {
       firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): Seq[tf.RNNCell[Output, Shape, S, SS]] = tf.createWithVariableScope(name) {
@@ -220,7 +220,7 @@ object RNNModel {
       cells :+ cell(
         cellCreator, cellNumInputs, numUnits, dataType, dropout,
         if (i >= numLayers - numResidualLayers) residualFn else None,
-        device(i + baseGPU, numGPUs, firstGPU), seed, s"Cell$i")(mode, parametersManager)
+        device(i + baseGPU, numGPUs, firstGPU), seed, s"Cell$i")(mode, parameterManager)
     })
   }
 
@@ -238,12 +238,12 @@ object RNNModel {
       firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {
     tf.MultiCell(cells(
       cellCreator, numInputs, numUnits, dataType, numLayers, numResidualLayers, dropout,
-      residualFn, baseGPU, numGPUs, firstGPU, seed, name)(mode, parametersManager), name)
+      residualFn, baseGPU, numGPUs, firstGPU, seed, name)(mode, parameterManager), name)
   }
 }

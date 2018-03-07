@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.ParametersManager
+import org.platanios.symphony.mt.models.ParameterManager
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -33,7 +33,7 @@ trait Attention {
     * @param  v                 Values tensor with shape `[batchSize, ..., length, depth]`.
     * @param  bias              Optional attention bias.
     * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parametersManager Parameter manager to use, if parameters are required.
+    * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
   def apply(
@@ -41,7 +41,7 @@ trait Attention {
       k: Output,
       v: Output,
       bias: Option[Output]
-  )(mode: Mode, parametersManager: ParametersManager): Output
+  )(mode: Mode, parameterManager: ParameterManager): Output
 
   // TODO: Add support for saving weights.
   // TODO: Add support for image summaries for the weights.
@@ -224,7 +224,7 @@ object Attention {
     * @param  qPaddingMode      Convolution padding mode for the case when `qNumFilters > 1`.
     * @param  kvPaddingMode     Convolution padding mode for the case when `kvNumFilters > 1`.
     * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parametersManager Parameter manager to use, if parameters are required.
+    * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Tuple containing the queries, keys, and values tensors.
     */
   def computeQKV(
@@ -236,12 +236,12 @@ object Attention {
       kvNumFilters: Int = 1,
       qPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
       kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding
-  )(mode: Mode, parametersManager: ParametersManager): (Output, Output, Output) = {
+  )(mode: Mode, parameterManager: ParameterManager): (Output, Output, Output) = {
 
     def compute(input: Output, depth: Int, numFilters: Int, paddingMode: tf.ConvPaddingMode, name: String): Output = {
       tf.createWithVariableScope(name) {
         if (numFilters == 1) {
-          val weights = parametersManager.get("Weights", input.dataType, Shape(input.shape(-1), depth))
+          val weights = parameterManager.get("Weights", input.dataType, Shape(input.shape(-1), depth))
           tf.linear(input, weights)
         } else {
           ???
@@ -278,7 +278,7 @@ object Attention {
     *                           For the initial call, the values for these keys should be
     * @param  name              Name for the multi-head attention component that also specifies a variable scope.
     * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parametersManager Parameter manager to use, if parameters are required.
+    * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Result of the attention transformation, with shape `[batchSize, queryLength, outputDepth]`, unless a cache
     *         is provided, in which case only the last memory position is calculated and the output shape is
     *         `[batchSize, 1, outputDepth]`.
@@ -301,13 +301,13 @@ object Attention {
       kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
       cache: Option[Cache] = None,
       name: String = "MultiHeadAttention"
-  )(mode: Mode, parametersManager: ParametersManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager): Output = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.createWithVariableScope(name) {
       var (q, k, v) = computeQKV(
         queryAntecedent, memoryAntecedent, totalKeysDepth, totalValuesDepth, qNumFilters, kvNumFilters,
-        qPaddingMode, kvPaddingMode)(mode, parametersManager)
+        qPaddingMode, kvPaddingMode)(mode, parameterManager)
       cache match {
         case Some(c) =>
           require(
@@ -324,9 +324,9 @@ object Attention {
       k = splitHeads(k, numHeads)
       v = splitHeads(v, numHeads)
       q = q * tf.pow(tf.truncateDivide(totalKeysDepth, numHeads), -0.5f)
-      var result = attention(q, k, v, Some(bias))(mode, parametersManager)
+      var result = attention(q, k, v, Some(bias))(mode, parameterManager)
       result = combineHeads(result)
-      val w = parametersManager.get("OutputTransformWeights", result.dataType, Shape(result.shape(-1), outputsDepth))
+      val w = parameterManager.get("OutputTransformWeights", result.dataType, Shape(result.shape(-1), outputsDepth))
       tf.linear(result, w)
     }
   }

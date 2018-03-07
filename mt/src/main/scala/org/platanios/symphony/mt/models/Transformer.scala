@@ -48,7 +48,7 @@
 //    val inputMaxLength = tf.shape(inputTokens)(1)
 //
 //    // Obtain token embeddings for the input sequence.
-//    val embeddings = parametersManager.get("Embeddings", FLOAT32, Shape(srcVocabulary.size, config.hiddenSize))
+//    val embeddings = parameterManager.get("Embeddings", FLOAT32, Shape(srcVocabulary.size, config.hiddenSize))
 //    val embeddedInputs = embeddings.gather(inputTokens)
 //
 //    // Perform some pre-processing to the token embeddings sequence.
@@ -69,7 +69,7 @@
 //    (0 until config.encoderNumLayers).foreach(layer => {
 //      tf.createWithVariableScope(s"Layer$layer") {
 //        tf.createWithVariableScope("SelfAttention") {
-//          val queryAntecedent = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
+//          val queryAntecedent = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parameterManager)
 //          y = Attention.multiHeadAttention(
 //            queryAntecedent = queryAntecedent,
 //            memoryAntecedent = queryAntecedent,
@@ -79,20 +79,20 @@
 //            outputsDepth = config.hiddenSize,
 //            numHeads = config.attentionNumHeads,
 //            attention = config.encoderSelfAttention,
-//            name = "MultiHeadAttention")(mode, parametersManager)
-//          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+//            name = "MultiHeadAttention")(mode, parameterManager)
+//          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)
 //        }
 //        tf.createWithVariableScope("FeedForward") {
-//          val xx = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
-//          y = config.encoderFeedForwardLayer(xx, padRemover)(mode, parametersManager)
-//          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+//          val xx = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parameterManager)
+//          y = config.encoderFeedForwardLayer(xx, padRemover)(mode, parameterManager)
+//          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)
 //        }
 //      }
 //    })
 //
 //    // If normalization is done during layer preprocessing, then it should also be done on the output, since the output
 //    // can grow very large, being the sum of a whole stack of unnormalized layer outputs.
-//    val encoderOutput = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
+//    val encoderOutput = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parameterManager)
 //
 //    Transformer.State(encoderOutput, encoderDecoderAttentionBias)
 //  }
@@ -102,7 +102,7 @@
 //      state: Option[Transformer.State],
 //      mode: Mode
 //  ): (Output, Output) = {
-//    val embeddings = parametersManager.get("Embeddings", FLOAT32, Shape(tgtVocabulary.size, config.hiddenSize))
+//    val embeddings = parameterManager.get("Embeddings", FLOAT32, Shape(tgtVocabulary.size, config.hiddenSize))
 //    input match {
 //      case Some(inputSequences) =>
 //        // TODO: Handle this shift more efficiently.
@@ -127,7 +127,7 @@
 //          decoderInput = tf.dropout(decoderInput, 1.0f - config.postPositionEmbeddingsDropout)
 //
 //        var decoderOutput = decode(decoderInput, decoderSelfAttentionBias, state, None, mode)
-//        val w = parametersManager.get("OutputProjectionWeights", FLOAT32, Shape(config.hiddenSize, tgtVocabulary.size))
+//        val w = parameterManager.get("OutputProjectionWeights", FLOAT32, Shape(config.hiddenSize, tgtVocabulary.size))
 //        decoderOutput = tf.linear(decoderOutput, w)
 //
 //        (decoderOutput, inputLengths)
@@ -147,7 +147,7 @@
 //    var decoderSelfAttentionBias = Attention.attentionBiasLowerTriangular(tgtMaxLength)
 //    if (config.useSelfAttentionProximityBias)
 //      decoderSelfAttentionBias += Attention.attentionBiasProximal(tgtMaxLength)
-//    val w = parametersManager.get("OutputProjectionWeights", FLOAT32, Shape(config.hiddenSize, tgtVocabulary.size))
+//    val w = parameterManager.get("OutputProjectionWeights", FLOAT32, Shape(config.hiddenSize, tgtVocabulary.size))
 //    val decodeHelper = new Transformer.GreedyDecodeHelper(config)
 //
 //    def decodingFn(
@@ -191,7 +191,7 @@
 //      tf.createWithVariableScope(s"Layer$layer") {
 //        tf.createWithVariableScope("SelfAttention") {
 //          val queryAntecedent = LayerProcessor.layerPreprocess(
-//            x, config.layerPreprocessors)(mode, parametersManager)
+//            x, config.layerPreprocessors)(mode, parameterManager)
 //          y = Attention.multiHeadAttention(
 //            queryAntecedent = queryAntecedent,
 //            memoryAntecedent = queryAntecedent,
@@ -202,14 +202,14 @@
 //            numHeads = config.attentionNumHeads,
 //            attention = config.decoderSelfAttention,
 //            cache = cache.map(_ (layer)),
-//            name = "MultiHeadAttention")(mode, parametersManager)
-//          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+//            name = "MultiHeadAttention")(mode, parameterManager)
+//          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)
 //        }
 //        state.foreach(encOutput => {
 //          // TODO: Add caching.
 //          tf.createWithVariableScope("EncoderDecoderAttention") {
 //            val queryAntecedent = LayerProcessor.layerPreprocess(
-//              x, config.layerPreprocessors)(mode, parametersManager)
+//              x, config.layerPreprocessors)(mode, parameterManager)
 //            y = Attention.multiHeadAttention(
 //              queryAntecedent = queryAntecedent,
 //              memoryAntecedent = encOutput.output,
@@ -219,21 +219,21 @@
 //              outputsDepth = config.hiddenSize,
 //              numHeads = config.attentionNumHeads,
 //              attention = config.decoderSelfAttention,
-//              name = "MultiHeadAttention")(mode, parametersManager)
-//            x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+//              name = "MultiHeadAttention")(mode, parameterManager)
+//            x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)
 //          }
 //        })
 //        tf.createWithVariableScope("FeedForward") {
-//          val xx = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
-//          y = config.encoderFeedForwardLayer(xx, None)(mode, parametersManager)
-//          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parametersManager)
+//          val xx = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parameterManager)
+//          y = config.encoderFeedForwardLayer(xx, None)(mode, parameterManager)
+//          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)
 //        }
 //      }
 //    })
 //
 //    // If normalization is done during layer preprocessing, then it should also be done on the output, since the
 //    // output can grow very large, being the sum of a whole stack of unnormalized layer outputs.
-//    LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parametersManager)
+//    LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parameterManager)
 //  }
 //}
 //
@@ -278,7 +278,7 @@
 //      attentionDropoutBroadcastAxes: Set[Int],
 //      attentionPrependMode: AttentionPrependMode,
 //      usePadRemover: Boolean = true,
-//      override val parametersManager: ParametersManager[Seq[Language]] = DefaultParametersManager(
+//      override val parameterManager: parameterManager[Seq[Language]] = DefaultparameterManager(
 //        tf.VarianceScalingInitializer(
 //          1.0f,
 //          tf.VarianceScalingInitializer.FanAverageScalingMode,
@@ -286,7 +286,7 @@
 //      override val summarySteps: Int = 100,
 //      override val checkpointSteps: Int = 1000
 //  ) extends Model.Config(
-//    env, parametersManager, labelSmoothing, timeMajor = false,
+//    env, parameterManager, labelSmoothing, timeMajor = false,
 //    summarySteps = summarySteps, checkpointSteps = checkpointSteps)
 //
 //  val defaultConfig: Config = Config(

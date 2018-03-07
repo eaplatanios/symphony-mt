@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.helpers
 
-import org.platanios.symphony.mt.models.ParametersManager
+import org.platanios.symphony.mt.models.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 
@@ -382,7 +382,7 @@ object Common {
     * @param  reluDropoutBroadcastAxes Specifies along which axes of the attention weights the dropout is broadcast.
     * @param  name                     Name for this alayer that also specifies a variable scope.
     * @param  mode                     Current learning mode (e.g., training or evaluation).
-    * @param  parametersManager        Parameter manager to use, if parameters are required.
+    * @param  parameterManager        Parameter manager to use, if parameters are required.
     * @return Output of the last fully connected layer.
     */
   def denseReLUDense(
@@ -392,14 +392,14 @@ object Common {
       reluDropoutRate: Float = 0.0f,
       reluDropoutBroadcastAxes: Set[Int] = Set.empty,
       name: String = "DenseReLUDense"
-  )(mode: Mode, parametersManager: ParametersManager): Output = tf.createWithVariableScope(name) {
-    val weights1 = parametersManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
-    val bias1 = parametersManager.get("Dense1/Bias", input.dataType, Shape(filterSize))
+  )(mode: Mode, parameterManager: ParameterManager): Output = tf.createWithVariableScope(name) {
+    val weights1 = parameterManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
+    val bias1 = parameterManager.get("Dense1/Bias", input.dataType, Shape(filterSize))
     var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")
     if (mode.isTraining)
       hidden = dropoutWithBroadcastAxes(hidden, 1.0f - reluDropoutRate, scaleOutput = true, reluDropoutBroadcastAxes)
-    val weights2 = parametersManager.get("Dense2/Weights", input.dataType, Shape(filterSize, outputSize))
-    val bias2 = parametersManager.get("Dense2/Bias", input.dataType, Shape(outputSize))
+    val weights2 = parameterManager.get("Dense2/Weights", input.dataType, Shape(filterSize, outputSize))
+    val bias2 = parameterManager.get("Dense2/Bias", input.dataType, Shape(outputSize))
     tf.linear(hidden, weights2, bias2, "Dense2")
   }
 }

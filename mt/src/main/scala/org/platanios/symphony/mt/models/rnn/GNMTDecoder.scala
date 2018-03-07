@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
+import org.platanios.symphony.mt.models.{ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -51,15 +51,15 @@ class GNMTDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output = {
+  )(mode: Mode, parameterManager: ParameterManager): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = parametersManager.wordEmbeddings(tgtLanguage)
+    val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
 
     // RNN cells
     val cells = RNNModel.cells(
       cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout,
       Some(GNMTDecoder.residualFn[Output, Shape]), 0, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "Cells")(mode, parametersManager)
+      "Cells")(mode, parameterManager)
 
     // Attention
     var initialState = encoderState._1.state
@@ -73,12 +73,12 @@ class GNMTDecoder[S, SS, AS, ASS](
     }
     val (attentionCell, attentionInitialState) = attention.create[S, SS](
       srcLanguage, tgtLanguage, cells.head, memory, memorySequenceLengths, numUnits,
-      numUnits, initialState.head, useAttentionLayer = false, outputAttention = false)(mode, parametersManager)
+      numUnits, initialState.head, useAttentionLayer = false, outputAttention = false)(mode, parameterManager)
     val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](attentionCell, cells.tail, useNewAttention)
     decode(
       config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
       (attentionInitialState, initialState.tail), embeddings, multiCell, encoderState._3,
-      beginOfSequenceToken, endOfSequenceToken)(mode, parametersManager)
+      beginOfSequenceToken, endOfSequenceToken)(mode, parameterManager)
   }
 }
 

@@ -22,7 +22,7 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
-import org.platanios.symphony.mt.models.{LanguageEmbeddingsPairParametersManager, Model, RNNModel}
+import org.platanios.symphony.mt.models.{LanguageEmbeddingsPairParameterManager, Model, RNNModel}
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
 
@@ -65,7 +65,7 @@ object IWSLT15LanguageEmbeddings extends App {
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
-      LanguageEmbeddingsPairParametersManager(
+      LanguageEmbeddingsPairParameterManager(
         languageEmbeddingsSize = 512,
         wordEmbeddingsSize = 512),
       BidirectionalRNNEncoder(
