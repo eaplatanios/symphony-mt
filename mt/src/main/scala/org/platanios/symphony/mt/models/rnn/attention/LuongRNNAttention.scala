@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn.attention
 
-import org.platanios.symphony.mt.models.ParametersManager
+import org.platanios.symphony.mt.models.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -41,14 +41,14 @@ case class LuongRNNAttention(
       initialState: S,
       useAttentionLayer: Boolean,
       outputAttention: Boolean
-  )(mode: Mode, parametersManager: ParametersManager)(implicit
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: tf.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, Output, Shape], AttentionWrapperState[S, SS, Seq[Output], Seq[Shape]]) = {
-    val memoryWeights = parametersManager.get("MemoryWeights", memory.dataType, Shape(memory.shape(-1), numUnits))
+    val memoryWeights = parameterManager.get("MemoryWeights", memory.dataType, Shape(memory.shape(-1), numUnits))
     val scale = {
       if (scaled)
-        parametersManager.get("LuongFactor", memory.dataType, Shape.scalar(), OnesInitializer)
+        parameterManager.get("LuongFactor", memory.dataType, Shape.scalar(), OnesInitializer)
       else
         null
     }
@@ -56,7 +56,7 @@ case class LuongRNNAttention(
       memory, memoryWeights, memorySequenceLengths, scale, probabilityFn, scoreMask, "Attention")
     val attentionWeights = {
       if (useAttentionLayer)
-        Seq(parametersManager.get("AttentionWeights", attention.dataType, Shape(numUnits + memory.shape(-1), numUnits)))
+        Seq(parameterManager.get("AttentionWeights", attention.dataType, Shape(numUnits + memory.shape(-1), numUnits)))
       else
         null
     }

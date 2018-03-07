@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{ParametersManager, RNNModel}
+import org.platanios.symphony.mt.models.{ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -51,9 +51,9 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output = {
+  )(mode: Mode, parameterManager: ParameterManager): RNNDecoder.Output = {
     // Embeddings
-    val embeddings = parametersManager.wordEmbeddings(tgtLanguage)
+    val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
 
     // RNN cell
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
@@ -61,11 +61,11 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       case None =>
         RNNModel.multiCell(
           cell, numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, 0,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiUniCell")(mode, parametersManager)
+          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiUniCell")(mode, parameterManager)
       case Some(_) =>
         RNNModel.multiCell(
           cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, 0,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiUniCell")(mode, parametersManager)
+          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiUniCell")(mode, parameterManager)
     }
 
     // Use attention if necessary and create the decoder RNN
@@ -83,16 +83,16 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       case None =>
         decode(
           config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths, initialState,
-          embeddings, uniCell, encoderState._3, beginOfSequenceToken, endOfSequenceToken)(mode, parametersManager)
+          embeddings, uniCell, encoderState._3, beginOfSequenceToken, endOfSequenceToken)(mode, parameterManager)
       case Some(attentionCreator) =>
         val (attentionCell, attentionInitialState) = attentionCreator.create(
           srcLanguage, tgtLanguage, uniCell, memory, memorySequenceLengths,
           numUnits, numUnits, initialState, useAttentionLayer = true,
-          outputAttention = outputAttention)(mode, parametersManager)
+          outputAttention = outputAttention)(mode, parameterManager)
         decode(
           config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
           attentionInitialState, embeddings, attentionCell, encoderState._3, beginOfSequenceToken,
-          endOfSequenceToken)(mode, parametersManager)
+          endOfSequenceToken)(mode, parameterManager)
     }
   }
 }

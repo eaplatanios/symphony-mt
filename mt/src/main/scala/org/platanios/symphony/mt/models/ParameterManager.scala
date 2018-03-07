@@ -25,7 +25,7 @@ import scala.collection.mutable
 /**
   * @author Emmanouil Antonios Platanios
   */
-class ParametersManager protected (
+class ParameterManager protected (
     val wordEmbeddingsSize: Int,
     val variableInitializer: tf.VariableInitializer = null
 ) {
@@ -58,17 +58,17 @@ class ParametersManager protected (
     this.languages = languages
     val graph = currentGraph
     if (!languageIds.contains(graph)) {
-      languageIds += graph -> tf.createWithNameScope("ParametersManager/LanguageIDs") {
+      languageIds += graph -> tf.createWithNameScope("parameterManager/LanguageIDs") {
         languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = l._1.name))
       }
     }
     if (!lookupTables.contains(graph)) {
-      lookupTables += graph -> tf.createWithNameScope("ParametersManager/LookupTables") {
+      lookupTables += graph -> tf.createWithNameScope("parameterManager/LookupTables") {
         languages.map(l => l._2.lookupTable(name = l._1.name))
       }
     }
     if (!wordEmbeddings.contains(graph)) {
-      wordEmbeddings += graph -> tf.createWithNameScope("ParametersManager/WordEmbeddings") {
+      wordEmbeddings += graph -> tf.createWithNameScope("parameterManager/WordEmbeddings") {
         val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
         languages.map(l =>
           tf.variable(l._1.name, FLOAT32, Shape(l._2.size, wordEmbeddingsSize), embeddingsInitializer).value)
@@ -125,17 +125,17 @@ class ParametersManager protected (
   }
 }
 
-object ParametersManager {
-  def apply(wordEmbeddingsSize: Int, variableInitializer: tf.VariableInitializer = null): ParametersManager = {
-    new ParametersManager(wordEmbeddingsSize, variableInitializer)
+object ParameterManager {
+  def apply(wordEmbeddingsSize: Int, variableInitializer: tf.VariableInitializer = null): ParameterManager = {
+    new ParameterManager(wordEmbeddingsSize, variableInitializer)
   }
 }
 
-class LanguageEmbeddingsPairParametersManager protected (
+class LanguageEmbeddingsPairParameterManager protected (
     val languageEmbeddingsSize: Int,
     override val wordEmbeddingsSize: Int,
     override val variableInitializer: tf.VariableInitializer = null
-) extends ParametersManager(wordEmbeddingsSize, variableInitializer) {
+) extends ParameterManager(wordEmbeddingsSize, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
   protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
 
@@ -149,7 +149,7 @@ class LanguageEmbeddingsPairParametersManager protected (
     super.initialize(languages)
     val graph = currentGraph
     if (!languageEmbeddings.contains(graph)) {
-      languageEmbeddings += graph -> tf.createWithNameScope("ParametersManager/LanguageEmbeddings") {
+      languageEmbeddings += graph -> tf.createWithNameScope("parameterManager/LanguageEmbeddings") {
         val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
         tf.variable(
           "LanguageEmbeddings", FLOAT32, Shape(languages.length, languageEmbeddingsSize),
@@ -193,13 +193,13 @@ class LanguageEmbeddingsPairParametersManager protected (
   }
 }
 
-object LanguageEmbeddingsPairParametersManager {
+object LanguageEmbeddingsPairParameterManager {
   def apply(
       languageEmbeddingsSize: Int,
       wordEmbeddingsSize: Int,
       variableInitializer: tf.VariableInitializer = null
-  ): LanguageEmbeddingsPairParametersManager = {
-    new LanguageEmbeddingsPairParametersManager(
+  ): LanguageEmbeddingsPairParameterManager = {
+    new LanguageEmbeddingsPairParameterManager(
       languageEmbeddingsSize,
       wordEmbeddingsSize,
       variableInitializer)

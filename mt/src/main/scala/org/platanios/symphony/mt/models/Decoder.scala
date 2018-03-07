@@ -32,5 +32,5 @@ trait Decoder[O] {
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parametersManager: ParametersManager): RNNDecoder.Output
+  )(mode: Mode, parameterManager: ParameterManager): RNNDecoder.Output
 }

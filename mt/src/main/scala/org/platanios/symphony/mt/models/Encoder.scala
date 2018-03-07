@@ -28,5 +28,5 @@ trait Encoder[O] {
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  )(mode: Mode, parametersManager: ParametersManager): O
+  )(mode: Mode, parameterManager: ParameterManager): O
 }
