@@ -28,7 +28,7 @@ case object RoundRobinDeviceManager extends DeviceManager {
   private[this] var currentGPUIndex: Int = 0
 
   override def nextDevice(env: Environment): String = {
-    if (env.numGPUs - currentGPUIndex <= 0) {
+    if (env.numGPUs == 0) {
       "/device:CPU:0"
     } else {
       currentGPUIndex %= env.numGPUs
