@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.ParameterManager
+import org.platanios.symphony.mt.models.{ParameterManager, Stage}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.cell._
@@ -30,7 +30,9 @@ trait Cell[S, SS] {
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parameterManager: ParameterManager): RNNCell[Output, Shape, S, SS]
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): RNNCell[Output, Shape, S, SS]
 }
 
 case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, Shape] {
@@ -39,7 +41,9 @@ case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, S
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parameterManager: ParameterManager): RNNCell[Output, Shape, Output, Shape] = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): RNNCell[Output, Shape, Output, Shape] = {
     val gateKernel = parameterManager.get("Gate/Weights", dataType, Shape(numInputs + numUnits, 2 * numUnits))
     val gateBias = parameterManager.get("Gate/Bias", dataType, Shape(2 * numUnits), tf.ZerosInitializer)
     val candidateKernel = parameterManager.get("Candidate/Weights", dataType, Shape(numInputs + numUnits, numUnits))
@@ -55,7 +59,9 @@ case class BasicLSTM(forgetBias: Float = 1.0f, activation: Output => Output = tf
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parameterManager: ParameterManager): BasicLSTMCell = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): BasicLSTMCell = {
     val kernel = parameterManager.get("Weights", dataType, Shape(numInputs + numUnits, 4 * numUnits))
     val bias = parameterManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
     BasicLSTMCell(kernel, bias, activation, forgetBias, name)
@@ -75,7 +81,9 @@ case class LSTM(
       numInputs: Int,
       numUnits: Int,
       dataType: DataType
-  )(mode: Mode, parameterManager: ParameterManager): LSTMCell = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): LSTMCell = {
     val hiddenDepth = if (projectionSize != -1) projectionSize else numUnits
     val kernel = parameterManager.get("Weights", dataType, Shape(numInputs + hiddenDepth, 4 * numUnits))
     val bias = parameterManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)

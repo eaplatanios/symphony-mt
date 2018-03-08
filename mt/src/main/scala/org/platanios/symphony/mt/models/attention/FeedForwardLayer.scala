@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.ParameterManager
+import org.platanios.symphony.mt.models.{ParameterManager, Stage}
 import org.platanios.symphony.mt.models.helpers.{Common, PadRemover}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -29,7 +29,9 @@ trait FeedForwardLayer {
   def apply(
       input: Output,
       paddingRemover: Option[PadRemover]
-  )(mode: Mode, parameterManager: ParameterManager): Output
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output
 }
 
 class DenseReLUDenseFeedForwardLayer protected (
@@ -42,7 +44,9 @@ class DenseReLUDenseFeedForwardLayer protected (
   override def apply(
       input: Output,
       paddingRemover: Option[PadRemover]
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+    stage: Stage
+  ): Output = {
     val inputShape = tf.shape(input)
     val processedInput = paddingRemover.map(pr => {
       // Collapse `input` across examples, and remove padding positions.

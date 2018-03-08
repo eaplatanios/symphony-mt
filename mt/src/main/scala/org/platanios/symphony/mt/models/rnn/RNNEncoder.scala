@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.{DeviceManager, Encoder, ParameterManager, RNNModel}
+import org.platanios.symphony.mt.models._
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -40,5 +40,7 @@ abstract class RNNEncoder[S, SS]()(implicit
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
+  )(implicit
+      stage: Stage
   ): Tuple[Output, Seq[S]]
 }

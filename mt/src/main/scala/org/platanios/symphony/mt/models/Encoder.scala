@@ -34,5 +34,7 @@ trait Encoder[O] {
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
+  )(implicit
+      stage: Stage
   ): O
 }

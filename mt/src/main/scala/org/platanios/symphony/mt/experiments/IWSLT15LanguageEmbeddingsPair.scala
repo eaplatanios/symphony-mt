@@ -19,10 +19,9 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
-import org.platanios.symphony.mt.models.{ParameterManager, Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
-
+import org.platanios.symphony.mt.models.{LanguageEmbeddingsPairParameterManager, Model, RNNModel}
 import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
@@ -30,8 +29,8 @@ import java.nio.file.{Path, Paths}
 /**
   * @author Emmanouil Antonios Platanios
   */
-object IWSLT15 extends App {
-  val workingDir: Path = Paths.get("temp").resolve("iwslt15-pairwise")
+object IWSLT15LanguageEmbeddingsPair extends App {
+  val workingDir: Path = Paths.get("temp").resolve("iwslt15-language-embeddings-pair")
 
   val srcLanguage: Language = english
   val tgtLanguage: Language = vietnamese
@@ -66,21 +65,18 @@ object IWSLT15 extends App {
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
-      ParameterManager(
-        wordEmbeddingsSize = 512,
-        tf.VarianceScalingInitializer(
-          1.0f,
-          tf.VarianceScalingInitializer.FanAverageScalingMode,
-          tf.VarianceScalingInitializer.UniformDistribution)),
+      LanguageEmbeddingsPairParameterManager(
+        languageEmbeddingsSize = 64,
+        wordEmbeddingsSize = 64),
       BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 64,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 64,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f),

@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel}
+import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel, Stage}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -57,6 +57,8 @@ class GNMTDecoder[S, SS, AS, ASS](
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
+  )(implicit
+      stage: Stage
   ): RNNDecoder.Output = {
     // Embeddings
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)

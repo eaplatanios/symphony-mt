@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.helpers
 
-import org.platanios.symphony.mt.models.ParameterManager
+import org.platanios.symphony.mt.models.{ParameterManager, Stage}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 
@@ -392,7 +392,9 @@ object Common {
       reluDropoutRate: Float = 0.0f,
       reluDropoutBroadcastAxes: Set[Int] = Set.empty,
       name: String = "DenseReLUDense"
-  )(mode: Mode, parameterManager: ParameterManager): Output = tf.createWithVariableScope(name) {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = tf.createWithVariableScope(name) {
     val weights1 = parameterManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
     val bias1 = parameterManager.get("Dense1/Bias", input.dataType, Shape(filterSize))
     var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")

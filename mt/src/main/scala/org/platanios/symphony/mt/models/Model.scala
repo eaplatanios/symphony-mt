@@ -169,8 +169,14 @@ abstract class Model[S] protected (
         val tgtSequence = mapToWordIds(input._2._1, input._2._2)
         val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
         val tgtMapped = (tgtSequence, input._2._3)
-        val state = tf.createWithVariableScope("Encoder")(encoder(srcMapped, mode))
-        val output = tf.createWithVariableScope("Decoder")(decoder(srcMapped, Some(tgtMapped), Some(state), mode))
+        val state = tf.createWithVariableScope("Encoder") {
+          implicit val stage: Stage = Encoding
+          encoder(srcMapped, mode)
+        }
+        val output = tf.createWithVariableScope("Decoder") {
+          implicit val stage: Stage = Decoding
+          decoder(srcMapped, Some(tgtMapped), Some(state), mode)
+        }
         (input._1._2, output._1, output._2)
       }
     }
@@ -187,8 +193,14 @@ abstract class Model[S] protected (
         parameterManager.setContext((input._1, input._2))
         val srcSequence = mapToWordIds(input._1, input._3)
         val srcMapped = (input._1, input._2, srcSequence, input._4)
-        val state = tf.createWithVariableScope("Encoder")(encoder(srcMapped, mode))
-        val output = tf.createWithVariableScope("Decoder")(decoder(srcMapped, None, Some(state), mode))
+        val state = tf.createWithVariableScope("Encoder") {
+          implicit val stage: Stage = Encoding
+          encoder(srcMapped, mode)
+        }
+        val output = tf.createWithVariableScope("Decoder") {
+          implicit val stage: Stage = Decoding
+          decoder(srcMapped, None, Some(state), mode)
+        }
         (input._2, output._1, output._2)
       }
     }
@@ -232,7 +244,7 @@ abstract class Model[S] protected (
     *           - Encoder output, with shape `[batchSize, inputLength, hiddenSize]`.
     *           - Encoder-decoder attention bias and mask weights, with shape `[batchSize, inputLength]`.
     */
-  protected def encoder(input: TFBatchWithLanguages, mode: Mode): S
+  protected def encoder(input: TFBatchWithLanguages, mode: Mode)(implicit stage: Stage): S
 
   /**
     *
@@ -243,6 +255,8 @@ abstract class Model[S] protected (
       input: Option[TFBatch],
       state: Option[S],
       mode: Mode
+  )(implicit
+      stage: Stage
   ): TFBatch
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {

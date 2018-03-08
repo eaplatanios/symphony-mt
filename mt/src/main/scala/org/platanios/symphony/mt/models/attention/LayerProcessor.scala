@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.ParameterManager
+import org.platanios.symphony.mt.models.{ParameterManager, Stage}
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -29,7 +29,9 @@ trait LayerProcessor {
       value: Output,
       previousValue: Option[Output],
       name: String = "LayerProcessor"
-  )(mode: Mode, parameterManager: ParameterManager): Output
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output
 }
 
 case object AddResidualConnection extends LayerProcessor {
@@ -38,7 +40,9 @@ case object AddResidualConnection extends LayerProcessor {
       value: Output,
       previousValue: Option[Output],
       name: String = "AddResidualConnection"
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     previousValue match {
       case Some(v) => value + v
       case None => throw new IllegalArgumentException(
@@ -53,7 +57,9 @@ case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) exte
       value: Output,
       previousValue: Option[Output],
       name: String = "Normalize"
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     normalization(value, epsilon = epsilon, name = name)(mode, parameterManager)
   }
 }
@@ -68,7 +74,9 @@ case class Dropout(
       value: Output,
       previousValue: Option[Output],
       name: String = "Normalize"
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     if (mode.isTraining)
       Common.dropoutWithBroadcastAxes(value, 1.0f - dropoutRate, scaleOutput, broadcastAxes)
     else
@@ -88,7 +96,9 @@ object LayerProcessor {
   def layerPreprocess(
       input: Output,
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     processors.foldLeft(input) {
       case (value, processor) => processor(value, None)(mode, parameterManager)
     }
@@ -107,7 +117,9 @@ object LayerProcessor {
       input: Output,
       output: Output,
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     processors.foldLeft(output) {
       case (value, processor) => processor(value, Some(input))(mode, parameterManager)
     }

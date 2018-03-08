@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.{Decoder, DeviceManager, ParameterManager, RNNModel}
+import org.platanios.symphony.mt.models._
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
@@ -45,6 +45,8 @@ abstract class RNNDecoder[S, SS]()(implicit
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
+  )(implicit
+      stage: Stage
   ): RNNDecoder.Output
 
   protected def decode[DS, DSS](

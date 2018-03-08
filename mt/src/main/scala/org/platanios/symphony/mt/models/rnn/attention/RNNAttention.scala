@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn.attention
 
-import org.platanios.symphony.mt.models.ParameterManager
+import org.platanios.symphony.mt.models.{ParameterManager, Stage}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -37,6 +37,7 @@ abstract class RNNAttention[AS, ASS](implicit evAS: WhileLoopVariable.Aux[AS, AS
       useAttentionLayer: Boolean,
       outputAttention: Boolean
   )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage,
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, AS, ASS], AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]])

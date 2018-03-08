@@ -15,30 +15,9 @@
 
 package org.platanios.symphony.mt.models
 
-import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.rnn.RNNDecoder
-import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.Output
-
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Decoder[O] {
-  def create(
-      config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
-      encoderState: O,
-      beginOfSequenceToken: String,
-      endOfSequenceToken: String,
-      tgtSequences: Output = null,
-      tgtSequenceLengths: Output = null
-  )(
-      mode: Mode,
-      env: Environment,
-      parameterManager: ParameterManager,
-      deviceManager: DeviceManager
-  )(implicit
-      stage: Stage
-  ): RNNDecoder.Output
-}
+sealed trait Stage
+case object Encoding extends Stage
+case object Decoding extends Stage

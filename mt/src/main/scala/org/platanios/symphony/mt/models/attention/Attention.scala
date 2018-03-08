@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.ParameterManager
+import org.platanios.symphony.mt.models.{ParameterManager, Stage}
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -236,7 +236,9 @@ object Attention {
       kvNumFilters: Int = 1,
       qPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
       kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding
-  )(mode: Mode, parameterManager: ParameterManager): (Output, Output, Output) = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): (Output, Output, Output) = {
 
     def compute(input: Output, depth: Int, numFilters: Int, paddingMode: tf.ConvPaddingMode, name: String): Output = {
       tf.createWithVariableScope(name) {
@@ -301,7 +303,9 @@ object Attention {
       kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
       cache: Option[Cache] = None,
       name: String = "MultiHeadAttention"
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.createWithVariableScope(name) {

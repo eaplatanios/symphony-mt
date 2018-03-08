@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel}
+import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel, Stage}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -48,6 +48,8 @@ class BidirectionalRNNEncoder[S, SS](
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
+  )(implicit
+      stage: Stage
   ): Tuple[Output, Seq[S]] = {
     val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
     val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage).gather(transposedSequences)

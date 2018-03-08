@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.ParameterManager
+import org.platanios.symphony.mt.models.{ParameterManager, Stage}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 
@@ -28,7 +28,9 @@ trait Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(mode: Mode, parameterManager: ParameterManager): Output
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output
 }
 
 /** Applies no normalization to the input tensor. */
@@ -38,7 +40,9 @@ case object NoNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "NoNormalization"
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     input
   }
 }
@@ -49,7 +53,9 @@ case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVaria
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "LayerNormalization"
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     val numFilters = depth.getOrElse(input.shape(-1))
     tf.createWithVariableScope(name, reuse) {
       val scale = parameterManager.get("Scale", input.dataType, Shape(numFilters), tf.OnesInitializer)
@@ -69,7 +75,9 @@ case object BatchNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "BatchNormalization"
-  )(mode: Mode, parameterManager: ParameterManager): Output = {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = {
     ???
   }
 }
@@ -80,7 +88,9 @@ case object NoamNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "NoamNormalization"
-  )(mode: Mode, parameterManager: ParameterManager): Output = tf.createWithNameScope(name) {
+  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      stage: Stage
+  ): Output = tf.createWithNameScope(name) {
     tf.l2Normalize(input, input.rank - 1, epsilon) * tf.sqrt(tf.constant(input.shape(-1), FLOAT32))
   }
 }
