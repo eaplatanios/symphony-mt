@@ -15,7 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{ParameterManager, RNNModel}
+import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -43,7 +44,12 @@ class GNMTEncoder[S, SS](
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  )(mode: Mode, parameterManager: ParameterManager): Tuple[Output, Seq[S]] = {
+  )(
+      mode: Mode,
+      env: Environment,
+      parameterManager: ParameterManager,
+      deviceManager: DeviceManager
+  ): Tuple[Output, Seq[S]] = {
     val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
     val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage).gather(transposedSequences)
 
@@ -52,10 +58,12 @@ class GNMTEncoder[S, SS](
       if (numBiLayers > 0) {
         val biCellFw = RNNModel.multiCell(
           cell, embeddedSequences.shape(-1), numUnits, dataType, numBiLayers, 0, dropout, residualFn, 0,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiBiCellFw")(mode, parameterManager)
+          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
+          "MultiBiCellFw")(mode, env, parameterManager, deviceManager)
         val biCellBw = RNNModel.multiCell(
           cell, embeddedSequences.shape(-1), numUnits, dataType, numBiLayers, 0, dropout, residualFn, numBiLayers,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiBiCellBw")(mode, parameterManager)
+          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
+          "MultiBiCellBw")(mode, env, parameterManager, deviceManager)
         val unmergedBiTuple = tf.bidirectionalDynamicRNN(
           biCellFw, biCellBw, embeddedSequences, null, null, config.timeMajor, config.env.parallelIterations,
           config.env.swapMemory, srcSequenceLengths, "BidirectionalLayers")
@@ -69,7 +77,7 @@ class GNMTEncoder[S, SS](
     val uniCell = RNNModel.multiCell(
       cell, biTuple.output.shape(-1), numUnits, dataType, numUniLayers, numUniResLayers, dropout, residualFn,
       2 * numBiLayers, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "MultiUniCell")(mode, parameterManager)
+      "MultiUniCell")(mode, env, parameterManager, deviceManager)
     val uniTuple = tf.dynamicRNN(
       uniCell, biTuple.output, null, config.timeMajor, config.env.parallelIterations, config.env.swapMemory,
       srcSequenceLengths, "UnidirectionalLayers")

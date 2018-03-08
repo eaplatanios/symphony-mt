@@ -16,23 +16,25 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.Output
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Encoder[O] {
-  def create(
-      config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
-      srcSequences: Output,
-      srcSequenceLengths: Output
-  )(
-      mode: Mode,
-      env: Environment,
-      parameterManager: ParameterManager,
-      deviceManager: DeviceManager
-  ): O
+trait DeviceManager {
+  def nextDevice(env: Environment): String
+}
+
+case object RoundRobinDeviceManager extends DeviceManager {
+  private[this] var currentGPUIndex: Int = 0
+
+  override def nextDevice(env: Environment): String = {
+    if (env.numGPUs - currentGPUIndex <= 0) {
+      "/device:CPU:0"
+    } else {
+      currentGPUIndex %= env.numGPUs
+      val nextDevice = s"/device:GPU:${env.firstGPU + currentGPUIndex}"
+      currentGPUIndex += 1
+      nextDevice
+    }
+  }
 }

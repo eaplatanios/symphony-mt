@@ -15,7 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{Decoder, ParameterManager, RNNModel}
+import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.models.{Decoder, DeviceManager, ParameterManager, RNNModel}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
@@ -39,7 +40,12 @@ abstract class RNNDecoder[S, SS]()(implicit
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parameterManager: ParameterManager): RNNDecoder.Output
+  )(
+      mode: Mode,
+      env: Environment,
+      parameterManager: ParameterManager,
+      deviceManager: DeviceManager
+  ): RNNDecoder.Output
 
   protected def decode[DS, DSS](
       config: RNNModel.Config[_, _],

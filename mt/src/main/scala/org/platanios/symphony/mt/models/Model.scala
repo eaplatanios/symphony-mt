@@ -144,6 +144,8 @@ abstract class Model[S] protected (
           mode: Mode
       ): (Output, Output) = {
         parameterManager.initialize(languages)
+        parameterManager.setEnvironment(config.env)
+        parameterManager.setDeviceManager(config.deviceManager)
         tf.createWithNameScope("TrainInputsToWordIDs") {
           (mapToWordIds(input._1, input._2), input._3)
         }
@@ -160,6 +162,8 @@ abstract class Model[S] protected (
           mode: Mode
       ): TFBatchWithLanguage = {
         parameterManager.initialize(languages)
+        parameterManager.setEnvironment(config.env)
+        parameterManager.setDeviceManager(config.deviceManager)
         parameterManager.setContext((input._1._1, input._1._2))
         val srcSequence = mapToWordIds(input._1._1, input._1._3)
         val tgtSequence = mapToWordIds(input._2._1, input._2._2)
@@ -178,6 +182,8 @@ abstract class Model[S] protected (
 
       override protected def _forward(input: TFBatchWithLanguages, mode: Mode): TFBatchWithLanguage = {
         parameterManager.initialize(languages)
+        parameterManager.setEnvironment(config.env)
+        parameterManager.setDeviceManager(config.deviceManager)
         parameterManager.setContext((input._1, input._2))
         val srcSequence = mapToWordIds(input._1, input._3)
         val srcMapped = (input._1, input._2, srcSequence, input._4)
@@ -250,6 +256,7 @@ object Model {
   class Config protected (
       val env: Environment,
       val parameterManager: ParameterManager,
+      val deviceManager: DeviceManager,
       val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
@@ -259,12 +266,13 @@ object Model {
     def apply(
         env: Environment,
         parameterManager: ParameterManager,
+        deviceManager: DeviceManager = RoundRobinDeviceManager,
         labelSmoothing: Float = 0.0f,
         timeMajor: Boolean = false,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000
     ): Config = {
-      new Config(env, parameterManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+      new Config(env, parameterManager, deviceManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
     }
   }
 

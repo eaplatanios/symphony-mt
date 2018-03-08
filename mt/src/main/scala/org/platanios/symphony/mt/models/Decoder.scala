@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.models
 
+import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.rnn.RNNDecoder
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
@@ -32,5 +33,10 @@ trait Decoder[O] {
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parameterManager: ParameterManager): RNNDecoder.Output
+  )(
+      mode: Mode,
+      env: Environment,
+      parameterManager: ParameterManager,
+      deviceManager: DeviceManager
+  ): RNNDecoder.Output
 }

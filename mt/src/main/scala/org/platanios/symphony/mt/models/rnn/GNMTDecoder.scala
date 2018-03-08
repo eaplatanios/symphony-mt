@@ -15,7 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{ParameterManager, RNNModel}
+import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -51,7 +52,12 @@ class GNMTDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parameterManager: ParameterManager): RNNDecoder.Output = {
+  )(
+      mode: Mode,
+      env: Environment,
+      parameterManager: ParameterManager,
+      deviceManager: DeviceManager
+  ): RNNDecoder.Output = {
     // Embeddings
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
 
@@ -59,7 +65,7 @@ class GNMTDecoder[S, SS, AS, ASS](
     val cells = RNNModel.cells(
       cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout,
       Some(GNMTDecoder.residualFn[Output, Shape]), 0, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "Cells")(mode, parameterManager)
+      "Cells")(mode, env, parameterManager, deviceManager)
 
     // Attention
     var initialState = encoderState._1.state

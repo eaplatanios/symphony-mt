@@ -15,7 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{ParameterManager, RNNModel}
+import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
@@ -51,7 +52,12 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(mode: Mode, parameterManager: ParameterManager): RNNDecoder.Output = {
+  )(
+      mode: Mode,
+      env: Environment,
+      parameterManager: ParameterManager,
+      deviceManager: DeviceManager
+  ): RNNDecoder.Output = {
     // Embeddings
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
 
@@ -61,11 +67,13 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       case None =>
         RNNModel.multiCell(
           cell, numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, 0,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiUniCell")(mode, parameterManager)
+          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
+          "MultiUniCell")(mode, env, parameterManager, deviceManager)
       case Some(_) =>
         RNNModel.multiCell(
           cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, 0,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiUniCell")(mode, parameterManager)
+          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
+          "MultiUniCell")(mode, env, parameterManager, deviceManager)
     }
 
     // Use attention if necessary and create the decoder RNN

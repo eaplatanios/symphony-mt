@@ -15,7 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{ParameterManager, RNNModel}
+import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
@@ -42,18 +43,24 @@ class BidirectionalRNNEncoder[S, SS](
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  )(mode: Mode, parameterManager: ParameterManager): Tuple[Output, Seq[S]] = {
+  )(
+      mode: Mode,
+      env: Environment,
+      parameterManager: ParameterManager,
+      deviceManager: DeviceManager
+  ): Tuple[Output, Seq[S]] = {
     val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
     val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage).gather(transposedSequences)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
 
     val biCellFw = RNNModel.multiCell(
       cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers / 2, numResLayers / 2, dropout, residualFn, 0,
-      config.env.numGPUs, config.env.firstGPU, config.env.randomSeed, "MultiBiCellFw")(mode, parameterManager)
+      config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
+      "MultiBiCellFw")(mode, env, parameterManager, deviceManager)
     val biCellBw = RNNModel.multiCell(
       cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers / 2, numResLayers / 2, dropout, residualFn,
       numLayers / 2, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "MultiBiCellBw")(mode, parameterManager)
+      "MultiBiCellBw")(mode, env, parameterManager, deviceManager)
 
     val unmergedBiTuple = tf.bidirectionalDynamicRNN(
       biCellFw, biCellBw, embeddedSequences, null, null, config.timeMajor,
