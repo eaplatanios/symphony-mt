@@ -61,8 +61,10 @@ class EuroparlV8DatasetLoader(
   /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
   override def corpora(datasetType: DatasetType): Seq[(String, File, File)] = datasetType match {
     case Train => Seq(("EuroparlV8/Train",
-        File(downloadsDir) / EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(downloadsDir) / EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt"))
+        File(downloadsDir) / EuroparlV8DatasetLoader.archivePrefix /
+            EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
+        File(downloadsDir) / EuroparlV8DatasetLoader.archivePrefix /
+            EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt"))
     case _ => Seq.empty
   }
 }

@@ -202,9 +202,6 @@ object RNNModel {
       numResidualLayers: Int,
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-      baseGPU: Int = 0,
-      numGPUs: Int = 0,
-      firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
   )(
@@ -235,9 +232,6 @@ object RNNModel {
       numResidualLayers: Int,
       dropout: Option[Float] = None,
       residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output),
-      baseGPU: Int = 0,
-      numGPUs: Int = 0,
-      firstGPU: Int = 0,
       seed: Option[Int] = None,
       name: String
   )(
@@ -252,6 +246,6 @@ object RNNModel {
   ): tf.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {
     tf.MultiCell(cells(
       cellCreator, numInputs, numUnits, dataType, numLayers, numResidualLayers, dropout,
-      residualFn, baseGPU, numGPUs, firstGPU, seed, name)(mode, env, parameterManager, deviceManager), name)
+      residualFn, seed, name)(mode, env, parameterManager, deviceManager), name)
   }
 }

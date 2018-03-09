@@ -55,9 +55,8 @@ class UnidirectionalRNNEncoder[S, SS](
     val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage).gather(transposedSequences)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = RNNModel.multiCell(
-      cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers, numResLayers, dropout,
-      residualFn, 0, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "MultiUniCell")(mode, env, parameterManager, deviceManager)
+      cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers, numResLayers, dropout, residualFn,
+      config.env.randomSeed, "MultiUniCell")(mode, env, parameterManager, deviceManager)
     tf.dynamicRNN(
       uniCell, embeddedSequences, null, config.timeMajor, config.env.parallelIterations, config.env.swapMemory,
       srcSequenceLengths, "UnidirectionalLayers")

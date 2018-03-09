@@ -142,7 +142,6 @@ object Vocabulary {
                 s"are not equal to [$unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
           tokens.prepend(unknownToken, beginOfSequenceToken, endOfSequenceToken)
           val newFile = if (directory != null) directory.sibling(file.name) else file
-          logger.info(s"Creating fixed vocabulary file at '$newFile'.")
           val writer = newFile.newBufferedWriter(StandardCharsets.UTF_8)
           tokens.foreach(token => writer.write(s"$token\n"))
           writer.close()

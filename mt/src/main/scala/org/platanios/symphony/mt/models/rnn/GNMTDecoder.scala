@@ -64,10 +64,13 @@ class GNMTDecoder[S, SS, AS, ASS](
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
 
     // RNN cells
-    val cells = RNNModel.cells(
-      cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout,
-      Some(GNMTDecoder.residualFn[Output, Shape]), 0, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "Cells")(mode, env, parameterManager, deviceManager)
+    val cells = (0 until numLayers).foldLeft(Seq.empty[tf.RNNCell[Output, Shape, S, SS]])((cells, i) => {
+      val cellNumInputs = if (i == 0) 2 * numUnits else cells(i - 1).outputShape(-1) + numUnits
+      cells :+ RNNModel.cell(
+        cell, cellNumInputs, numUnits, dataType, dropout,
+        if (i >= numLayers - numResLayers) Some(GNMTDecoder.residualFn[Output, Shape]) else None,
+        deviceManager.nextDevice(env), config.env.randomSeed, s"Cell$i")(mode, parameterManager)
+    })
 
     // Attention
     var initialState = encoderState._1.state

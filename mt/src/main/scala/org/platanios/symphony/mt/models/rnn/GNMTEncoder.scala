@@ -59,13 +59,11 @@ class GNMTEncoder[S, SS](
     val biTuple = {
       if (numBiLayers > 0) {
         val biCellFw = RNNModel.multiCell(
-          cell, embeddedSequences.shape(-1), numUnits, dataType, numBiLayers, 0, dropout, residualFn, 0,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-          "MultiBiCellFw")(mode, env, parameterManager, deviceManager)
+          cell, embeddedSequences.shape(-1), numUnits, dataType, numBiLayers, 0, dropout, residualFn,
+          config.env.randomSeed, "MultiBiCellFw")(mode, env, parameterManager, deviceManager)
         val biCellBw = RNNModel.multiCell(
-          cell, embeddedSequences.shape(-1), numUnits, dataType, numBiLayers, 0, dropout, residualFn, numBiLayers,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-          "MultiBiCellBw")(mode, env, parameterManager, deviceManager)
+          cell, embeddedSequences.shape(-1), numUnits, dataType, numBiLayers, 0, dropout, residualFn,
+          config.env.randomSeed, "MultiBiCellBw")(mode, env, parameterManager, deviceManager)
         val unmergedBiTuple = tf.bidirectionalDynamicRNN(
           biCellFw, biCellBw, embeddedSequences, null, null, config.timeMajor, config.env.parallelIterations,
           config.env.swapMemory, srcSequenceLengths, "BidirectionalLayers")
@@ -78,8 +76,7 @@ class GNMTEncoder[S, SS](
     // Unidirectional RNN layers
     val uniCell = RNNModel.multiCell(
       cell, biTuple.output.shape(-1), numUnits, dataType, numUniLayers, numUniResLayers, dropout, residualFn,
-      2 * numBiLayers, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "MultiUniCell")(mode, env, parameterManager, deviceManager)
+      config.env.randomSeed, "MultiUniCell")(mode, env, parameterManager, deviceManager)
     val uniTuple = tf.dynamicRNN(
       uniCell, biTuple.output, null, config.timeMajor, config.env.parallelIterations, config.env.swapMemory,
       srcSequenceLengths, "UnidirectionalLayers")

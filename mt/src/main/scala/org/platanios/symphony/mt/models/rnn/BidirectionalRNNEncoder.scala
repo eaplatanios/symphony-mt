@@ -56,13 +56,11 @@ class BidirectionalRNNEncoder[S, SS](
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
 
     val biCellFw = RNNModel.multiCell(
-      cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers / 2, numResLayers / 2, dropout, residualFn, 0,
-      config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "MultiBiCellFw")(mode, env, parameterManager, deviceManager)
+      cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers / 2, numResLayers / 2, dropout, residualFn,
+      config.env.randomSeed, "MultiBiCellFw")(mode, env, parameterManager, deviceManager)
     val biCellBw = RNNModel.multiCell(
       cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers / 2, numResLayers / 2, dropout, residualFn,
-      numLayers / 2, config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
-      "MultiBiCellBw")(mode, env, parameterManager, deviceManager)
+      config.env.randomSeed, "MultiBiCellBw")(mode, env, parameterManager, deviceManager)
 
     val unmergedBiTuple = tf.bidirectionalDynamicRNN(
       biCellFw, biCellBw, embeddedSequences, null, null, config.timeMajor,

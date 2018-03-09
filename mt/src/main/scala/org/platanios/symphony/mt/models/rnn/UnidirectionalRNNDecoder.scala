@@ -68,13 +68,11 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
     val uniCell = attention match {
       case None =>
         RNNModel.multiCell(
-          cell, numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, 0,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
+          cell, numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, config.env.randomSeed,
           "MultiUniCell")(mode, env, parameterManager, deviceManager)
       case Some(_) =>
         RNNModel.multiCell(
-          cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, 0,
-          config.env.numGPUs, config.env.firstGPU, config.env.randomSeed,
+          cell, 2 * numUnits, numUnits, dataType, numLayers, numResLayers, dropout, residualFn, config.env.randomSeed,
           "MultiUniCell")(mode, env, parameterManager, deviceManager)
     }
 
