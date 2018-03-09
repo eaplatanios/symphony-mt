@@ -37,7 +37,7 @@ object WMT16 extends App {
   val tgtLanguage: Language = english
 
   val dataConfig = DataConfig(
-    workingDir = workingDir.resolve("data"),
+    workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
     loaderSentenceLengthBounds = Some((1, 80)),
     numBuckets = 5,

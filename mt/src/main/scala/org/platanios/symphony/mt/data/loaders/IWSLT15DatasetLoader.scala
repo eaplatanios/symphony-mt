@@ -65,13 +65,13 @@ class IWSLT15DatasetLoader(
 
   /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
   override def corpora(datasetType: DatasetType): Seq[(String, File, File)] = datasetType match {
-    case Train => Seq(("IWSLT15/Train",
+    case Train => Seq(("Train",
         File(downloadsDir) / s"${IWSLT15DatasetLoader.trainPrefix}.$src",
         File(downloadsDir) / s"${IWSLT15DatasetLoader.trainPrefix}.$tgt"))
-    case Dev => Seq(("IWSLT15/Dev",
+    case Dev => Seq(("Dev",
         File(downloadsDir) / s"${IWSLT15DatasetLoader.devPrefix}.$src",
         File(downloadsDir) / s"${IWSLT15DatasetLoader.devPrefix}.$tgt"))
-    case Test => Seq(("IWSLT15/Test",
+    case Test => Seq(("Test",
         File(downloadsDir) / s"${IWSLT15DatasetLoader.testPrefix}.$src",
         File(downloadsDir) / s"${IWSLT15DatasetLoader.testPrefix}.$tgt"))
   }

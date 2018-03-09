@@ -38,7 +38,7 @@ object WMT16LanguageEmbeddings extends App {
     (romanian, english), (russian, english), (turkish, english))
 
   val dataConfig = DataConfig(
-    workingDir = workingDir.resolve("data"),
+    workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
     loaderSentenceLengthBounds = Some((1, 80)),
     loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, 8192)),
