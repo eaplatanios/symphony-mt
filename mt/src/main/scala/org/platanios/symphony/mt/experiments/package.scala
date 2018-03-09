@@ -23,7 +23,6 @@ import org.platanios.symphony.mt.vocabulary.Vocabulary
   */
 package object experiments {
   def loadDatasets(loaders: Seq[ParallelDatasetLoader]): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    val datasets = ParallelDatasetLoader.load(loaders: _*)
-    (datasets, datasets.head.vocabulary.toSeq)
+    ParallelDatasetLoader.load(loaders: _*)
   }
 }

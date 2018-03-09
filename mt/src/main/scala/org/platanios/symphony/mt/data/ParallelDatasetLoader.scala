@@ -176,7 +176,7 @@ object ParallelDatasetLoader {
     }
   }
 
-  def load(loaders: ParallelDatasetLoader*): Seq[FileParallelDataset] = {
+  def load(loaders: ParallelDatasetLoader*): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
     // Collect all files.
     val files = loaders.map(loader => {
       var srcFiles = Seq.empty[File]
@@ -259,11 +259,13 @@ object ParallelDatasetLoader {
         }
     }
 
-    loaders.zip(files).map {
+    val datasets = loaders.zip(files).map {
       case (loader, (srcFiles, tgtFiles, fileTypes, fileKeys)) =>
         val groupedFiles = Map(loader.srcLanguage -> srcFiles, loader.tgtLanguage -> tgtFiles)
         val filteredVocabulary = vocabulary.filterKeys(l => l == loader.srcLanguage || l == loader.tgtLanguage)
         FileParallelDataset(loader.name, filteredVocabulary, loader.dataConfig, groupedFiles, fileTypes, fileKeys)
     }
+
+    (datasets, vocabulary.toSeq)
   }
 }
