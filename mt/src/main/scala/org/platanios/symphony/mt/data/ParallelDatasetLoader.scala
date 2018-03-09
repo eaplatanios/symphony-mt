@@ -16,7 +16,9 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.symphony.mt.utilities.CompressedFiles
+
 import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
@@ -25,7 +27,7 @@ import java.io.{BufferedWriter, IOException}
 import java.net.URL
 import java.nio.file.Path
 
-import org.platanios.symphony.mt.vocabulary.Vocabulary
+import scala.collection.mutable
 
 /** Parallel dataset used for machine translation experiments.
   *
@@ -111,78 +113,7 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
   def vocabularies: (Seq[File], Seq[File]) = (Seq.empty, Seq.empty)
 
   /** Returns the files included in this dataset, grouped based on their role. */
-  def load(): FileParallelDataset = {
-    // Collect all files.
-    var srcFiles = Seq.empty[File]
-    var tgtFiles = Seq.empty[File]
-    var fileTypes = Seq.empty[DatasetType]
-    var fileKeys = Seq.empty[String]
-    DatasetType.types.foreach(datasetType => {
-      val typeCorpora = corpora(datasetType)
-      srcFiles ++= typeCorpora.map(_._2)
-      tgtFiles ++= typeCorpora.map(_._3)
-      fileTypes ++= Seq.fill(typeCorpora.length)(datasetType)
-      fileKeys ++= typeCorpora.map(_._1)
-    })
-
-    // Clean the corpora, if necessary.
-    dataConfig.loaderSentenceLengthBounds.foreach {
-      case (minLength, maxLength) =>
-        val cleanedFiles = srcFiles.map(files => {
-          // TODO: [DATA] This is a hacky way of checking for the clean corpus files.
-          val corpusFile = files.sibling(files.nameWithoutExtension(includeAll = false))
-          val cleanCorpusFile = files.sibling(corpusFile.name + ".clean")
-          val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$src")
-          val tgtCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".$tgt")
-          if (srcCleanCorpusFile.notExists || tgtCleanCorpusFile.notExists) {
-            val exitCode = mosesDecoder.cleanCorpus(
-              corpusFile, cleanCorpusFile, src, tgt, minLength, maxLength)
-            if (exitCode != 0) {
-              corpusFile.sibling(corpusFile.name + s".$src").copyTo(srcCleanCorpusFile)
-              corpusFile.sibling(corpusFile.name + s".$tgt").copyTo(tgtCleanCorpusFile)
-            }
-          }
-          (srcCleanCorpusFile, tgtCleanCorpusFile)
-        }).unzip
-        srcFiles = cleanedFiles._1
-        tgtFiles = cleanedFiles._2
-    }
-
-    // Generate vocabularies, if necessary.
-    val workingDir = File(dataConfig.workingDir)
-    val vocabulary = Map(srcLanguage -> vocabularies._1, tgtLanguage -> vocabularies._2).map {
-      case (l, v) =>
-        dataConfig.loaderVocab match {
-          case GeneratedVocabulary(generator) =>
-            l -> {
-              val tokenizedFiles = if (l == srcLanguage) srcFiles else tgtFiles
-              val vocabFile = workingDir / s"vocab.${l.abbreviation}"
-              if (vocabFile.notExists) {
-                ParallelDatasetLoader.logger.info(s"Generating vocabulary file for $l.")
-                generator.generate(tokenizedFiles, vocabFile)
-                ParallelDatasetLoader.logger.info(s"Generated vocabulary file for $l.")
-              }
-              Vocabulary(vocabFile)
-            }
-          case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
-          case MergedVocabularies if v.nonEmpty =>
-            val vocabFile = workingDir.createChild(s"vocab.${l.abbreviation}", createParents = true)
-            val writer = new BufferedWriter(vocabFile.newPrintWriter(), dataConfig.loaderBufferSize)
-            v.toStream
-                .flatMap(_.lineIterator).toSet
-                .filter(_ != "")
-                .foreach(word => writer.write(word + "\n"))
-            writer.flush()
-            writer.close()
-            l -> Vocabulary(vocabFile)
-          case MergedVocabularies if v.isEmpty =>
-            throw new IllegalArgumentException("No existing vocabularies found to merge.")
-        }
-    }
-
-    val files = Map(srcLanguage -> srcFiles, tgtLanguage -> tgtFiles)
-    FileParallelDataset(name, vocabulary, dataConfig, files, fileTypes, fileKeys)
-  }
+  def load(): FileParallelDataset = ParallelDatasetLoader.load(this).head
 }
 
 object ParallelDatasetLoader {
@@ -231,6 +162,96 @@ object ParallelDatasetLoader {
       processedFile
     } else {
       file
+    }
+  }
+
+  def load(loaders: ParallelDatasetLoader*): Seq[FileParallelDataset] = {
+    // Collect all files.
+    val files = loaders.map(loader => {
+      var srcFiles = Seq.empty[File]
+      var tgtFiles = Seq.empty[File]
+      var fileTypes = Seq.empty[DatasetType]
+      var fileKeys = Seq.empty[String]
+      DatasetType.types.foreach(datasetType => {
+        val typeCorpora = loader.corpora(datasetType)
+        srcFiles ++= typeCorpora.map(_._2)
+        tgtFiles ++= typeCorpora.map(_._3)
+        fileTypes ++= Seq.fill(typeCorpora.length)(datasetType)
+        fileKeys ++= typeCorpora.map(_._1)
+      })
+
+      // Clean the corpora, if necessary.
+      loader.dataConfig.loaderSentenceLengthBounds.foreach {
+        case (minLength, maxLength) =>
+          val cleanedFiles = srcFiles.map(files => {
+            // TODO: [DATA] This is a hacky way of checking for the clean corpus files.
+            val corpusFile = files.sibling(files.nameWithoutExtension(includeAll = false))
+            val cleanCorpusFile = files.sibling(corpusFile.name + ".clean")
+            val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".${loader.src}")
+            val tgtCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".${loader.tgt}")
+            if (srcCleanCorpusFile.notExists || tgtCleanCorpusFile.notExists) {
+              val exitCode = loader.mosesDecoder.cleanCorpus(
+                corpusFile, cleanCorpusFile, loader.src, loader.tgt, minLength, maxLength)
+              if (exitCode != 0) {
+                corpusFile.sibling(corpusFile.name + s".${loader.src}").copyTo(srcCleanCorpusFile)
+                corpusFile.sibling(corpusFile.name + s".${loader.tgt}").copyTo(tgtCleanCorpusFile)
+              }
+            }
+            (srcCleanCorpusFile, tgtCleanCorpusFile)
+          }).unzip
+          srcFiles = cleanedFiles._1
+          tgtFiles = cleanedFiles._2
+      }
+
+      (srcFiles, tgtFiles, fileTypes, fileKeys)
+    })
+
+    // Generate vocabularies, if necessary.
+    val vocabularies = mutable.Map.empty[Language, mutable.ListBuffer[File]]
+    loaders.foreach(loader => {
+      vocabularies.getOrElseUpdate(loader.srcLanguage, mutable.ListBuffer.empty).append(loader.vocabularies._1: _*)
+      vocabularies.getOrElseUpdate(loader.tgtLanguage, mutable.ListBuffer.empty).append(loader.vocabularies._2: _*)
+    })
+    val workingDir = File(loaders.head.dataConfig.workingDir) / "vocabularies"
+    val vocabulary = vocabularies.toMap.map {
+      case (l, v) =>
+        loaders.head.dataConfig.loaderVocab match {
+          case NoVocabulary => l -> null // TODO: Avoid using nulls.
+          case GeneratedVocabulary(generator) =>
+            l -> {
+              val tokenizedFiles = loaders.zip(files).flatMap {
+                case (loader, f) if loader.srcLanguage == l => f._1
+                case (loader, f) if loader.tgtLanguage == l => f._2
+                case _ => Seq.empty
+              }
+              val vocabFile = workingDir / s"vocab.${l.abbreviation}"
+              if (vocabFile.notExists) {
+                ParallelDatasetLoader.logger.info(s"Generating vocabulary file for $l.")
+                generator.generate(tokenizedFiles, vocabFile)
+                ParallelDatasetLoader.logger.info(s"Generated vocabulary file for $l.")
+              }
+              Vocabulary(vocabFile)
+            }
+          case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
+          case MergedVocabularies if v.nonEmpty =>
+            val vocabFile = workingDir.createChild(s"vocab.${l.abbreviation}", createParents = true)
+            val writer = new BufferedWriter(vocabFile.newPrintWriter(), loaders.head.dataConfig.loaderBufferSize)
+            v.toStream
+                .flatMap(_.lineIterator).toSet
+                .filter(_ != "")
+                .foreach(word => writer.write(word + "\n"))
+            writer.flush()
+            writer.close()
+            l -> Vocabulary(vocabFile)
+          case MergedVocabularies if v.isEmpty =>
+            throw new IllegalArgumentException("No existing vocabularies found to merge.")
+        }
+    }
+
+    loaders.zip(files).map {
+      case (loader, (srcFiles, tgtFiles, fileTypes, fileKeys)) =>
+        val groupedFiles = Map(loader.srcLanguage -> srcFiles, loader.tgtLanguage -> tgtFiles)
+        FileParallelDataset(loader.name, vocabulary, loader.dataConfig, groupedFiles, fileTypes, fileKeys)
     }
   }
 }

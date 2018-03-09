@@ -13,15 +13,17 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data
+package org.platanios.symphony.mt
 
-import org.platanios.symphony.mt.vocabulary.VocabularyGenerator
+import org.platanios.symphony.mt.data.{FileParallelDataset, ParallelDatasetLoader}
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-sealed trait DatasetVocabulary
-
-case object NoVocabulary extends DatasetVocabulary
-case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVocabulary
-case object MergedVocabularies extends DatasetVocabulary
+package object experiments {
+  def loadDatasets(loaders: Seq[ParallelDatasetLoader]): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
+    val datasets = ParallelDatasetLoader.load(loaders: _*)
+    (datasets, datasets.head.vocabulary.toSeq)
+  }
+}
