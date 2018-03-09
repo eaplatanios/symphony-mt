@@ -87,6 +87,17 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
           if (newFile.notExists)
             mosesDecoder.sgmToText(file, newFile)
         }
+        if (newFile.name.endsWith(s"-src.$src") || newFile.name.endsWith(s"-ref.$src")) {
+          val renamedFile = newFile.sibling(newFile.name.dropRight(5 + src.length) + s".$src")
+          if (renamedFile.notExists)
+            newFile.copyTo(renamedFile)
+          newFile = renamedFile
+        } else if (newFile.name.endsWith(s"-src.$tgt") || newFile.name.endsWith(s"-ref.$tgt")) {
+          val renamedFile = newFile.sibling(newFile.name.dropRight(5 + tgt.length) + s".$tgt")
+          if (renamedFile.notExists)
+            newFile.copyTo(renamedFile)
+          newFile = renamedFile
+        }
         if (dataConfig.loaderTokenize && !newFile.name.contains(".tok")) {
           // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
           val tokenizedFile = newFile.sibling(
@@ -251,7 +262,8 @@ object ParallelDatasetLoader {
     loaders.zip(files).map {
       case (loader, (srcFiles, tgtFiles, fileTypes, fileKeys)) =>
         val groupedFiles = Map(loader.srcLanguage -> srcFiles, loader.tgtLanguage -> tgtFiles)
-        FileParallelDataset(loader.name, vocabulary, loader.dataConfig, groupedFiles, fileTypes, fileKeys)
+        val filteredVocabulary = vocabulary.filterKeys(l => l == loader.srcLanguage || l == loader.tgtLanguage)
+        FileParallelDataset(loader.name, filteredVocabulary, loader.dataConfig, groupedFiles, fileTypes, fileKeys)
     }
   }
 }

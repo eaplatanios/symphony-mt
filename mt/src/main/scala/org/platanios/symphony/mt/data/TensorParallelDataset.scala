@@ -33,7 +33,6 @@ class TensorParallelDataset protected (
   override def nonEmpty: Boolean = !isEmpty
 
   override def filterLanguages(languages: Language*): TensorParallelDataset = {
-    languages.foreach(checkSupportsLanguage)
     TensorParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
       vocabulary.filterKeys(languages.contains), tensors.filterKeys(languages.contains),

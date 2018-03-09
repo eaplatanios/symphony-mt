@@ -35,7 +35,6 @@ class FileParallelDataset protected (
   override def nonEmpty: Boolean = !isEmpty
 
   override def filterLanguages(languages: Language*): FileParallelDataset = {
-    languages.foreach(checkSupportsLanguage)
     FileParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
       vocabulary.filterKeys(languages.contains), dataConfig,
