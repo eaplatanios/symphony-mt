@@ -89,8 +89,8 @@ object Inputs {
     filesDataset
         .shuffle(numParallelFiles)
         .parallelInterleave(
-          d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles, name = "Interleave")
-        .prefetch(bufferSize)
+          d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles, sloppy = true,
+          bufferOutputElements = bufferSize, prefetchInputElements = numParallelFiles, name = "Interleave")
   }
 
   def createEvalDatasets(

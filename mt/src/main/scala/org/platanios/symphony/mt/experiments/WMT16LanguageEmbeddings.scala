@@ -111,10 +111,10 @@ object WMT16LanguageEmbeddings extends App {
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
     evalDatasets = datasets.flatMap(d => Seq(
-      ("WMT16", d.filterKeys("newstest2013")),
-      ("WMT16", d.filterKeys("newstest2014")),
-      ("WMT16", d.filterKeys("newstest2015")),
-      ("WMT16", d.filterKeys("newstest2016")))
+      ("WMT16/newstest2013", d.filterKeys("newstest2013")),
+      ("WMT16/newstest2014", d.filterKeys("newstest2014")),
+      ("WMT16/newstest2015", d.filterKeys("newstest2015")),
+      ("WMT16/newstest2016", d.filterKeys("newstest2016")))
     ))
 
   model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(340000))

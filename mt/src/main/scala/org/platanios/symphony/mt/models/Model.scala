@@ -80,7 +80,7 @@ abstract class Model[S] protected (
     if (logConfig.logEvalSteps > 0) {
       var datasets = Seq.empty[(String, FileParallelDataset)]
       for (datasetType <- Seq(Train, Dev, Test))
-        datasets ++= evalDatasets.map(d => (s"${d._1}/$datasetType", d._2.filterTypes(datasetType)))
+        datasets ++= evalDatasets.map(d => (d._1, d._2.filterTypes(datasetType)))
       datasets = datasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
         hooks += tf.learn.Evaluator(
