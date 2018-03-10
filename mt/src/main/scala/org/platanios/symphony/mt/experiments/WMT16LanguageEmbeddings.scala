@@ -20,11 +20,10 @@ import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
 import org.platanios.symphony.mt.models.rnn._
-import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention
+import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
 import org.platanios.symphony.mt.models.{LanguageEmbeddingsParameterManager, Model, RNNModel}
 import org.platanios.symphony.mt.vocabulary.{SimpleVocabularyGenerator, Vocabulary}
 import org.platanios.tensorflow.api._
-
 import java.nio.file.{Path, Paths}
 
 /**
@@ -40,7 +39,7 @@ object WMT16LanguageEmbeddings extends App {
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
-    loaderSentenceLengthBounds = Some((1, 80)),
+    // loaderSentenceLengthBounds = Some((1, 80)),
     loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, 8192)),
     numBuckets = 5,
     srcMaxLength = 50,
@@ -74,22 +73,36 @@ object WMT16LanguageEmbeddings extends App {
       env,
       LanguageEmbeddingsParameterManager(
         languageEmbeddingsSize = 64,
-        wordEmbeddingsSize = 128),
-      GNMTEncoder(
+        wordEmbeddingsSize = 64),
+      // GNMTEncoder(
+      //   cell = BasicLSTM(forgetBias = 1.0f),
+      //   numUnits = 32,
+      //   numBiLayers = 1,
+      //   numUniLayers = 3,
+      //   numUniResLayers = 2,
+      //   dropout = Some(0.2f)),
+      // GNMTDecoder(
+      //   cell = BasicLSTM(forgetBias = 1.0f),
+      //   numUnits = 32,
+      //   numLayers = 1 + 3, // Number of encoder bidirectional and unidirectional layers
+      //   numResLayers = 2,
+      //   attention = BahdanauRNNAttention(normalized = true),
+      //   dropout = Some(0.2f),
+      //   useNewAttention = true),
+      BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 128,
-        numBiLayers = 1,
-        numUniLayers = 3,
-        numUniResLayers = 2,
+        numUnits = 64,
+        numLayers = 2,
+        residual = false,
         dropout = Some(0.2f)),
-      GNMTDecoder(
+      UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 128,
-        numLayers = 1 + 3, // Number of encoder bidirectional and unidirectional layers
-        numResLayers = 2,
-        attention = BahdanauRNNAttention(normalized = true),
+        numUnits = 64,
+        numLayers = 2,
+        residual = false,
         dropout = Some(0.2f),
-        useNewAttention = true),
+        attention = Some(LuongRNNAttention(scaled = true)),
+        outputAttention = true),
       labelSmoothing = 0.1f,
       timeMajor = true,
       beamWidth = 10,
