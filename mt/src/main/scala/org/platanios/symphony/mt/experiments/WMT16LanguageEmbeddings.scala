@@ -63,7 +63,9 @@ object WMT16LanguageEmbeddings extends App {
     //   1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 340000 * 1 / (2 * 10), startStep = 340000 / 2),
     //   learningRateSummaryTag = "LearningRate"))
 
-  val logConfig = Model.LogConfig(logLossSteps = 100)
+  val logConfig = Model.LogConfig(
+    logLossSteps = 100,
+    logEvalSteps = 5000)
 
   val model = RNNModel(
     name = "Model",
@@ -74,35 +76,35 @@ object WMT16LanguageEmbeddings extends App {
       LanguageEmbeddingsParameterManager(
         languageEmbeddingsSize = 64,
         wordEmbeddingsSize = 64),
-      // GNMTEncoder(
-      //   cell = BasicLSTM(forgetBias = 1.0f),
-      //   numUnits = 32,
-      //   numBiLayers = 1,
-      //   numUniLayers = 3,
-      //   numUniResLayers = 2,
-      //   dropout = Some(0.2f)),
-      // GNMTDecoder(
-      //   cell = BasicLSTM(forgetBias = 1.0f),
-      //   numUnits = 32,
-      //   numLayers = 1 + 3, // Number of encoder bidirectional and unidirectional layers
-      //   numResLayers = 2,
-      //   attention = BahdanauRNNAttention(normalized = true),
-      //   dropout = Some(0.2f),
-      //   useNewAttention = true),
-      BidirectionalRNNEncoder(
-        cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 64,
-        numLayers = 2,
-        residual = false,
-        dropout = Some(0.2f)),
-      UnidirectionalRNNDecoder(
-        cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 64,
-        numLayers = 2,
-        residual = false,
-        dropout = Some(0.2f),
-        attention = Some(LuongRNNAttention(scaled = true)),
-        outputAttention = true),
+       GNMTEncoder(
+         cell = BasicLSTM(forgetBias = 1.0f),
+         numUnits = 64,
+         numBiLayers = 1,
+         numUniLayers = 3,
+         numUniResLayers = 2,
+         dropout = Some(0.2f)),
+       GNMTDecoder(
+         cell = BasicLSTM(forgetBias = 1.0f),
+         numUnits = 64,
+         numLayers = 1 + 3, // Number of encoder bidirectional and unidirectional layers
+         numResLayers = 2,
+         attention = BahdanauRNNAttention(normalized = true),
+         dropout = Some(0.2f),
+         useNewAttention = true),
+//      BidirectionalRNNEncoder(
+//        cell = BasicLSTM(forgetBias = 1.0f),
+//        numUnits = 64,
+//        numLayers = 2,
+//        residual = false,
+//        dropout = Some(0.2f)),
+//      UnidirectionalRNNDecoder(
+//        cell = BasicLSTM(forgetBias = 1.0f),
+//        numUnits = 64,
+//        numLayers = 2,
+//        residual = false,
+//        dropout = Some(0.2f),
+//        attention = Some(LuongRNNAttention(scaled = true)),
+//        outputAttention = true),
       labelSmoothing = 0.1f,
       timeMajor = true,
       beamWidth = 10,
