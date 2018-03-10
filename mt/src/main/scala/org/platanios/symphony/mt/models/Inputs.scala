@@ -195,7 +195,12 @@ object Inputs {
             else
               d
           })
-          .shuffle(bufferSize)
+          .transform(d => {
+            if (!isEval)
+              d.shuffle(bufferSize)
+            else
+              d
+          })
           // Tokenize by splitting on white spaces.
           .map(
             d => (d._1, (tf.stringSplit(d._2._1(NewAxis)).values, tf.stringSplit(d._2._2(NewAxis)).values)),
