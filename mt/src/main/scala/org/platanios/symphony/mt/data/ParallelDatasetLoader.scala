@@ -124,7 +124,7 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
   def vocabularies: (Seq[File], Seq[File]) = (Seq.empty, Seq.empty)
 
   /** Returns the files included in this dataset, grouped based on their role. */
-  def load(): FileParallelDataset = ParallelDatasetLoader.load(this).head
+  def load(): FileParallelDataset = ParallelDatasetLoader.load(this)._1.head
 }
 
 object ParallelDatasetLoader {

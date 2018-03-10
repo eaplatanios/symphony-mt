@@ -65,6 +65,7 @@ object Inputs {
 
     // Each element in `filesDataset` is a tuple: (srcLanguage, tgtLanguage, srcFile, tgtFile).
     val filesDataset = filteredDatasets
+        .filter(_.nonEmpty)
         .flatMap(d => {
           val currentLanguagePairs = d.languagePairs()
           languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(_ -> d)
