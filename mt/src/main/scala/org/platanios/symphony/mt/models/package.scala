@@ -54,8 +54,8 @@ package object models {
       TFBatchWithLanguagesD, TFBatchWithLanguagesS]
 
   type TFTrainDataset = tf.data.Dataset[
-      (TFBatchWithLanguagesT, TFBatchWithLanguageT),
-      (TFBatchWithLanguages, TFBatchWithLanguage),
-      (TFBatchWithLanguagesD, TFBatchWithLanguageD),
-      (TFBatchWithLanguagesS, TFBatchWithLanguageS)]
+      (TFBatchWithLanguagesT, TFBatchT),
+      (TFBatchWithLanguages, TFBatch),
+      (TFBatchWithLanguagesD, TFBatchD),
+      (TFBatchWithLanguagesS, TFBatchS)]
 }

@@ -81,7 +81,7 @@ abstract class RNNDecoder[S, SS]()(implicit
     } else {
       // Decoder embeddings
       val embeddingFn = (o: Output) => embeddings.gather(o)
-      val tgtVocabLookupTable = parameterManager.lookupTable(tgtLanguage)
+      val tgtVocabLookupTable = parameterManager.stringToIndexLookup(tgtLanguage)
       val tgtBosID = tgtVocabLookupTable(tf.constant(beginOfSequenceToken)).cast(INT32)
       val tgtEosID = tgtVocabLookupTable(tf.constant(endOfSequenceToken)).cast(INT32)
 

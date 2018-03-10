@@ -33,9 +33,10 @@ class ParameterManager protected (
   protected var deviceManager: Option[DeviceManager]       = None
   protected var languages    : Seq[(Language, Vocabulary)] = _
 
-  protected val languageIds   : mutable.Map[Graph, Seq[Output]]       = mutable.Map.empty
-  protected val lookupTables  : mutable.Map[Graph, Seq[tf.HashTable]] = mutable.Map.empty
-  protected val wordEmbeddings: mutable.Map[Graph, Seq[Output]]       = mutable.Map.empty
+  protected val languageIds              : mutable.Map[Graph, Seq[Output]]       = mutable.Map.empty
+  protected val stringToIndexLookupTables: mutable.Map[Graph, Seq[tf.HashTable]] = mutable.Map.empty
+  protected val indexToStringLookupTables: mutable.Map[Graph, Seq[tf.HashTable]] = mutable.Map.empty
+  protected val wordEmbeddings           : mutable.Map[Graph, Seq[Output]]       = mutable.Map.empty
 
   protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, Seq[Output]]] = mutable.Map.empty
 
@@ -53,7 +54,8 @@ class ParameterManager protected (
 
   protected def removeGraph(graph: Graph): Unit = {
     languageIds -= graph
-    lookupTables -= graph
+    stringToIndexLookupTables -= graph
+    indexToStringLookupTables -= graph
     wordEmbeddings -= graph
     projectionsToWords -= graph
   }
@@ -63,17 +65,22 @@ class ParameterManager protected (
     this.languages = languages
     val graph = currentGraph
     if (!languageIds.contains(graph)) {
-      languageIds += graph -> tf.createWithNameScope("parameterManager/LanguageIDs") {
+      languageIds += graph -> tf.createWithNameScope("ParameterManager/LanguageIDs") {
         languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = l._1.name))
       }
     }
-    if (!lookupTables.contains(graph)) {
-      lookupTables += graph -> tf.createWithNameScope("parameterManager/LookupTables") {
-        languages.map(l => l._2.lookupTable(name = l._1.name))
+    if (!stringToIndexLookupTables.contains(graph)) {
+      stringToIndexLookupTables += graph -> tf.createWithNameScope("ParameterManager/StringToIndexLookupTables") {
+        languages.map(l => l._2.stringToIndexLookupTable(name = l._1.name))
+      }
+    }
+    if (!indexToStringLookupTables.contains(graph)) {
+      indexToStringLookupTables += graph -> tf.createWithNameScope("ParameterManager/IndexToStringLookupTables") {
+        languages.map(l => l._2.indexToStringLookupTable(name = l._1.name))
       }
     }
     if (!wordEmbeddings.contains(graph)) {
-      wordEmbeddings += graph -> tf.createWithNameScope("parameterManager/WordEmbeddings") {
+      wordEmbeddings += graph -> tf.createWithNameScope("ParameterManager/WordEmbeddings") {
         val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
         languages.map(l =>
           tf.variable(l._1.name, FLOAT32, Shape(l._2.size, wordEmbeddingsSize), embeddingsInitializer).value)
@@ -81,12 +88,21 @@ class ParameterManager protected (
     }
   }
 
-  def lookupTable(languageId: Output): (Output) => Output = (keys: Output) => {
+  def stringToIndexLookup(languageId: Output): (Output) => Output = (keys: Output) => {
     val graph = currentGraph
-    val predicates = lookupTables(graph).zip(languageIds(graph)).map {
+    val predicates = stringToIndexLookupTables(graph).zip(languageIds(graph)).map {
       case (table, langId) => (tf.equal(languageId, langId), () => table.lookup(keys))
     }
-    val default = () => lookupTables(graph).head.lookup(keys)
+    val default = () => stringToIndexLookupTables(graph).head.lookup(keys)
+    tf.cases(predicates, default)
+  }
+
+  def indexToStringLookup(languageId: Output): (Output) => Output = (keys: Output) => {
+    val graph = currentGraph
+    val predicates = indexToStringLookupTables(graph).zip(languageIds(graph)).map {
+      case (table, langId) => (tf.equal(languageId, langId), () => table.lookup(keys))
+    }
+    val default = () => indexToStringLookupTables(graph).head.lookup(keys)
     tf.cases(predicates, default)
   }
 
@@ -154,7 +170,7 @@ class LanguageEmbeddingsPairParameterManager protected (
     super.initialize(languages)
     val graph = currentGraph
     if (!languageEmbeddings.contains(graph)) {
-      languageEmbeddings += graph -> tf.createWithNameScope("parameterManager/LanguageEmbeddings") {
+      languageEmbeddings += graph -> tf.createWithNameScope("ParameterManager/LanguageEmbeddings") {
         val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
         tf.variable(
           "LanguageEmbeddings", FLOAT32, Shape(languages.length, languageEmbeddingsSize),
@@ -231,7 +247,7 @@ class LanguageEmbeddingsParameterManager protected (
     super.initialize(languages)
     val graph = currentGraph
     if (!languageEmbeddings.contains(graph)) {
-      languageEmbeddings += graph -> tf.createWithNameScope("parameterManager/LanguageEmbeddings") {
+      languageEmbeddings += graph -> tf.createWithNameScope("ParameterManager/LanguageEmbeddings") {
         val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
         tf.variable(
           "LanguageEmbeddings", FLOAT32, Shape(languages.length, languageEmbeddingsSize),

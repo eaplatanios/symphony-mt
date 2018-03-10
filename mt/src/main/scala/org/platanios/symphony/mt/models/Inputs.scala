@@ -165,7 +165,7 @@ object Inputs {
       tgtFile: Output
   ): TFTrainDataset = {
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
-    val bufferSize = if (dataConfig.bufferSize == -1L) 1024L * batchSize else dataConfig.bufferSize
+    val bufferSize = if (dataConfig.bufferSize == -1L) 64L * batchSize else dataConfig.bufferSize
 
     val srcLanguageDataset = tf.data.OutputDataset(srcLanguage).repeat()
     val tgtLanguageDataset = tf.data.OutputDataset(tgtLanguage).repeat()
@@ -258,7 +258,7 @@ object Inputs {
 
     parallelDataset
         .map(
-          d => ((d._1._1(0), d._1._2(0), d._2._1._1, d._2._1._2), (d._1._2(0), d._2._2._1, d._2._2._2)),
+          d => ((d._1._1(0), d._1._2(0), d._2._1._1, d._2._1._2), (d._2._2._1, d._2._2._2)),
           dataConfig.numParallelCalls, name = "AddLanguageIDs")
         .prefetch(bufferSize)
         .asInstanceOf[TFTrainDataset]

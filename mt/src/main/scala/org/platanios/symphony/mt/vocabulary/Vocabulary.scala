@@ -38,9 +38,18 @@ case class Vocabulary private[Vocabulary] (file: File, size: Int) {
     *
     * @return Vocabulary lookup table.
     */
-  def lookupTable(name: String = "IndexTableFromFile"): tf.HashTable = {
-    Vocabulary.indexTableFromFile(
+  def stringToIndexLookupTable(name: String = "StringToIndexTableFromFile"): tf.HashTable = {
+    Vocabulary.stringToIndexTableFromFile(
       file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN_ID, name = name)
+  }
+
+  /** Creates a vocabulary lookup table (from word ID to word string), from the provided vocabulary file.
+    *
+    * @return Vocabulary lookup table.
+    */
+  def indexToStringLookupTable(name: String = "IndexToStringTableFromFile"): tf.HashTable = {
+    Vocabulary.indexToStringTableFromFile(
+      file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN, name = name)
   }
 }
 
@@ -154,28 +163,6 @@ object Vocabulary {
     }
   }
 
-  /** Creates vocabulary lookup tables (from word string to word ID), from the provided vocabulary files.
-    *
-    * @param  srcFile Source vocabulary file.
-    * @param  tgtFile Target vocabulary file.
-    * @return Tuple contain the source vocabulary lookup table and the target one.
-    */
-  private[Vocabulary] def createTables(srcFile: File, tgtFile: File): (tf.HashTable, tf.HashTable) = {
-    val srcPath = srcFile.path.toAbsolutePath.toString
-    val tgtPath = tgtFile.path.toAbsolutePath.toString
-    val sourceTable = indexTableFromFile(srcPath, defaultValue = UNKNOWN_TOKEN_ID)
-    val targetTable = {
-      if (srcFile == tgtFile)
-        sourceTable
-      else
-        indexTableFromFile(tgtPath, defaultValue = UNKNOWN_TOKEN_ID)
-    }
-    sourceTable.initialize()
-    if (srcFile != tgtFile)
-      targetTable.initialize()
-    (sourceTable, targetTable)
-  }
-
   /** Creates a lookup table that converts string tensors into integer IDs.
     *
     * This operation constructs a lookup table to convert tensors of strings into tensors of `INT64` IDs. The mapping
@@ -196,21 +183,21 @@ object Vocabulary {
     * Then, we can use the following code to create a table mapping `"emerson" -> 0`, `"lake" -> 1`, and
     * `"palmer" -> 2`:
     * {{{
-    *   val table = tf.indexTableFromFile("test.txt"))
+    *   val table = tf.stringToIndexTableFromFile("test.txt"))
     * }}}
     *
     * @param  filename          Filename of the text file to be used for initialization. The path must be accessible
     *                           from wherever the graph is initialized (e.g., trainer or evaluation workers).
-    * @param  delimiter         Delimiter to use in case a `TextFileColumn` extractor is being used.
     * @param  vocabularySize    Number of elements in the file, if known. If not known, set to `-1` (the default value).
     * @param  defaultValue      Default value to use if a key is missing from the table.
-    * @param  keysDataType      Data type of the table keys.
     * @param  name              Name for the created table.
     * @return Created table.
     */
-  private[Vocabulary] def indexTableFromFile(
-      filename: String, delimiter: String = "\t", vocabularySize: Int = -1, defaultValue: Long = -1L,
-      keysDataType: DataType = STRING, name: String = "IndexTableFromFile"
+  private[Vocabulary] def stringToIndexTableFromFile(
+      filename: String,
+      vocabularySize: Int = -1,
+      defaultValue: Long = -1L,
+      name: String = "StringToIndexTableFromFile"
   ): tf.HashTable = {
     tf.createWithNameScope(name) {
       tf.createWithNameScope("HashTable") {
@@ -221,8 +208,58 @@ object Vocabulary {
             s"hash_table_${filename}_${tf.TextFileWholeLine}_${tf.TextFileLineNumber}"
         }
         val initializer = tf.LookupTableTextFileInitializer(
-          filename, if (keysDataType.isInteger) INT64 else keysDataType, INT64,
-          tf.TextFileWholeLine, tf.TextFileLineNumber, delimiter, vocabularySize)
+          filename, STRING, INT64, tf.TextFileWholeLine, tf.TextFileLineNumber, vocabularySize = vocabularySize)
+        tf.HashTable(initializer, defaultValue, sharedName = sharedName, name = "Table")
+      }
+    }
+  }
+
+  /** Creates a lookup table that converts integer ID tensors into strings.
+    *
+    * This operation constructs a lookup table to convert tensors of `INT64` IDs into tensors of strings. The mapping
+    * is initialized from a vocabulary file specified in `filename`, where the zero-based line number is the key and the
+    * whole line is the ID.
+    *
+    * The underlying table must be initialized by executing the `tf.tablesInitializer()` op or the op returned by
+    * `table.initialize()`.
+    *
+    * Example usage:
+    *
+    * If we have a vocabulary file `"test.txt"` with the following content:
+    * {{{
+    *   emerson
+    *   lake
+    *   palmer
+    * }}}
+    * Then, we can use the following code to create a table mapping `0 -> "emerson"`, `1 -> "lake"`, and
+    * `2 -> "palmer"`:
+    * {{{
+    *   val table = tf.indexToStringTableFromFile("test.txt"))
+    * }}}
+    *
+    * @param  filename          Filename of the text file to be used for initialization. The path must be accessible
+    *                           from wherever the graph is initialized (e.g., trainer or evaluation workers).
+    * @param  vocabularySize    Number of elements in the file, if known. If not known, set to `-1` (the default value).
+    * @param  defaultValue      Default value to use if a key is missing from the table.
+    * @param  name              Name for the created table.
+    * @return Created table.
+    */
+  private[Vocabulary] def indexToStringTableFromFile(
+      filename: String,
+      vocabularySize: Int = -1,
+      defaultValue: String = UNKNOWN_TOKEN,
+      name: String = "IndexToStringTableFromFile"
+  ): tf.HashTable = {
+    tf.createWithNameScope(name) {
+      tf.createWithNameScope("HashTable") {
+        val sharedName = {
+          if (vocabularySize != -1)
+            s"hash_table_${filename}_${vocabularySize}_${tf.TextFileLineNumber}_${tf.TextFileWholeLine}"
+          else
+            s"hash_table_${filename}_${tf.TextFileLineNumber}_${tf.TextFileWholeLine}"
+        }
+        val initializer = tf.LookupTableTextFileInitializer(
+          filename, INT64, STRING, tf.TextFileLineNumber, tf.TextFileWholeLine, vocabularySize = vocabularySize)
         tf.HashTable(initializer, defaultValue, sharedName = sharedName, name = "Table")
       }
     }

@@ -55,16 +55,22 @@ abstract class Model[S] protected (
     *   - A tensor containing the sentence lengths for the aforementioned padded batch.
     */
   protected val input      = Input((INT32, INT32, STRING, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
-  protected val trainInput = Input((INT32, STRING, INT32), (Shape(), Shape(-1, -1), Shape(-1)))
+  protected val trainInput = Input((STRING, INT32), (Shape(-1, -1), Shape(-1)))
 
   protected val estimator: tf.learn.Estimator[
       TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS, TFBatchWithLanguage,
-      (TFBatchWithLanguagesT, TFBatchWithLanguageT), (TFBatchWithLanguages, TFBatchWithLanguage),
-      (TFBatchWithLanguagesD, TFBatchWithLanguageD), (TFBatchWithLanguagesS, TFBatchWithLanguageS),
+      (TFBatchWithLanguagesT, TFBatchT), (TFBatchWithLanguages, TFBatch),
+      (TFBatchWithLanguagesD, TFBatchD), (TFBatchWithLanguagesS, TFBatchS),
       (TFBatchWithLanguage, TFBatch)] = tf.createWithNameScope(name) {
     val model = learn.Model.supervised(
-      input, inferLayer, trainLayer, trainInput, trainInputLayer, lossLayer, optConfig.optimizer,
-      tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm), optConfig.colocateGradientsWithOps)
+      input = input,
+      layer = inferLayer,
+      trainLayer = trainLayer,
+      trainInput = trainInput,
+      loss = lossLayer,
+      optimizer = optConfig.optimizer,
+      clipGradients = tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm),
+      colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
     val summariesDir = config.env.workingDir.resolve("summaries")
 
     // Create estimator hooks.
@@ -135,30 +141,12 @@ abstract class Model[S] protected (
 //    estimator.evaluate(Model.createEvalDatasets(datasets, languageIds), metrics, maxSteps, saveSummaries, name)
 //  }
 
-  protected def trainInputLayer: Layer[TFBatchWithLanguage, TFBatch] = {
-    new Layer[TFBatchWithLanguage, TFBatch](name) {
-      override val layerType: String = "InputTrain"
-
-      override protected def _forward(
-          input: (Output, Output, Output),
-          mode: Mode
-      ): (Output, Output) = {
-        parameterManager.initialize(languages)
-        parameterManager.setEnvironment(config.env)
-        parameterManager.setDeviceManager(config.deviceManager)
-        tf.createWithNameScope("TrainInputsToWordIDs") {
-          (mapToWordIds(input._1, input._2), input._3)
-        }
-      }
-    }
-  }
-
-  protected def trainLayer: Layer[(TFBatchWithLanguages, TFBatchWithLanguage), TFBatchWithLanguage] = {
-    new Layer[(TFBatchWithLanguages, TFBatchWithLanguage), TFBatchWithLanguage](name) {
+  protected def trainLayer: Layer[(TFBatchWithLanguages, TFBatch), TFBatchWithLanguage] = {
+    new Layer[(TFBatchWithLanguages, TFBatch), TFBatchWithLanguage](name) {
       override val layerType: String = "TrainLayer"
 
       override protected def _forward(
-          input: (TFBatchWithLanguages, TFBatchWithLanguage),
+          input: (TFBatchWithLanguages, TFBatch),
           mode: Mode
       ): TFBatchWithLanguage = {
         parameterManager.initialize(languages)
@@ -166,9 +154,9 @@ abstract class Model[S] protected (
         parameterManager.setDeviceManager(config.deviceManager)
         parameterManager.setContext((input._1._1, input._1._2))
         val srcSequence = mapToWordIds(input._1._1, input._1._3)
-        val tgtSequence = mapToWordIds(input._2._1, input._2._2)
+        val tgtSequence = mapToWordIds(input._1._2, input._2._1)
         val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
-        val tgtMapped = (tgtSequence, input._2._3)
+        val tgtMapped = (tgtSequence, input._2._2)
         val state = tf.createWithVariableScope("Encoder") {
           implicit val stage: Stage = Encoding
           encoder(srcMapped, mode)
@@ -201,7 +189,7 @@ abstract class Model[S] protected (
           implicit val stage: Stage = Decoding
           decoder(srcMapped, None, Some(state), mode)
         }
-        (input._2, output._1, output._2)
+        (input._2, mapFromWordIds(input._2, output._1), output._2)
       }
     }
   }
@@ -214,14 +202,20 @@ abstract class Model[S] protected (
           input: (TFBatchWithLanguage, TFBatch),
           mode: Mode
       ): Output = tf.createWithNameScope("Loss") {
+        parameterManager.initialize(languages)
+        parameterManager.setEnvironment(config.env)
+        parameterManager.setDeviceManager(config.deviceManager)
+        var tgtSequence = tf.createWithNameScope("TrainInputsToWordIDs") {
+          mapToWordIds(input._1._1, input._2._1)
+        }
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
         // word used as input, rather than the previous predicted word.
         val tgtEosId = parameterManager
-            .lookupTable(input._1._1)(tf.constant(dataConfig.endOfSequenceToken))
+            .stringToIndexLookup(input._1._1)(tf.constant(dataConfig.endOfSequenceToken))
             .cast(INT32)
-        val tgtSequence = tf.concatenate(Seq(
-          input._2._1, tf.fill(INT32, tf.stack(Seq(tf.shape(input._2._1)(0), 1)))(tgtEosId)), axis = 1)
+        tgtSequence = tf.concatenate(Seq(
+          tgtSequence, tf.fill(INT32, tf.stack(Seq(tf.shape(tgtSequence)(0), 1)))(tgtEosId)), axis = 1)
         val tgtSequenceLength = input._2._2 + 1
         val lossValue = loss(input._1._2, tgtSequence, tgtSequenceLength)
         tf.summary.scalar("Loss", lossValue)
@@ -231,7 +225,11 @@ abstract class Model[S] protected (
   }
 
   protected def mapToWordIds(language: Output, wordSequence: Output): Output = {
-    parameterManager.lookupTable(language)(wordSequence).cast(INT32)
+    parameterManager.stringToIndexLookup(language)(wordSequence).cast(INT32)
+  }
+
+  protected def mapFromWordIds(language: Output, wordIDSequence: Output): Output = {
+    parameterManager.indexToStringLookup(language)(wordIDSequence.cast(INT64))
   }
 
   /**
