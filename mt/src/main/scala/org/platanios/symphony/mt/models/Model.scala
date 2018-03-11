@@ -44,6 +44,9 @@ abstract class Model[S] protected (
     val logConfig: Model.LogConfig = Model.LogConfig(),
     val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty
 ) {
+  /** Languages implicit used by evaluation metrics. */
+  protected implicit val languagesImplicit: Seq[(Language, Vocabulary)] = languages
+
   protected val languageIds: Map[Language, Int] = languages.map(_._1).zipWithIndex.toMap
 
   protected val parameterManager: ParameterManager = config.parameterManager
@@ -90,9 +93,7 @@ abstract class Model[S] protected (
       datasets = datasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
         hooks += tf.learn.Evaluator(
-          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages),
-          // TODO: !!! Fix hacky solution used for the sentence decoder.
-          Seq(BLEU(sentenceDecoder = languages.head._2.decodeSentence)),
+          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages), Seq(BLEU()),
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }

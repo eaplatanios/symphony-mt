@@ -15,6 +15,8 @@
 
 package org.platanios.symphony.mt.evaluation
 
+import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.Op
 import org.platanios.tensorflow.api.ops.metrics.Metric
@@ -30,17 +32,17 @@ import scala.collection.mutable
 class BLEU protected (
     val maxOrder: Int = 4,
     val smooth: Boolean = false,
-    val sentenceDecoder: Seq[String] => Seq[String] = identity[Seq[String]],
     val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
     val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
     val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
     val resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
     override val name: String = "BLEU"
-) extends Metric[((Output, Output, Output), (Output, Output)), Output] {
+)(implicit languages: Seq[(Language, Vocabulary)]) extends MTMetric {
   // TODO: Do not ignore the weights.
 
   private[this] def counts(batch: Seq[Tensor]): Seq[Tensor] = {
-    val (hyp, hypLen, ref, refLen) = (batch(0), batch(1), batch(2), batch(3))
+    val (tgtLanguageId, hyp, hypLen, ref, refLen) = (batch(0), batch(1), batch(2), batch(3), batch(4))
+    val tgtLanguage = tgtLanguageId.scalar.asInstanceOf[Int]
 
     val (hypSentences, hypLengths) = (hyp.unstack(), hypLen.unstack())
     val (refSentences, refLengths) = (ref.unstack(), refLen.unstack())
@@ -48,13 +50,13 @@ class BLEU protected (
       case (s, len) =>
         val lenScalar = len.scalar.asInstanceOf[Int]
         val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
-        sentenceDecoder(seq)
+        languages(tgtLanguage)._2.decodeSentence(seq)
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
         val lenScalar = len.scalar.asInstanceOf[Int]
         val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
-        Seq(sentenceDecoder(seq))
+        Seq(languages(tgtLanguage)._2.decodeSentence(seq))
     }
     val (matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen) = BLEU.nGramMatches(refSeq, hypSeq, maxOrder)
     Seq(matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen)
@@ -98,13 +100,13 @@ class BLEU protected (
       weights: Output = null,
       name: String = this.name
   ): Output = {
-    val ((_, src, srcLen), (tgt, tgtLen)) = values
+    val ((tgtLanguageId, src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
     if (weights != null)
       ops += weights.op
     tf.createWithNameScope(name, ops) {
       val _counts = tf.callback(
-        counts, Seq(src, srcLen, tgt, tgtLen), Seq(INT64, INT64, INT32, INT32), stateful = false)
+        counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(INT64, INT64, INT32, INT32), stateful = false)
       val (_matches, _possibleMatches, _refLen, _hypLen) = (_counts(0), _counts(1), _counts(2), _counts(3))
       score(_matches, _possibleMatches, _refLen, _hypLen, name = "Value")
     }
@@ -115,7 +117,7 @@ class BLEU protected (
       weights: Output,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
-    val ((_, src, srcLen), (tgt, tgtLen)) = values
+    val ((tgtLanguageId, src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
     if (weights != null)
       ops += weights.op
@@ -127,7 +129,7 @@ class BLEU protected (
         val refLen = variable("ReferenceLength", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val hypLen = variable("HypothesisLength", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val _counts = tf.callback(
-          counts, Seq(src, srcLen, tgt, tgtLen), Seq(INT64, INT64, INT32, INT32), stateful = false)
+          counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(INT64, INT64, INT32, INT32), stateful = false)
         val (_matches, _possibleMatches, _refLen, _hypLen) = (_counts(0), _counts(1), _counts(2), _counts(3))
         val updateMatches = matches.assignAdd(_matches)
         val updatePossibleMatches = possibleMatches.assignAdd(_possibleMatches)
@@ -151,16 +153,15 @@ object BLEU {
   def apply(
       maxOrder: Int = 4,
       smooth: Boolean = false,
-      sentenceDecoder: Seq[String] => Seq[String] = identity[Seq[String]],
       variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
       valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
       updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
       resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
       name: String = "BLEU"
-  ): BLEU = {
+  )(implicit languages: Seq[(Language, Vocabulary)]): BLEU = {
     new BLEU(
-      maxOrder, smooth, sentenceDecoder, variablesCollections,
-      valuesCollections, updatesCollections, resetsCollections, name)
+      maxOrder, smooth, variablesCollections,
+      valuesCollections, updatesCollections, resetsCollections, name)(languages)
   }
 
   /** BLEU score computation result.
