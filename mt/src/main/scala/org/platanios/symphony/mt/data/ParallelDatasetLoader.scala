@@ -87,6 +87,7 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
           if (newFile.notExists)
             mosesDecoder.sgmToText(file, newFile)
         }
+        // TODO: The following file moves are hacky and non-generic (they only apply to the WMT-16 dataset).
         if (newFile.name.endsWith(s"-src.$src") || newFile.name.endsWith(s"-ref.$src")) {
           val renamedFile = newFile.sibling(newFile.name.dropRight(5 + src.length) + s".$src")
           if (renamedFile.notExists)
@@ -97,18 +98,6 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
           if (renamedFile.notExists)
             newFile.copyTo(renamedFile)
           newFile = renamedFile
-        }
-        if (dataConfig.loaderTokenize && !newFile.name.contains(".tok")) {
-          // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
-          val tokenizedFile = newFile.sibling(
-            newFile.nameWithoutExtension(includeAll = false) + ".tok" + newFile.extension.getOrElse(""))
-          if (tokenizedFile.notExists) {
-            val exitCode = mosesDecoder.tokenize(
-              newFile, tokenizedFile, tokenizedFile.extension(includeDot = false).getOrElse(""))
-            if (exitCode != 0)
-              newFile.copyTo(tokenizedFile)
-          }
-          newFile = tokenizedFile
         }
       }
       newFile
@@ -185,8 +174,8 @@ object ParallelDatasetLoader {
       var fileKeys = Seq.empty[String]
       DatasetType.types.foreach(datasetType => {
         val typeCorpora = loader.corpora(datasetType)
-        srcFiles ++= typeCorpora.map(_._2)
-        tgtFiles ++= typeCorpora.map(_._3)
+        srcFiles ++= typeCorpora.map(_._2).map(preprocessFile(_, loader))
+        tgtFiles ++= typeCorpora.map(_._3).map(preprocessFile(_, loader))
         fileTypes ++= Seq.fill(typeCorpora.length)(datasetType)
         fileKeys ++= typeCorpora.map(_._1)
       })
@@ -267,5 +256,22 @@ object ParallelDatasetLoader {
     }
 
     (datasets, vocabulary.toSeq)
+  }
+
+  private[this] def preprocessFile(file: File, loader: ParallelDatasetLoader): File = {
+    var newFile = file
+    if (loader.dataConfig.loaderTokenize && !newFile.name.contains(".tok")) {
+      // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
+      val tokenizedFile = newFile.sibling(
+        newFile.nameWithoutExtension(includeAll = false) + ".tok" + newFile.extension.getOrElse(""))
+      if (tokenizedFile.notExists) {
+        val exitCode = loader.mosesDecoder.tokenize(
+          newFile, tokenizedFile, tokenizedFile.extension(includeDot = false).getOrElse(""))
+        if (exitCode != 0)
+          newFile.copyTo(tokenizedFile)
+      }
+      newFile = tokenizedFile
+    }
+    newFile
   }
 }
