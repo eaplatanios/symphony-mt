@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.vocabulary
 
+import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.utilities.TrieWordCounter
 
 import better.files.File
@@ -41,13 +42,31 @@ class SimpleVocabularyGenerator protected (
     val countThreshold: Int = -1,
     val bufferSize: Int = 8192
 ) extends VocabularyGenerator {
+  /** Returns the vocabulary file name that this generator uses / will use.
+    *
+    * @param  language Language for which a vocabulary will be generated.
+    * @return Vocabulary file name.
+    */
+  override def filename(language: Language): String = {
+    if (sizeThreshold == -1 && countThreshold == -1)
+      s"vocab.${language.abbreviation}"
+    else if (countThreshold == -1)
+      s"vocab.s$sizeThreshold.${language.abbreviation}"
+    else if (sizeThreshold == -1)
+      s"vocab.c$countThreshold.${language.abbreviation}"
+    else
+      s"vocab.s$sizeThreshold.c$countThreshold.${language.abbreviation}"
+  }
+
   /** Generates/Replaces a vocabulary file given a sequence of tokenized text files.
     *
+    * @param  language       Language for which a vocabulary will be generated.
     * @param  tokenizedFiles Tokenized text files to use for generating the vocabulary file.
-    * @param  vocabFile      Vocabulary file to generate/replace.
-    * @return The generated/replaced vocabulary file (same as `vocabFile`).
+    * @param  vocabDir       Directory in which to save the generated vocabulary file.
+    * @return The generated/replaced vocabulary file.
     */
-  override def generate(tokenizedFiles: Seq[File], vocabFile: File): File = {
+  override def generate(language: Language, tokenizedFiles: Seq[File], vocabDir: File): File = {
+    val vocabFile = vocabDir / filename(language)
     vocabFile.parent.createDirectories()
     val whitespaceRegex = "\\s+".r
     val writer = new BufferedWriter(

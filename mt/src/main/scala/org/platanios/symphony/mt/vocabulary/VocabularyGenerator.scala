@@ -15,9 +15,9 @@
 
 package org.platanios.symphony.mt.vocabulary
 
-import better.files.File
+import org.platanios.symphony.mt.Language
 
-// TODO: Add support for `BPEVocabularyGenerator`.
+import better.files.File
 
 /** Vocabulary creator.
   *
@@ -27,11 +27,38 @@ import better.files.File
   * @author Emmanouil Antonios Platanios
   */
 trait VocabularyGenerator {
+  /** Returns the vocabulary file name that this generator uses / will use.
+    *
+    * @param  language Language for which a vocabulary will be generated.
+    * @return Vocabulary file name.
+    */
+  def filename(language: Language): String = s"vocab.${language.abbreviation}"
+
   /** Generates/Replaces a vocabulary file given a sequence of tokenized text files.
     *
+    * @param  language       Language for which a vocabulary will be generated.
     * @param  tokenizedFiles Tokenized text files to use for generating the vocabulary file.
-    * @param  vocabFile      Vocabulary file to generate/replace.
-    * @return The generated/replaced vocabulary file (same as `vocabFile`).
+    * @param  vocabDir       Directory in which to save the generated vocabulary file.
+    * @return The generated/replaced vocabulary file.
     */
-  def generate(tokenizedFiles: Seq[File], vocabFile: File): File
+  def generate(language: Language, tokenizedFiles: Seq[File], vocabDir: File): File
+
+  /** Initializes the state of this vocabulary generator for the specified language.
+    *
+    * This method is useful if `generate()` is not called (if, for example, the vocabulary file already exists).
+    *
+    * @param  language Language for which a vocabulary has been generated.
+    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
+    */
+  def initialize(language: Language, vocabDir: File): Unit = ()
+
+  /** Returns a vocabulary for the specified language, ready to be used by machine translation models.
+    *
+    * @param  language Language for which to return a vocabulary.
+    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
+    * @return Created vocabulary.
+    */
+  def getVocabulary(language: Language, vocabDir: File): Vocabulary = {
+    Vocabulary(vocabDir / filename(language))
+  }
 }

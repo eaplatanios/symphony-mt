@@ -215,6 +215,7 @@ object ParallelDatasetLoader {
     val workingDir = File(loaders.head.dataConfig.workingDir) / "vocabularies"
     val vocabulary = vocabularies.toMap.map {
       case (l, v) =>
+        val vocabFilename = loaders.head.dataConfig.loaderVocab.filename(l)
         loaders.head.dataConfig.loaderVocab match {
           case NoVocabulary => l -> null // TODO: Avoid using nulls.
           case GeneratedVocabulary(generator) =>
@@ -224,17 +225,19 @@ object ParallelDatasetLoader {
                 case (loader, f) if loader.tgtLanguage == l => f._2
                 case _ => Seq.empty
               }
-              val vocabFile = workingDir / s"vocab.${l.abbreviation}"
+              val vocabFile = workingDir / vocabFilename
               if (vocabFile.notExists) {
                 ParallelDatasetLoader.logger.info(s"Generating vocabulary file for $l.")
-                generator.generate(tokenizedFiles, vocabFile)
+                generator.generate(l, tokenizedFiles, workingDir)
                 ParallelDatasetLoader.logger.info(s"Generated vocabulary file for $l.")
+              } else {
+                generator.initialize(l, workingDir)
               }
-              Vocabulary(vocabFile)
+              generator.getVocabulary(l, workingDir)
             }
           case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
           case MergedVocabularies if v.nonEmpty =>
-            val vocabFile = workingDir.createChild(s"vocab.${l.abbreviation}", createParents = true)
+            val vocabFile = workingDir.createChild(vocabFilename, createParents = true)
             val writer = new BufferedWriter(vocabFile.newPrintWriter(), loaders.head.dataConfig.loaderBufferSize)
             v.toStream
                 .flatMap(_.lineIterator).toSet

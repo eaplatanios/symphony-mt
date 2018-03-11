@@ -15,13 +15,30 @@
 
 package org.platanios.symphony.mt.data
 
+import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.VocabularyGenerator
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-sealed trait DatasetVocabulary
+sealed trait DatasetVocabulary {
+  /** Returns the vocabulary file name that this vocabulary uses.
+    *
+    * @param  language Language for which a vocabulary will be generated.
+    * @return Vocabulary file name.
+    */
+  def filename(language: Language): String = s"vocab.${language.abbreviation}"
+}
 
 case object NoVocabulary extends DatasetVocabulary
-case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVocabulary
+
 case object MergedVocabularies extends DatasetVocabulary
+
+case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVocabulary {
+  /** Returns the vocabulary file name that this vocabulary uses.
+    *
+    * @param  language Language for which a vocabulary will be generated.
+    * @return Vocabulary file name.
+    */
+  override def filename(language: Language): String = generator.filename(language)
+}

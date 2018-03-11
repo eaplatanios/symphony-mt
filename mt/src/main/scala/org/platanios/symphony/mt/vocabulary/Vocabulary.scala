@@ -51,6 +51,8 @@ case class Vocabulary private[Vocabulary] (file: File, size: Int) {
     Vocabulary.indexToStringTableFromFile(
       file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN, name = name)
   }
+
+  // TODO: Add support for sentence pre-processors and post-processors (useful for dealing with subword units).
 }
 
 /** Contains utilities for dealing with vocabularies. */
