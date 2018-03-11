@@ -205,19 +205,19 @@ object Inputs {
           .map(
             d => (d._1, (tf.stringSplit(d._2._1(NewAxis)).values, tf.stringSplit(d._2._2(NewAxis)).values)),
             name = "Map/StringSplit")
-              // Filter zero length input sequences and sequences exceeding the maximum length.
-              .filter(d => tf.logicalAnd(tf.size(d._2._1) > 0, tf.size(d._2._2) > 0), "Filter/NonZeroLength")
-              // Crop based on the maximum allowed sequence lengths.
-              .transform(d => {
-            if (dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1)
+          // Filter zero length input sequences and sequences exceeding the maximum length.
+          .filter(d => tf.logicalAnd(tf.size(d._2._1) > 0, tf.size(d._2._2) > 0), "Filter/NonZeroLength")
+          // Crop based on the maximum allowed sequence lengths.
+          .transform(d => {
+            if (!isEval && dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1)
               d.map(
                 dd => (dd._1, (dd._2._1(0 :: dataConfig.srcMaxLength), dd._2._2(0 :: dataConfig.tgtMaxLength))),
                 dataConfig.numParallelCalls, name = "Map/MaxLength")
-            else if (dataConfig.srcMaxLength != -1)
+            else if (!isEval && dataConfig.srcMaxLength != -1)
               d.map(
                 dd => (dd._1, (dd._2._1(0 :: dataConfig.srcMaxLength), dd._2._2)),
                 dataConfig.numParallelCalls, name = "Map/MaxLength")
-            else if (dataConfig.tgtMaxLength != -1)
+            else if (!isEval && dataConfig.tgtMaxLength != -1)
               d.map(
                 dd => (dd._1, (dd._2._1, dd._2._2(0 :: dataConfig.tgtMaxLength))),
                 dataConfig.numParallelCalls, name = "Map/MaxLength")
