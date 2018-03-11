@@ -28,12 +28,25 @@ import scala.collection.mutable
 
 /** Represents a vocabulary of words.
   *
-  * @param  file File containing the vocabulary, with one word per line.
-  * @param  size Size of this vocabulary (i.e., number of words).
+  * @param  file                 File containing the vocabulary, with one word per line.
+  * @param  size                 Size of this vocabulary (i.e., number of words).
+  * @param  unknownToken         Token representing unknown symbols (i.e., not included in this vocabulary).
+  * @param  beginOfSequenceToken Token representing the beginning of a sequence.
+  * @param  endOfSequenceToken   Token representing the end of a sequence.
   *
   * @author Emmanouil Antonios Platanios
   */
-class Vocabulary protected (val file: File, val size: Int) {
+class Vocabulary protected (
+    val file: File,
+    val size: Int,
+    val unknownToken: String,
+    val beginOfSequenceToken: String,
+    val endOfSequenceToken: String
+) {
+  val unknownTokenId        : Int = 0
+  val beginOfSequenceTokenId: Int = 1
+  val endOfSequenceTokenId  : Int = 2
+
   /** Creates a vocabulary lookup table (from word string to word ID), from the provided vocabulary file.
     *
     * @return Vocabulary lookup table.
@@ -52,8 +65,23 @@ class Vocabulary protected (val file: File, val size: Int) {
       file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN, name = name)
   }
 
-  def encodeSentence(sentence: Seq[String]): Seq[String] = sentence
-  def decodeSentence(sentence: Seq[String]): Seq[String] = sentence
+  /** Encodes the provided sequence using this vocabulary. This is typically an identity function.
+    *
+    * This method is useful for coded vocabularies, such as the byte-pair-encoding vocabulary.
+    *
+    * @param  sequence Sequence of tokens to encode.
+    * @return Encoded sequence of tokens that may differ in size from the input sequence.
+    */
+  def encodeSequence(sequence: Seq[String]): Seq[String] = sequence
+
+  /** Decodes the provided sequence using this vocabulary. This is typically an identity function.
+    *
+    * This method is useful for coded vocabularies, such as the byte-pair-encoding vocabulary.
+    *
+    * @param  sequence Sequence of tokens to decode.
+    * @return Decoded sequence of tokens that may differ in size from the input sequence.
+    */
+  def decodeSequence(sequence: Seq[String]): Seq[String] = sequence
 }
 
 /** Contains utilities for dealing with vocabularies. */
@@ -62,11 +90,20 @@ object Vocabulary {
 
   /** Creates a new vocabulary.
     *
-    * @param  file File containing the vocabulary, with one word per line.
-    * @param  size Size of this vocabulary (i.e., number of words).
+    * @param  file                 File containing the vocabulary, with one word per line.
+    * @param  size                 Size of this vocabulary (i.e., number of words).
+    * @param  unknownToken         Token representing unknown symbols (i.e., not included in this vocabulary).
+    * @param  beginOfSequenceToken Token representing the beginning of a sequence.
+    * @param  endOfSequenceToken   Token representing the end of a sequence.
     * @return Created vocabulary.
     */
-  protected def apply(file: File, size: Int): Vocabulary = new Vocabulary(file, size)
+  protected def apply(
+      file: File,
+      size: Int,
+      unknownToken: String,
+      beginOfSequenceToken: String,
+      endOfSequenceToken: String
+  ): Vocabulary = new Vocabulary(file, size, unknownToken, beginOfSequenceToken, endOfSequenceToken)
 
   /** Creates a new vocabulary from the provided vocabulary file.
     *
@@ -100,7 +137,8 @@ object Vocabulary {
       dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
     check match {
       case None => throw new IllegalArgumentException(s"Could not load the vocabulary file located at '$file'.")
-      case Some((size, path)) => Vocabulary(path, size)
+      case Some((size, path)) => Vocabulary(
+        path, size, dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
     }
   }
 

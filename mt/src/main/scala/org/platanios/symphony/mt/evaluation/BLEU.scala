@@ -50,13 +50,13 @@ class BLEU protected (
       case (s, len) =>
         val lenScalar = len.scalar.asInstanceOf[Int]
         val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
-        languages(tgtLanguage)._2.decodeSentence(seq)
+        languages(tgtLanguage)._2.decodeSequence(seq)
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
         val lenScalar = len.scalar.asInstanceOf[Int]
         val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
-        Seq(languages(tgtLanguage)._2.decodeSentence(seq))
+        Seq(languages(tgtLanguage)._2.decodeSequence(seq))
     }
     val (matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen) = BLEU.nGramMatches(refSeq, hypSeq, maxOrder)
     Seq(matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen)

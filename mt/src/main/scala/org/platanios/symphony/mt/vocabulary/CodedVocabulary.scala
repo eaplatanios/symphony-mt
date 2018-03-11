@@ -21,10 +21,13 @@ import better.files.File
 
 /** Represents a vocabulary of coded words (e.g., using the byte-pair-encoding method).
   *
-  * @param  file    File containing the vocabulary, with one word per line.
-  * @param  size    Size of this vocabulary (i.e., number of words).
-  * @param  encoder Sentence encoding function (each sentence is represented as a sequence of words).
-  * @param  decoder Sentence decoding function (each sentence is represented as a sequence of words).
+  * @param  file                 File containing the vocabulary, with one word per line.
+  * @param  size                 Size of this vocabulary (i.e., number of words).
+  * @param  encoder              Sentence encoding function (each sentence is represented as a sequence of words).
+  * @param  decoder              Sentence decoding function (each sentence is represented as a sequence of words).
+  * @param  unknownToken         Token representing unknown symbols (i.e., not included in this vocabulary).
+  * @param  beginOfSequenceToken Token representing the beginning of a sequence.
+  * @param  endOfSequenceToken   Token representing the end of a sequence.
   *
   * @author Emmanouil Antonios Platanios
   */
@@ -32,27 +35,53 @@ class CodedVocabulary protected (
     override val file: File,
     override val size: Int,
     protected val encoder: Seq[String] => Seq[String],
-    protected val decoder: Seq[String] => Seq[String]
-) extends Vocabulary(file, size) {
-  override def encodeSentence(sentence: Seq[String]): Seq[String] = encoder(sentence)
-  override def decodeSentence(sentence: Seq[String]): Seq[String] = decoder(sentence)
+    protected val decoder: Seq[String] => Seq[String],
+    override val unknownToken: String,
+    override val beginOfSequenceToken: String,
+    override val endOfSequenceToken: String
+) extends Vocabulary(file, size, unknownToken, beginOfSequenceToken, endOfSequenceToken) {
+  /** Encodes the provided sequence using this vocabulary. This is typically an identity function.
+    *
+    * This method is useful for coded vocabularies, such as the byte-pair-encoding vocabulary.
+    *
+    * @param  sequence Sequence of tokens to encode.
+    * @return Encoded sequence of tokens that may differ in size from the input sequence.
+    */
+  override def encodeSequence(sequence: Seq[String]): Seq[String] = encoder(sequence)
+
+  /** Decodes the provided sequence using this vocabulary. This is typically an identity function.
+    *
+    * This method is useful for coded vocabularies, such as the byte-pair-encoding vocabulary.
+    *
+    * @param  sequence Sequence of tokens to decode.
+    * @return Decoded sequence of tokens that may differ in size from the input sequence.
+    */
+  override def decodeSequence(sequence: Seq[String]): Seq[String] = decoder(sequence)
 }
 
 object CodedVocabulary {
   /** Creates a new coded vocabulary.
     *
-    * @param  file    File containing the vocabulary, with one word per line.
-    * @param  size    Size of this vocabulary (i.e., number of words).
-    * @param  encoder Sentence encoding function (each sentence is represented as a sequence of words).
-    * @param  decoder Sentence decoding function (each sentence is represented as a sequence of words).
+    * @param  file                 File containing the vocabulary, with one word per line.
+    * @param  size                 Size of this vocabulary (i.e., number of words).
+    * @param  encoder              Sentence encoding function (each sentence is represented as a sequence of words).
+    * @param  decoder              Sentence decoding function (each sentence is represented as a sequence of words).
+    * @param  unknownToken         Token representing unknown symbols (i.e., not included in this vocabulary).
+    * @param  beginOfSequenceToken Token representing the beginning of a sequence.
+    * @param  endOfSequenceToken   Token representing the end of a sequence.
     * @return Created vocabulary.
     */
   protected def apply(
       file: File,
       size: Int,
       encoder: Seq[String] => Seq[String],
-      decoder: Seq[String] => Seq[String]
-  ): CodedVocabulary = new CodedVocabulary(file, size, encoder, decoder)
+      decoder: Seq[String] => Seq[String],
+      unknownToken: String,
+      beginOfSequenceToken: String,
+      endOfSequenceToken: String
+  ): CodedVocabulary = {
+    new CodedVocabulary(file, size, encoder, decoder, unknownToken, beginOfSequenceToken, endOfSequenceToken)
+  }
 
   /** Creates a new coded vocabulary from the provided vocabulary file.
     *
@@ -90,7 +119,9 @@ object CodedVocabulary {
       dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
     check match {
       case None => throw new IllegalArgumentException(s"Could not load the vocabulary file located at '$file'.")
-      case Some((size, path)) => CodedVocabulary(path, size, encoder, decoder)
+      case Some((size, path)) => CodedVocabulary(
+        path, size, encoder, decoder,
+        dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
     }
   }
 }

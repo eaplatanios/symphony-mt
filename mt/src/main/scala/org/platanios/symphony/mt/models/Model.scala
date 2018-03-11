@@ -124,8 +124,28 @@ abstract class Model[S] protected (
     estimator.infer(Inputs.createInputDataset(dataConfig, config, dataset, srcLanguage, tgtLanguage, languages))
         .asInstanceOf[Iterator[(TFBatchWithLanguagesT, TFBatchWithLanguageT)]]
         .map(pair => {
-          // TODO: Use the vocabulary sentence decoder.
-          pair
+          // TODO: We may be able to do this more efficiently.
+          def decodeSequenceBatch(language: Tensor, sequences: Tensor, lengths: Tensor): (Tensor, Tensor) = {
+            val languageId = language.scalar.asInstanceOf[Int]
+            val (unpackedSentences, unpackedLengths) = (sequences.unstack(), lengths.unstack())
+            val decodedSentences = unpackedSentences.zip(unpackedLengths).map {
+              case (s, len) =>
+                val lenScalar = len.scalar.asInstanceOf[Int]
+                val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
+                languages(languageId)._2.decodeSequence(seq)
+            }
+            val decodedLengths = decodedSentences.map(_.length)
+            val maxLength = decodedSentences.map(_.length).max
+            val paddedDecodedSentences = decodedSentences.map(s => {
+              s ++ Seq.fill(maxLength - s.length)(languages(languageId)._2.endOfSequenceToken)
+            })
+            (paddedDecodedSentences, decodedLengths)
+          }
+
+          val srcDecoded = decodeSequenceBatch(pair._1._1, pair._1._3, pair._1._4)
+          val tgtDecoded = decodeSequenceBatch(pair._1._2, pair._2._2, pair._2._3)
+
+          ((pair._1._1, pair._1._2, srcDecoded._1, srcDecoded._2), (pair._1._2, tgtDecoded._1, tgtDecoded._2))
         })
   }
 
@@ -134,6 +154,7 @@ abstract class Model[S] protected (
 //      tgtLanguage: (Language, Vocabulary),
 //      input: (Tensor, Tensor)
 //  ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
+//    TODO: Encode the input tensors.
 //    translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
 //      name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
 //      tensors = Map(srcLanguage._1 -> Seq(input))))
