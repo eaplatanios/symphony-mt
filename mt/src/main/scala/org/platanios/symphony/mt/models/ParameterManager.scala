@@ -191,14 +191,12 @@ class LanguageEmbeddingsPairParameterManager protected (
     val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
 
     def create(): Output = tf.createWithVariableScope(name) {
-      tf.createWith(device = "/device:CPU:0") {
-        val languagePair = tf.stack(Seq(context.get._1, context.get._2))
-        val embeddings = languageEmbeddings(graph).gather(languagePair).reshape(Shape(1, -1))
-        val weights = tf.variable("Dense/Weights", FLOAT32, Shape(2 * languageEmbeddingsSize, shape.numElements.toInt))
-        val bias = tf.variable("Dense/Bias", FLOAT32, Shape(shape.numElements.toInt))
-        val parameters = tf.linear(embeddings, weights, bias, "Dense")
-        parameters.cast(dataType).reshape(shape)
-      }
+      val languagePair = tf.stack(Seq(context.get._1, context.get._2))
+      val embeddings = languageEmbeddings(graph).gather(languagePair).reshape(Shape(1, -1))
+      val weights = tf.variable("Dense/Weights", FLOAT32, Shape(2 * languageEmbeddingsSize, shape.numElements.toInt))
+      val bias = tf.variable("Dense/Bias", FLOAT32, Shape(shape.numElements.toInt))
+      val parameters = tf.linear(embeddings, weights, bias, "Dense")
+      parameters.cast(dataType).reshape(shape)
     }
 
     variableReuse match {
@@ -268,17 +266,15 @@ class LanguageEmbeddingsParameterManager protected (
     val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
 
     def create(): Output = tf.createWithVariableScope(name) {
-      tf.createWith(device = "/device:CPU:0") {
-        val language = stage match {
-          case Encoding => context.get._1
-          case Decoding => context.get._2
-        }
-        val embedding = languageEmbeddings(graph).gather(language).reshape(Shape(1, -1))
-        val weights = tf.variable("Dense/Weights", FLOAT32, Shape(languageEmbeddingsSize, shape.numElements.toInt))
-        val bias = tf.variable("Dense/Bias", FLOAT32, Shape(shape.numElements.toInt))
-        val parameters = tf.linear(embedding, weights, bias, "Dense")
-        parameters.cast(dataType).reshape(shape)
+      val language = stage match {
+        case Encoding => context.get._1
+        case Decoding => context.get._2
       }
+      val embedding = languageEmbeddings(graph).gather(language).reshape(Shape(1, -1))
+      val weights = tf.variable("Dense/Weights", FLOAT32, Shape(languageEmbeddingsSize, shape.numElements.toInt))
+      val bias = tf.variable("Dense/Bias", FLOAT32, Shape(shape.numElements.toInt))
+      val parameters = tf.linear(embedding, weights, bias, "Dense")
+      parameters.cast(dataType).reshape(shape)
     }
 
     variableReuse match {
