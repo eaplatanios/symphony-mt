@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.symphony.mt.utilities.CompressedFiles
+import org.platanios.symphony.mt.utilities.{CompressedFiles, MutableFile}
 
 import better.files._
 import com.typesafe.scalalogging.Logger
@@ -168,25 +168,25 @@ object ParallelDatasetLoader {
   def load(loaders: ParallelDatasetLoader*): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
     // Collect all files.
     val files = loaders.map(loader => {
-      var srcFiles = Seq.empty[File]
-      var tgtFiles = Seq.empty[File]
+      var srcFiles = Seq.empty[MutableFile]
+      var tgtFiles = Seq.empty[MutableFile]
       var fileTypes = Seq.empty[DatasetType]
       var fileKeys = Seq.empty[String]
       DatasetType.types.foreach(datasetType => {
-        val typeCorpora = loader.corpora(datasetType)
-        srcFiles ++= typeCorpora.map(_._2).map(preprocessFile(_, loader))
-        tgtFiles ++= typeCorpora.map(_._3).map(preprocessFile(_, loader))
-        fileTypes ++= Seq.fill(typeCorpora.length)(datasetType)
-        fileKeys ++= typeCorpora.map(_._1)
+        val corpora = loader.corpora(datasetType)
+        srcFiles ++= corpora.map(_._2).map(MutableFile(_)).map(preprocessFile(_, loader))
+        tgtFiles ++= corpora.map(_._3).map(MutableFile(_)).map(preprocessFile(_, loader))
+        fileTypes ++= Seq.fill(corpora.length)(datasetType)
+        fileKeys ++= corpora.map(_._1)
       })
 
       // Clean the corpora, if necessary.
       loader.dataConfig.loaderSentenceLengthBounds.foreach {
         case (minLength, maxLength) =>
-          val cleanedFiles = srcFiles.map(files => {
+          val cleanedFiles = srcFiles.map(file => {
             // TODO: [DATA] This is a hacky way of checking for the clean corpus files.
-            val corpusFile = files.sibling(files.nameWithoutExtension(includeAll = false))
-            val cleanCorpusFile = files.sibling(corpusFile.name + ".clean")
+            val corpusFile = file.get.sibling(file.get.nameWithoutExtension(includeAll = false))
+            val cleanCorpusFile = file.get.sibling(corpusFile.name + ".clean")
             val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".${loader.src}")
             val tgtCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".${loader.tgt}")
             if (srcCleanCorpusFile.notExists || tgtCleanCorpusFile.notExists) {
@@ -197,7 +197,7 @@ object ParallelDatasetLoader {
                 corpusFile.sibling(corpusFile.name + s".${loader.tgt}").copyTo(tgtCleanCorpusFile)
               }
             }
-            (srcCleanCorpusFile, tgtCleanCorpusFile)
+            (MutableFile(srcCleanCorpusFile), MutableFile(tgtCleanCorpusFile))
           }).unzip
           srcFiles = cleanedFiles._1
           tgtFiles = cleanedFiles._2
@@ -253,7 +253,7 @@ object ParallelDatasetLoader {
 
     val datasets = loaders.zip(files).map {
       case (loader, (srcFiles, tgtFiles, fileTypes, fileKeys)) =>
-        val groupedFiles = Map(loader.srcLanguage -> srcFiles, loader.tgtLanguage -> tgtFiles)
+        val groupedFiles = Map(loader.srcLanguage -> srcFiles.map(_.get), loader.tgtLanguage -> tgtFiles.map(_.get))
         val filteredVocabulary = vocabulary.filterKeys(l => l == loader.srcLanguage || l == loader.tgtLanguage)
         FileParallelDataset(loader.name, filteredVocabulary, loader.dataConfig, groupedFiles, fileTypes, fileKeys)
     }
@@ -261,8 +261,8 @@ object ParallelDatasetLoader {
     (datasets, vocabulary.toSeq)
   }
 
-  private[this] def preprocessFile(file: File, loader: ParallelDatasetLoader): File = {
-    var newFile = file
+  private[this] def preprocessFile(mutableFile: MutableFile, loader: ParallelDatasetLoader): MutableFile = {
+    var newFile = mutableFile.get
     if (loader.dataConfig.loaderTokenize && !newFile.name.contains(".tok")) {
       // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
       val tokenizedFile = newFile.sibling(
@@ -275,6 +275,7 @@ object ParallelDatasetLoader {
       }
       newFile = tokenizedFile
     }
-    newFile
+    mutableFile.set(newFile)
+    mutableFile
   }
 }

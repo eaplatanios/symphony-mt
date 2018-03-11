@@ -34,11 +34,17 @@ case class TrieWordCounter() {
   }
 
   def words(sizeThreshold: Int = -1, countThreshold: Int = -1): Iterable[(Long, String)] = {
-    val words = BoundedPriorityQueue[(Long, String)](sizeThreshold)
-    rootNode.words.filter(_._2 != "").foreach {
-      case (count, word) if countThreshold < 0 || count >= countThreshold => words += ((count, word))
+    if (sizeThreshold == -1 && countThreshold == -1) {
+      rootNode.words.filter(_._2 != "")
+    } else if (sizeThreshold == -1) {
+      rootNode.words.filter(w => w._2 != "" && w._1 >= countThreshold)
+    } else {
+      val words = BoundedPriorityQueue[(Long, String)](sizeThreshold)
+      rootNode.words.filter(_._2 != "").foreach {
+        case (count, word) if countThreshold < 0 || count >= countThreshold => words += ((count, word))
+      }
+      words
     }
-    words
   }
 }
 
