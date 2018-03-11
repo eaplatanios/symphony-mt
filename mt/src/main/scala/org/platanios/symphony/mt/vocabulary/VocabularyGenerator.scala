@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.vocabulary
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.utilities.MutableFile
 
 import better.files.File
 
@@ -41,7 +42,7 @@ trait VocabularyGenerator {
     * @param  vocabDir       Directory in which to save the generated vocabulary file.
     * @return The generated/replaced vocabulary file.
     */
-  def generate(language: Language, tokenizedFiles: Seq[File], vocabDir: File): File
+  def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File
 
   /** Initializes the state of this vocabulary generator for the specified language.
     *

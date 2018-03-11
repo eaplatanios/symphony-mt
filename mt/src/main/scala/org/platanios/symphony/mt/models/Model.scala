@@ -90,7 +90,9 @@ abstract class Model[S] protected (
       datasets = datasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
         hooks += tf.learn.Evaluator(
-          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages), Seq(BLEU()),
+          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages),
+          // TODO: !!! Fix hacky solution used for the sentence decoder.
+          Seq(BLEU(sentenceDecoder = languages.head._2.decodeSentence)),
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
@@ -119,6 +121,11 @@ abstract class Model[S] protected (
       dataset: FileParallelDataset
   ): Iterator[(TFBatchWithLanguagesT, TFBatchWithLanguageT)] = {
     estimator.infer(Inputs.createInputDataset(dataConfig, config, dataset, srcLanguage, tgtLanguage, languages))
+        .asInstanceOf[Iterator[(TFBatchWithLanguagesT, TFBatchWithLanguageT)]]
+        .map(pair => {
+          // TODO: Use the vocabulary sentence decoder.
+          pair
+        })
   }
 
 //  def translate(
@@ -189,7 +196,8 @@ abstract class Model[S] protected (
           implicit val stage: Stage = Decoding
           decoder(srcMapped, None, Some(state), mode)
         }
-        (input._2, mapFromWordIds(input._2, output._1), output._2)
+        val decodedSequences = mapFromWordIds(input._2, output._1)
+        (input._2, decodedSequences, output._2)
       }
     }
   }

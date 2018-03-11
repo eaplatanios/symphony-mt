@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.vocabulary
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.utilities.TrieWordCounter
+import org.platanios.symphony.mt.utilities.{MutableFile, TrieWordCounter}
 
 import better.files.File
 
@@ -65,7 +65,7 @@ class SimpleVocabularyGenerator protected (
     * @param  vocabDir       Directory in which to save the generated vocabulary file.
     * @return The generated/replaced vocabulary file.
     */
-  override def generate(language: Language, tokenizedFiles: Seq[File], vocabDir: File): File = {
+  override def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
     val vocabFile = vocabDir / filename(language)
     vocabFile.parent.createDirectories()
     val whitespaceRegex = "\\s+".r
@@ -74,7 +74,7 @@ class SimpleVocabularyGenerator protected (
         StandardOpenOption.CREATE,
         StandardOpenOption.WRITE,
         StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-    tokenizedFiles.toStream.flatMap(file => {
+    tokenizedFiles.map(_.get).toStream.flatMap(file => {
       Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
           .getLines
           .flatMap(whitespaceRegex.split)

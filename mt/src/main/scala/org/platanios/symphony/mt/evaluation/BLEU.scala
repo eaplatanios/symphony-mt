@@ -27,9 +27,10 @@ import scala.collection.mutable
   *
   * @author Emmanouil Antonios Platanios
   */
-class BLEU(
+class BLEU protected (
     val maxOrder: Int = 4,
     val smooth: Boolean = false,
+    val sentenceDecoder: Seq[String] => Seq[String] = identity[Seq[String]],
     val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
     val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
     val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
@@ -46,12 +47,14 @@ class BLEU(
     val hypSeq = hypSentences.zip(hypLengths).map {
       case (s, len) =>
         val lenScalar = len.scalar.asInstanceOf[Int]
-        s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
+        val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
+        sentenceDecoder(seq)
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
         val lenScalar = len.scalar.asInstanceOf[Int]
-        Seq(s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq)
+        val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
+        Seq(sentenceDecoder(seq))
     }
     val (matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen) = BLEU.nGramMatches(refSeq, hypSeq, maxOrder)
     Seq(matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen)
@@ -148,13 +151,16 @@ object BLEU {
   def apply(
       maxOrder: Int = 4,
       smooth: Boolean = false,
+      sentenceDecoder: Seq[String] => Seq[String] = identity[Seq[String]],
       variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
       valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
       updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
       resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
       name: String = "BLEU"
   ): BLEU = {
-    new BLEU(maxOrder, smooth, variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)
+    new BLEU(
+      maxOrder, smooth, sentenceDecoder, variablesCollections,
+      valuesCollections, updatesCollections, resetsCollections, name)
   }
 
   /** BLEU score computation result.

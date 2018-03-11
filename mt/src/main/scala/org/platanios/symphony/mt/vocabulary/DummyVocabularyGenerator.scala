@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.vocabulary
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.utilities.MutableFile
 
 import better.files.File
 
@@ -49,7 +50,7 @@ class DummyVocabularyGenerator protected (
     * @param  vocabDir       Directory in which to save the generated vocabulary file.
     * @return The generated/replaced vocabulary file.
     */
-  override def generate(language: Language, tokenizedFiles: Seq[File], vocabDir: File): File = {
+  def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
     val vocabFile = vocabDir / filename(language)
     vocabFile.parent.createDirectories()
     val writer = new BufferedWriter(

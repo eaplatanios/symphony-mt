@@ -33,7 +33,7 @@ import scala.collection.mutable
   *
   * @author Emmanouil Antonios Platanios
   */
-case class Vocabulary private[Vocabulary] (file: File, size: Int) {
+class Vocabulary protected (val file: File, val size: Int) {
   /** Creates a vocabulary lookup table (from word string to word ID), from the provided vocabulary file.
     *
     * @return Vocabulary lookup table.
@@ -52,12 +52,21 @@ case class Vocabulary private[Vocabulary] (file: File, size: Int) {
       file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN, name = name)
   }
 
-  // TODO: Add support for sentence pre-processors and post-processors (useful for dealing with subword units).
+  def encodeSentence(sentence: Seq[String]): Seq[String] = sentence
+  def decodeSentence(sentence: Seq[String]): Seq[String] = sentence
 }
 
 /** Contains utilities for dealing with vocabularies. */
 object Vocabulary {
   private[this] val logger: Logger = Logger(LoggerFactory.getLogger("Vocabulary"))
+
+  /** Creates a new vocabulary.
+    *
+    * @param  file File containing the vocabulary, with one word per line.
+    * @param  size Size of this vocabulary (i.e., number of words).
+    * @return Created vocabulary.
+    */
+  protected def apply(file: File, size: Int): Vocabulary = new Vocabulary(file, size)
 
   /** Creates a new vocabulary from the provided vocabulary file.
     *
@@ -119,7 +128,7 @@ object Vocabulary {
     * @param  endOfSequenceToken   Special token for the end of a sequence. Defaults to `</s>`.
     * @return Option containing the number of tokens and the checked vocabulary file, which could be a new file.
     */
-  private[Vocabulary] def check(
+  private[vocabulary] def check(
       file: File,
       checkSpecialTokens: Boolean = true,
       directory: File = null,
