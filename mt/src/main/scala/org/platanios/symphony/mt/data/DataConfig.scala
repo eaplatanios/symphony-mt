@@ -30,7 +30,7 @@ case class DataConfig(
     loaderConvertSGMToText: Boolean = true,
     loaderTokenize: Boolean = false,
     loaderSentenceLengthBounds: Option[(Int, Int)] = None,
-    loaderVocab: DatasetVocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, 8192)),
+    loaderVocab: DatasetVocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
     // Corpus
     trainBatchSize: Long = 128,
     inferBatchSize: Long = 32,

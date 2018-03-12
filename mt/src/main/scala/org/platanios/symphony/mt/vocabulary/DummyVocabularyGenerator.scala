@@ -27,13 +27,15 @@ import java.nio.file.StandardOpenOption
 
 /** Dummy vocabulary generator that generates a vocabulary containing numbers starting at `0` and ending at `size - 1`.
   *
-  * @param  size       Vocabulary size to use.
-  * @param  bufferSize Buffer size to use while writing vocabulary files.
+  * @param  size            Vocabulary size to use.
+  * @param  replaceExisting If `true`, existing vocabulary files will be replaced, if found.
+  * @param  bufferSize      Buffer size to use while writing vocabulary files.
   *
   * @author Emmanouil Antonios Platanios
   */
 class DummyVocabularyGenerator protected (
     val size: Int,
+    val replaceExisting: Boolean = false,
     val bufferSize: Int = 8192
 ) extends VocabularyGenerator {
   /** Returns the vocabulary file name that this generator uses / will use.
@@ -54,7 +56,7 @@ class DummyVocabularyGenerator protected (
     */
   def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
     val vocabFile = vocabDir / filename(language)
-    if (vocabFile.notExists) {
+    if (replaceExisting || vocabFile.notExists) {
       DummyVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
       vocabFile.parent.createDirectories()
       val writer = new BufferedWriter(
@@ -76,7 +78,7 @@ class DummyVocabularyGenerator protected (
 object DummyVocabularyGenerator {
   private[DummyVocabularyGenerator] val logger = Logger(LoggerFactory.getLogger("Vocabulary / Dummy Generator"))
 
-  def apply(size: Int, bufferSize: Int = 8192): DummyVocabularyGenerator = {
-    new DummyVocabularyGenerator(size, bufferSize)
+  def apply(size: Int, replaceExisting: Boolean = false, bufferSize: Int = 8192): DummyVocabularyGenerator = {
+    new DummyVocabularyGenerator(size, replaceExisting, bufferSize)
   }
 }

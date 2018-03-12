@@ -35,13 +35,13 @@ object WMT16UsingBPELanguageEmbeddings extends App {
 
   val languagePairs: Set[(Language, Language)] = Set(
     (czech, english), (finnish, english), (german, english),
-    (romanian, english), (russian, english), (turkish, english))
+    (romanian, english), (russian, english)) //, (turkish, english))
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
     // loaderSentenceLengthBounds = Some((1, 80)),
-    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000)),
+    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000, replaceExisting = true)),
     numBuckets = 5,
     srcMaxLength = 80,
     tgtMaxLength = 80)
@@ -66,7 +66,8 @@ object WMT16UsingBPELanguageEmbeddings extends App {
 
   val logConfig = Model.LogConfig(
     logLossSteps = 100,
-    logEvalSteps = 5000)
+    logEvalSteps = 5000,
+    launchTensorBoard = true)
 
   val model = RNNModel(
     name = "Model",

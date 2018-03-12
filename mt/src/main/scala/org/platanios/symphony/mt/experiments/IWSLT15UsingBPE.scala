@@ -47,7 +47,7 @@ object IWSLT15UsingBPE extends App {
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
-    numGPUs = 1,
+    numGPUs = 0,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
@@ -67,20 +67,20 @@ object IWSLT15UsingBPE extends App {
     config = RNNModel.Config(
       env,
       ParameterManager(
-        wordEmbeddingsSize = 512,
+        wordEmbeddingsSize = 32,
         tf.VarianceScalingInitializer(
           1.0f,
           tf.VarianceScalingInitializer.FanAverageScalingMode,
           tf.VarianceScalingInitializer.UniformDistribution)),
       BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 32,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 32,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f),

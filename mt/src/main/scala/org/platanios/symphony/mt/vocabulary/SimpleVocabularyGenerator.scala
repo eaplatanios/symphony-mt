@@ -30,18 +30,20 @@ import scala.io.Source
 
 /** Simple vocabulary generator that generates a vocabulary by simply splitting the input text files on spaces.
   *
-  * @param  sizeThreshold  Vocabulary size threshold. If non-negative, then the created vocabulary size will be
-  *                        bounded by this number. This means that only the `sizeThreshold` most frequent words will
-  *                        be kept.
-  * @param  countThreshold Vocabulary count threshold. If non-negative, then all words with counts less than
-  *                        `countThreshold` will be ignored.
-  * @param  bufferSize     Buffer size to use while reading and writing files.
+  * @param  sizeThreshold   Vocabulary size threshold. If non-negative, then the created vocabulary size will be
+  *                         bounded by this number. This means that only the `sizeThreshold` most frequent words will
+  *                         be kept.
+  * @param  countThreshold  Vocabulary count threshold. If non-negative, then all words with counts less than
+  *                         `countThreshold` will be ignored.
+  * @param  replaceExisting If `true`, existing vocabulary files will be replaced, if found.
+  * @param  bufferSize      Buffer size to use while reading and writing files.
   *
   * @author Emmanouil Antonios Platanios
   */
 class SimpleVocabularyGenerator protected (
     val sizeThreshold: Int = -1,
     val countThreshold: Int = -1,
+    val replaceExisting: Boolean = false,
     val bufferSize: Int = 8192
 ) extends VocabularyGenerator {
   /** Returns the vocabulary file name that this generator uses / will use.
@@ -69,7 +71,7 @@ class SimpleVocabularyGenerator protected (
     */
   override def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
     val vocabFile = vocabDir / filename(language)
-    if (vocabFile.notExists) {
+    if (replaceExisting || vocabFile.notExists) {
       SimpleVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
       vocabFile.parent.createDirectories()
       val whitespaceRegex = "\\s+".r
@@ -104,8 +106,9 @@ object SimpleVocabularyGenerator {
   def apply(
       sizeThreshold: Int = -1,
       countThreshold: Int = -1,
+      replaceExisting: Boolean = false,
       bufferSize: Int = 8192
   ): SimpleVocabularyGenerator = {
-    new SimpleVocabularyGenerator(sizeThreshold, countThreshold, bufferSize)
+    new SimpleVocabularyGenerator(sizeThreshold, countThreshold, replaceExisting, bufferSize)
   }
 }

@@ -26,6 +26,7 @@ import org.platanios.symphony.mt.utilities.{MutableFile, TrieWordCounter}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
+import scala.collection.parallel.mutable.ParMap
 import scala.io.Source
 
 // TODO: Support shared BPE subword units across languages.
@@ -41,7 +42,8 @@ import scala.io.Source
   * '''NOTE:''' Our implementation is based upon the one of the original paper authors, which can be found at
   * [https://github.com/rsennrich/subword-nmt](https://github.com/rsennrich/subword-nmt).
   *
-  *
+  * @param  replaceExisting If `true`, existing vocabulary files will be replaced, if found.
+  * @param  bufferSize      Buffer size to use while reading and writing files.
   *
   * @author Emmanouil Antonios Platanios
   */
@@ -49,6 +51,7 @@ class BPEVocabularyGenerator protected (
     val numSymbols: Int = 32000,
     val separator: String = "@@",
     val countThreshold: Int = -1,
+    val replaceExisting: Boolean = false,
     val bufferSize: Int = 8192,
     val verbose: Boolean = false
 ) extends VocabularyGenerator {
@@ -84,7 +87,7 @@ class BPEVocabularyGenerator protected (
 
     // We first generate the merge pairs, if necessary.
     val mergePairsFile = vocabDir / mergePairsFilename(language)
-    if (mergePairsFile.exists) {
+    if (mergePairsFile.exists && !replaceExisting) {
       BPEVocabularyGenerator.logger.info(s"Loading existing BPE coding for $language: $mergePairsFile.")
       initializeMergePairs(language, vocabDir)
     } else {
@@ -95,18 +98,18 @@ class BPEVocabularyGenerator protected (
           StandardOpenOption.CREATE,
           StandardOpenOption.WRITE,
           StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-      val tokens = tokenizedFiles.map(_.get).toStream.flatMap(file => {
+      val tokens = mutable.ArrayBuffer(tokenizedFiles.map(_.get).toStream.flatMap(file => {
         Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
             .getLines
             .flatMap(whitespaceRegex.split)
       }).foldLeft(TrieWordCounter())((counter, word) => {
         counter.insertWord(word)
         counter
-      }).words().toArray.map(p => (p._1, {
+      }).words().map(p => (p._1, {
         val parts = p._2.split("")
         parts.update(parts.length - 1, parts.last + BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
-        parts
-      }))
+        parts.toSeq
+      })).toSeq: _*)
 
       val pairStatistics = BPEVocabularyGenerator.computePairStatistics(tokens)
       val fullCounts = pairStatistics.counts
@@ -122,7 +125,7 @@ class BPEVocabularyGenerator protected (
 
       while (currentSymbol < numSymbols && continue) {
         val time = System.currentTimeMillis
-        if (time - progressLogTime >= 6e4) {
+        if (time - progressLogTime >= 1e4) {
           val numBars = Math.floorDiv(10 * currentSymbol, numSymbols)
           BPEVocabularyGenerator.logger.info(
             s"│${"═" * numBars}${" " * (10 - numBars)}│ $currentSymbol / $numSymbols BPE symbols processed.")
@@ -168,7 +171,7 @@ class BPEVocabularyGenerator protected (
     // We then generate the vocabulary, if necessary.
     val vocabFile = vocabDir / filename(language)
     val vocabWriter = {
-      if (vocabFile.exists) {
+      if (vocabFile.exists && !replaceExisting) {
         BPEVocabularyGenerator.logger.info(s"Vocabulary file for $language already exists: $vocabFile.")
         initializeVocabularies(language, vocabDir)
         None
@@ -185,21 +188,20 @@ class BPEVocabularyGenerator protected (
 
     // Irrespective of whether a new vocabulary is being generated, or an existing one was loaded, we also convert the
     // provided tokenized files to their encoded equivalent.
-    val fileWriters = new mutable.ArrayBuffer[BufferedWriter](tokenizedFiles.length)
-    fileWriters.sizeHint(tokenizedFiles.length)
+    var fileWriters = Seq.empty[BufferedWriter]
     val tokens = tokenizedFiles.toStream.flatMap(mutableFile => {
       val oldFile = mutableFile.get
       val file = oldFile.sibling(s"${oldFile.nameWithoutExtension}.bpe.$numSymbols.${language.abbreviation}")
       mutableFile.set(file)
-      if (file.notExists || vocabWriter.isDefined) {
+      if (replaceExisting || file.notExists || vocabWriter.isDefined) {
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
         val fileWriter = new BufferedWriter(
           file.newPrintWriter()(Seq(
             StandardOpenOption.CREATE,
             StandardOpenOption.WRITE,
             StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-        val cache = mutable.Map.empty[String, Array[String]]
-        val tokens = Source.fromFile(mutableFile.get.toJava)(StandardCharsets.UTF_8)
+        val cache = mutable.Map.empty[String, Seq[String]]
+        val tokens = Source.fromFile(oldFile.toJava)(StandardCharsets.UTF_8)
             .getLines
             .flatMap(line => {
               var sentence = whitespaceRegex.split(line)
@@ -207,7 +209,7 @@ class BPEVocabularyGenerator protected (
               fileWriter.write(s"${sentence.mkString(" ")}\n")
               sentence
             })
-        fileWriters += fileWriter
+        fileWriters :+= fileWriter
         tokens
       } else {
         Seq.empty
@@ -289,11 +291,11 @@ class BPEVocabularyGenerator protected (
   def encodeSentence(
       language: Language,
       sentence: Seq[String],
-      cache: mutable.Map[String, Array[String]] = mutable.Map.empty
+      cache: mutable.Map[String, Seq[String]] = mutable.Map.empty
   ): Seq[String] = {
     // TODO: Add support for glossaries (i.e., words that will be encoded with the identity function.
     sentence.flatMap(word => {
-      var parts = encodeWord(language, word, cache).toSeq
+      var parts = encodeWord(language, word, cache)
       var i = 0
       while (i < parts.length - 1) {
         parts = parts.updated(i, parts(i) + separator)
@@ -313,17 +315,16 @@ class BPEVocabularyGenerator protected (
   def encodeWord(
       language: Language,
       word: String,
-      cache: mutable.Map[String, Array[String]] = mutable.Map.empty
-  ): Array[String] = {
+      cache: mutable.Map[String, Seq[String]] = mutable.Map.empty
+  ): Seq[String] = {
     cache.getOrElseUpdate(word, {
-      var wordParts = word.split("")
-      wordParts.update(
-        wordParts.length - 1, wordParts(wordParts.length - 1) + BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
+      var wordParts = word.split("").toSeq
+      wordParts = wordParts.updated(
+        wordParts.length - 1, wordParts.last + BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
       var pairs = BPEVocabularyGenerator.getPairs(wordParts)
       if (pairs.isEmpty) {
-        wordParts.update(
-          wordParts.length - 1,
-          wordParts(wordParts.length - 1).dropRight(BPEVocabularyGenerator.END_OF_WORD_SYMBOL.length))
+        wordParts = wordParts.updated(
+          wordParts.length - 1, wordParts.last.dropRight(BPEVocabularyGenerator.END_OF_WORD_SYMBOL.length))
         wordParts
       } else {
         var continue = true
@@ -332,15 +333,14 @@ class BPEVocabularyGenerator protected (
           if (pair._2.isEmpty) {
             continue = false
           } else {
-            val newWordParts = new mutable.ArrayBuffer[String](wordParts.length)
-            newWordParts.sizeHint(wordParts.length)
+            var newWordParts = Seq.empty[String]
             var i = 0
             var last = 0
             while (i < wordParts.length) {
               if (wordParts(i) != pair._1._1 && i == wordParts.length - 1) {
                 var k = last
                 while (k < wordParts.length) {
-                  newWordParts.append(wordParts(k))
+                  newWordParts :+= wordParts(k)
                   k += 1
                 }
                 // Force the loop to finish.
@@ -350,20 +350,20 @@ class BPEVocabularyGenerator protected (
               } else {
                 var k = last
                 while (k < i) {
-                  newWordParts.append(wordParts(k))
+                  newWordParts :+= wordParts(k)
                   k += 1
                 }
                 if (wordParts(i) == pair._1._1 && i < wordParts.length - 1 && wordParts(i + 1) == pair._1._2) {
-                  newWordParts += pair._1._1 + pair._1._2
+                  newWordParts :+= pair._1._1 + pair._1._2
                   i += 2
                 } else {
-                  newWordParts += wordParts(i)
+                  newWordParts :+= wordParts(i)
                   i += 1
                 }
                 last = i
               }
             }
-            wordParts = newWordParts.toArray
+            wordParts = newWordParts
             pairs = BPEVocabularyGenerator.getPairs(wordParts)
           }
         }
@@ -372,7 +372,7 @@ class BPEVocabularyGenerator protected (
         if (wordParts.last == BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
           wordParts = wordParts.slice(0, wordParts.length - 1)
         else if (wordParts.last.endsWith(BPEVocabularyGenerator.END_OF_WORD_SYMBOL))
-          wordParts.update(wordParts.length - 1, wordParts(wordParts.length - 1)
+          wordParts = wordParts.updated(wordParts.length - 1, wordParts.last
               .dropRight(BPEVocabularyGenerator.END_OF_WORD_SYMBOL.length))
 
         // Check if the new words parts are in the vocabulary, and backtrack if necessary.
@@ -415,37 +415,38 @@ object BPEVocabularyGenerator {
       numSymbols: Int = 32000,
       separator: String = "@@",
       countThreshold: Int = -1,
+      replaceExisting: Boolean = false,
       bufferSize: Int = 8192,
       verbose: Boolean = false
   ): BPEVocabularyGenerator = {
-    new BPEVocabularyGenerator(numSymbols, separator, countThreshold, bufferSize, verbose)
+    new BPEVocabularyGenerator(numSymbols, separator, countThreshold, replaceExisting, bufferSize, verbose)
   }
 
   val END_OF_WORD_SYMBOL: String = "</w>"
 
   private[BPEVocabularyGenerator] case class PairStatistics(
       counts: mutable.Map[(String, String), Long],
-      indices: mutable.Map[(String, String), mutable.Map[Int, Long]])
+      indices: ParMap[(String, String), ParMap[Int, Long]])
 
   private[BPEVocabularyGenerator] case class Change(
       index: Int,
-      word: Array[String],
-      newWord: Array[String],
+      word: Seq[String],
+      newWord: Seq[String],
       count: Long)
 
   private[BPEVocabularyGenerator] def computePairStatistics(
-      words: Array[(Long, Array[String])]
+      words: Seq[(Long, Seq[String])]
   ): PairStatistics = {
     val counts = mutable.Map.empty[(String, String), Long].withDefaultValue(0)
-    val indices = mutable.Map.empty[(String, String), mutable.Map[Int, Long]]
-        .withDefaultValue(mutable.Map.empty[Int, Long].withDefaultValue(0))
+    val indices = ParMap.empty[(String, String), ParMap[Int, Long]]
+        .withDefaultValue(ParMap.empty[Int, Long].withDefaultValue(0))
     words.zipWithIndex.foreach {
       case ((count, symbols), index) =>
         var prevSymbol = symbols(0)
         symbols.tail.foreach(symbol => {
           val pair = (prevSymbol, symbol)
           counts(pair) = counts(pair) + count
-          indices(pair)(index) = indices(pair)(index) + 1
+          indices(pair) += index -> (indices(pair)(index) + 1)
           prevSymbol = symbol
         })
     }
@@ -489,27 +490,27 @@ object BPEVocabularyGenerator {
     */
   private[BPEVocabularyGenerator] def replacePair(
       pair: (String, String),
-      words: Array[(Long, Array[String])],
-      indices: mutable.Map[(String, String), mutable.Map[Int, Long]]
-  ): Array[Change] = {
-    val pairIndices = indices(pair).toSeq.filter(_._2 >= 1).map(_._1).toArray
-    val changes = Array.fill[Change](pairIndices.length)(null)
+      words: mutable.Seq[(Long, Seq[String])],
+      indices: ParMap[(String, String), ParMap[Int, Long]]
+  ): Seq[Change] = {
+    val pairIndices = indices(pair).toSeq.filter(_._2 >= 1).map(_._1)
+    val changes = new mutable.ArrayBuffer[Change](pairIndices.size)
+    changes.sizeHint(pairIndices.size)
     val joinedPair = pair._1 + pair._2
     var i = 0
-    while (i < pairIndices.length) {
+    while (i < pairIndices.size) {
       val index = pairIndices(i)
       val (count, word) = words(index)
-      val newWord = new mutable.ArrayBuffer[String](word.length)
-      newWord.sizeHint(word.length)
+      var newWord = Seq.empty[String]
       var j = 0
       while (j < word.length - 1) {
         (word(j), word(j + 1)) match {
-          case p if p == pair => newWord += joinedPair; j += 2
-          case _ => newWord += word(j); j += 1
+          case p if p == pair => newWord :+= joinedPair; j += 2
+          case _ => newWord :+= word(j); j += 1
         }
       }
-      words.update(index, (count, newWord.toArray))
-      changes.update(i, Change(index, word, newWord.toArray, count))
+      words.update(index, (count, newWord))
+      changes.append(Change(index, word, newWord, count))
       i += 1
     }
     changes
@@ -527,14 +528,14 @@ object BPEVocabularyGenerator {
     */
   private[BPEVocabularyGenerator] def updatePairStatistics(
       pair: (String, String),
-      changes: Array[Change],
+      changes: Seq[Change],
       counts: mutable.Map[(String, String), Long],
-      indices: mutable.Map[(String, String), mutable.Map[Int, Long]]
+      indices: ParMap[(String, String), ParMap[Int, Long]]
   ): Unit = {
     val joinedPair = pair._1 + pair._2
 
     counts.update(pair, 0L)
-    indices.update(pair, mutable.Map.empty[Int, Long].withDefaultValue(0L))
+    indices += pair -> ParMap.empty[Int, Long].withDefaultValue(0L)
     changes.foreach(change => {
       // Find all instances of the pair, and update the corresponding statistics.
       var i = 0
@@ -545,7 +546,7 @@ object BPEVocabularyGenerator {
             if (i > 0) {
               val prevPair = (change.word(i - 1), change.word(i))
               counts.update(prevPair, counts(prevPair) - change.count)
-              indices(prevPair)(change.index) = indices(prevPair)(change.index) - 1
+              indices(prevPair) += change.index -> (indices(prevPair)(change.index) - 1)
             }
             // Assuming a symbol sequence "A B C B", if "B C" is merged, we reduce the frequency of "C B". However, we
             // skip this if the sequence is "A B C B C", because the frequency of "C B" will have already been reduced
@@ -554,7 +555,7 @@ object BPEVocabularyGenerator {
                 (change.word(i + 2) != pair._1 || i >= change.word.length - 3 || change.word(i + 3) != pair._2)) {
               val nextPair = (change.word(i + 1), change.word(i + 2))
               counts.update(nextPair, counts(nextPair) - change.count)
-              indices(nextPair)(change.index) = indices(nextPair)(change.index) - 1
+              indices(nextPair) += change.index -> (indices(nextPair)(change.index) - 1)
             }
             i += 2
           case _ => i += 1
@@ -570,7 +571,7 @@ object BPEVocabularyGenerator {
             if (i > 0) {
               val prevPair = (change.newWord(i - 1), change.newWord(i))
               counts.update(prevPair, counts(prevPair) + change.count)
-              indices(prevPair)(change.index) = indices(prevPair)(change.index) + 1
+              indices(prevPair) += change.index -> (indices(prevPair)(change.index) + 1)
             }
             // Assuming a symbol sequence "A BC B", if "B C" is merged, we increase the frequency of "BC B". However, we
             // skip this if the sequence is "A BC BC", because the count of "BC BC" will have already been incremented
@@ -578,7 +579,7 @@ object BPEVocabularyGenerator {
             if (i < change.newWord.length - 1 && change.newWord(i + 1) != joinedPair) {
               val nextPair = (change.newWord(i), change.newWord(i + 1))
               counts.update(nextPair, counts(nextPair) + change.count)
-              indices(nextPair)(change.index) = indices(nextPair)(change.index) + 1
+              indices(nextPair) += change.index -> (indices(nextPair)(change.index) + 1)
             }
             i += 1
           case _ => i += 1
@@ -587,12 +588,11 @@ object BPEVocabularyGenerator {
     })
   }
 
-  private[BPEVocabularyGenerator] def getPairs(wordParts: Array[String]): Seq[(String, String)] = {
-    val pairs = new mutable.ArrayBuffer[(String, String)](wordParts.length)
-    pairs.sizeHint(wordParts.length)
+  private[BPEVocabularyGenerator] def getPairs(wordParts: Seq[String]): Seq[(String, String)] = {
+    var pairs = Seq.empty[(String, String)]
     var i = 0
     while (i < wordParts.length - 1) {
-      pairs.append((wordParts(i), wordParts(i + 1)))
+      pairs :+= ((wordParts(i), wordParts(i + 1)))
       i += 1
     }
     pairs
@@ -648,11 +648,11 @@ object BPEVocabularyGenerator {
     * @return
     */
   private[BPEVocabularyGenerator] def checkVocabularyAndSplit(
-      wordParts: Array[String],
+      wordParts: Seq[String],
       reversedMergePairs: Map[String, (String, String)],
       vocabulary: Set[String],
       separator: String
-  ): Array[String] = {
+  ): Seq[String] = {
     if (vocabulary.isEmpty) {
       wordParts
     } else {
