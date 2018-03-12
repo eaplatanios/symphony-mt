@@ -30,7 +30,7 @@ import java.nio.file.{Path, Paths}
   * @author Emmanouil Antonios Platanios
   */
 object IWSLT15LanguageEmbeddings extends App {
-  val workingDir: Path = Paths.get("temp").resolve("iwslt15-language-embeddings")
+  val workingDir: Path = Paths.get("temp").resolve("iwslt15-rnn-language-embeddings")
 
   val srcLanguage: Language = english
   val tgtLanguage: Language = vietnamese

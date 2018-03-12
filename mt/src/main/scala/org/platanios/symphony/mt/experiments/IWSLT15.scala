@@ -31,7 +31,7 @@ import java.nio.file.{Path, Paths}
   * @author Emmanouil Antonios Platanios
   */
 object IWSLT15 extends App {
-  val workingDir: Path = Paths.get("temp").resolve("iwslt15-pairwise")
+  val workingDir: Path = Paths.get("temp").resolve("iwslt15-rnn")
 
   val srcLanguage: Language = english
   val tgtLanguage: Language = vietnamese

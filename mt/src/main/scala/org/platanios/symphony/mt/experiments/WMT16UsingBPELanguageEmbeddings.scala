@@ -47,7 +47,7 @@ object WMT16UsingBPELanguageEmbeddings extends App {
     tgtMaxLength = 80)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    loadDatasets(languagePairs.toSeq.map(l => WMT16DatasetLoader(l._1, l._2, dataConfig)))
+    loadDatasets(languagePairs.toSeq.map(l => WMT16DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))
   }
 
   val env = Environment(

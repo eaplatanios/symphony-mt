@@ -24,13 +24,14 @@ import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, Luo
 import org.platanios.symphony.mt.models.{LanguageEmbeddingsParameterManager, Model, RNNModel}
 import org.platanios.symphony.mt.vocabulary.{SimpleVocabularyGenerator, Vocabulary}
 import org.platanios.tensorflow.api._
+
 import java.nio.file.{Path, Paths}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 object WMT16LanguageEmbeddings extends App {
-  val workingDir: Path = Paths.get("temp").resolve("wmt16-language-embeddings")
+  val workingDir: Path = Paths.get("temp").resolve("wmt16-gnmt-language-embeddings")
 
   val languagePairs: Set[(Language, Language)] = Set(
     (czech, english), (finnish, english), (german, english),
@@ -46,7 +47,7 @@ object WMT16LanguageEmbeddings extends App {
     tgtMaxLength = 50)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    loadDatasets(languagePairs.toSeq.map(l => WMT16DatasetLoader(l._1, l._2, dataConfig)))
+    loadDatasets(languagePairs.toSeq.map(l => WMT16DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))
   }
 
   val env = Environment(

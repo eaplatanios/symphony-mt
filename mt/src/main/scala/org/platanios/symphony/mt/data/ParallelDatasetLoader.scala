@@ -113,7 +113,7 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
   def vocabularies: (Seq[File], Seq[File]) = (Seq.empty, Seq.empty)
 
   /** Returns the files included in this dataset, grouped based on their role. */
-  def load(): FileParallelDataset = ParallelDatasetLoader.load(this)._1.head
+  def load(): FileParallelDataset = ParallelDatasetLoader.load(Seq(this))._1.head
 }
 
 object ParallelDatasetLoader {
@@ -165,7 +165,10 @@ object ParallelDatasetLoader {
     }
   }
 
-  def load(loaders: ParallelDatasetLoader*): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
+  def load(
+      loaders: Seq[ParallelDatasetLoader],
+      workingDir: Option[File] = None
+  ): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
     // Collect all files.
     val files = loaders.map(loader => {
       var srcFiles = Seq.empty[MutableFile]
@@ -212,7 +215,7 @@ object ParallelDatasetLoader {
       vocabularies.getOrElseUpdate(loader.srcLanguage, mutable.ListBuffer.empty).append(loader.vocabularies._1: _*)
       vocabularies.getOrElseUpdate(loader.tgtLanguage, mutable.ListBuffer.empty).append(loader.vocabularies._2: _*)
     })
-    val workingDir = File(loaders.head.dataConfig.workingDir) / "vocabularies"
+    val vocabDir = workingDir.getOrElse(File(loaders.head.dataConfig.workingDir)) / "vocabularies"
     val vocabulary = vocabularies.toMap.map {
       case (l, v) =>
         val vocabFilename = loaders.head.dataConfig.loaderVocab.filename(l)
@@ -225,19 +228,19 @@ object ParallelDatasetLoader {
                 case (loader, f) if loader.tgtLanguage == l => f._2
                 case _ => Seq.empty
               }
-              val vocabFile = workingDir / vocabFilename
+              val vocabFile = vocabDir / vocabFilename
               if (vocabFile.notExists) {
                 ParallelDatasetLoader.logger.info(s"Generating vocabulary file for $l.")
-                generator.generate(l, tokenizedFiles, workingDir)
+                generator.generate(l, tokenizedFiles, vocabDir)
                 ParallelDatasetLoader.logger.info(s"Generated vocabulary file for $l.")
               } else {
-                generator.initialize(l, workingDir)
+                generator.initialize(l, vocabDir)
               }
-              generator.getVocabulary(l, workingDir)
+              generator.getVocabulary(l, vocabDir)
             }
           case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
           case MergedVocabularies if v.nonEmpty =>
-            val vocabFile = workingDir.createChild(vocabFilename, createParents = true)
+            val vocabFile = vocabDir.createChild(vocabFilename, createParents = true)
             val writer = new BufferedWriter(vocabFile.newPrintWriter(), loaders.head.dataConfig.loaderBufferSize)
             v.toStream
                 .flatMap(_.lineIterator).toSet

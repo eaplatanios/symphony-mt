@@ -31,7 +31,7 @@ import java.nio.file.{Path, Paths}
   * @author Emmanouil Antonios Platanios
   */
 object WMT16 extends App {
-  val workingDir: Path = Paths.get("temp")
+  val workingDir: Path = Paths.get("temp").resolve("wmt16-gnmt")
 
   val srcLanguage: Language = german
   val tgtLanguage: Language = english

@@ -18,11 +18,16 @@ package org.platanios.symphony.mt
 import org.platanios.symphony.mt.data.{FileParallelDataset, ParallelDatasetLoader}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 
+import better.files.File
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 package object experiments {
-  def loadDatasets(loaders: Seq[ParallelDatasetLoader]): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    ParallelDatasetLoader.load(loaders: _*)
+  def loadDatasets(
+      loaders: Seq[ParallelDatasetLoader],
+      workingDir: Option[File] = None
+  ): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
+    ParallelDatasetLoader.load(loaders, workingDir)
   }
 }
