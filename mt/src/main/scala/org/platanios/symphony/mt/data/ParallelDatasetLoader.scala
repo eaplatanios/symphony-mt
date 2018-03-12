@@ -139,12 +139,15 @@ object ParallelDatasetLoader {
           val time = System.currentTimeMillis
           if (time - progressLogTime >= 1e4) {
             val numBars = Math.floorDiv(10 * progress, contentLength).toInt
-            logger.info(s"│${"═" * numBars}${" " * (10 - numBars)}│ $progress / $contentLength bytes downloaded.")
+            logger.info(
+              s"│${"═" * numBars}${" " * (10 - numBars)}│ " +
+                  s"%${contentLength.toString.length}s / $contentLength bytes downloaded.".format(progress))
             progressLogTime = time
           }
         })
         outputStream.close()
-        logger.info(s"│${"═" * 10}│ $progress / $contentLength bytes downloaded.")
+        logger.info(
+          s"│${"═" * 10}│ %${contentLength.toString.length}s / $contentLength bytes downloaded.".format(progress))
         logger.info(s"Downloaded file '$url'.")
         true
       } catch {

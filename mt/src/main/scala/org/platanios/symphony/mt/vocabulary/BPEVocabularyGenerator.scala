@@ -125,10 +125,11 @@ class BPEVocabularyGenerator protected (
 
       while (currentSymbol < numSymbols && continue) {
         val time = System.currentTimeMillis
-        if (time - progressLogTime >= 1e4) {
+        if (time - progressLogTime >= 6e4) {
           val numBars = Math.floorDiv(10 * currentSymbol, numSymbols)
           BPEVocabularyGenerator.logger.info(
-            s"│${"═" * numBars}${" " * (10 - numBars)}│ $currentSymbol / $numSymbols BPE symbols processed.")
+            s"│${"═" * numBars}${" " * (10 - numBars)}│ " +
+                s"%${numSymbols.toString.length}s / $numSymbols BPE symbols processed.".format(currentSymbol))
           progressLogTime = time
         }
         var mostFrequent = if (counts.nonEmpty) counts.maxBy(_._2) else null
@@ -164,7 +165,8 @@ class BPEVocabularyGenerator protected (
       mergePairsWriter.flush()
       mergePairsWriter.close()
 
-      BPEVocabularyGenerator.logger.info(s"│${"═" * 10}│ $currentSymbol / $numSymbols BPE symbols processed.")
+      BPEVocabularyGenerator.logger.info(
+        s"│${"═" * 10}│ %${numSymbols.toString.length}s / $numSymbols BPE symbols processed.".format(currentSymbol))
       BPEVocabularyGenerator.logger.info(s"Learned BPE coding for $language: $mergePairsFile.")
     }
 
@@ -493,13 +495,8 @@ object BPEVocabularyGenerator {
       words: mutable.Seq[(Long, Seq[String])],
       indices: ParMap[(String, String), ParMap[Int, Long]]
   ): Seq[Change] = {
-    val pairIndices = indices(pair).toSeq.filter(_._2 >= 1).map(_._1)
-    val changes = new mutable.ArrayBuffer[Change](pairIndices.size)
-    changes.sizeHint(pairIndices.size)
     val joinedPair = pair._1 + pair._2
-    var i = 0
-    while (i < pairIndices.size) {
-      val index = pairIndices(i)
+    indices(pair).toSeq.filter(_._2 >= 1).map(_._1).map(index => {
       val (count, word) = words(index)
       var newWord = Seq.empty[String]
       var j = 0
@@ -510,10 +507,8 @@ object BPEVocabularyGenerator {
         }
       }
       words.update(index, (count, newWord))
-      changes.append(Change(index, word, newWord, count))
-      i += 1
-    }
-    changes
+      Change(index, word, newWord, count)
+    }).seq
   }
 
   /** Minimally updates the symbol pair statistics, based on the provided list of changes.
