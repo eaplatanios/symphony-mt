@@ -216,6 +216,11 @@ class BPEVocabularyGenerator protected (
           (parts(0), parts(1))
         }).zipWithIndex.toMap
     reversedMergePairs += language -> mergePairs(language).toSeq.map(p => p._1._1 + p._1._2 -> p._1).toMap
+    val vocabFile = vocabDir / filename(language)
+    vocabularies += language -> Source.fromFile(vocabFile.toJava)(StandardCharsets.UTF_8)
+        .getLines
+        .filter(_ != "")
+        .toSet
   }
 
   /** Returns a vocabulary for the specified language, ready to be used by machine translation models.
