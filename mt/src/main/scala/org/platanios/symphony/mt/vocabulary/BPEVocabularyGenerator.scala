@@ -15,16 +15,15 @@
 
 package org.platanios.symphony.mt.vocabulary
 
-import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.utilities.{MutableFile, TrieWordCounter}
-
-import better.files.File
-import com.typesafe.scalalogging.Logger
-import org.slf4j.LoggerFactory
-
 import java.io.BufferedWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.StandardOpenOption
+
+import better.files.File
+import com.typesafe.scalalogging.Logger
+import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.utilities.{MutableFile, TrieWordCounter}
+import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 import scala.io.Source
@@ -81,121 +80,145 @@ class BPEVocabularyGenerator protected (
       reversedMergePairs += language -> Map.empty
       vocabularies += language -> Set.empty
     }
-    val mergePairsFile = vocabDir / mergePairsFilename(language)
-    mergePairsFile.parent.createDirectories()
     val whitespaceRegex = "\\s+".r
-    val mergePairsWriter = new BufferedWriter(
-      mergePairsFile.newPrintWriter()(Seq(
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-    val tokens = tokenizedFiles.map(_.get).toStream.flatMap(file => {
-      Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
-          .getLines
-          .flatMap(whitespaceRegex.split)
-    }).foldLeft(TrieWordCounter())((counter, word) => {
-      counter.insertWord(word)
-      counter
-    }).words().toArray.map(p => (p._1, {
-      val parts = p._2.split("")
-      parts.update(parts.length - 1, parts.last + BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
-      parts
-    }))
 
-    val pairStatistics = BPEVocabularyGenerator.computePairStatistics(tokens)
-    val fullCounts = pairStatistics.counts
-    val indices = pairStatistics.indices
-
-    // Threshold is inspired by a Zipfian assumption, but it should only affect speed
-    var threshold = fullCounts.values.max / 10
-    var counts = mutable.Map(fullCounts.toSeq: _*).withDefaultValue(0L)
-
-    var continue = true
-    var currentSymbol = 0
-
-    while (currentSymbol < numSymbols && continue) {
-      if (currentSymbol % 100 == 0)
-        BPEVocabularyGenerator.logger.info("Symbol: " + currentSymbol)
-      var mostFrequent = if (counts.nonEmpty) counts.maxBy(_._2) else null
-      if (counts.isEmpty || (currentSymbol > 0 && mostFrequent._2 < threshold)) {
-        BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
-        counts = mutable.Map(fullCounts.toSeq: _*)
-        mostFrequent = counts.maxBy(_._2)
-        threshold = (mostFrequent._2 * currentSymbol / (currentSymbol + 10000f)).toLong
-        BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
-      }
-
-      if (mostFrequent._2 < countThreshold) {
-        BPEVocabularyGenerator.logger.info(
-          s"No pair has frequency higher than $countThreshold. Stopping the byte pair encoding (BPE) iteration.")
-        continue = false
-      } else {
-        if (verbose)
-          BPEVocabularyGenerator.logger.info(s"Pair $currentSymbol: ${mostFrequent._1} (count = ${mostFrequent._2})")
-        if (!mergePairs(language).contains(mostFrequent._1)) {
-          mergePairs(language) += mostFrequent._1 -> currentSymbol
-          reversedMergePairs(language) += mostFrequent._1._1 + mostFrequent._1._2 -> mostFrequent._1
-          mergePairsWriter.write(s"${mostFrequent._1._1}\t${mostFrequent._1._2}\n")
-        }
-        val changes = BPEVocabularyGenerator.replacePair(mostFrequent._1, tokens, indices)
-        BPEVocabularyGenerator.updatePairStatistics(mostFrequent._1, changes, counts, indices)
-        if (currentSymbol % 100 == 0)
-          BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
-      }
-
-      currentSymbol += 1
-    }
-
-    mergePairsWriter.flush()
-    mergePairsWriter.close()
-
-    val vocabFile = vocabDir / filename(language)
-    vocabFile.parent.createDirectories()
-    val vocabWriter = new BufferedWriter(
-      vocabFile.newPrintWriter()(Seq(
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-
-    val fileWriters = new mutable.ArrayBuffer[BufferedWriter](tokenizedFiles.length)
-    fileWriters.sizeHint(tokenizedFiles.length)
-    tokenizedFiles.toStream.flatMap(mutableFile => {
-      val oldFile = mutableFile.get
-      val file = oldFile.sibling(s"${oldFile.nameWithoutExtension}.bpe.$numSymbols.${language.abbreviation}")
-      val fileWriter = new BufferedWriter(
-        file.newPrintWriter()(Seq(
+    // We first generate the merge pairs, if necessary.
+    val mergePairsFile = vocabDir / mergePairsFilename(language)
+    if (mergePairsFile.exists) {
+      initializeMergePairs(language, vocabDir)
+    } else {
+      mergePairsFile.parent.createDirectories()
+      val mergePairsWriter = new BufferedWriter(
+        mergePairsFile.newPrintWriter()(Seq(
           StandardOpenOption.CREATE,
           StandardOpenOption.WRITE,
           StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-      val cache = mutable.Map.empty[String, Array[String]]
-      val tokens = Source.fromFile(mutableFile.get.toJava)(StandardCharsets.UTF_8)
-          .getLines
-          .flatMap(line => {
-            var sentence = whitespaceRegex.split(line)
-            sentence = encodeSentence(language, sentence, cache).toArray
-            fileWriter.write(s"${sentence.mkString(" ")}\n")
-            sentence
+      val tokens = tokenizedFiles.map(_.get).toStream.flatMap(file => {
+        Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
+            .getLines
+            .flatMap(whitespaceRegex.split)
+      }).foldLeft(TrieWordCounter())((counter, word) => {
+        counter.insertWord(word)
+        counter
+      }).words().toArray.map(p => (p._1, {
+        val parts = p._2.split("")
+        parts.update(parts.length - 1, parts.last + BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
+        parts
+      }))
+
+      val pairStatistics = BPEVocabularyGenerator.computePairStatistics(tokens)
+      val fullCounts = pairStatistics.counts
+      val indices = pairStatistics.indices
+
+      // Threshold is inspired by a Zipfian assumption, but it should only affect speed
+      var threshold = fullCounts.values.max / 10
+      var counts = mutable.Map(fullCounts.toSeq: _*).withDefaultValue(0L)
+
+      var continue = true
+      var currentSymbol = 0
+
+      while (currentSymbol < numSymbols && continue) {
+        if (currentSymbol % 100 == 0)
+          BPEVocabularyGenerator.logger.info("Symbol: " + currentSymbol)
+        var mostFrequent = if (counts.nonEmpty) counts.maxBy(_._2) else null
+        if (counts.isEmpty || (currentSymbol > 0 && mostFrequent._2 < threshold)) {
+          BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
+          counts = mutable.Map(fullCounts.toSeq: _*)
+          mostFrequent = counts.maxBy(_._2)
+          threshold = (mostFrequent._2 * currentSymbol / (currentSymbol + 10000f)).toLong
+          BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
+        }
+
+        if (mostFrequent._2 < countThreshold) {
+          BPEVocabularyGenerator.logger.info(
+            s"No pair has frequency higher than $countThreshold. Stopping the byte pair encoding (BPE) iteration.")
+          continue = false
+        } else {
+          if (verbose)
+            BPEVocabularyGenerator.logger.info(s"Pair $currentSymbol: ${mostFrequent._1} (count = ${mostFrequent._2})")
+          if (!mergePairs(language).contains(mostFrequent._1)) {
+            mergePairs(language) += mostFrequent._1 -> currentSymbol
+            reversedMergePairs(language) += mostFrequent._1._1 + mostFrequent._1._2 -> mostFrequent._1
+            mergePairsWriter.write(s"${mostFrequent._1._1}\t${mostFrequent._1._2}\n")
+          }
+          val changes = BPEVocabularyGenerator.replacePair(mostFrequent._1, tokens, indices)
+          BPEVocabularyGenerator.updatePairStatistics(mostFrequent._1, changes, counts, indices)
+          if (currentSymbol % 100 == 0)
+            BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
+        }
+
+        currentSymbol += 1
+      }
+
+      mergePairsWriter.flush()
+      mergePairsWriter.close()
+    }
+
+    // We then generate the vocabulary, if necessary.
+    val vocabFile = vocabDir / filename(language)
+    val vocabWriter = {
+      if (vocabFile.exists) {
+        initializeVocabularies(language, vocabDir)
+        None
+      } else {
+        vocabFile.parent.createDirectories()
+        Some(new BufferedWriter(
+          vocabFile.newPrintWriter()(Seq(
+            StandardOpenOption.CREATE,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.TRUNCATE_EXISTING)), bufferSize))
+      }
+    }
+
+    // Irrespective of whether a new vocabulary is being generated, or an existing one was loaded, we also convert the
+    // provided tokenized files to their encoded equivalent.
+    val fileWriters = new mutable.ArrayBuffer[BufferedWriter](tokenizedFiles.length)
+    fileWriters.sizeHint(tokenizedFiles.length)
+    val tokens = tokenizedFiles.toStream.flatMap(mutableFile => {
+      val oldFile = mutableFile.get
+      val file = oldFile.sibling(s"${oldFile.nameWithoutExtension}.bpe.$numSymbols.${language.abbreviation}")
+      if (file.notExists || vocabWriter.isDefined) {
+        val fileWriter = new BufferedWriter(
+          file.newPrintWriter()(Seq(
+            StandardOpenOption.CREATE,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
+        val cache = mutable.Map.empty[String, Array[String]]
+        val tokens = Source.fromFile(mutableFile.get.toJava)(StandardCharsets.UTF_8)
+            .getLines
+            .flatMap(line => {
+              var sentence = whitespaceRegex.split(line)
+              sentence = encodeSentence(language, sentence, cache).toArray
+              fileWriter.write(s"${sentence.mkString(" ")}\n")
+              sentence
+            })
+        fileWriters += fileWriter
+        mutableFile.set(file)
+        tokens
+      } else {
+        Seq.empty
+      }
+    })
+
+    vocabWriter.foreach(writer => {
+      tokens.foldLeft(TrieWordCounter())((counter, word) => {
+        counter.insertWord(word)
+        counter
+      }).words()
+          .toSeq.sortBy(-_._1).map(_._2)
+          .foreach(word => {
+            vocabularies(language) += word
+            writer.write(word + "\n")
           })
-      fileWriters += fileWriter
-      mutableFile.set(file)
-      tokens
-    }).foldLeft(TrieWordCounter())((counter, word) => {
-      counter.insertWord(word)
-      counter
-    }).words()
-        .toSeq.sortBy(-_._1).map(_._2)
-        .foreach(word => {
-          vocabularies(language) += word
-          vocabWriter.write(word + "\n")
-        })
+      writer.flush()
+      writer.close()
+    })
 
     fileWriters.foreach(fileWriter => {
       fileWriter.flush()
       fileWriter.close()
     })
 
-    vocabWriter.flush()
-    vocabWriter.close()
     vocabFile
   }
 
@@ -207,6 +230,16 @@ class BPEVocabularyGenerator protected (
     * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
     */
   override def initialize(language: Language, vocabDir: File): Unit = {
+    initializeMergePairs(language, vocabDir)
+    initializeVocabularies(language, vocabDir)
+  }
+
+  /** Initializes the merge pairs of this BPE generators from an existing file.
+    *
+    * @param  language Language for which a vocabulary has been generated.
+    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
+    */
+  protected def initializeMergePairs(language: Language, vocabDir: File): Unit = {
     val mergePairsFile = vocabDir / mergePairsFilename(language)
     mergePairs += language -> Source.fromFile(mergePairsFile.toJava)(StandardCharsets.UTF_8)
         .getLines
@@ -216,6 +249,14 @@ class BPEVocabularyGenerator protected (
           (parts(0), parts(1))
         }).zipWithIndex.toMap
     reversedMergePairs += language -> mergePairs(language).toSeq.map(p => p._1._1 + p._1._2 -> p._1).toMap
+  }
+
+  /** Initializes the vocabularies of this BPE generators from an existing file.
+    *
+    * @param  language Language for which a vocabulary has been generated.
+    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
+    */
+  protected def initializeVocabularies(language: Language, vocabDir: File): Unit = {
     val vocabFile = vocabDir / filename(language)
     vocabularies += language -> Source.fromFile(vocabFile.toJava)(StandardCharsets.UTF_8)
         .getLines
@@ -233,6 +274,13 @@ class BPEVocabularyGenerator protected (
     CodedVocabulary(vocabDir / filename(language), s => encodeSentence(language, s), decodeSentence)
   }
 
+  /** Encodes the provided sentence to a sequence of BPE coded words.
+    *
+    * @param  language Language in which the sentence is written.
+    * @param  sentence Sentence to encode as a sequence of words.
+    * @param  cache    Optional cache of already encoded words, used to speed up the encoding process.
+    * @return Encoded sentence as a sequence of BPE coded words.
+    */
   def encodeSentence(
       language: Language,
       sentence: Seq[String],
@@ -250,6 +298,13 @@ class BPEVocabularyGenerator protected (
     })
   }
 
+  /** Encodes the provided word to a sequence of BPE coded words.
+    *
+    * @param  language Language in which the word is written.
+    * @param  word     Word to encode.
+    * @param  cache    Optional cache of already encoded words, used to speed up the encoding process.
+    * @return Encoded word as a sequence of BPE coded words.
+    */
   def encodeWord(
       language: Language,
       word: String,
@@ -324,6 +379,11 @@ class BPEVocabularyGenerator protected (
     })
   }
 
+  /** Decodes the provided sentence to a sequence of words (before the BPE encoding was applied).
+    *
+    * @param  sentence Sentence to decode as a sequence of BPE coded words.
+    * @return Decoded sentence as a sequence of words.
+    */
   def decodeSentence(sentence: Seq[String]): Seq[String] = {
     val decodedSentence = mutable.ArrayBuffer.empty[String]
     var i = 0
