@@ -85,8 +85,10 @@ class BPEVocabularyGenerator protected (
     // We first generate the merge pairs, if necessary.
     val mergePairsFile = vocabDir / mergePairsFilename(language)
     if (mergePairsFile.exists) {
+      BPEVocabularyGenerator.logger.info(s"Loading existing BPE coding for $language: $mergePairsFile.")
       initializeMergePairs(language, vocabDir)
     } else {
+      BPEVocabularyGenerator.logger.info(s"Learning BPE coding for $language.")
       mergePairsFile.parent.createDirectories()
       val mergePairsWriter = new BufferedWriter(
         mergePairsFile.newPrintWriter()(Seq(
@@ -116,10 +118,16 @@ class BPEVocabularyGenerator protected (
 
       var continue = true
       var currentSymbol = 0
+      var progressLogTime = System.currentTimeMillis
 
       while (currentSymbol < numSymbols && continue) {
-        if (currentSymbol % 100 == 0)
-          BPEVocabularyGenerator.logger.info("Symbol: " + currentSymbol)
+        val time = System.currentTimeMillis
+        if (time - progressLogTime >= 6e4) {
+          val numBars = Math.floorDiv(10 * currentSymbol, numSymbols)
+          BPEVocabularyGenerator.logger.info(
+            s"│${"═" * numBars}${" " * (10 - numBars)}│ $currentSymbol / $numSymbols BPE symbols processed.")
+          progressLogTime = time
+        }
         var mostFrequent = if (counts.nonEmpty) counts.maxBy(_._2) else null
         if (counts.isEmpty || (currentSymbol > 0 && mostFrequent._2 < threshold)) {
           BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
@@ -152,15 +160,20 @@ class BPEVocabularyGenerator protected (
 
       mergePairsWriter.flush()
       mergePairsWriter.close()
+
+      BPEVocabularyGenerator.logger.info(s"│${"═" * 10}│ $currentSymbol / $numSymbols BPE symbols processed.")
+      BPEVocabularyGenerator.logger.info(s"Learned BPE coding for $language: $mergePairsFile.")
     }
 
     // We then generate the vocabulary, if necessary.
     val vocabFile = vocabDir / filename(language)
     val vocabWriter = {
       if (vocabFile.exists) {
+        BPEVocabularyGenerator.logger.info(s"Vocabulary file for $language already exists: $vocabFile.")
         initializeVocabularies(language, vocabDir)
         None
       } else {
+        BPEVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
         vocabFile.parent.createDirectories()
         Some(new BufferedWriter(
           vocabFile.newPrintWriter()(Seq(
@@ -177,7 +190,9 @@ class BPEVocabularyGenerator protected (
     val tokens = tokenizedFiles.toStream.flatMap(mutableFile => {
       val oldFile = mutableFile.get
       val file = oldFile.sibling(s"${oldFile.nameWithoutExtension}.bpe.$numSymbols.${language.abbreviation}")
+      mutableFile.set(file)
       if (file.notExists || vocabWriter.isDefined) {
+        BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
         val fileWriter = new BufferedWriter(
           file.newPrintWriter()(Seq(
             StandardOpenOption.CREATE,
@@ -193,7 +208,6 @@ class BPEVocabularyGenerator protected (
               sentence
             })
         fileWriters += fileWriter
-        mutableFile.set(file)
         tokens
       } else {
         Seq.empty
@@ -212,6 +226,7 @@ class BPEVocabularyGenerator protected (
           })
       writer.flush()
       writer.close()
+      BPEVocabularyGenerator.logger.info(s"Generated vocabulary file for $language.")
     })
 
     fileWriters.foreach(fileWriter => {
@@ -219,19 +234,9 @@ class BPEVocabularyGenerator protected (
       fileWriter.close()
     })
 
-    vocabFile
-  }
+    BPEVocabularyGenerator.logger.info(s"Applied BPE coding to all provided files for $language.")
 
-  /** Initializes the state of this vocabulary generator for the specified language.
-    *
-    * This method is useful if `generate()` is not called (if, for example, the vocabulary file already exists).
-    *
-    * @param  language Language for which a vocabulary has been generated.
-    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
-    */
-  override def initialize(language: Language, vocabDir: File): Unit = {
-    initializeMergePairs(language, vocabDir)
-    initializeVocabularies(language, vocabDir)
+    vocabFile
   }
 
   /** Initializes the merge pairs of this BPE generators from an existing file.

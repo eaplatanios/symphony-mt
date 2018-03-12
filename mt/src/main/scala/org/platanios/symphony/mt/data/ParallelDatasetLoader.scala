@@ -139,11 +139,12 @@ object ParallelDatasetLoader {
           val time = System.currentTimeMillis
           if (time - progressLogTime >= 1e4) {
             val numBars = Math.floorDiv(10 * progress, contentLength).toInt
-            logger.info(s"[${"=" * numBars}${" " * (10 - numBars)}] $progress / $contentLength bytes downloaded.")
+            logger.info(s"│${"═" * numBars}${" " * (10 - numBars)}│ $progress / $contentLength bytes downloaded.")
             progressLogTime = time
           }
         })
         outputStream.close()
+        logger.info(s"│${"═" * 10}│ $progress / $contentLength bytes downloaded.")
         logger.info(s"Downloaded file '$url'.")
         true
       } catch {
@@ -228,14 +229,7 @@ object ParallelDatasetLoader {
                 case (loader, f) if loader.tgtLanguage == l => f._2
                 case _ => Seq.empty
               }
-              val vocabFile = vocabDir / vocabFilename
-              if (vocabFile.notExists) {
-                ParallelDatasetLoader.logger.info(s"Generating vocabulary file for $l.")
-                generator.generate(l, tokenizedFiles, vocabDir)
-                ParallelDatasetLoader.logger.info(s"Generated vocabulary file for $l.")
-              } else {
-                generator.initialize(l, vocabDir)
-              }
+              generator.generate(l, tokenizedFiles, vocabDir)
               generator.getVocabulary(l, vocabDir)
             }
           case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)

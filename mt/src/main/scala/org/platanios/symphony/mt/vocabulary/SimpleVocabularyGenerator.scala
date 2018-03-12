@@ -19,6 +19,8 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.utilities.{MutableFile, TrieWordCounter}
 
 import better.files.File
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
 import java.io.BufferedWriter
 import java.nio.charset.StandardCharsets
@@ -67,30 +69,38 @@ class SimpleVocabularyGenerator protected (
     */
   override def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
     val vocabFile = vocabDir / filename(language)
-    vocabFile.parent.createDirectories()
-    val whitespaceRegex = "\\s+".r
-    val writer = new BufferedWriter(
-      vocabFile.newPrintWriter()(Seq(
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-    tokenizedFiles.map(_.get).toStream.flatMap(file => {
-      Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
-          .getLines
-          .flatMap(whitespaceRegex.split)
-    }).foldLeft(TrieWordCounter())((counter, word) => {
-      counter.insertWord(word)
-      counter
-    }).words(sizeThreshold, countThreshold)
-        .toSeq.sortBy(-_._1).map(_._2)
-        .foreach(word => writer.write(word + "\n"))
-    writer.flush()
-    writer.close()
+    if (vocabFile.notExists) {
+      SimpleVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
+      vocabFile.parent.createDirectories()
+      val whitespaceRegex = "\\s+".r
+      val writer = new BufferedWriter(
+        vocabFile.newPrintWriter()(Seq(
+          StandardOpenOption.CREATE,
+          StandardOpenOption.WRITE,
+          StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
+      tokenizedFiles.map(_.get).toStream.flatMap(file => {
+        Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
+            .getLines
+            .flatMap(whitespaceRegex.split)
+      }).foldLeft(TrieWordCounter())((counter, word) => {
+        counter.insertWord(word)
+        counter
+      }).words(sizeThreshold, countThreshold)
+          .toSeq.sortBy(-_._1).map(_._2)
+          .foreach(word => writer.write(word + "\n"))
+      writer.flush()
+      writer.close()
+      SimpleVocabularyGenerator.logger.info(s"Generated vocabulary file for $language.")
+    } else {
+      SimpleVocabularyGenerator.logger.info(s"Vocabulary file for $language already exists: $vocabFile.")
+    }
     vocabFile
   }
 }
 
 object SimpleVocabularyGenerator {
+  private[SimpleVocabularyGenerator] val logger = Logger(LoggerFactory.getLogger("Vocabulary / Simple Generator"))
+
   def apply(
       sizeThreshold: Int = -1,
       countThreshold: Int = -1,

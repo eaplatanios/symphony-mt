@@ -44,15 +44,6 @@ trait VocabularyGenerator {
     */
   def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File
 
-  /** Initializes the state of this vocabulary generator for the specified language.
-    *
-    * This method is useful if `generate()` is not called (if, for example, the vocabulary file already exists).
-    *
-    * @param  language Language for which a vocabulary has been generated.
-    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
-    */
-  def initialize(language: Language, vocabDir: File): Unit = ()
-
   /** Returns a vocabulary for the specified language, ready to be used by machine translation models.
     *
     * @param  language Language for which to return a vocabulary.

@@ -19,6 +19,8 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.utilities.MutableFile
 
 import better.files.File
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
 import java.io.BufferedWriter
 import java.nio.file.StandardOpenOption
@@ -52,20 +54,28 @@ class DummyVocabularyGenerator protected (
     */
   def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
     val vocabFile = vocabDir / filename(language)
-    vocabFile.parent.createDirectories()
-    val writer = new BufferedWriter(
-      vocabFile.newPrintWriter()(Seq(
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-    (0 until size).foreach(wordId => writer.write(wordId + "\n"))
-    writer.flush()
-    writer.close()
+    if (vocabFile.notExists) {
+      DummyVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
+      vocabFile.parent.createDirectories()
+      val writer = new BufferedWriter(
+        vocabFile.newPrintWriter()(Seq(
+          StandardOpenOption.CREATE,
+          StandardOpenOption.WRITE,
+          StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
+      (0 until size).foreach(wordId => writer.write(wordId + "\n"))
+      writer.flush()
+      writer.close()
+      DummyVocabularyGenerator.logger.info(s"Generated vocabulary file for $language.")
+    } else {
+      DummyVocabularyGenerator.logger.info(s"Vocabulary file for $language already exists: $vocabFile.")
+    }
     vocabFile
   }
 }
 
 object DummyVocabularyGenerator {
+  private[DummyVocabularyGenerator] val logger = Logger(LoggerFactory.getLogger("Vocabulary / Dummy Generator"))
+
   def apply(size: Int, bufferSize: Int = 8192): DummyVocabularyGenerator = {
     new DummyVocabularyGenerator(size, bufferSize)
   }
