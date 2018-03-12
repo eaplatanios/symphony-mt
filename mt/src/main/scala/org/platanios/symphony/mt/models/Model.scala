@@ -22,6 +22,7 @@ import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.config.TensorBoardConfig
 import org.platanios.tensorflow.api.core.client.SessionConfig
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
@@ -97,6 +98,9 @@ abstract class Model[S] protected (
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
+    if (logConfig.launchTensorBoard)
+      hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
+        summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
 
     // Create estimator.
     tf.learn.InMemoryEstimator(
@@ -295,7 +299,7 @@ abstract class Model[S] protected (
 }
 
 object Model {
-  class Config protected (
+  class Config protected(
       val env: Environment,
       val parameterManager: ParameterManager,
       val deviceManager: DeviceManager,
@@ -318,7 +322,7 @@ object Model {
     }
   }
 
-  class OptConfig protected (
+  class OptConfig protected(
       val maxGradNorm: Float,
       val optimizer: Optimizer,
       val colocateGradientsWithOps: Boolean)
@@ -333,18 +337,22 @@ object Model {
     }
   }
 
-  class LogConfig protected (
+  class LogConfig protected(
       val logLossSteps: Int,
       val logEvalBatchSize: Int,
-      val logEvalSteps: Int)
+      val logEvalSteps: Int,
+      val launchTensorBoard: Boolean,
+      val tensorBoardConfig: (String, Int))
 
   object LogConfig {
     def apply(
         logLossSteps: Int = 100,
         logEvalBatchSize: Int = 512,
-        logEvalSteps: Int = 1000
+        logEvalSteps: Int = 1000,
+        launchTensorBoard: Boolean = false,
+        tensorBoardConfig: (String, Int) = ("localhost", 6006),
     ): LogConfig = {
-      new LogConfig(logLossSteps, logEvalBatchSize, logEvalSteps)
+      new LogConfig(logLossSteps, logEvalBatchSize, logEvalSteps, launchTensorBoard, tensorBoardConfig)
     }
   }
 }
