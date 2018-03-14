@@ -139,12 +139,12 @@ class PriorityCounter[A] extends scala.Cloneable {
   @throws[NoSuchElementException]
   def dequeueMax(): (Long, A) = {
     if (internalArray.p_size0 > 1) {
-      internalArray.p_size0 = internalArray.p_size0 - 1
+      internalArray.p_size0 -= 1
       val result = cast(internalArray.p_array(1))
       locations -= result._2
       val last = internalArray.p_array(internalArray.p_size0)
       internalArray.p_array(1) = last
-      internalArray.p_array(internalArray.p_size0) = null // erase reference from array
+      internalArray.p_array(internalArray.p_size0) = null
       val castedLast = cast(last)
       locations.update(castedLast._2, 1)
       fixDown(1, internalArray.p_size0 - 1)
