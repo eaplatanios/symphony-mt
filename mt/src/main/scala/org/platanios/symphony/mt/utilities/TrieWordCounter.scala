@@ -60,12 +60,13 @@ object TrieWordCounter {
     def children: Seq[(Long, TrieNode)] = _children.toSeq
 
     def words: Iterable[(Long, String)] = {
-      (count, "") +: children.flatMap {
+      val words = (count, "") +: children.flatMap {
         case (char, childNode) =>
           childNode.words.map {
             case (count, word) => (count, char.toChar + word)
           }
       }
+      words.filter(_._1 > 0)
     }
   }
 }

@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.vocabulary
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.utilities.{MutableFile, TrieWordCounter}
+import org.platanios.symphony.mt.utilities.{MutableFile, PriorityCounter, TrieWordCounter}
 
 import better.files.File
 import com.typesafe.scalalogging.Logger
@@ -117,12 +117,8 @@ class BPEVocabularyGenerator protected (
       })).toSeq: _*)
 
       val pairStatistics = BPEVocabularyGenerator.computePairStatistics(tokens)
-      val fullCounts = pairStatistics.counts
+      val counts = pairStatistics.counts
       val indices = pairStatistics.indices
-
-      // Threshold is inspired by a Zipfian assumption, but it should only affect speed
-      var threshold = fullCounts.values.max / 10
-      var counts = mutable.Map(fullCounts.seq.toSeq: _*).withDefaultValue(0L)
 
       var continue = true
       var currentSymbol = 0
@@ -130,36 +126,28 @@ class BPEVocabularyGenerator protected (
 
       while (currentSymbol < numSymbols && continue) {
         val time = System.currentTimeMillis
-        if (time - progressLogTime >= 6e4) {
+        if (time - progressLogTime >= 1e4) {
           val numBars = Math.floorDiv(10 * currentSymbol, numSymbols)
           BPEVocabularyGenerator.logger.info(
             s"│${"═" * numBars}${" " * (10 - numBars)}│ " +
                 s"%${numSymbols.toString.length}s / $numSymbols BPE symbols processed.".format(currentSymbol))
           progressLogTime = time
         }
-        var mostFrequent = if (counts.nonEmpty) counts.maxBy(_._2) else null
-        if (counts.isEmpty || (currentSymbol > 0 && mostFrequent._2 < threshold)) {
-          BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
-          counts = mutable.Map(fullCounts.seq.toSeq: _*).withDefaultValue(0L)
-          mostFrequent = counts.maxBy(_._2)
-          threshold = (mostFrequent._2 * currentSymbol / (currentSymbol + 10000f)).toLong
-          BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
-        }
 
-        if (mostFrequent._2 < countThreshold) {
+        val mostFrequent = if (counts.nonEmpty) counts.dequeueMax() else null
+
+        if (mostFrequent._1 < countThreshold) {
           BPEVocabularyGenerator.logger.info(
             s"No pair has frequency higher than $countThreshold. Stopping the byte pair encoding (BPE) iteration.")
           continue = false
         } else {
-          if (!mergePairs(language).contains(mostFrequent._1)) {
-            mergePairs(language) += mostFrequent._1 -> currentSymbol
-            reversedMergePairs(language) += mostFrequent._1._1 + mostFrequent._1._2 -> mostFrequent._1
-            mergePairsWriter.write(s"${mostFrequent._1._1}\t${mostFrequent._1._2}\n")
+          if (!mergePairs(language).contains(mostFrequent._2)) {
+            mergePairs(language) += mostFrequent._2 -> currentSymbol
+            reversedMergePairs(language) += mostFrequent._2._1 + mostFrequent._2._2 -> mostFrequent._2
+            mergePairsWriter.write(s"${mostFrequent._2._1}\t${mostFrequent._2._2}\n")
           }
-          val changes = BPEVocabularyGenerator.replacePair(mostFrequent._1, tokens, indices)
-          BPEVocabularyGenerator.updatePairStatistics(mostFrequent._1, changes, counts, indices)
-          if (currentSymbol % 100 == 0)
-            BPEVocabularyGenerator.pruneCounts(counts, fullCounts, threshold)
+          val changes = BPEVocabularyGenerator.replacePair(mostFrequent._2, tokens, indices)
+          BPEVocabularyGenerator.updatePairStatistics(mostFrequent._2, changes, counts, indices)
         }
 
         currentSymbol += 1
@@ -233,7 +221,7 @@ class BPEVocabularyGenerator protected (
         counter.insertWord(word)
         counter
       }).words()
-          .map(_._2).filter(_ != "").toSet[String]
+          .map(_._2)
           .foreach(word => {
             vocabularies(language) += word
             writer.write(word + "\n")
@@ -438,7 +426,7 @@ object BPEVocabularyGenerator {
   private[BPEVocabularyGenerator] val whitespaceRegex: Regex = "\\s+".r
 
   private[BPEVocabularyGenerator] case class PairStatistics(
-      counts: mutable.Map[(String, String), Long],
+      counts: PriorityCounter[(String, String)],
       indices: ParMap[(String, String), mutable.LongMap[Long]])
 
   private[BPEVocabularyGenerator] case class Change(
@@ -469,46 +457,17 @@ object BPEVocabularyGenerator {
   private[BPEVocabularyGenerator] def computePairStatistics(
       words: Seq[(Long, Seq[String])]
   ): PairStatistics = {
-    val counts = mutable.Map.empty[(String, String), Long].withDefaultValue(0)
+    val counts = PriorityCounter[(String, String)]()
     val indices = ParMap.empty[(String, String), mutable.LongMap[Long]]
     words.zipWithIndex.filter(_._1._2.length > 1).foreach {
       case ((count, symbols), index) =>
         symbols.sliding(2).foreach(s => {
           val pair = (s(0), s(1))
-          counts.update(pair, counts(pair) + count)
+          counts.add(pair, count)
           updateIndices(indices, pair, index, 1)
         })
     }
     PairStatistics(counts, indices)
-  }
-
-  /** Prunes the pair counts map for improved efficiency.
-    *
-    * The frequency of a symbol pair never increases, so pruning is generally safe (until the most frequent pair is less
-    * frequent than a pair that was previously pruned).
-    *
-    * @param  counts     Symbol counts map to be pruned.
-    * @param  fullCounts Map that keeps counts information for when we need to access pruned symbol counts. Note that
-    *                    this map may be modified by this method.
-    * @param  threshold  Symbol count threshold to use while pruning.
-    * @return Pruned symbol counts map.
-    */
-  private[BPEVocabularyGenerator] def pruneCounts(
-      counts: mutable.Map[(String, String), Long],
-      fullCounts: mutable.Map[(String, String), Long],
-      threshold: Long
-  ): Unit = {
-    counts.retain {
-      case (pair, count) =>
-        val keep = count >= threshold
-        if (!keep) {
-          if (count < 0)
-            fullCounts.put(pair, fullCounts(pair) + count)
-          else
-            fullCounts.put(pair, count)
-        }
-        keep
-    }
   }
 
   /** Replaces all occurrences of the provided symbol pair in `words` with the joined symbol.
@@ -558,12 +517,13 @@ object BPEVocabularyGenerator {
   private[BPEVocabularyGenerator] def updatePairStatistics(
       pair: (String, String),
       changes: Seq[Change],
-      counts: mutable.Map[(String, String), Long],
+      counts: PriorityCounter[(String, String)],
       indices: ParMap[(String, String), mutable.LongMap[Long]]
   ): Unit = {
     val joinedPair = pair._1 + pair._2
 
-    counts -= pair
+    // TODO: counts -= pair
+    counts.update(pair, 0)
     indices(pair).clear()
     changes.foreach(change => {
       // Find all instances of the pair, and update the corresponding statistics.
@@ -574,7 +534,7 @@ object BPEVocabularyGenerator {
             // Assuming a symbol sequence "A B C", if "B C" is merged, we reduce the frequency of "A B".
             if (i > 0) {
               val prevPair = (change.word(i - 1), change.word(i))
-              counts.update(prevPair, counts(prevPair) - change.count)
+              counts.add(prevPair, -change.count)
               updateIndices(indices, prevPair, change.index, -1)
             }
             // Assuming a symbol sequence "A B C B", if "B C" is merged, we reduce the frequency of "C B". However, we
@@ -583,7 +543,7 @@ object BPEVocabularyGenerator {
             if (i < change.word.length - 2 &&
                 (change.word(i + 2) != pair._1 || i >= change.word.length - 3 || change.word(i + 3) != pair._2)) {
               val nextPair = (change.word(i + 1), change.word(i + 2))
-              counts.update(nextPair, counts(nextPair) - change.count)
+              counts.add(nextPair, -change.count)
               updateIndices(indices, nextPair, change.index, -1)
             }
             i += 2
@@ -599,7 +559,7 @@ object BPEVocabularyGenerator {
             // Assuming a symbol sequence "A BC D", if "B C" is merged, we increase the frequency of "A BC".
             if (i > 0) {
               val prevPair = (change.newWord(i - 1), change.newWord(i))
-              counts.update(prevPair, counts(prevPair) + change.count)
+              counts.add(prevPair, change.count)
               updateIndices(indices, prevPair, change.index, 1)
             }
             // Assuming a symbol sequence "A BC B", if "B C" is merged, we increase the frequency of "BC B". However, we
@@ -607,7 +567,7 @@ object BPEVocabularyGenerator {
             // by the previous code block.
             if (i < change.newWord.length - 1 && change.newWord(i + 1) != joinedPair) {
               val nextPair = (change.newWord(i), change.newWord(i + 1))
-              counts.update(nextPair, counts(nextPair) + change.count)
+              counts.add(nextPair, change.count)
               updateIndices(indices, nextPair, change.index, -1)
             }
             i += 1

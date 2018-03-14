@@ -88,7 +88,7 @@ class SimpleVocabularyGenerator protected (
         counter.insertWord(word)
         counter
       }).words(sizeThreshold, countThreshold)
-          .map(_._2).filter(_ != "").toSet[String]
+          .map(_._2)
           .foreach(word => writer.write(word + "\n"))
       writer.flush()
       writer.close()
