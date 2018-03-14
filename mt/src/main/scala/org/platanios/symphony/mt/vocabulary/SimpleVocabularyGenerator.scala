@@ -80,7 +80,7 @@ class SimpleVocabularyGenerator protected (
           StandardOpenOption.CREATE,
           StandardOpenOption.WRITE,
           StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
-      tokenizedFiles.map(_.get).toStream.flatMap(file => {
+      tokenizedFiles.map(_.get).toIterator.flatMap(file => {
         Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
             .getLines
             .flatMap(whitespaceRegex.split)
@@ -88,7 +88,7 @@ class SimpleVocabularyGenerator protected (
         counter.insertWord(word)
         counter
       }).words(sizeThreshold, countThreshold)
-          .toSeq.sortBy(-_._1).map(_._2)
+          .map(_._2).filter(_ != "").toSet[String]
           .foreach(word => writer.write(word + "\n"))
       writer.flush()
       writer.close()

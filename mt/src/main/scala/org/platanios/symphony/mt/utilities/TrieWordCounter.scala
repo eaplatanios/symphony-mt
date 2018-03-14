@@ -28,7 +28,7 @@ case class TrieWordCounter() {
 
   def insertWord(word: String): Long = {
     var currentNode = rootNode
-    for (char <- word.toCharArray)
+    for (char <- word)
       currentNode = currentNode.child(char)
     currentNode.incrementCount()
   }
@@ -59,17 +59,13 @@ object TrieWordCounter {
     def child(char: Long): TrieNode = _children.getOrElseUpdate(char, TrieNode())
     def children: Seq[(Long, TrieNode)] = _children.toSeq
 
-    def words: Stream[(Long, String)] = {
-      var words = Stream.empty[(Long, String)]
-      if (count > 0)
-        words = words.append(Seq((count, "")))
-      children.foreach {
+    def words: Iterable[(Long, String)] = {
+      (count, "") +: children.flatMap {
         case (char, childNode) =>
-          words = words.append(childNode.words.map {
+          childNode.words.map {
             case (count, word) => (count, char.toChar + word)
-          })
+          }
       }
-      words
     }
   }
 }

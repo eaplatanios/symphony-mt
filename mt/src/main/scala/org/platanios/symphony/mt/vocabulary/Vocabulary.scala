@@ -196,7 +196,7 @@ object Vocabulary {
             tokens(1) != beginOfSequenceToken ||
             tokens(2) != endOfSequenceToken) {
           logger.info(
-            s"The first 4 vocabulary tokens [${tokens(0)}, ${tokens(1)}, ${tokens(2)}] " +
+            s"The first 3 vocabulary tokens [${tokens(0)}, ${tokens(1)}, ${tokens(2)}] " +
                 s"are not equal to [$unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
           tokens.prepend(unknownToken, beginOfSequenceToken, endOfSequenceToken)
           val newFile = if (directory != null) directory.sibling(file.name) else file
