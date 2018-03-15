@@ -22,7 +22,6 @@ import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.models.{ParameterManager, Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
-
 import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
@@ -47,16 +46,17 @@ object IWSLT15 extends App {
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
-    numGPUs = 0,
+    numGPUs = 1,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
 
   val optConfig = Model.OptConfig(
-    maxGradNorm = 5.0f,
-    optimizer = tf.train.GradientDescent(
-      1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
-      learningRateSummaryTag = "LearningRate"))
+    maxGradNorm = 100.0f,
+    optimizer = tf.train.AMSGrad(learningRateSummaryTag = "LearningRate"))
+    // optimizer = tf.train.GradientDescent(
+    //   1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
+    //   learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(
     logLossSteps = 100,
@@ -69,26 +69,26 @@ object IWSLT15 extends App {
     config = RNNModel.Config(
       env,
       ParameterManager(
-        wordEmbeddingsSize = 32,
+        wordEmbeddingsSize = 512,
         tf.VarianceScalingInitializer(
           1.0f,
           tf.VarianceScalingInitializer.FanAverageScalingMode,
           tf.VarianceScalingInitializer.UniformDistribution)),
       BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 32,
+        numUnits = 512,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 32,
+        numUnits = 512,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f),
         attention = Some(LuongRNNAttention(scaled = true)),
         outputAttention = true),
-      labelSmoothing = 0.0f,
+      labelSmoothing = 0.1f,
       timeMajor = true,
       beamWidth = 10),
     optConfig = optConfig,

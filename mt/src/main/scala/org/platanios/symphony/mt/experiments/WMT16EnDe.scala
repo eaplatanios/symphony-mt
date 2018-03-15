@@ -38,7 +38,7 @@ object WMT16EnDe extends App {
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
-    loaderSentenceLengthBounds = Some((1, 80)),
+    // loaderSentenceLengthBounds = Some((1, 80)),
     numBuckets = 5,
     srcMaxLength = 50,
     tgtMaxLength = 50)
@@ -54,7 +54,7 @@ object WMT16EnDe extends App {
 
   val optConfig = Model.OptConfig(
     maxGradNorm = 100.0f,
-    optimizer = tf.train.AMSGrad())
+    optimizer = tf.train.AMSGrad(learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(logLossSteps = 100)
 

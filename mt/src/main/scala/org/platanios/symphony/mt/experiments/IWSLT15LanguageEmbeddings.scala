@@ -52,10 +52,8 @@ object IWSLT15LanguageEmbeddings extends App {
     randomSeed = Some(10))
 
   val optConfig = Model.OptConfig(
-    maxGradNorm = 5.0f,
-    optimizer = tf.train.GradientDescent(
-      1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
-      learningRateSummaryTag = "LearningRate"))
+    maxGradNorm = 100.0f,
+    optimizer = tf.train.AMSGrad(learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(logLossSteps = 100)
 
@@ -82,15 +80,15 @@ object IWSLT15LanguageEmbeddings extends App {
         dropout = Some(0.2f),
         attention = Some(LuongRNNAttention(scaled = true)),
         outputAttention = true),
-      labelSmoothing = 0.0f,
+      labelSmoothing = 0.1f,
       timeMajor = true,
       beamWidth = 10),
     optConfig = optConfig,
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
     evalDatasets = Seq(
-      ("IWSLT15", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
-      ("IWSLT15", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
+      ("IWSLT15/dev", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
+      ("IWSLT15/test", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
   model.train(dataset.filterTypes(Train), tf.learn.StopCriteria.steps(12000))
 

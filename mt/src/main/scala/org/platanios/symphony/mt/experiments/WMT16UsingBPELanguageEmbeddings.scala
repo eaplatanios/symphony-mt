@@ -41,10 +41,10 @@ object WMT16UsingBPELanguageEmbeddings extends App {
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
     // loaderSentenceLengthBounds = Some((1, 80)),
-    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000, replaceExisting = true)),
+    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000)),
     numBuckets = 5,
-    srcMaxLength = 80,
-    tgtMaxLength = 80)
+    srcMaxLength = 50,
+    tgtMaxLength = 50)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
     loadDatasets(languagePairs.toSeq.map(l => WMT16DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))
@@ -58,8 +58,8 @@ object WMT16UsingBPELanguageEmbeddings extends App {
     randomSeed = Some(10))
 
   val optConfig = Model.OptConfig(
-    maxGradNorm = 10.0f,
-    optimizer = tf.train.Adam(learningRateSummaryTag = "LearningRate"))
+    maxGradNorm = 100.0f,
+    optimizer = tf.train.AMSGrad(learningRateSummaryTag = "LearningRate"))
   // optimizer = tf.train.GradientDescent(
   //   1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 340000 * 1 / (2 * 10), startStep = 340000 / 2),
   //   learningRateSummaryTag = "LearningRate"))

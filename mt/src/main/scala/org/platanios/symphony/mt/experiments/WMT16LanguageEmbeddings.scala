@@ -52,14 +52,14 @@ object WMT16LanguageEmbeddings extends App {
 
   val env = Environment(
     workingDir = workingDir,
-    numGPUs = 4,
+    numGPUs = 1,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
 
   val optConfig = Model.OptConfig(
-    // maxGradNorm = 5.0f,
-    optimizer = tf.train.Adam(learningRateSummaryTag = "LearningRate"))
+    maxGradNorm = 100.0f,
+    optimizer = tf.train.AMSGrad(learningRateSummaryTag = "LearningRate"))
     // optimizer = tf.train.GradientDescent(
     //   1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 340000 * 1 / (2 * 10), startStep = 340000 / 2),
     //   learningRateSummaryTag = "LearningRate"))
@@ -114,9 +114,9 @@ object WMT16LanguageEmbeddings extends App {
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
     evalDatasets = datasets.flatMap(d => Seq(
-      ("WMT16/newstest2013", d.filterKeys("newstest2013")),
-      ("WMT16/newstest2014", d.filterKeys("newstest2014")),
-      ("WMT16/newstest2015", d.filterKeys("newstest2015")),
+      // ("WMT16/newstest2013", d.filterKeys("newstest2013")),
+      // ("WMT16/newstest2014", d.filterKeys("newstest2014")),
+      // ("WMT16/newstest2015", d.filterKeys("newstest2015")),
       ("WMT16/newstest2016", d.filterKeys("newstest2016")))
     ))
 

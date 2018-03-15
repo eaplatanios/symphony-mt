@@ -47,16 +47,14 @@ object IWSLT15UsingBPE extends App {
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
-    numGPUs = 0,
+    numGPUs = 1,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
 
   val optConfig = Model.OptConfig(
-    maxGradNorm = 5.0f,
-    optimizer = tf.train.GradientDescent(
-      1.0f, tf.train.ExponentialDecay(decayRate = 0.5f, decaySteps = 12000 * 1 / (3 * 4), startStep = 12000 * 2 / 3),
-      learningRateSummaryTag = "LearningRate"))
+    maxGradNorm = 100.0f,
+    optimizer = tf.train.AMSGrad(learningRateSummaryTag = "LearningRate"))
 
   val logConfig = Model.LogConfig(logLossSteps = 100)
 
@@ -86,7 +84,7 @@ object IWSLT15UsingBPE extends App {
         dropout = Some(0.2f),
         attention = Some(LuongRNNAttention(scaled = true)),
         outputAttention = true),
-      labelSmoothing = 0.0f,
+      labelSmoothing = 0.1f,
       timeMajor = true,
       beamWidth = 10),
     optConfig = optConfig,
