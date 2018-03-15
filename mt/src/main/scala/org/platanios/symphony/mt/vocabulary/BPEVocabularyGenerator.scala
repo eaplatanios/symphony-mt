@@ -187,7 +187,7 @@ class BPEVocabularyGenerator protected (
       val file = oldFile.sibling(
         s"${oldFile.nameWithoutExtension(includeAll = false)}.bpe.$numSymbols.${language.abbreviation}")
       mutableFile.set(file)
-      if (replaceExisting || file.notExists || vocabWriter.isDefined) {
+      if (replaceExisting || file.notExists) {
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
         val fileWriter = {
           if (replaceExisting || file.notExists) {
@@ -211,6 +211,10 @@ class BPEVocabularyGenerator protected (
             })
         fileWriter.foreach(fileWriters :+= _)
         tokens
+      } else if (vocabWriter.isDefined) {
+        Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
+            .getLines
+            .flatMap(line => BPEVocabularyGenerator.whitespaceRegex.split(line))
       } else {
         Seq.empty
       }
@@ -222,6 +226,7 @@ class BPEVocabularyGenerator protected (
         counter
       }).words()
           .map(_._2)
+          .toSet[String]
           .foreach(word => {
             vocabularies(language) += word
             writer.write(word + "\n")
