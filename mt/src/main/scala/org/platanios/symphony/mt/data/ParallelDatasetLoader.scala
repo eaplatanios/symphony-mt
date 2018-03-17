@@ -29,6 +29,8 @@ import java.nio.file.Path
 
 import scala.collection.mutable
 
+// TODO: [DATA] Placed processed files in a different directory.
+
 /** Parallel dataset used for machine translation experiments.
   *
   * @author Emmanouil Antonios Platanios

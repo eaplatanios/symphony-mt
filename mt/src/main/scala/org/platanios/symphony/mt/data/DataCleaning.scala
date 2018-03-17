@@ -19,6 +19,8 @@ import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
+import java.nio.charset.StandardCharsets
+
 import scala.util.matching.Regex
 
 /**
@@ -103,6 +105,10 @@ class MosesDataCleaning protected (
         src = src.toLowerCase
         tgt = tgt.toLowerCase
       }
+
+      // Remove non-UTF8 characters.
+      src = StandardCharsets.UTF_8.decode(StandardCharsets.UTF_8.encode(src)).toString
+      tgt = StandardCharsets.UTF_8.decode(StandardCharsets.UTF_8.encode(tgt)).toString
 
       Some((src, tgt))
     }

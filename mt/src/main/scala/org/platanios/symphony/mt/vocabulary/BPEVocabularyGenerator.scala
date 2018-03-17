@@ -24,7 +24,6 @@ import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
 import java.io.BufferedWriter
-import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable
 import scala.collection.parallel.mutable.ParMap
@@ -182,13 +181,7 @@ class BPEVocabularyGenerator protected (
       mutableFile.set(file)
       if (replaceExisting || file.notExists) {
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
-        val fileWriter = {
-          if (replaceExisting || file.notExists) {
-            Some(newWriter(file))
-          } else {
-            None
-          }
-        }
+        val fileWriter = if (replaceExisting || file.notExists) Some(newWriter(file)) else None
         val cache = mutable.Map.empty[String, Seq[String]]
         val tokens = newReader(oldFile).lines().toAutoClosedIterator
             .filter(_.length > 0)
@@ -197,11 +190,10 @@ class BPEVocabularyGenerator protected (
               sentence = encodeSentence(language, sentence, cache).toArray
               if (sentence.nonEmpty)
                 fileWriter.foreach(_.write(s"${sentence.mkString(" ")}\n"))
-              if (replaceExisting || vocabWriter.isDefined) {
+              if (replaceExisting || vocabWriter.isDefined)
                 sentence
-              } else {
+              else
                 Seq.empty
-              }
             })
         fileWriter.foreach(fileWriters :+= _)
         tokens
