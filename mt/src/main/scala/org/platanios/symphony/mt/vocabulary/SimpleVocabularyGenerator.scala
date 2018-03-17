@@ -16,17 +16,12 @@
 package org.platanios.symphony.mt.vocabulary
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.data.{newReader, newWriter}
 import org.platanios.symphony.mt.utilities.{MutableFile, TrieWordCounter}
 
 import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
-
-import java.io.{BufferedWriter, OutputStreamWriter}
-import java.nio.charset.StandardCharsets
-import java.nio.file.StandardOpenOption
-
-import scala.io.Source
 
 /** Simple vocabulary generator that generates a vocabulary by simply splitting the input text files on spaces.
   *
@@ -75,16 +70,9 @@ class SimpleVocabularyGenerator protected (
       SimpleVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
       vocabFile.parent.createDirectories()
       val whitespaceRegex = "\\s+".r
-      val writer = new BufferedWriter(
-        new OutputStreamWriter(
-          vocabFile.newOutputStream(Seq(
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING)),
-          StandardCharsets.UTF_8))
+      val writer = newWriter(vocabFile)
       tokenizedFiles.map(_.get).toIterator.flatMap(file => {
-        Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
-            .getLines
+        newReader(file).lines().toAutoClosedIterator
             .flatMap(whitespaceRegex.split)
       }).foldLeft(TrieWordCounter())((counter, word) => {
         counter.insertWord(word.trim)

@@ -16,19 +16,18 @@
 package org.platanios.symphony.mt.vocabulary
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.data.{newReader, newWriter}
 import org.platanios.symphony.mt.utilities.{MutableFile, PriorityCounter, TrieWordCounter}
 
-import better.files.File
+import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.{BufferedWriter, OutputStreamWriter}
+import java.io.BufferedWriter
 import java.nio.charset.StandardCharsets
-import java.nio.file.StandardOpenOption
 
 import scala.collection.mutable
 import scala.collection.parallel.mutable.ParMap
-import scala.io.Source
 import scala.util.matching.Regex
 
 // TODO: Support shared BPE subword units across languages.
@@ -101,16 +100,9 @@ class BPEVocabularyGenerator protected (
     } else {
       BPEVocabularyGenerator.logger.info(s"Learning BPE coding for $language.")
       mergePairsFile.parent.createDirectories()
-      val mergePairsWriter = new BufferedWriter(
-        new OutputStreamWriter(
-          mergePairsFile.newOutputStream(Seq(
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING)),
-          StandardCharsets.UTF_8))
+      val mergePairsWriter = newWriter(mergePairsFile)
       val tokens = mutable.ArrayBuffer(tokenizedFiles.map(_.get).toIterator.flatMap(file => {
-        Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
-            .getLines
+        newReader(file).lines().toAutoClosedIterator
             .flatMap(BPEVocabularyGenerator.whitespaceRegex.split)
       }).foldLeft(TrieWordCounter())((counter, word) => {
         counter.insertWord(word)
@@ -176,13 +168,7 @@ class BPEVocabularyGenerator protected (
       } else {
         BPEVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
         vocabFile.parent.createDirectories()
-        Some(new BufferedWriter(
-          new OutputStreamWriter(
-            vocabFile.newOutputStream(Seq(
-              StandardOpenOption.CREATE,
-              StandardOpenOption.WRITE,
-              StandardOpenOption.TRUNCATE_EXISTING)),
-            StandardCharsets.UTF_8)))
+        Some(newWriter(vocabFile))
       }
     }
 
@@ -198,20 +184,13 @@ class BPEVocabularyGenerator protected (
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
         val fileWriter = {
           if (replaceExisting || file.notExists) {
-            Some(new BufferedWriter(
-              new OutputStreamWriter(
-                file.newOutputStream(Seq(
-                  StandardOpenOption.CREATE,
-                  StandardOpenOption.WRITE,
-                  StandardOpenOption.TRUNCATE_EXISTING)),
-                StandardCharsets.UTF_8)))
+            Some(newWriter(file))
           } else {
             None
           }
         }
         val cache = mutable.Map.empty[String, Seq[String]]
-        val tokens = Source.fromFile(oldFile.toJava)(StandardCharsets.UTF_8)
-            .getLines
+        val tokens = newReader(oldFile).lines().toAutoClosedIterator
             .filter(_.length > 0)
             .flatMap(line => {
               var sentence = BPEVocabularyGenerator.whitespaceRegex.split(line)
@@ -227,8 +206,7 @@ class BPEVocabularyGenerator protected (
         fileWriter.foreach(fileWriters :+= _)
         tokens
       } else if (vocabWriter.isDefined) {
-        Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
-            .getLines
+        newReader(file).lines().toAutoClosedIterator
             .flatMap(line => BPEVocabularyGenerator.whitespaceRegex.split(line))
       } else {
         Seq.empty
@@ -236,6 +214,17 @@ class BPEVocabularyGenerator protected (
     })
 
     vocabWriter.foreach(writer => {
+      val vocab = tokens.foldLeft(TrieWordCounter())((counter, word) => {
+        counter.insertWord(word.trim)
+        counter
+      }).words()
+          .toSeq
+          .sortBy(-_._1)
+          .map(_._2)
+          .distinct
+          .toList
+      val vocabSet = vocab.toSet
+      val vocabUTF8Set = vocab.map(w => new String(w.getBytes, StandardCharsets.UTF_8)).toSet
       tokens.foldLeft(TrieWordCounter())((counter, word) => {
         counter.insertWord(word.trim)
         counter
@@ -270,8 +259,7 @@ class BPEVocabularyGenerator protected (
     */
   protected def initializeMergePairs(language: Language, vocabDir: File): Unit = {
     val mergePairsFile = vocabDir / mergePairsFilename(language)
-    mergePairs += language -> Source.fromFile(mergePairsFile.toJava)(StandardCharsets.UTF_8)
-        .getLines
+    mergePairs += language -> newReader(mergePairsFile).lines().toAutoClosedIterator
         .filter(_ != "")
         .map(l => {
           val parts = l.split("\t")
@@ -287,8 +275,7 @@ class BPEVocabularyGenerator protected (
     */
   protected def initializeVocabularies(language: Language, vocabDir: File): Unit = {
     val vocabFile = vocabDir / filename(language)
-    vocabularies += language -> Source.fromFile(vocabFile.toJava)(StandardCharsets.UTF_8)
-        .getLines
+    vocabularies += language -> newReader(vocabFile).lines().toAutoClosedIterator
         .filter(_ != "")
         .toSet
   }

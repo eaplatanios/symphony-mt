@@ -15,18 +15,12 @@
 
 package org.platanios.symphony.mt.vocabulary
 
-import org.platanios.symphony.mt.data.DataConfig
+import org.platanios.symphony.mt.data.{DataConfig, newReader, newWriter}
 import org.platanios.tensorflow.api._
 
 import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
-
-import java.io.{BufferedWriter, OutputStreamWriter}
-import java.nio.charset.StandardCharsets
-import java.nio.file.StandardOpenOption
-
-import scala.io.Source
 
 /** Represents a vocabulary of words.
   *
@@ -180,8 +174,7 @@ object Vocabulary {
       None
     } else {
       logger.info(s"Vocabulary file '$file' exists.")
-      var tokens = Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
-          .getLines
+      var tokens = newReader(file).lines().toAutoClosedIterator
           .filter(_ != "")
           .toSeq
       if (!checkSpecialTokens) {
@@ -198,13 +191,7 @@ object Vocabulary {
                 s"are not equal to [$unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
           tokens = Seq(unknownToken, beginOfSequenceToken, endOfSequenceToken) ++ tokens
           val newFile = if (directory != null) directory.sibling(file.name) else file
-          val writer = new BufferedWriter(
-            new OutputStreamWriter(
-              newFile.newOutputStream(Seq(
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING)),
-              StandardCharsets.UTF_8))
+          val writer = newWriter(newFile)
           tokens.foreach(token => writer.write(s"$token\n"))
           writer.flush()
           writer.close()

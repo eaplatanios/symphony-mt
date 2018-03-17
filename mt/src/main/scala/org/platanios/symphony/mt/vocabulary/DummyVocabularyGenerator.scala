@@ -15,17 +15,13 @@
 
 package org.platanios.symphony.mt.vocabulary
 
-import java.io.{BufferedWriter, OutputStreamWriter}
-
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.data.newWriter
 import org.platanios.symphony.mt.utilities.MutableFile
 
 import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
-
-import java.nio.charset.StandardCharsets
-import java.nio.file.StandardOpenOption
 
 /** Dummy vocabulary generator that generates a vocabulary containing numbers starting at `0` and ending at `size - 1`.
   *
@@ -61,13 +57,7 @@ class DummyVocabularyGenerator protected (
     if (replaceExisting || vocabFile.notExists) {
       DummyVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
       vocabFile.parent.createDirectories()
-      val writer = new BufferedWriter(
-        new OutputStreamWriter(
-          vocabFile.newOutputStream(Seq(
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING)),
-          StandardCharsets.UTF_8))
+      val writer = newWriter(vocabFile)
       (0 until size).foreach(wordId => writer.write(wordId + "\n"))
       writer.flush()
       writer.close()

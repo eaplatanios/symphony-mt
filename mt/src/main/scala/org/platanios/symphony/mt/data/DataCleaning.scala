@@ -19,11 +19,6 @@ import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.{BufferedWriter, OutputStreamWriter}
-import java.nio.charset.StandardCharsets
-import java.nio.file.StandardOpenOption
-
-import scala.io.Source
 import scala.util.matching.Regex
 
 /**
@@ -42,22 +37,10 @@ trait DataCleaning {
     val tgtClean = cleanFile(tgtFile)
     if (srcClean.notExists || tgtClean.notExists) {
       DataCleaning.logger.info(s"Cleaning '$srcFile' and '$tgtFile'.")
-      val srcWriter = new BufferedWriter(
-        new OutputStreamWriter(
-          srcClean.newOutputStream(Seq(
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING)),
-          StandardCharsets.UTF_8))
-      val tgtWriter = new BufferedWriter(
-        new OutputStreamWriter(
-          tgtClean.newOutputStream(Seq(
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING)),
-          StandardCharsets.UTF_8))
-      Source.fromFile(srcFile.toJava)(StandardCharsets.UTF_8).getLines
-          .zip(Source.fromFile(tgtFile.toJava)(StandardCharsets.UTF_8).getLines).foreach(pair => {
+      val srcWriter = newWriter(srcClean)
+      val tgtWriter = newWriter(tgtClean)
+      newReader(srcFile).lines().toAutoClosedIterator
+          .zip(newReader(tgtFile).lines().toAutoClosedIterator).foreach(pair => {
         processPair(pair._1, pair._2) match {
           case Some((srcSentence, tgtSentence)) if srcSentence.length > 0 && tgtSentence.length > 0 =>
             srcWriter.write(s"$srcSentence\n")
