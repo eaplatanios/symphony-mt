@@ -214,17 +214,6 @@ class BPEVocabularyGenerator protected (
     })
 
     vocabWriter.foreach(writer => {
-      val vocab = tokens.foldLeft(TrieWordCounter())((counter, word) => {
-        counter.insertWord(word.trim)
-        counter
-      }).words()
-          .toSeq
-          .sortBy(-_._1)
-          .map(_._2)
-          .distinct
-          .toList
-      val vocabSet = vocab.toSet
-      val vocabUTF8Set = vocab.map(w => new String(w.getBytes, StandardCharsets.UTF_8)).toSet
       tokens.foldLeft(TrieWordCounter())((counter, word) => {
         counter.insertWord(word.trim)
         counter
