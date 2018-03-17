@@ -40,11 +40,11 @@ object WMT16UsingBPELanguageEmbeddings extends App {
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
-    // loaderSentenceLengthBounds = Some((1, 80)),
-    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000)),
+    loaderDataCleaning = MosesDataCleaning(1, 80),
+    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000, replaceExisting = false)),
     numBuckets = 5,
-    srcMaxLength = 50,
-    tgtMaxLength = 50)
+    srcMaxLength = 80,
+    tgtMaxLength = 80)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
     loadDatasets(languagePairs.toSeq.map(l => WMT16DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))
@@ -52,7 +52,7 @@ object WMT16UsingBPELanguageEmbeddings extends App {
 
   val env = Environment(
     workingDir = workingDir,
-    numGPUs = 4,
+    numGPUs = 1,
     parallelIterations = 32,
     swapMemory = true,
     randomSeed = Some(10))
@@ -117,8 +117,8 @@ object WMT16UsingBPELanguageEmbeddings extends App {
     evalDatasets = datasets.flatMap(d => Seq(
       // ("WMT16/newstest2013", d.filterKeys("newstest2013")),
       // ("WMT16/newstest2014", d.filterKeys("newstest2014")),
-      // ("WMT16/newstest2015", d.filterKeys("newstest2015")),
-      ("WMT16/newstest2016", d.filterKeys("newstest2016")))
+      ("WMT16/newstest2015", d.filterKeys("newstest2015")))
+      //("WMT16/newstest2016", d.filterKeys("newstest2016")))
     ))
 
   model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(340000))

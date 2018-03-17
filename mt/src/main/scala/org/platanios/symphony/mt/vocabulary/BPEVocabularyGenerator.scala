@@ -98,11 +98,11 @@ class BPEVocabularyGenerator protected (
     } else {
       BPEVocabularyGenerator.logger.info(s"Learning BPE coding for $language.")
       mergePairsFile.parent.createDirectories()
-      val mergePairsWriter = new BufferedWriter(
-        mergePairsFile.newPrintWriter()(Seq(
+      val mergePairsWriter = mergePairsFile.newBufferedWriter(
+        StandardCharsets.UTF_8, Seq(
           StandardOpenOption.CREATE,
           StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
+          StandardOpenOption.TRUNCATE_EXISTING))
       val tokens = mutable.ArrayBuffer(tokenizedFiles.map(_.get).toIterator.flatMap(file => {
         Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
             .getLines
@@ -171,11 +171,11 @@ class BPEVocabularyGenerator protected (
       } else {
         BPEVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
         vocabFile.parent.createDirectories()
-        Some(new BufferedWriter(
-          vocabFile.newPrintWriter()(Seq(
+        Some(vocabFile.newBufferedWriter(
+          StandardCharsets.UTF_8, Seq(
             StandardOpenOption.CREATE,
             StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING)), bufferSize))
+            StandardOpenOption.TRUNCATE_EXISTING)))
       }
     }
 
@@ -191,11 +191,11 @@ class BPEVocabularyGenerator protected (
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
         val fileWriter = {
           if (replaceExisting || file.notExists) {
-            Some(new BufferedWriter(
-              file.newPrintWriter()(Seq(
+            Some(file.newBufferedWriter(
+              StandardCharsets.UTF_8, Seq(
                 StandardOpenOption.CREATE,
                 StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING)), bufferSize))
+                StandardOpenOption.TRUNCATE_EXISTING)))
           } else {
             None
           }
@@ -207,7 +207,11 @@ class BPEVocabularyGenerator protected (
               var sentence = BPEVocabularyGenerator.whitespaceRegex.split(line)
               sentence = encodeSentence(language, sentence, cache).toArray
               fileWriter.foreach(_.write(s"${sentence.mkString(" ")}\n"))
-              sentence
+              if (replaceExisting || vocabWriter.isDefined) {
+                sentence
+              } else {
+                Seq.empty
+              }
             })
         fileWriter.foreach(fileWriters :+= _)
         tokens
@@ -222,11 +226,13 @@ class BPEVocabularyGenerator protected (
 
     vocabWriter.foreach(writer => {
       tokens.foldLeft(TrieWordCounter())((counter, word) => {
-        counter.insertWord(word)
+        counter.insertWord(word.trim)
         counter
       }).words()
+          .toSeq
+          .sortBy(-_._1)
           .map(_._2)
-          .toSet[String]
+          .distinct
           .foreach(word => {
             vocabularies(language) += word
             writer.write(word + "\n")
@@ -270,6 +276,11 @@ class BPEVocabularyGenerator protected (
     */
   protected def initializeVocabularies(language: Language, vocabDir: File): Unit = {
     val vocabFile = vocabDir / filename(language)
+    val vocab = Source.fromFile(vocabFile.toJava)(StandardCharsets.UTF_8)
+        .getLines
+        .filter(_ != "")
+        .toList
+    val vocabSet = vocab.toSet
     vocabularies += language -> Source.fromFile(vocabFile.toJava)(StandardCharsets.UTF_8)
         .getLines
         .filter(_ != "")
@@ -329,52 +340,20 @@ class BPEVocabularyGenerator protected (
       } else {
         wordParts = wordParts.updated(
           wordParts.length - 1, wordParts.last + BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
-        var pairs = wordParts.sliding(2).map(p => (p(0), p(1)))
+        var pairs = wordParts.sliding(2).map(p => (p(0), p(1))).toArray
         var continue = true
         while (pairs.nonEmpty && continue) {
           val pair = pairs.map(p => (p, mergePairs(language).get(p))).minBy(_._2.getOrElse(Int.MaxValue))
           if (pair._2.isEmpty) {
             continue = false
           } else {
-            val newWordParts = mutable.ListBuffer.empty[String]
-            var i = 0
-            var last = 0
-            while (i < wordParts.length) {
-              if (wordParts(i) != pair._1._1 && i == wordParts.length - 1) {
-                var k = last
-                while (k < wordParts.length) {
-                  newWordParts += wordParts(k)
-                  k += 1
-                }
-                // Force the loop to finish.
-                i = wordParts.length
-              } else if (wordParts(i) != pair._1._1) {
-                i += 1
-              } else {
-                var k = last
-                while (k < i) {
-                  newWordParts += wordParts(k)
-                  k += 1
-                }
-                if (wordParts(i) == pair._1._1 && i < wordParts.length - 1 && wordParts(i + 1) == pair._1._2) {
-                  newWordParts += pair._1._1 + pair._1._2
-                  i += 2
-                } else {
-                  newWordParts += wordParts(i)
-                  i += 1
-                }
-                last = i
-              }
-            }
-            wordParts = newWordParts
-            pairs = if (wordParts.length < 2) Iterator.empty else wordParts.sliding(2).map(p => (p(0), p(1)))
+            wordParts = BPEVocabularyGenerator.replacePair(pair._1, wordParts)(pair._1._1 + pair._1._2)
+            pairs = if (wordParts.length < 2) Array.empty else wordParts.sliding(2).map(p => (p(0), p(1))).toArray
           }
         }
 
         // Remove end-of-word symbols.
-        if (wordParts.last == BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
-          wordParts = wordParts.slice(0, wordParts.length - 1)
-        else if (wordParts.last.endsWith(BPEVocabularyGenerator.END_OF_WORD_SYMBOL))
+        if (wordParts.last.endsWith(BPEVocabularyGenerator.END_OF_WORD_SYMBOL))
           wordParts = wordParts.updated(wordParts.length - 1, wordParts.last
               .dropRight(BPEVocabularyGenerator.END_OF_WORD_SYMBOL.length))
 
@@ -429,6 +408,8 @@ object BPEVocabularyGenerator {
 
   /** Regular expression used for tokenizing sentences. */
   private[BPEVocabularyGenerator] val whitespaceRegex: Regex = "\\s+".r
+
+  private[BPEVocabularyGenerator] val DEFAULT_GLOSSARY: Set[String] = Set("&quot;", "&apos;")
 
   private[BPEVocabularyGenerator] case class PairStatistics(
       counts: PriorityCounter[(String, String)],
@@ -493,19 +474,36 @@ object BPEVocabularyGenerator {
     val joinedPair = pair._1 + pair._2
     indices(pair).toSeq.filter(_._2 >= 1).map(_._1.toInt).map(index => {
       val (count, word) = words(index)
-      val newWord = mutable.ListBuffer.empty[String]
-      var j = 0
-      var changed = false
-      while (j < word.length - 1) {
-        (word(j), word(j + 1)) match {
-          case p if p == pair => changed = true; newWord += joinedPair; j += 2
-          case _ if j < word.length - 2 => newWord += word(j); j += 1
-          case _ => newWord ++= Seq(word(j), word(j + 1)); j += 1
-        }
-      }
+      val newWord = replacePair(pair, word)(joinedPair)
       words.update(index, (count, newWord))
       Change(index, word, newWord, count)
     }).seq
+  }
+
+  /** Replaces all occurrences of the provided symbol pair in `word` with the joined symbol.
+    *
+    * @param  pair       Symbol pair to replace in `word`.
+    * @param  word       Word as a sequence of symbols.
+    * @param  joinedPair Optionally, the precomputed joined pair to replace in `word`. This can sometimes help with
+    *                    performance.
+    * @return New word with `pair` replaced in `word`.
+    */
+  @inline
+  private[BPEVocabularyGenerator] final def replacePair(
+      pair: (String, String),
+      word: Seq[String]
+  )(joinedPair: String = pair._1 + pair._2): Seq[String] = {
+    val newWord = mutable.ListBuffer.empty[String]
+    var j = 0
+    while (j < word.length - 1) {
+      (word(j), word(j + 1)) match {
+        case p if p == pair => newWord += joinedPair; j += 2
+        case _ => newWord += word(j); j += 1
+      }
+    }
+    if (j == word.length - 1)
+      newWord += word(j)
+    newWord
   }
 
   /** Minimally updates the symbol pair statistics, based on the provided list of changes.

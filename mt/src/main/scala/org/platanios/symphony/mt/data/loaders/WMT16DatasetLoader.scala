@@ -52,32 +52,28 @@ class WMT16DatasetLoader(
 
   protected def commonCrawlDataset: Option[CommonCrawlDatasetLoader] = {
     if (CommonCrawlDatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(CommonCrawlDatasetLoader(
-        srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir, loaderSentenceLengthBounds = None)))
+      Some(CommonCrawlDatasetLoader(srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir)))
     else
       None
   }
 
   protected def europarlV7Dataset: Option[EuroparlV7DatasetLoader] = {
     if (EuroparlV7DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV7DatasetLoader(
-        srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir, loaderSentenceLengthBounds = None)))
+      Some(EuroparlV7DatasetLoader(srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir)))
     else
       None
   }
 
   protected def europarlV8Dataset: Option[EuroparlV8DatasetLoader] = {
     if (EuroparlV8DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV8DatasetLoader(
-        srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir, loaderSentenceLengthBounds = None)))
+      Some(EuroparlV8DatasetLoader(srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir)))
     else
       None
   }
 
   protected def newsCommentaryV11Dataset: Option[NewsCommentaryV11DatasetLoader] = {
     if (NewsCommentaryV11DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(NewsCommentaryV11DatasetLoader(
-        srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir, loaderSentenceLengthBounds = None)))
+      Some(NewsCommentaryV11DatasetLoader(srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir)))
     else
       None
   }

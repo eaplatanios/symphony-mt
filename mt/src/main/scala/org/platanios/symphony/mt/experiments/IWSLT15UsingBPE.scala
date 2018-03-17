@@ -38,10 +38,11 @@ object IWSLT15UsingBPE extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
+    loaderDataCleaning = MosesDataCleaning(1, 80),
     loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(10000)),
     numBuckets = 5,
-    srcMaxLength = 50,
-    tgtMaxLength = 50)
+    srcMaxLength = 80,
+    tgtMaxLength = 80)
 
   val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
 
@@ -65,20 +66,20 @@ object IWSLT15UsingBPE extends App {
     config = RNNModel.Config(
       env,
       ParameterManager(
-        wordEmbeddingsSize = 32,
+        wordEmbeddingsSize = 512,
         tf.VarianceScalingInitializer(
           1.0f,
           tf.VarianceScalingInitializer.FanAverageScalingMode,
           tf.VarianceScalingInitializer.UniformDistribution)),
       BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 32,
+        numUnits = 512,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 32,
+        numUnits = 512,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f),

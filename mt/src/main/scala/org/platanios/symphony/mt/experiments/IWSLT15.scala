@@ -26,6 +26,8 @@ import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
 
+// TODO: [DATA] Modularize the data cleaners.
+
 /**
   * @author Emmanouil Antonios Platanios
   */
@@ -37,10 +39,11 @@ object IWSLT15 extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
+    loaderDataCleaning = MosesDataCleaning(1, 80),
     loaderVocab = MergedVocabularies,
     numBuckets = 5,
-    srcMaxLength = 50,
-    tgtMaxLength = 50)
+    srcMaxLength = 80,
+    tgtMaxLength = 80)
 
   val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
 

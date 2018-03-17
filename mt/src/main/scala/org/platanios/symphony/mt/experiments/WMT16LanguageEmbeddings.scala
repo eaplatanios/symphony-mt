@@ -40,11 +40,11 @@ object WMT16LanguageEmbeddings extends App {
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
-    // loaderSentenceLengthBounds = Some((1, 80)),
+    loaderDataCleaning = MosesDataCleaning(1, 80),
     loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
     numBuckets = 5,
-    srcMaxLength = 50,
-    tgtMaxLength = 50)
+    srcMaxLength = 80,
+    tgtMaxLength = 80)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
     loadDatasets(languagePairs.toSeq.map(l => WMT16DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))

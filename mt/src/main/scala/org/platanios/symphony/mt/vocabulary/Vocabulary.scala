@@ -23,8 +23,9 @@ import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets
+import java.nio.file.StandardOpenOption
 
-import scala.collection.mutable
+import scala.io.Source
 
 /** Represents a vocabulary of words.
   *
@@ -178,14 +179,10 @@ object Vocabulary {
       None
     } else {
       logger.info(s"Vocabulary file '$file' exists.")
-      val reader = file.newBufferedReader(StandardCharsets.UTF_8)
-      val tokens = mutable.ListBuffer.empty[String]
-      var line = reader.readLine()
-      while (line != null) {
-        tokens ++= line.split("\\s+").toSeq
-        line = reader.readLine()
-      }
-      reader.close()
+      var tokens = Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
+          .getLines
+          .filter(_ != "")
+          .toSeq
       if (!checkSpecialTokens) {
         Some((tokens.size, file))
       } else {
@@ -198,10 +195,15 @@ object Vocabulary {
           logger.info(
             s"The first 3 vocabulary tokens [${tokens(0)}, ${tokens(1)}, ${tokens(2)}] " +
                 s"are not equal to [$unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
-          tokens.prepend(unknownToken, beginOfSequenceToken, endOfSequenceToken)
+          tokens = Seq(unknownToken, beginOfSequenceToken, endOfSequenceToken) ++ tokens
           val newFile = if (directory != null) directory.sibling(file.name) else file
-          val writer = newFile.newBufferedWriter(StandardCharsets.UTF_8)
+          val writer = newFile.newBufferedWriter(
+            StandardCharsets.UTF_8, Seq(
+              StandardOpenOption.CREATE,
+              StandardOpenOption.WRITE,
+              StandardOpenOption.TRUNCATE_EXISTING))
           tokens.foreach(token => writer.write(s"$token\n"))
+          writer.flush()
           writer.close()
           logger.info(s"Created fixed vocabulary file at '$newFile'.")
           Some((tokens.size, newFile))

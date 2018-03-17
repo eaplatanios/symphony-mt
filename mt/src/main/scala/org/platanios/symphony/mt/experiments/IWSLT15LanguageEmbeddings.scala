@@ -37,10 +37,11 @@ object IWSLT15LanguageEmbeddings extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
+    loaderDataCleaning = MosesDataCleaning(1, 80),
     loaderVocab = MergedVocabularies,
     numBuckets = 5,
-    srcMaxLength = 50,
-    tgtMaxLength = 50)
+    srcMaxLength = 80,
+    tgtMaxLength = 80)
 
   val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
 

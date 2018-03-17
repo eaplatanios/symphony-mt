@@ -38,10 +38,10 @@ object WMT16 extends App {
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
-    // loaderSentenceLengthBounds = Some((1, 80)),
+    loaderDataCleaning = MosesDataCleaning(1, 80),
     numBuckets = 5,
-    srcMaxLength = 50,
-    tgtMaxLength = 50)
+    srcMaxLength = 80,
+    tgtMaxLength = 80)
 
   val dataset: FileParallelDataset = WMT16DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
 

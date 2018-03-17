@@ -22,7 +22,6 @@ import better.files.File
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.BufferedWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.StandardOpenOption
 
@@ -75,20 +74,23 @@ class SimpleVocabularyGenerator protected (
       SimpleVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
       vocabFile.parent.createDirectories()
       val whitespaceRegex = "\\s+".r
-      val writer = new BufferedWriter(
-        vocabFile.newPrintWriter()(Seq(
+      val writer = vocabFile.newBufferedWriter(
+        StandardCharsets.UTF_8, Seq(
           StandardOpenOption.CREATE,
           StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING)), bufferSize)
+          StandardOpenOption.TRUNCATE_EXISTING))
       tokenizedFiles.map(_.get).toIterator.flatMap(file => {
         Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
             .getLines
             .flatMap(whitespaceRegex.split)
       }).foldLeft(TrieWordCounter())((counter, word) => {
-        counter.insertWord(word)
+        counter.insertWord(word.trim)
         counter
       }).words(sizeThreshold, countThreshold)
+          .toSeq
+          .sortBy(-_._1)
           .map(_._2)
+          .distinct
           .foreach(word => writer.write(word + "\n"))
       writer.flush()
       writer.close()

@@ -23,9 +23,10 @@ import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.{BufferedWriter, IOException}
+import java.io.IOException
 import java.net.URL
-import java.nio.file.Path
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Path, StandardOpenOption}
 
 import scala.collection.mutable
 
@@ -187,27 +188,15 @@ object ParallelDatasetLoader {
         fileKeys ++= corpora.map(_._1)
       })
 
-      // Clean the corpora, if necessary.
-      loader.dataConfig.loaderSentenceLengthBounds.foreach {
-        case (minLength, maxLength) =>
-          val cleanedFiles = srcFiles.map(file => {
-            // TODO: [DATA] This is a hacky way of checking for the clean corpus files.
-            val corpusFile = file.get.sibling(file.get.nameWithoutExtension(includeAll = false))
-            val cleanCorpusFile = file.get.sibling(corpusFile.name + ".clean")
-            val srcCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".${loader.src}")
-            val tgtCleanCorpusFile = corpusFile.sibling(cleanCorpusFile.name + s".${loader.tgt}")
-            if (srcCleanCorpusFile.notExists || tgtCleanCorpusFile.notExists) {
-              val exitCode = loader.mosesDecoder.cleanCorpus(
-                corpusFile, cleanCorpusFile, loader.src, loader.tgt, minLength, maxLength)
-              if (exitCode != 0) {
-                corpusFile.sibling(corpusFile.name + s".${loader.src}").copyTo(srcCleanCorpusFile)
-                corpusFile.sibling(corpusFile.name + s".${loader.tgt}").copyTo(tgtCleanCorpusFile)
-              }
-            }
-            (MutableFile(srcCleanCorpusFile), MutableFile(tgtCleanCorpusFile))
-          }).unzip
-          srcFiles = cleanedFiles._1
-          tgtFiles = cleanedFiles._2
+      // TODO: [DATA] Only clean the training data.
+
+      // Clean the corpora.
+      val dataCleaning = loader.dataConfig.loaderDataCleaning
+      srcFiles.zip(tgtFiles).foreach {
+        case (srcFile, tgtFile) =>
+          val cleaned = dataCleaning.processCorporaPair(srcFile.get, tgtFile.get, loader.dataConfig.loaderBufferSize)
+          srcFile.set(cleaned._1)
+          tgtFile.set(cleaned._2)
       }
 
       (srcFiles, tgtFiles, fileTypes, fileKeys)
@@ -238,7 +227,11 @@ object ParallelDatasetLoader {
           case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
           case MergedVocabularies if v.nonEmpty =>
             val vocabFile = vocabDir.createChild(vocabFilename, createParents = true)
-            val writer = new BufferedWriter(vocabFile.newPrintWriter(), loaders.head.dataConfig.loaderBufferSize)
+            val writer = vocabFile.newBufferedWriter(
+              StandardCharsets.UTF_8, Seq(
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING))
             v.toStream
                 .flatMap(_.lineIterator).toSet
                 .filter(_ != "")
