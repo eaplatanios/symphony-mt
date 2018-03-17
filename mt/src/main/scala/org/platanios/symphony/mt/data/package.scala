@@ -22,12 +22,10 @@ import java.nio.charset._
 import java.nio.file.StandardOpenOption
 
 package object data {
-  private[this] val encoder: CharsetEncoder = StandardCharsets.UTF_8.newEncoder()
-  private[this] val decoder: CharsetDecoder = StandardCharsets.UTF_8.newDecoder()
-
-  decoder.onMalformedInput(CodingErrorAction.IGNORE)
-
   private[mt] def newReader(file: File): BufferedReader = {
+    val decoder: CharsetDecoder = StandardCharsets.UTF_8.newDecoder()
+    decoder.onMalformedInput(CodingErrorAction.IGNORE)
+    decoder.onUnmappableCharacter(CodingErrorAction.IGNORE)
     new BufferedReader(
       new InputStreamReader(
         file.newInputStream(),
@@ -35,6 +33,9 @@ package object data {
   }
 
   private[mt] def newWriter(file: File): BufferedWriter = {
+    val encoder: CharsetEncoder = StandardCharsets.UTF_8.newEncoder()
+    encoder.onMalformedInput(CodingErrorAction.IGNORE)
+    encoder.onUnmappableCharacter(CodingErrorAction.IGNORE)
     new BufferedWriter(
       new OutputStreamWriter(
         file.newOutputStream(Seq(
