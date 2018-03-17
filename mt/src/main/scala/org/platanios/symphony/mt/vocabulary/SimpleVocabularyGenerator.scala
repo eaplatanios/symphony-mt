@@ -18,10 +18,11 @@ package org.platanios.symphony.mt.vocabulary
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.utilities.{MutableFile, TrieWordCounter}
 
-import better.files.File
+import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
+import java.io.{BufferedWriter, OutputStreamWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.StandardOpenOption
 
@@ -74,11 +75,13 @@ class SimpleVocabularyGenerator protected (
       SimpleVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
       vocabFile.parent.createDirectories()
       val whitespaceRegex = "\\s+".r
-      val writer = vocabFile.newBufferedWriter(
-        StandardCharsets.UTF_8, Seq(
-          StandardOpenOption.CREATE,
-          StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING))
+      val writer = new BufferedWriter(
+        new OutputStreamWriter(
+          vocabFile.newOutputStream(Seq(
+            StandardOpenOption.CREATE,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.TRUNCATE_EXISTING)),
+          StandardCharsets.UTF_8))
       tokenizedFiles.map(_.get).toIterator.flatMap(file => {
         Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
             .getLines

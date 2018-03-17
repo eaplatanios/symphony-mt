@@ -22,7 +22,7 @@ import better.files.File
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.BufferedWriter
+import java.io.{BufferedWriter, OutputStreamWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.StandardOpenOption
 
@@ -57,10 +57,13 @@ import scala.util.matching.Regex
 class BPEVocabularyGenerator protected (
     val numSymbols: Int = 32000,
     val separator: String = "@@",
+    val glossary: Set[String] = BPEVocabularyGenerator.DEFAULT_GLOSSARY,
     val countThreshold: Int = -1,
     val replaceExisting: Boolean = false,
     val bufferSize: Int = 8192
 ) extends VocabularyGenerator {
+  protected val glossaryRegex: Regex = BPEVocabularyGenerator.glossaryRegex(glossary)
+
   protected val mergePairs        : mutable.Map[Language, Map[(String, String), Int]]    = mutable.Map.empty
   protected val reversedMergePairs: mutable.Map[Language, Map[String, (String, String)]] = mutable.Map.empty
   protected val vocabularies      : mutable.Map[Language, Set[String]]                   = mutable.Map.empty
@@ -98,11 +101,13 @@ class BPEVocabularyGenerator protected (
     } else {
       BPEVocabularyGenerator.logger.info(s"Learning BPE coding for $language.")
       mergePairsFile.parent.createDirectories()
-      val mergePairsWriter = mergePairsFile.newBufferedWriter(
-        StandardCharsets.UTF_8, Seq(
-          StandardOpenOption.CREATE,
-          StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING))
+      val mergePairsWriter = new BufferedWriter(
+        new OutputStreamWriter(
+          mergePairsFile.newOutputStream(Seq(
+            StandardOpenOption.CREATE,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.TRUNCATE_EXISTING)),
+          StandardCharsets.UTF_8))
       val tokens = mutable.ArrayBuffer(tokenizedFiles.map(_.get).toIterator.flatMap(file => {
         Source.fromFile(file.toJava)(StandardCharsets.UTF_8)
             .getLines
@@ -171,11 +176,13 @@ class BPEVocabularyGenerator protected (
       } else {
         BPEVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
         vocabFile.parent.createDirectories()
-        Some(vocabFile.newBufferedWriter(
-          StandardCharsets.UTF_8, Seq(
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING)))
+        Some(new BufferedWriter(
+          new OutputStreamWriter(
+            vocabFile.newOutputStream(Seq(
+              StandardOpenOption.CREATE,
+              StandardOpenOption.WRITE,
+              StandardOpenOption.TRUNCATE_EXISTING)),
+            StandardCharsets.UTF_8)))
       }
     }
 
@@ -191,11 +198,13 @@ class BPEVocabularyGenerator protected (
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
         val fileWriter = {
           if (replaceExisting || file.notExists) {
-            Some(file.newBufferedWriter(
-              StandardCharsets.UTF_8, Seq(
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING)))
+            Some(new BufferedWriter(
+              new OutputStreamWriter(
+                file.newOutputStream(Seq(
+                  StandardOpenOption.CREATE,
+                  StandardOpenOption.WRITE,
+                  StandardOpenOption.TRUNCATE_EXISTING)),
+                StandardCharsets.UTF_8)))
           } else {
             None
           }
@@ -203,10 +212,12 @@ class BPEVocabularyGenerator protected (
         val cache = mutable.Map.empty[String, Seq[String]]
         val tokens = Source.fromFile(oldFile.toJava)(StandardCharsets.UTF_8)
             .getLines
+            .filter(_.length > 0)
             .flatMap(line => {
               var sentence = BPEVocabularyGenerator.whitespaceRegex.split(line)
               sentence = encodeSentence(language, sentence, cache).toArray
-              fileWriter.foreach(_.write(s"${sentence.mkString(" ")}\n"))
+              if (sentence.nonEmpty)
+                fileWriter.foreach(_.write(s"${sentence.mkString(" ")}\n"))
               if (replaceExisting || vocabWriter.isDefined) {
                 sentence
               } else {
@@ -276,11 +287,6 @@ class BPEVocabularyGenerator protected (
     */
   protected def initializeVocabularies(language: Language, vocabDir: File): Unit = {
     val vocabFile = vocabDir / filename(language)
-    val vocab = Source.fromFile(vocabFile.toJava)(StandardCharsets.UTF_8)
-        .getLines
-        .filter(_ != "")
-        .toList
-    val vocabSet = vocab.toSet
     vocabularies += language -> Source.fromFile(vocabFile.toJava)(StandardCharsets.UTF_8)
         .getLines
         .filter(_ != "")
@@ -334,7 +340,7 @@ class BPEVocabularyGenerator protected (
       cache: mutable.Map[String, Seq[String]] = mutable.Map.empty
   ): Seq[String] = {
     cache.getOrElseUpdate(word, {
-      var wordParts = word.toCharArray.map(_.toString).toSeq
+      var wordParts = BPEVocabularyGenerator.splitWithDelimiters(word, glossaryRegex, keepEmpty = false)
       if (wordParts.length < 2) {
         wordParts
       } else {
@@ -396,11 +402,12 @@ object BPEVocabularyGenerator {
   def apply(
       numSymbols: Int = 32000,
       separator: String = "@@",
+      glossary: Set[String] = DEFAULT_GLOSSARY,
       countThreshold: Int = -1,
       replaceExisting: Boolean = false,
       bufferSize: Int = 8192
   ): BPEVocabularyGenerator = {
-    new BPEVocabularyGenerator(numSymbols, separator, countThreshold, replaceExisting, bufferSize)
+    new BPEVocabularyGenerator(numSymbols, separator, glossary, countThreshold, replaceExisting, bufferSize)
   }
 
   /** End-of-word symbol used by the BPE vocabulary generator. */
@@ -409,7 +416,35 @@ object BPEVocabularyGenerator {
   /** Regular expression used for tokenizing sentences. */
   private[BPEVocabularyGenerator] val whitespaceRegex: Regex = "\\s+".r
 
+  /** Default glossary to use. */
   private[BPEVocabularyGenerator] val DEFAULT_GLOSSARY: Set[String] = Set("&quot;", "&apos;")
+
+  private[BPEVocabularyGenerator] def glossaryRegex(glossary: Set[String]): Regex = {
+    s"(?:${glossary.mkString("|")})|(?!${glossary.mkString("|")})".r
+  }
+
+  private[BPEVocabularyGenerator] def splitWithDelimiters(
+      string: String,
+      regex: Regex,
+      keepEmpty: Boolean = false
+  ): Seq[String] = {
+    val parts = mutable.ArrayBuffer.empty[String]
+    parts.sizeHint(string.length)
+    val p = regex.pattern
+    val m = p.matcher(string)
+    var lastEnd = 0
+    while (m.find) {
+      val start = m.start
+      if (lastEnd != start)
+        parts += string.substring(lastEnd, start)
+      if (keepEmpty || m.group.length > 0)
+        parts += m.group
+      lastEnd = m.end
+    }
+    if (lastEnd != string.length)
+      parts += string.substring(lastEnd)
+    parts
+  }
 
   private[BPEVocabularyGenerator] case class PairStatistics(
       counts: PriorityCounter[(String, String)],

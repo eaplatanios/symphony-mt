@@ -15,10 +15,12 @@
 
 package org.platanios.symphony.mt.vocabulary
 
+import java.io.{BufferedWriter, OutputStreamWriter}
+
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.utilities.MutableFile
 
-import better.files.File
+import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
@@ -59,11 +61,13 @@ class DummyVocabularyGenerator protected (
     if (replaceExisting || vocabFile.notExists) {
       DummyVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
       vocabFile.parent.createDirectories()
-      val writer = vocabFile.newBufferedWriter(
-        StandardCharsets.UTF_8, Seq(
-          StandardOpenOption.CREATE,
-          StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING))
+      val writer = new BufferedWriter(
+        new OutputStreamWriter(
+          vocabFile.newOutputStream(Seq(
+            StandardOpenOption.CREATE,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.TRUNCATE_EXISTING)),
+          StandardCharsets.UTF_8))
       (0 until size).foreach(wordId => writer.write(wordId + "\n"))
       writer.flush()
       writer.close()

@@ -16,7 +16,10 @@
 package org.platanios.symphony.mt.data
 
 import better.files._
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
+import java.io.{BufferedWriter, OutputStreamWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.StandardOpenOption
 
@@ -37,31 +40,43 @@ trait DataCleaning {
   def processCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {
     val srcClean = cleanFile(srcFile)
     val tgtClean = cleanFile(tgtFile)
-    val srcWriter = srcClean.newBufferedWriter(
-      StandardCharsets.UTF_8, Seq(
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.TRUNCATE_EXISTING))
-    val tgtWriter = tgtClean.newBufferedWriter(
-      StandardCharsets.UTF_8, Seq(
-        StandardOpenOption.CREATE,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.TRUNCATE_EXISTING))
-    Source.fromFile(srcFile.toJava)(StandardCharsets.UTF_8).getLines
-        .zip(Source.fromFile(tgtFile.toJava)(StandardCharsets.UTF_8).getLines).foreach(pair => {
-      processPair(pair._1, pair._2) match {
-        case Some((srcSentence, tgtSentence)) =>
-          srcWriter.write(s"$srcSentence\n")
-          tgtWriter.write(s"$tgtSentence\n")
-        case None => ()
-      }
-    })
-    srcWriter.flush()
-    srcWriter.close()
-    tgtWriter.flush()
-    tgtWriter.close()
+    if (srcClean.notExists || tgtClean.notExists) {
+      DataCleaning.logger.info(s"Cleaning '$srcFile' and '$tgtFile'.")
+      val srcWriter = new BufferedWriter(
+        new OutputStreamWriter(
+          srcClean.newOutputStream(Seq(
+            StandardOpenOption.CREATE,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.TRUNCATE_EXISTING)),
+          StandardCharsets.UTF_8))
+      val tgtWriter = new BufferedWriter(
+        new OutputStreamWriter(
+          tgtClean.newOutputStream(Seq(
+            StandardOpenOption.CREATE,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.TRUNCATE_EXISTING)),
+          StandardCharsets.UTF_8))
+      Source.fromFile(srcFile.toJava)(StandardCharsets.UTF_8).getLines
+          .zip(Source.fromFile(tgtFile.toJava)(StandardCharsets.UTF_8).getLines).foreach(pair => {
+        processPair(pair._1, pair._2) match {
+          case Some((srcSentence, tgtSentence)) if srcSentence.length > 0 && tgtSentence.length > 0 =>
+            srcWriter.write(s"$srcSentence\n")
+            tgtWriter.write(s"$tgtSentence\n")
+          case None => ()
+        }
+      })
+      srcWriter.flush()
+      srcWriter.close()
+      tgtWriter.flush()
+      tgtWriter.close()
+      DataCleaning.logger.info(s"Created clean files '$srcClean' and '$tgtClean'.")
+    }
     (srcClean, tgtClean)
   }
+}
+
+object DataCleaning {
+  private[data] val logger = Logger(LoggerFactory.getLogger("Dataset"))
 }
 
 class MosesDataCleaning protected (

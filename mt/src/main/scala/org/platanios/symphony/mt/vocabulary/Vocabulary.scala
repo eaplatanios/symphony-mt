@@ -22,6 +22,7 @@ import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
+import java.io.{BufferedWriter, OutputStreamWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.StandardOpenOption
 
@@ -197,11 +198,13 @@ object Vocabulary {
                 s"are not equal to [$unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
           tokens = Seq(unknownToken, beginOfSequenceToken, endOfSequenceToken) ++ tokens
           val newFile = if (directory != null) directory.sibling(file.name) else file
-          val writer = newFile.newBufferedWriter(
-            StandardCharsets.UTF_8, Seq(
-              StandardOpenOption.CREATE,
-              StandardOpenOption.WRITE,
-              StandardOpenOption.TRUNCATE_EXISTING))
+          val writer = new BufferedWriter(
+            new OutputStreamWriter(
+              newFile.newOutputStream(Seq(
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING)),
+              StandardCharsets.UTF_8))
           tokens.foreach(token => writer.write(s"$token\n"))
           writer.flush()
           writer.close()

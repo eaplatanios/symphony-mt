@@ -23,7 +23,7 @@ import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.IOException
+import java.io.{BufferedWriter, IOException, OutputStreamWriter}
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Path, StandardOpenOption}
@@ -227,11 +227,13 @@ object ParallelDatasetLoader {
           case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
           case MergedVocabularies if v.nonEmpty =>
             val vocabFile = vocabDir.createChild(vocabFilename, createParents = true)
-            val writer = vocabFile.newBufferedWriter(
-              StandardCharsets.UTF_8, Seq(
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING))
+            val writer = new BufferedWriter(
+              new OutputStreamWriter(
+                vocabFile.newOutputStream(Seq(
+                  StandardOpenOption.CREATE,
+                  StandardOpenOption.WRITE,
+                  StandardOpenOption.TRUNCATE_EXISTING)),
+                StandardCharsets.UTF_8))
             v.toStream
                 .flatMap(_.lineIterator).toSet
                 .filter(_ != "")
