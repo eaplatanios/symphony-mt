@@ -29,7 +29,7 @@ case class DataConfig(
     loaderExtractTGZ: Boolean = true,
     loaderConvertSGMToText: Boolean = true,
     loaderTokenize: Boolean = false,
-    loaderDataCleaning: DataCleaning = MosesDataCleaning(),
+    loaderDataCleaning: DataCleaner = MosesDataCleaner(),
     loaderVocab: DatasetVocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
     // Corpus
     trainBatchSize: Long = 128,

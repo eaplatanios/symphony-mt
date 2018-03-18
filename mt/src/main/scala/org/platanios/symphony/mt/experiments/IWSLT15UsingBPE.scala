@@ -38,7 +38,7 @@ object IWSLT15UsingBPE extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderDataCleaning = MosesDataCleaning(1, 80),
+    loaderDataCleaning = MosesDataCleaner(1, 80),
     loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(10000)),
     numBuckets = 5,
     srcMaxLength = 80,

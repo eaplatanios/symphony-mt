@@ -37,7 +37,7 @@ object IWSLT15LanguageEmbeddings extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderDataCleaning = MosesDataCleaning(1, 80),
+    loaderDataCleaning = MosesDataCleaner(1, 80),
     loaderVocab = MergedVocabularies,
     numBuckets = 5,
     srcMaxLength = 80,

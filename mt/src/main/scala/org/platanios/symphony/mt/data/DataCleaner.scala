@@ -26,7 +26,7 @@ import scala.util.matching.Regex
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait DataCleaning {
+trait DataCleaner {
   def cleanFile(originalFile: File): File = {
     val fileName = originalFile.nameWithoutExtension(includeAll = false) + s".clean${originalFile.extension().get}"
     originalFile.sibling(fileName)
@@ -38,7 +38,7 @@ trait DataCleaning {
     val srcClean = cleanFile(srcFile)
     val tgtClean = cleanFile(tgtFile)
     if (srcClean.notExists || tgtClean.notExists) {
-      DataCleaning.logger.info(s"Cleaning '$srcFile' and '$tgtFile'.")
+      DataCleaner.logger.info(s"Cleaning '$srcFile' and '$tgtFile'.")
       val srcWriter = newWriter(srcClean)
       val tgtWriter = newWriter(tgtClean)
       newReader(srcFile).lines().toAutoClosedIterator
@@ -54,22 +54,22 @@ trait DataCleaning {
       srcWriter.close()
       tgtWriter.flush()
       tgtWriter.close()
-      DataCleaning.logger.info(s"Created clean files '$srcClean' and '$tgtClean'.")
+      DataCleaner.logger.info(s"Created clean files '$srcClean' and '$tgtClean'.")
     }
     (srcClean, tgtClean)
   }
 }
 
-object DataCleaning {
+object DataCleaner {
   private[data] val logger = Logger(LoggerFactory.getLogger("Dataset"))
 }
 
-class MosesDataCleaning protected (
+class MosesDataCleaner protected (
     val minSentenceLength: Int = -1,
     val maxSentenceLength: Int = -1,
     val maxWordLength: Int = -1,
     val lowerCase: Boolean = false
-) extends DataCleaning {
+) extends DataCleaner {
   protected val ignoredRegex      : Regex = """\|""".r
   protected val whitespaceRegex   : Regex = """\\s+""".r
   protected val maxWordLengthRegex: Regex = s"""[^\\s]{${maxWordLength + 1},}""".r
@@ -115,14 +115,14 @@ class MosesDataCleaning protected (
   }
 }
 
-object MosesDataCleaning {
+object MosesDataCleaner {
   def apply(
       minSentenceLength: Int = -1,
       maxSentenceLength: Int = -1,
       maxWordLength: Int = -1,
       lowerCase: Boolean = false
-  ): MosesDataCleaning = {
-    new MosesDataCleaning(
+  ): MosesDataCleaner = {
+    new MosesDataCleaner(
       minSentenceLength,
       maxSentenceLength,
       maxWordLength,
