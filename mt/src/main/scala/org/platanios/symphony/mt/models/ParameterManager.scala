@@ -29,6 +29,7 @@ import scala.collection.mutable
 class ParameterManager protected (
     val wordEmbeddingsSize: Int,
     val mergedWordEmbeddings: Boolean = true,
+    val mergedWordProjections: Boolean = true,
     val variableInitializer: tf.VariableInitializer = null
 ) {
   protected var environment  : Environment                 = _
@@ -163,18 +164,40 @@ class ParameterManager protected (
   def getProjectionToWords(inputSize: Int, languageId: Output): Output = {
     tf.createWithVariableScope("ParameterManager/ProjectionToWords/") {
       val graph = currentGraph
-      val projectionsForSize = projectionsToWords
-          .getOrElseUpdate(graph, mutable.HashMap.empty)
-          .getOrElseUpdate(inputSize, {
-            val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-            languages.map(l =>
-              tf.variable(s"${l._1.name}/OutWeights", FLOAT32, Shape(inputSize, l._2.size), weightsInitializer).value)
-          })
-      val predicates = projectionsForSize.zip(languageIds(graph)).map {
-        case (projections, langId) => (tf.equal(languageId, langId), () => projections)
+      if (!mergedWordProjections) {
+        val projectionsForSize = projectionsToWords
+            .getOrElseUpdate(graph, mutable.HashMap.empty)
+            .getOrElseUpdate(inputSize, {
+              val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+              languages.map(l =>
+                tf.variable(s"${l._1.name}/OutWeights", FLOAT32, Shape(inputSize, l._2.size), weightsInitializer).value)
+            })
+        val predicates = projectionsForSize.zip(languageIds(graph)).map {
+          case (projections, langId) => (tf.equal(languageId, langId), () => projections)
+        }
+        val default = () => projectionsForSize.head
+        tf.cases(predicates, default)
+      } else {
+        val projectionsForSize = projectionsToWords
+            .getOrElseUpdate(graph, mutable.HashMap.empty)
+            .getOrElseUpdate(inputSize, {
+              val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+              val vocabSizes = languages.map(_._2.size)
+              val merged = tf.variable(
+                "ProjectionWeights", FLOAT32, Shape(inputSize, vocabSizes.sum), weightsInitializer).value
+              val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
+              val offsets = tf.squeeze(
+                tf.stack(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1))), axes = Seq(1))
+              Seq(merged, offsets, sizes)
+            })
+        val merged = projectionsForSize(0)
+        val offsets = projectionsForSize(1)
+        val sizes = projectionsForSize(2)
+        tf.slice(
+          merged,
+          tf.stack(Seq(0, offsets.gather(languageId))),
+          tf.stack(Seq(inputSize, sizes.gather(languageId))))
       }
-      val default = () => projectionsForSize.head
-      tf.cases(predicates, default)
     }
   }
 }
@@ -183,9 +206,10 @@ object ParameterManager {
   def apply(
       wordEmbeddingsSize: Int,
       mergedWordEmbeddings: Boolean = true,
+      mergedWordProjections: Boolean = true,
       variableInitializer: tf.VariableInitializer = null
   ): ParameterManager = {
-    new ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, variableInitializer)
+    new ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, variableInitializer)
   }
 
   /** Creates an op that looks up the provided keys in the lookup table referred to by `handle` and returns the
@@ -218,8 +242,9 @@ class LanguageEmbeddingsPairParameterManager protected (
     val languageEmbeddingsSize: Int,
     override val wordEmbeddingsSize: Int,
     override val mergedWordEmbeddings: Boolean = true,
+    override val mergedWordProjections: Boolean = true,
     override val variableInitializer: tf.VariableInitializer = null
-) extends ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, variableInitializer) {
+) extends ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
   protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
 
@@ -286,12 +311,14 @@ object LanguageEmbeddingsPairParameterManager {
       languageEmbeddingsSize: Int,
       wordEmbeddingsSize: Int,
       mergedWordEmbeddings: Boolean = true,
+      mergedWordProjections: Boolean = true,
       variableInitializer: tf.VariableInitializer = null
   ): LanguageEmbeddingsPairParameterManager = {
     new LanguageEmbeddingsPairParameterManager(
       languageEmbeddingsSize,
       wordEmbeddingsSize,
       mergedWordEmbeddings,
+      mergedWordProjections,
       variableInitializer)
   }
 }
@@ -300,8 +327,9 @@ class LanguageEmbeddingsParameterManager protected (
     val languageEmbeddingsSize: Int,
     override val wordEmbeddingsSize: Int,
     override val mergedWordEmbeddings: Boolean = true,
+    override val mergedWordProjections: Boolean = true,
     override val variableInitializer: tf.VariableInitializer = null
-) extends ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, variableInitializer) {
+) extends ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
   protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
 
@@ -371,12 +399,14 @@ object LanguageEmbeddingsParameterManager {
       languageEmbeddingsSize: Int,
       wordEmbeddingsSize: Int,
       mergedWordEmbeddings: Boolean = true,
+      mergedWordProjections: Boolean = true,
       variableInitializer: tf.VariableInitializer = null
   ): LanguageEmbeddingsParameterManager = {
     new LanguageEmbeddingsParameterManager(
       languageEmbeddingsSize,
       wordEmbeddingsSize,
       mergedWordEmbeddings,
+      mergedWordProjections,
       variableInitializer)
   }
 }
