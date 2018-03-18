@@ -39,7 +39,7 @@ object IWSLT15UsingBPELanguageEmbeddings extends App {
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
     loaderDataCleaning = MosesDataCleaner(1, 80),
-    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(10000)),
+    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(10000, replaceExisting = false)),
     numBuckets = 5,
     srcMaxLength = 80,
     tgtMaxLength = 80)
@@ -71,16 +71,16 @@ object IWSLT15UsingBPELanguageEmbeddings extends App {
       env,
       LanguageEmbeddingsParameterManager(
         languageEmbeddingsSize = 64,
-        wordEmbeddingsSize = 64),
+        wordEmbeddingsSize = 512),
       BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 64,
+        numUnits = 512,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 64,
+        numUnits = 512,
         numLayers = 2,
         residual = false,
         dropout = Some(0.2f),
@@ -96,7 +96,7 @@ object IWSLT15UsingBPELanguageEmbeddings extends App {
       ("IWSLT15/dev", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
       ("IWSLT15/test", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
 
-  model.train(dataset.filterTypes(Train), tf.learn.StopCriteria.steps(12000))
+  model.train(dataset.filterTypes(Train), tf.learn.StopCriteria.steps(120000))
 
   // val evaluator = BilingualEvaluator(Seq(BLEU()), srcLanguage, tgtLanguage, dataset.filterTypes(Test))
   // println(evaluator.evaluate(model).values.head.scalar.asInstanceOf[Float])

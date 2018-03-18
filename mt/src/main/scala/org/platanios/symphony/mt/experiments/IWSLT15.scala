@@ -77,7 +77,7 @@ object IWSLT15 extends App {
       env,
       ParameterManager(
         wordEmbeddingsSize = 512,
-        tf.VarianceScalingInitializer(
+        variableInitializer = tf.VarianceScalingInitializer(
           1.0f,
           tf.VarianceScalingInitializer.FanAverageScalingMode,
           tf.VarianceScalingInitializer.UniformDistribution)),

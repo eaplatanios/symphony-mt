@@ -53,7 +53,7 @@ class GNMTEncoder[S, SS](
       stage: Stage
   ): Tuple[Output, Seq[S]] = {
     val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
-    val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage).gather(transposedSequences)
+    val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage)(transposedSequences)
 
     // Bidirectional RNN layers
     val biTuple = {

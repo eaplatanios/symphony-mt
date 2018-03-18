@@ -56,7 +56,7 @@ abstract class RNNDecoder[S, SS]()(implicit
       tgtSequences: Output,
       tgtSequenceLengths: Output,
       initialState: DS,
-      embeddings: Output,
+      embeddings: (Output) => Output,
       cell: tf.RNNCell[Output, Shape, DS, DSS],
       tgtMaxLength: Output,
       beginOfSequenceToken: String,
@@ -69,7 +69,7 @@ abstract class RNNDecoder[S, SS]()(implicit
     if (mode.isTraining) {
       // Time-major transpose
       val transposedSequences = if (config.timeMajor) tgtSequences.transpose() else tgtSequences
-      val embeddedSequences = embeddings.gather(transposedSequences)
+      val embeddedSequences = embeddings(transposedSequences)
 
       // Decoder RNN
       val helper = BasicDecoder.TrainingHelper(embeddedSequences, tgtSequenceLengths, config.timeMajor)
@@ -80,7 +80,7 @@ abstract class RNNDecoder[S, SS]()(implicit
       RNNDecoder.Output(tuple._1.rnnOutput, tuple._3)
     } else {
       // Decoder embeddings
-      val embeddingFn = (o: Output) => embeddings.gather(o)
+      val embeddingFn = (o: Output) => embeddings(o)
       val tgtVocabLookupTable = parameterManager.stringToIndexLookup(tgtLanguage)
       val tgtBosID = tgtVocabLookupTable(tf.constant(beginOfSequenceToken)).cast(INT32)
       val tgtEosID = tgtVocabLookupTable(tf.constant(endOfSequenceToken)).cast(INT32)

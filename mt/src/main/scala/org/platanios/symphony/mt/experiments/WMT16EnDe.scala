@@ -15,13 +15,14 @@
 
 package org.platanios.symphony.mt.experiments
 
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention
 import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}
-import org.platanios.symphony.mt.{Environment, Language}
+import org.platanios.symphony.mt.vocabulary.BPEVocabularyGenerator
 import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
@@ -39,11 +40,14 @@ object WMT16EnDe extends App {
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenize = true,
     loaderDataCleaning = MosesDataCleaner(1, 80),
+    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(10000, replaceExisting = false)),
     numBuckets = 5,
     srcMaxLength = 80,
     tgtMaxLength = 80)
 
-  val dataset: FileParallelDataset = WMT16DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
+  val dataset: FileParallelDataset = {
+    loadDatasets(Seq(WMT16DatasetLoader(srcLanguage, tgtLanguage, dataConfig)), Some(workingDir))._1.head
+  }
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
@@ -70,7 +74,7 @@ object WMT16EnDe extends App {
       env,
       ParameterManager(
         wordEmbeddingsSize = 1024,
-        tf.VarianceScalingInitializer(
+        variableInitializer = tf.VarianceScalingInitializer(
           1.0f,
           tf.VarianceScalingInitializer.FanAverageScalingMode,
           tf.VarianceScalingInitializer.UniformDistribution)),
