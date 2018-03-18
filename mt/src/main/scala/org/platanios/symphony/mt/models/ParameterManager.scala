@@ -76,7 +76,7 @@ class ParameterManager protected (
           languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = l._1.name))
         }
 
-        val vocabTables = tf.createWithVariableScope("StringToIndexLookupTables/") {
+        tf.createWithVariableScope("StringToIndexLookupTables/") {
           val tables = languages.map(l => l._2.stringToIndexLookupTable(name = l._1.name))
           stringToIndexLookupTables += graph -> tf.stack(tables.map(_.handle))
           stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID, INT64, name = "Default")
@@ -91,13 +91,14 @@ class ParameterManager protected (
 
         wordEmbeddings += graph -> tf.createWithVariableScope("WordEmbeddings/") {
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          val embeddings = languages.map(l =>
-            tf.variable(l._1.name, FLOAT32, Shape(l._2.size, wordEmbeddingsSize), embeddingsInitializer).value)
           if (!mergedWordEmbeddings) {
-            embeddings
+            languages.map(l =>
+              tf.variable(l._1.name, FLOAT32, Shape(l._2.size, wordEmbeddingsSize), embeddingsInitializer).value)
           } else {
-            val merged = tf.concatenate(embeddings, axis = 0)
-            val sizes = tf.createWithNameScope("StringToIndexLookupTables/Sizes")(tf.stack(vocabTables.map(_.size())))
+            val vocabSizes = languages.map(_._2.size)
+            val merged = tf.variable(
+              "Embeddings", FLOAT32, Shape(vocabSizes.sum, wordEmbeddingsSize), embeddingsInitializer).value
+            val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
             val offsets = tf.stack(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
             Seq(merged, offsets)
           }
