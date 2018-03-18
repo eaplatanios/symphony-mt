@@ -24,6 +24,8 @@ case class Language(name: String, abbreviation: String) {
 
 object Language {
   val bulgarian : Language = Language("Bulgarian", "bg")
+  val catalan   : Language = Language("Catalan", "ca")
+  val chinese   : Language = Language("Chinese", "zh")
   val czech     : Language = Language("Czech", "cs")
   val danish    : Language = Language("Danish", "da")
   val dutch     : Language = Language("Dutch", "nl")
@@ -35,7 +37,9 @@ object Language {
   val greek     : Language = Language("Greek", "el")
   val hindi     : Language = Language("Hindi", "hi")
   val hungarian : Language = Language("Hungarian", "hu")
+  val icelandic : Language = Language("Icelandic", "is")
   val italian   : Language = Language("Italian", "it")
+  val irish     : Language = Language("Irish", "ga")
   val lithuanian: Language = Language("Lithuanian", "lt")
   val latvian   : Language = Language("Latvian", "lv")
   val polish    : Language = Language("Polish", "pl")
@@ -46,6 +50,7 @@ object Language {
   val slovenian : Language = Language("Slovenian", "sl")
   val spanish   : Language = Language("Spanish", "es")
   val swedish   : Language = Language("Swedish", "sv")
+  val tamil     : Language = Language("Tamil", "ta")
   val turkish   : Language = Language("Turkish", "tr")
   val vietnamese: Language = Language("Vietnamese", "vi")
 }

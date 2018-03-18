@@ -61,7 +61,7 @@ trait DataCleaner {
 }
 
 object DataCleaner {
-  private[data] val logger = Logger(LoggerFactory.getLogger("Dataset"))
+  private[data] val logger = Logger(LoggerFactory.getLogger("Data Cleaner"))
 }
 
 class MosesDataCleaner protected (
@@ -71,8 +71,8 @@ class MosesDataCleaner protected (
     val lowerCase: Boolean = false
 ) extends DataCleaner {
   protected val ignoredRegex      : Regex = """\|""".r
-  protected val whitespaceRegex   : Regex = """\\s+""".r
-  protected val maxWordLengthRegex: Regex = s"""[^\\s]{${maxWordLength + 1},}""".r
+  protected val whitespaceRegex   : Regex = """\s+""".r
+  protected val maxWordLengthRegex: Regex = s"""[\\S]{${maxWordLength + 1},}""".r
 
   override def processPair(srcSentence: String, tgtSentence: String): Option[(String, String)] = {
     var src = srcSentence.trim

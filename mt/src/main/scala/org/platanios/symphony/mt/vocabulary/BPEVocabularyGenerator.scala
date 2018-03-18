@@ -385,7 +385,8 @@ object BPEVocabularyGenerator {
   private[BPEVocabularyGenerator] val whitespaceRegex: Regex = "\\s+".r
 
   /** Default glossary to use. */
-  private[BPEVocabularyGenerator] val DEFAULT_GLOSSARY: Set[String] = Set("&quot;", "&apos;")
+  private[BPEVocabularyGenerator] val DEFAULT_GLOSSARY: Set[String] = Set(
+    "e.g", "i.e", "&amp;", "&#124;", "&lt;", "&gt;", "&apos;", "&quot;", "&#91;", "&#93;")
 
   private[BPEVocabularyGenerator] def glossaryRegex(glossary: Set[String]): Regex = {
     s"(?:${glossary.mkString("|")})|(?!${glossary.mkString("|")})".r
