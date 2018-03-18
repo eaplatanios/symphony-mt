@@ -18,7 +18,8 @@ package org.platanios.symphony.mt.models
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.FunctionGraph
+import org.platanios.tensorflow.api.core.exception.InvalidDataTypeException
+import org.platanios.tensorflow.api.ops.{FunctionGraph, Op}
 
 import scala.collection.mutable
 
@@ -33,10 +34,12 @@ class ParameterManager protected (
   protected var deviceManager: Option[DeviceManager]       = None
   protected var languages    : Seq[(Language, Vocabulary)] = _
 
-  protected val languageIds              : mutable.Map[Graph, Seq[Output]]       = mutable.Map.empty
-  protected val stringToIndexLookupTables: mutable.Map[Graph, Seq[tf.HashTable]] = mutable.Map.empty
-  protected val indexToStringLookupTables: mutable.Map[Graph, Seq[tf.HashTable]] = mutable.Map.empty
-  protected val wordEmbeddings           : mutable.Map[Graph, Seq[Output]]       = mutable.Map.empty
+  protected val languageIds                : mutable.Map[Graph, Seq[Output]] = mutable.Map.empty
+  protected val stringToIndexLookupTables  : mutable.Map[Graph, Output]      = mutable.Map.empty
+  protected val stringToIndexLookupDefaults: mutable.Map[Graph, Output]      = mutable.Map.empty
+  protected val indexToStringLookupTables  : mutable.Map[Graph, Output]      = mutable.Map.empty
+  protected val indexToStringLookupDefaults: mutable.Map[Graph, Output]      = mutable.Map.empty
+  protected val wordEmbeddings             : mutable.Map[Graph, Seq[Output]] = mutable.Map.empty
 
   protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, Seq[Output]]] = mutable.Map.empty
 
@@ -55,7 +58,9 @@ class ParameterManager protected (
   protected def removeGraph(graph: Graph): Unit = {
     languageIds -= graph
     stringToIndexLookupTables -= graph
+    stringToIndexLookupDefaults -= graph
     indexToStringLookupTables -= graph
+    indexToStringLookupDefaults -= graph
     wordEmbeddings -= graph
     projectionsToWords -= graph
   }
@@ -72,13 +77,21 @@ class ParameterManager protected (
       }
       if (!stringToIndexLookupTables.contains(graph)) {
         stringToIndexLookupTables += graph -> tf.createWithVariableScope("StringToIndexLookupTables/") {
-          languages.map(l => l._2.stringToIndexLookupTable(name = l._1.name))
+          tf.stack(languages.map(l => l._2.stringToIndexLookupTable(name = l._1.name).handle))
         }
+      }
+      if (!stringToIndexLookupDefaults.contains(graph)) {
+        stringToIndexLookupDefaults += graph -> tf.constant(
+          Vocabulary.UNKNOWN_TOKEN_ID, INT64, name = "StringToIndexLookupTables/Default")
       }
       if (!indexToStringLookupTables.contains(graph)) {
         indexToStringLookupTables += graph -> tf.createWithVariableScope("IndexToStringLookupTables/") {
-          languages.map(l => l._2.indexToStringLookupTable(name = l._1.name))
+          tf.stack(languages.map(l => l._2.indexToStringLookupTable(name = l._1.name).handle))
         }
+      }
+      if (!indexToStringLookupDefaults.contains(graph)) {
+        indexToStringLookupDefaults += graph -> tf.constant(
+          Vocabulary.UNKNOWN_TOKEN, STRING, name = "IndexToStringLookupTables/Default")
       }
       if (!wordEmbeddings.contains(graph)) {
         wordEmbeddings += graph -> tf.createWithVariableScope("WordEmbeddings/") {
@@ -93,22 +106,20 @@ class ParameterManager protected (
   def stringToIndexLookup(languageId: Output): (Output) => Output = (keys: Output) => {
     tf.createWithVariableScope("ParameterManager/StringToIndexLookupTables/") {
       val graph = currentGraph
-      val predicates = stringToIndexLookupTables(graph).zip(languageIds(graph)).map {
-        case (table, langId) => (tf.equal(languageId, langId), () => table.lookup(keys))
-      }
-      val default = () => stringToIndexLookupTables(graph).head.lookup(keys)
-      tf.cases(predicates, default)
+      ParameterManager.lookup(
+        handle = stringToIndexLookupTables(graph).gather(languageId),
+        keys = keys,
+        defaultValue = stringToIndexLookupDefaults(graph))
     }
   }
 
   def indexToStringLookup(languageId: Output): (Output) => Output = (keys: Output) => {
     tf.createWithVariableScope("ParameterManager/IndexToStringLookupTables/") {
       val graph = currentGraph
-      val predicates = indexToStringLookupTables(graph).zip(languageIds(graph)).map {
-        case (table, langId) => (tf.equal(languageId, langId), () => table.lookup(keys))
-      }
-      val default = () => indexToStringLookupTables(graph).head.lookup(keys)
-      tf.cases(predicates, default)
+      ParameterManager.lookup(
+        handle = indexToStringLookupTables(graph).gather(languageId),
+        keys = keys,
+        defaultValue = indexToStringLookupTables(graph))
     }
   }
 
@@ -161,6 +172,31 @@ class ParameterManager protected (
 object ParameterManager {
   def apply(wordEmbeddingsSize: Int, variableInitializer: tf.VariableInitializer = null): ParameterManager = {
     new ParameterManager(wordEmbeddingsSize, variableInitializer)
+  }
+
+  /** Creates an op that looks up the provided keys in the lookup table referred to by `handle` and returns the
+    * corresponding values.
+    *
+    * @param  handle `RESOURCE` tensor containing a handle to the lookup table.
+    * @param  keys   Tensor containing the keys to look up.
+    * @param  name   Name for the created op.
+    * @return Created op output.
+    * @throws InvalidDataTypeException If the provided keys data types does not match the keys data type of this table.
+    */
+  @throws[InvalidDataTypeException]
+  private[ParameterManager] def lookup(
+      handle: Output,
+      keys: Output,
+      defaultValue: Output,
+      name: String = "Lookup"
+  ): Output = tf.createWithNameScope(name) {
+    val values = Op.Builder("LookupTableFindV2", name)
+        .addInput(handle)
+        .addInput(keys)
+        .addInput(defaultValue)
+        .build().outputs(0)
+    values.setShape(keys.shape)
+    values
   }
 }
 
