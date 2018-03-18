@@ -49,6 +49,10 @@ object IWSLT15 extends App {
 
   val env = Environment(
     workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+    allowSoftPlacement = true,
+    logDevicePlacement = false,
+    gpuAllowMemoryGrowth = false,
+    useXLA = false,
     numGPUs = 1,
     parallelIterations = 32,
     swapMemory = true,

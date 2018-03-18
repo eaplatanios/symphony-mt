@@ -102,11 +102,18 @@ abstract class Model[S] protected (
       hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
         summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
 
+    var sessionConfig = SessionConfig(
+      allowSoftPlacement = Some(config.env.allowSoftPlacement),
+      logDevicePlacement = Some(config.env.logDevicePlacement),
+      gpuAllowMemoryGrowth = Some(config.env.gpuAllowMemoryGrowth))
+    if (config.env.useXLA)
+      sessionConfig = sessionConfig.copy(optGlobalJITLevel = Some(SessionConfig.L1GraphOptimizerGlobalJIT))
+
     // Create estimator.
     tf.learn.InMemoryEstimator(
       model, tf.learn.Configuration(
         workingDir = Some(config.env.workingDir),
-        sessionConfig = Some(SessionConfig(allowSoftPlacement = Some(true))),
+        sessionConfig = Some(sessionConfig),
         randomSeed = config.env.randomSeed),
       trainHooks = hooks)
   }

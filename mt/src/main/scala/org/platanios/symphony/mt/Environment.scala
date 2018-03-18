@@ -22,6 +22,10 @@ import java.nio.file.Path
   */
 case class Environment(
     workingDir: Path,
+    allowSoftPlacement: Boolean = true,
+    logDevicePlacement: Boolean = false,
+    gpuAllowMemoryGrowth: Boolean = false,
+    useXLA: Boolean = false,
     numGPUs: Int = 0,
     firstGPU: Int = 0,
     parallelIterations: Int = 32,

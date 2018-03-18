@@ -52,6 +52,10 @@ object WMT16LanguageEmbeddings extends App {
 
   val env = Environment(
     workingDir = workingDir,
+    allowSoftPlacement = true,
+    logDevicePlacement = false,
+    gpuAllowMemoryGrowth = false,
+    useXLA = false,
     numGPUs = 1,
     parallelIterations = 32,
     swapMemory = true,
