@@ -617,15 +617,17 @@ object BPEVocabularyGenerator {
         // We first go through the left parts.
         val leftParts = {
           if (vocabulary.contains(left + separator))
-            Seq(left)
+            Seq(left + separator)
           else
             splitRecursively(left, reversedMergePairs, vocabulary, separator, isLast = false)
         }
 
         // We then go through the right parts.
         val rightParts = {
-          if ((isLast && vocabulary.contains(right)) || (!isLast && vocabulary.contains(right + separator)))
+          if (isLast && vocabulary.contains(right))
             Seq(right)
+          else if (!isLast && vocabulary.contains(right + separator))
+            Seq(right + separator)
           else
             splitRecursively(right, reversedMergePairs, vocabulary, separator, isLast = isLast)
         }
@@ -653,7 +655,8 @@ object BPEVocabularyGenerator {
       wordParts
     } else {
       wordParts.zipWithIndex.flatMap {
-        case (part, index) if index < wordParts.length - 1 && vocabulary.contains(part + separator) => Seq(part)
+        case (part, index) if index < wordParts.length - 1 && vocabulary.contains(part + separator) =>
+          Seq(part + separator)
         case (part, index) if index < wordParts.length - 1 =>
           splitRecursively(part, reversedMergePairs, vocabulary, separator, isLast = false)
         case (part, _) if vocabulary.contains(part) => Seq(part)
