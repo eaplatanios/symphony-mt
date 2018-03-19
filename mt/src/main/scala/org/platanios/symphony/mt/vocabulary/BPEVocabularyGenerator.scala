@@ -174,7 +174,7 @@ class BPEVocabularyGenerator protected (
     // Irrespective of whether a new vocabulary is being generated, or an existing one was loaded, we also convert the
     // provided tokenized files to their encoded equivalent.
     var fileWriters = Seq.empty[BufferedWriter]
-    val tokens = tokenizedFiles.toIterator.flatMap(mutableFile => {
+    val tokens = tokenizedFiles.flatMap(mutableFile => {
       val oldFile = mutableFile.get
       val file = oldFile.sibling(
         s"${oldFile.nameWithoutExtension(includeAll = false)}.bpe.$numSymbols.${language.abbreviation}")
@@ -191,9 +191,9 @@ class BPEVocabularyGenerator protected (
               if (sentence.nonEmpty)
                 fileWriter.foreach(_.write(s"${sentence.mkString(" ")}\n"))
               if (replaceExisting || vocabWriter.isDefined)
-                sentence
+                sentence.toIterator
               else
-                Seq.empty
+                Iterator.empty
             })
         fileWriter.foreach(fileWriters :+= _)
         tokens
@@ -201,7 +201,7 @@ class BPEVocabularyGenerator protected (
         newReader(file).lines().toAutoClosedIterator
             .flatMap(line => BPEVocabularyGenerator.whitespaceRegex.split(line))
       } else {
-        Seq.empty
+        Iterator.empty
       }
     })
 
