@@ -68,7 +68,7 @@ object NoCleaner extends Cleaner {
   override def cleanFile(originalFile: File): File = originalFile
 
   override def processPair(srcSentence: String, tgtSentence: String): Option[(String, String)] = {
-    Some(srcSentence, tgtSentence)
+    Some((srcSentence, tgtSentence))
   }
 
   override def processCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {

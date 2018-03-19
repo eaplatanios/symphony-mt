@@ -18,14 +18,14 @@ package org.platanios.symphony.mt.data
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.symphony.mt.utilities.{CompressedFiles, MutableFile}
-
 import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
-
 import java.io.IOException
 import java.net.URL
 import java.nio.file.Path
+
+import org.platanios.symphony.mt.data.processors.SGMConverter
 
 import scala.collection.mutable
 
@@ -84,11 +84,8 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
     val files = extractedFiles.map(file => {
       var newFile = file
       if (!newFile.name.startsWith(".")) {
-        if (dataConfig.loaderConvertSGMToText && file.extension().contains(".sgm")) {
-          newFile = file.sibling(file.nameWithoutExtension(includeAll = false))
-          if (newFile.notExists)
-            mosesDecoder.sgmToText(file, newFile)
-        }
+        if (dataConfig.loaderConvertSGMToText && newFile.extension().contains(".sgm"))
+          newFile = SGMConverter.convertSGMToText(newFile)
         // TODO: The following file moves are hacky and non-generic (they only apply to the WMT-16 dataset).
         if (newFile.name.endsWith(s"-src.$src") || newFile.name.endsWith(s"-ref.$src")) {
           val renamedFile = newFile.sibling(newFile.name.dropRight(5 + src.length) + s".$src")
