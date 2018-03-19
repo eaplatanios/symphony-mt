@@ -27,7 +27,7 @@ import scala.util.matching.Regex
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait DataTokenizer {
+trait Tokenizer {
   def tokenizedFile(originalFile: File): File = {
     val fileName = originalFile.nameWithoutExtension(includeAll = false) + s".tok${originalFile.extension().get}"
     originalFile.sibling(fileName)
@@ -38,24 +38,24 @@ trait DataTokenizer {
   def tokenizeCorpus(file: File, language: Language, bufferSize: Int = 8192): File = {
     val tokenized = tokenizedFile(file)
     if (tokenized.notExists) {
-      DataTokenizer.logger.info(s"Tokenizing '$file'.")
+      Tokenizer.logger.info(s"Tokenizing '$file'.")
       val tokenizedWriter = newWriter(tokenized)
       newReader(file).lines().toAutoClosedIterator.foreach(sentence => {
         tokenizedWriter.write(s"${tokenize(sentence, language)}\n")
       })
       tokenizedWriter.flush()
       tokenizedWriter.close()
-      DataTokenizer.logger.info(s"Created tokenized file '$tokenized'.")
+      Tokenizer.logger.info(s"Created tokenized file '$tokenized'.")
     }
     tokenized
   }
 }
 
-object DataTokenizer {
-  private[data] val logger = Logger(LoggerFactory.getLogger("Data Tokenizer"))
+object Tokenizer {
+  private[data] val logger = Logger(LoggerFactory.getLogger("Data / Tokenizer"))
 }
 
-object NoTokenizer extends DataTokenizer {
+object NoTokenizer extends Tokenizer {
   override def tokenizedFile(originalFile: File): File = originalFile
   override def tokenize(sentence: String, language: Language): String = sentence
   override def tokenizeCorpus(file: File, language: Language, bufferSize: Int = 8192): File = file
@@ -76,7 +76,7 @@ case class MosesTokenizer(
     aggressiveHyphenSplitting: Boolean = false,
     escapeSpecialCharacters: Boolean = true,
     nonBreakingPrefixes: Map[Language, MosesTokenizer.NonBreakingPrefixes] = MosesTokenizer.defaultNonBreakingPrefixes
-) extends DataTokenizer {
+) extends Tokenizer {
   private val ignoredRegex                  : Regex = """[\000-\037]""".r
   private val whitespaceRegex               : Regex = """\s+""".r
   private val periodRegex                   : Regex = """\.""".r

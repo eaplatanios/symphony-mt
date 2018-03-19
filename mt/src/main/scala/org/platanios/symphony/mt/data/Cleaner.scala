@@ -26,7 +26,7 @@ import scala.util.matching.Regex
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait DataCleaner {
+trait Cleaner {
   def cleanFile(originalFile: File): File = {
     val fileName = originalFile.nameWithoutExtension(includeAll = false) + s".clean${originalFile.extension().get}"
     originalFile.sibling(fileName)
@@ -38,7 +38,7 @@ trait DataCleaner {
     val srcClean = cleanFile(srcFile)
     val tgtClean = cleanFile(tgtFile)
     if (srcClean.notExists || tgtClean.notExists) {
-      DataCleaner.logger.info(s"Cleaning '$srcFile' and '$tgtFile'.")
+      Cleaner.logger.info(s"Cleaning '$srcFile' and '$tgtFile'.")
       val srcWriter = newWriter(srcClean)
       val tgtWriter = newWriter(tgtClean)
       newReader(srcFile).lines().toAutoClosedIterator
@@ -54,22 +54,34 @@ trait DataCleaner {
       srcWriter.close()
       tgtWriter.flush()
       tgtWriter.close()
-      DataCleaner.logger.info(s"Created clean files '$srcClean' and '$tgtClean'.")
+      Cleaner.logger.info(s"Created clean files '$srcClean' and '$tgtClean'.")
     }
     (srcClean, tgtClean)
   }
 }
 
-object DataCleaner {
-  private[data] val logger = Logger(LoggerFactory.getLogger("Data Cleaner"))
+object Cleaner {
+  private[data] val logger = Logger(LoggerFactory.getLogger("Data / Cleaner"))
 }
 
-class MosesDataCleaner protected (
+object NoCleaner extends Cleaner {
+  override def cleanFile(originalFile: File): File = originalFile
+
+  override def processPair(srcSentence: String, tgtSentence: String): Option[(String, String)] = {
+    Some(srcSentence, tgtSentence)
+  }
+
+  override def processCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {
+    (srcFile, tgtFile)
+  }
+}
+
+class MosesCleaner protected (
     val minSentenceLength: Int = -1,
     val maxSentenceLength: Int = -1,
     val maxWordLength: Int = -1,
     val lowerCase: Boolean = false
-) extends DataCleaner {
+) extends Cleaner {
   protected val ignoredRegex      : Regex = """\|""".r
   protected val whitespaceRegex   : Regex = """\s+""".r
   protected val maxWordLengthRegex: Regex = s"""[\\S]{${maxWordLength + 1},}""".r
@@ -115,14 +127,14 @@ class MosesDataCleaner protected (
   }
 }
 
-object MosesDataCleaner {
+object MosesCleaner {
   def apply(
       minSentenceLength: Int = -1,
       maxSentenceLength: Int = -1,
       maxWordLength: Int = -1,
       lowerCase: Boolean = false
-  ): MosesDataCleaner = {
-    new MosesDataCleaner(
+  ): MosesCleaner = {
+    new MosesCleaner(
       minSentenceLength,
       maxSentenceLength,
       maxWordLength,
