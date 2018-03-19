@@ -38,7 +38,8 @@ object IWSLT15UsingBPELanguageEmbeddings extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderDataCleaning = MosesDataCleaner(1, 80),
+    loaderTokenizer = NoTokenizer,
+    loaderCleaner = MosesDataCleaner(1, 80),
     loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(10000, replaceExisting = false)),
     numBuckets = 5,
     srcMaxLength = 80,

@@ -39,8 +39,8 @@ object WMT16UsingBPELanguageEmbeddings extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderTokenize = true,
-    loaderDataCleaning = MosesDataCleaner(1, 80),
+    loaderTokenizer = MosesTokenizer(),
+    loaderCleaner = MosesDataCleaner(1, 80),
     loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000, replaceExisting = false)),
     numBuckets = 5,
     srcMaxLength = 80,

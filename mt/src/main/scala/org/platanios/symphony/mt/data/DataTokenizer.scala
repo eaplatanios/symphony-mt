@@ -55,6 +55,12 @@ object DataTokenizer {
   private[data] val logger = Logger(LoggerFactory.getLogger("Data Tokenizer"))
 }
 
+object NoTokenizer extends DataTokenizer {
+  override def tokenizedFile(originalFile: File): File = originalFile
+  override def tokenize(sentence: String, language: Language): String = sentence
+  override def tokenizeCorpus(file: File, language: Language, bufferSize: Int = 8192): File = file
+}
+
 /** Tokenizer used by the Moses library.
   *
   * The code in this class is a Scala translation of the
@@ -89,7 +95,7 @@ case class MosesTokenizer(
   private val commaRegex1                   : Regex = """([^\p{IsDigit}])[,]""".r
   private val commaRegex2                   : Regex = """[,]([^\p{IsDigit}])""".r
   private val enContractionsRegex1          : Regex = """([^\p{IsAlpha}])[']([^\p{IsAlpha}])""".r
-  private val enContractionsRegex2          : Regex = """([^\p{IsAlpha}\p{IsN}])[']([\p{IsAlpha}])""".r
+  private val enContractionsRegex2          : Regex = """([^\p{IsAlpha}\p{IsDigit}])[']([\p{IsAlpha}])""".r
   private val enContractionsRegex3          : Regex = """([\p{IsAlpha}])[']([^\p{IsAlpha}])""".r
   private val enContractionsRegex4          : Regex = """([\p{IsAlpha}])[']([\p{IsAlpha}])""".r
   private val enContractionsRegex5          : Regex = """([\p{IsDigit}])[']([s])""".r
@@ -164,18 +170,21 @@ case class MosesTokenizer(
     // Tokenize words.
     val words = whitespaceRegex.split(tokenized)
     tokenized = words.zipWithIndex.map(word => {
-      wordRegex.findFirstIn(word._1) match {
-        case Some(prefix) if periodRegex.findFirstIn(prefix).isDefined && alphabeticRegex.findFirstIn(prefix).isDefined =>
+      val wordMatch = wordRegex.findFirstMatchIn(word._1)
+      if (wordMatch.isEmpty) {
+        word._1
+      } else {
+        val prefix = wordMatch.get.group(1)
+        if (periodRegex.findFirstIn(prefix).isDefined && alphabeticRegex.findFirstIn(prefix).isDefined ||
+            nonBreakingPrefixes(language).prefixes.contains(prefix) ||
+            word._2 < words.length - 1 && notLowercaseRegex.findFirstIn(words(word._2 + 1)).isDefined ||
+            (word._2 < words.length - 1 &&
+                notDigitsRegex.findFirstIn(words(word._2 + 1)).isDefined &&
+                nonBreakingPrefixes(language).numericPrefixes.contains(prefix))) {
           word._1
-        case Some(prefix) if nonBreakingPrefixes(language).prefixes.contains(prefix) =>
-          word._1
-        case Some(_) if word._2 < words.length - 1 && notLowercaseRegex.findFirstIn(words(word._2 + 1)).isDefined =>
-          word._1
-        case Some(prefix) if word._2 < words.length - 1 && notDigitsRegex.findFirstIn(words(word._2 + 1)).isDefined
-            && nonBreakingPrefixes(language).numericPrefixes.contains(prefix) =>
-          word._1
-        case Some(prefix) => s"$prefix ."
-        case None => word._1
+        } else {
+          s"$prefix ."
+        }
       }
     }).mkString(" ")
 

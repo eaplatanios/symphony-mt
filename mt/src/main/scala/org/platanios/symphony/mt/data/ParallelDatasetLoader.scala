@@ -183,8 +183,17 @@ object ParallelDatasetLoader {
       var fileKeys = Seq.empty[String]
       DatasetType.types.foreach(datasetType => {
         val corpora = loader.corpora(datasetType)
-        srcFiles ++= corpora.map(_._2).map(MutableFile(_)).map(preprocessFile(_, loader))
-        tgtFiles ++= corpora.map(_._3).map(MutableFile(_)).map(preprocessFile(_, loader))
+
+        // Tokenize source and target files.
+        srcFiles ++= corpora.map(_._2).map(f => {
+          loader.dataConfig.loaderTokenizer.tokenizeCorpus(
+            f, loader.srcLanguage, loader.dataConfig.loaderBufferSize)
+        }).map(MutableFile(_))
+        tgtFiles ++= corpora.map(_._3).map(f => {
+          loader.dataConfig.loaderTokenizer.tokenizeCorpus(
+            f, loader.tgtLanguage, loader.dataConfig.loaderBufferSize)
+        }).map(MutableFile(_))
+
         fileTypes ++= Seq.fill(corpora.length)(datasetType)
         fileKeys ++= corpora.map(_._1)
       })
@@ -192,7 +201,7 @@ object ParallelDatasetLoader {
       // TODO: [DATA] Only clean the training data.
 
       // Clean the corpora.
-      val dataCleaning = loader.dataConfig.loaderDataCleaning
+      val dataCleaning = loader.dataConfig.loaderCleaner
       srcFiles.zip(tgtFiles).foreach {
         case (srcFile, tgtFile) =>
           val cleaned = dataCleaning.processCorporaPair(srcFile.get, tgtFile.get, loader.dataConfig.loaderBufferSize)
@@ -249,23 +258,5 @@ object ParallelDatasetLoader {
     }
 
     (datasets, vocabulary.toSeq)
-  }
-
-  private[this] def preprocessFile(mutableFile: MutableFile, loader: ParallelDatasetLoader): MutableFile = {
-    var newFile = mutableFile.get
-    if (loader.dataConfig.loaderTokenize && !newFile.name.contains(".tok")) {
-      // TODO: The language passed to the tokenizer is "computed" in a non-standardized way.
-      val tokenizedFile = newFile.sibling(
-        newFile.nameWithoutExtension(includeAll = false) + ".tok" + newFile.extension.getOrElse(""))
-      if (tokenizedFile.notExists) {
-        val exitCode = loader.mosesDecoder.tokenize(
-          newFile, tokenizedFile, tokenizedFile.extension(includeDot = false).getOrElse(""))
-        if (exitCode != 0)
-          newFile.copyTo(tokenizedFile)
-      }
-      newFile = tokenizedFile
-    }
-    mutableFile.set(newFile)
-    mutableFile
   }
 }

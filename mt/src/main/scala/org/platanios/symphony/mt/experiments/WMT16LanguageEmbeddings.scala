@@ -39,8 +39,8 @@ object WMT16LanguageEmbeddings extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderTokenize = true,
-    loaderDataCleaning = MosesDataCleaner(1, 80),
+    loaderTokenizer = MosesTokenizer(),
+    loaderCleaner = MosesDataCleaner(1, 80),
     loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
     numBuckets = 5,
     srcMaxLength = 80,

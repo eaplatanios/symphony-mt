@@ -39,7 +39,8 @@ object IWSLT15 extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderDataCleaning = MosesDataCleaner(1, 80),
+    loaderTokenizer = NoTokenizer,
+    loaderCleaner = MosesDataCleaner(1, 80),
     loaderVocab = MergedVocabularies,
     numBuckets = 5,
     srcMaxLength = 80,

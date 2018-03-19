@@ -37,8 +37,8 @@ object WMT16 extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderTokenize = true,
-    loaderDataCleaning = MosesDataCleaner(1, 80),
+    loaderTokenizer = MosesTokenizer(),
+    loaderCleaner = MosesDataCleaner(1, 80),
     numBuckets = 5,
     srcMaxLength = 80,
     tgtMaxLength = 80)
