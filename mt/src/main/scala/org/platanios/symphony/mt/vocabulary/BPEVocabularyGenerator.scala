@@ -602,25 +602,35 @@ object BPEVocabularyGenerator {
       isLast: Boolean = false
   ): Seq[String] = {
     val pair = {
-      if (isLast)
-        reversedMergePairs.get(wordPart + END_OF_WORD_SYMBOL).map(p => (p._1, p._2.drop(END_OF_WORD_SYMBOL.length)))
-      else
+      if (isLast) {
+        reversedMergePairs.get(wordPart + END_OF_WORD_SYMBOL)
+            .map(p => (p._1, p._2.dropRight(END_OF_WORD_SYMBOL.length)))
+      } else {
         reversedMergePairs.get(wordPart)
+      }
     }
 
     pair match {
       case None => Seq(wordPart)
-      case Some((left, right)) => { // We first go through the left parts.
-        if (vocabulary.contains(left + separator))
-          Seq(left)
-        else
-          splitRecursively(left, reversedMergePairs, vocabulary, separator, isLast = false)
-      } ++ { // We then go through the right parts.
-        if ((isLast && vocabulary.contains(right)) || (!isLast && vocabulary.contains(right + separator)))
-          Seq(right)
-        else
-          splitRecursively(right, reversedMergePairs, vocabulary, separator, isLast = isLast)
-      }
+      case Some((left, right)) =>
+
+        // We first go through the left parts.
+        val leftParts = {
+          if (vocabulary.contains(left + separator))
+            Seq(left)
+          else
+            splitRecursively(left, reversedMergePairs, vocabulary, separator, isLast = false)
+        }
+
+        // We then go through the right parts.
+        val rightParts = {
+          if ((isLast && vocabulary.contains(right)) || (!isLast && vocabulary.contains(right + separator)))
+            Seq(right)
+          else
+            splitRecursively(right, reversedMergePairs, vocabulary, separator, isLast = isLast)
+        }
+
+        leftParts ++ rightParts
     }
   }
 
@@ -643,16 +653,11 @@ object BPEVocabularyGenerator {
       wordParts
     } else {
       wordParts.zipWithIndex.flatMap {
+        case (part, index) if index < wordParts.length - 1 && vocabulary.contains(part + separator) => Seq(part)
         case (part, index) if index < wordParts.length - 1 =>
-          if (vocabulary.contains(part + separator))
-            Seq(part)
-          else
-            splitRecursively(part, reversedMergePairs, vocabulary, separator, isLast = false)
-        case (part, _) =>
-          if (vocabulary.contains(part))
-            Seq(part)
-          else
-            splitRecursively(part, reversedMergePairs, vocabulary, separator, isLast = true)
+          splitRecursively(part, reversedMergePairs, vocabulary, separator, isLast = false)
+        case (part, _) if vocabulary.contains(part) => Seq(part)
+        case (part, _) => splitRecursively(part, reversedMergePairs, vocabulary, separator, isLast = true)
       }
     }
   }

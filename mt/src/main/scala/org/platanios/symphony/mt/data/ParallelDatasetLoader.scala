@@ -194,10 +194,10 @@ object ParallelDatasetLoader {
       // TODO: [DATA] Only clean the training data.
 
       // Clean the corpora.
-      val dataCleaning = loader.dataConfig.loaderCleaner
+      val dataCleaner = loader.dataConfig.loaderCleaner
       srcFiles.zip(tgtFiles).foreach {
         case (srcFile, tgtFile) =>
-          val cleaned = dataCleaning.processCorporaPair(srcFile.get, tgtFile.get, loader.dataConfig.loaderBufferSize)
+          val cleaned = dataCleaner.processCorporaPair(srcFile.get, tgtFile.get, loader.dataConfig.loaderBufferSize)
           srcFile.set(cleaned._1)
           tgtFile.set(cleaned._2)
       }
