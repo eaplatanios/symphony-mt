@@ -52,13 +52,12 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(
+  )(implicit
+      stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
-  )(implicit
-      stage: Stage
   ): RNNDecoder.Output = {
     // Embeddings
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
@@ -91,16 +90,16 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       case None =>
         decode(
           config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths, initialState,
-          embeddings, uniCell, encoderState._3, beginOfSequenceToken, endOfSequenceToken)(mode, parameterManager)
+          embeddings, uniCell, encoderState._3, beginOfSequenceToken, endOfSequenceToken)
       case Some(attentionCreator) =>
         val (attentionCell, attentionInitialState) = attentionCreator.create(
           srcLanguage, tgtLanguage, uniCell, memory, memorySequenceLengths,
           numUnits, numUnits, initialState, useAttentionLayer = true,
-          outputAttention = outputAttention)(mode, parameterManager)
+          outputAttention = outputAttention)
         decode(
           config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
           attentionInitialState, embeddings, attentionCell, encoderState._3, beginOfSequenceToken,
-          endOfSequenceToken)(mode, parameterManager)
+          endOfSequenceToken)
     }
   }
 }

@@ -95,8 +95,7 @@ case class TrainingLogger(
       executableEv: Executable[E],
       fetchableEv: Fetchable.Aux[F, R]
   ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor]]] = {
-    shouldTrigger = gradientsNorm != null && loss != null &&
-        (lastStep == 0L || internalTrigger.shouldTriggerForStep(lastStep.toInt - 1))
+    shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
     if (average || shouldTrigger)
       Some(Hook.SessionRunArgs(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
     else

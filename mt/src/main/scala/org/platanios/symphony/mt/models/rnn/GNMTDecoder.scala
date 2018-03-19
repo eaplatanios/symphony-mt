@@ -52,13 +52,12 @@ class GNMTDecoder[S, SS, AS, ASS](
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(
+  )(implicit
+      stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
-  )(implicit
-      stage: Stage
   ): RNNDecoder.Output = {
     // Embeddings
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
@@ -84,12 +83,12 @@ class GNMTDecoder[S, SS, AS, ASS](
     }
     val (attentionCell, attentionInitialState) = attention.create[S, SS](
       srcLanguage, tgtLanguage, cells.head, memory, memorySequenceLengths, numUnits,
-      numUnits, initialState.head, useAttentionLayer = false, outputAttention = false)(mode, parameterManager)
+      numUnits, initialState.head, useAttentionLayer = false, outputAttention = false)
     val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](attentionCell, cells.tail, useNewAttention)
     decode(
       config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
       (attentionInitialState, initialState.tail), embeddings, multiCell, encoderState._3,
-      beginOfSequenceToken, endOfSequenceToken)(mode, parameterManager)
+      beginOfSequenceToken, endOfSequenceToken)
   }
 }
 

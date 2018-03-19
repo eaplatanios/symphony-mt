@@ -44,13 +44,12 @@ class GNMTEncoder[S, SS](
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  )(
+  )(implicit
+      stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
-  )(implicit
-      stage: Stage
   ): Tuple[Output, Seq[S]] = {
     val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
     val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage)(transposedSequences)

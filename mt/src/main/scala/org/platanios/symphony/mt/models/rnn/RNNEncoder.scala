@@ -35,12 +35,11 @@ abstract class RNNEncoder[S, SS]()(implicit
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  )(
+  )(implicit
+      stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
-  )(implicit
-      stage: Stage
   ): Tuple[Output, Seq[S]]
 }

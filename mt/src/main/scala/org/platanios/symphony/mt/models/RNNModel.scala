@@ -44,30 +44,26 @@ class RNNModel[S, SS](
   // TODO: Make this use the parameters manager.
 
   override protected def encoder(
-      input: TFBatchWithLanguages,
-      mode: Mode
-  )(implicit
-      stage: Stage
-  ): (Tuple[Output, Seq[S]], Output, Output) = {
+      input: TFBatchWithLanguages
+  )(implicit mode: Mode): (Tuple[Output, Seq[S]], Output, Output) = {
+    implicit val stage: Stage = Encoding
+
     val maxDecodingLength = {
       if (dataConfig.tgtMaxLength != -1)
         tf.constant(dataConfig.tgtMaxLength)
       else
         tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT32)
     }
-    (config.encoder.create(
-      config, input._1, input._2, input._3, input._4)(mode, config.env, parameterManager, config.deviceManager),
-        input._4, maxDecodingLength)
+    (config.encoder.create(config, input._1, input._2, input._3, input._4), input._4, maxDecodingLength)
   }
 
   override protected def decoder(
       encoderInput: TFBatchWithLanguages,
       input: Option[TFBatch],
-      state: Option[(Tuple[Output, Seq[S]], Output, Output)],
-      mode: Mode
-  )(implicit
-    stage: Stage
-  ): TFBatch = {
+      state: Option[(Tuple[Output, Seq[S]], Output, Output)]
+  )(implicit mode: Mode): TFBatch = {
+    implicit val stage: Stage = Decoding
+
     // TODO: What if the state is `None`?
     input match {
       case Some(inputSequences) =>
@@ -81,13 +77,12 @@ class RNNModel[S, SS](
         val tgtSequenceLength = inputSequences._2 + 1
         val output = config.decoder.create(
           config, encoderInput._1, encoderInput._2, state.get, dataConfig.beginOfSequenceToken,
-          dataConfig.endOfSequenceToken, tgtSequence,
-          tgtSequenceLength)(mode, config.env, parameterManager, config.deviceManager)
+          dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength)
         (output.sequences, output.sequenceLengths)
       case None =>
         val output = config.decoder.create(
           config, encoderInput._1, encoderInput._2, state.get, dataConfig.beginOfSequenceToken,
-          dataConfig.endOfSequenceToken, null, null)(mode, config.env, parameterManager, config.deviceManager)
+          dataConfig.endOfSequenceToken, null, null)
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
         // when using beam search.
         val outputSequence = {

@@ -33,12 +33,11 @@ trait Decoder[O] {
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(
+  )(implicit
+      stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
-  )(implicit
-      stage: Stage
   ): RNNDecoder.Output
 }

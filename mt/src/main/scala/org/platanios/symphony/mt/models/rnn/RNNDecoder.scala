@@ -40,13 +40,12 @@ abstract class RNNDecoder[S, SS]()(implicit
       endOfSequenceToken: String,
       tgtSequences: Output = null,
       tgtSequenceLengths: Output = null
-  )(
+  )(implicit
+      stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
-  )(implicit
-      stage: Stage
   ): RNNDecoder.Output
 
   protected def decode[DS, DSS](
@@ -61,7 +60,9 @@ abstract class RNNDecoder[S, SS]()(implicit
       tgtMaxLength: Output,
       beginOfSequenceToken: String,
       endOfSequenceToken: String
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       evS: WhileLoopVariable.Aux[DS, DSS]
   ): RNNDecoder.Output = {
     val outputWeights = parameterManager.getProjectionToWords(cell.outputShape(-1), tgtLanguage)

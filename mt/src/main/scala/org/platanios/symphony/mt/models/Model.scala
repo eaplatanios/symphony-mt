@@ -50,7 +50,9 @@ abstract class Model[S] protected (
 
   protected val languageIds: Map[Language, Int] = languages.map(_._1).zipWithIndex.toMap
 
-  protected val parameterManager: ParameterManager = config.parameterManager
+  protected implicit val env             : Environment      = config.env
+  protected implicit val parameterManager: ParameterManager = config.parameterManager
+  protected implicit val deviceManager   : DeviceManager    = config.deviceManager
 
   /** Each input consists of a tuple containing:
     *   - The source language ID.
@@ -186,9 +188,8 @@ abstract class Model[S] protected (
       override val layerType: String = "TrainLayer"
 
       override protected def _forward(
-          input: (TFBatchWithLanguages, TFBatch),
-          mode: Mode
-      ): TFBatchWithLanguage = {
+          input: (TFBatchWithLanguages, TFBatch)
+      )(implicit mode: Mode): TFBatchWithLanguage = {
         parameterManager.initialize(languages)
         parameterManager.setEnvironment(config.env)
         parameterManager.setDeviceManager(config.deviceManager)
@@ -198,12 +199,14 @@ abstract class Model[S] protected (
         val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
         val tgtMapped = (tgtSequence, input._2._2)
         val state = tf.createWithVariableScope("Encoder") {
-          implicit val stage: Stage = Encoding
-          encoder(srcMapped, mode)
+          implicit val modeImplicit : Mode  = mode
+          implicit val stageImplicit: Stage = Encoding
+          encoder(srcMapped)
         }
         val output = tf.createWithVariableScope("Decoder") {
-          implicit val stage: Stage = Decoding
-          decoder(srcMapped, Some(tgtMapped), Some(state), mode)
+          implicit val modeImplicit: Mode  = mode
+          implicit val stage       : Stage = Decoding
+          decoder(srcMapped, Some(tgtMapped), Some(state))
         }
         (input._1._2, output._1, output._2)
       }
@@ -214,7 +217,7 @@ abstract class Model[S] protected (
     new Layer[TFBatchWithLanguages, TFBatchWithLanguage](name) {
       override val layerType: String = "InferLayer"
 
-      override protected def _forward(input: TFBatchWithLanguages, mode: Mode): TFBatchWithLanguage = {
+      override protected def _forward(input: TFBatchWithLanguages)(implicit mode: Mode): TFBatchWithLanguage = {
         parameterManager.initialize(languages)
         parameterManager.setEnvironment(config.env)
         parameterManager.setDeviceManager(config.deviceManager)
@@ -222,12 +225,10 @@ abstract class Model[S] protected (
         val srcSequence = mapToWordIds(input._1, input._3)
         val srcMapped = (input._1, input._2, srcSequence, input._4)
         val state = tf.createWithVariableScope("Encoder") {
-          implicit val stage: Stage = Encoding
-          encoder(srcMapped, mode)
+          encoder(srcMapped)
         }
         val output = tf.createWithVariableScope("Decoder") {
-          implicit val stage: Stage = Decoding
-          decoder(srcMapped, None, Some(state), mode)
+          decoder(srcMapped, None, Some(state))
         }
         val decodedSequences = mapFromWordIds(input._2, output._1)
         (input._2, decodedSequences, output._2)
@@ -239,28 +240,27 @@ abstract class Model[S] protected (
     new Layer[(TFBatchWithLanguage, TFBatch), Output](name) {
       override val layerType: String = "Loss"
 
-      override protected def _forward(
-          input: (TFBatchWithLanguage, TFBatch),
-          mode: Mode
-      ): Output = tf.createWithNameScope("Loss") {
-        parameterManager.initialize(languages)
-        parameterManager.setEnvironment(config.env)
-        parameterManager.setDeviceManager(config.deviceManager)
-        var tgtSequence = tf.createWithNameScope("TrainInputsToWordIDs") {
-          mapToWordIds(input._1._1, input._2._1)
+      override protected def _forward(input: (TFBatchWithLanguage, TFBatch))(implicit mode: Mode): Output = {
+        tf.createWithNameScope("Loss") {
+          parameterManager.initialize(languages)
+          parameterManager.setEnvironment(config.env)
+          parameterManager.setDeviceManager(config.deviceManager)
+          var tgtSequence = tf.createWithNameScope("TrainInputsToWordIDs") {
+            mapToWordIds(input._1._1, input._2._1)
+          }
+          // TODO: Handle this shift more efficiently.
+          // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
+          // word used as input, rather than the previous predicted word.
+          val tgtEosId = parameterManager
+              .stringToIndexLookup(input._1._1)(tf.constant(dataConfig.endOfSequenceToken))
+              .cast(INT32)
+          tgtSequence = tf.concatenate(Seq(
+            tgtSequence, tf.fill(INT32, tf.stack(Seq(tf.shape(tgtSequence)(0), 1)))(tgtEosId)), axis = 1)
+          val tgtSequenceLength = input._2._2 + 1
+          val lossValue = loss(input._1._2, tgtSequence, tgtSequenceLength)
+          tf.summary.scalar("Loss", lossValue)
+          lossValue
         }
-        // TODO: Handle this shift more efficiently.
-        // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
-        // word used as input, rather than the previous predicted word.
-        val tgtEosId = parameterManager
-            .stringToIndexLookup(input._1._1)(tf.constant(dataConfig.endOfSequenceToken))
-            .cast(INT32)
-        tgtSequence = tf.concatenate(Seq(
-          tgtSequence, tf.fill(INT32, tf.stack(Seq(tf.shape(tgtSequence)(0), 1)))(tgtEosId)), axis = 1)
-        val tgtSequenceLength = input._2._2 + 1
-        val lossValue = loss(input._1._2, tgtSequence, tgtSequenceLength)
-        tf.summary.scalar("Loss", lossValue)
-        lossValue
       }
     }
   }
@@ -275,15 +275,15 @@ abstract class Model[S] protected (
 
   /**
     *
-    * @param  input        Tuple containing two tensors:
-    *                        - `INT32` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
-    *                        - `INT32` tensor with shape `[batchSize]`, containing the sequence lengths.
-    * @param  mode    Current learning mode (e.g., training or evaluation).
+    * @param  input Tuple containing two tensors:
+    *                 - `INT32` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
+    *                 - `INT32` tensor with shape `[batchSize]`, containing the sequence lengths.
+    * @param  mode  Current learning mode (e.g., training or evaluation).
     * @return   Tuple containing two tensors:
     *           - Encoder output, with shape `[batchSize, inputLength, hiddenSize]`.
     *           - Encoder-decoder attention bias and mask weights, with shape `[batchSize, inputLength]`.
     */
-  protected def encoder(input: TFBatchWithLanguages, mode: Mode)(implicit stage: Stage): S
+  protected def encoder(input: TFBatchWithLanguages)(implicit mode: Mode): S
 
   /**
     *
@@ -292,11 +292,8 @@ abstract class Model[S] protected (
   protected def decoder(
       encoderInput: TFBatchWithLanguages,
       input: Option[TFBatch],
-      state: Option[S],
-      mode: Mode
-  )(implicit
-      stage: Stage
-  ): TFBatch
+      state: Option[S]
+  )(implicit mode: Mode): TFBatch
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
     val (lossSum, _) = Common.paddedCrossEntropy(

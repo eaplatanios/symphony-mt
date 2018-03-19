@@ -36,8 +36,10 @@ abstract class RNNAttention[AS, ASS](implicit evAS: WhileLoopVariable.Aux[AS, AS
       initialState: S,
       useAttentionLayer: Boolean,
       outputAttention: Boolean
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
       stage: Stage,
+      mode: Mode,
+      parameterManager: ParameterManager,
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, AS, ASS], AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]])

@@ -29,12 +29,11 @@ trait Encoder[O] {
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  )(
+  )(implicit
+      stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
-  )(implicit
-      stage: Stage
   ): O
 }
