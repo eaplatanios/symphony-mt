@@ -16,16 +16,17 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.data.processors.SGMConverter
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.symphony.mt.utilities.{CompressedFiles, MutableFile}
+
 import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
+
 import java.io.IOException
 import java.net.URL
 import java.nio.file.Path
-
-import org.platanios.symphony.mt.data.processors.SGMConverter
 
 import scala.collection.mutable
 
@@ -44,11 +45,6 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
 
   protected def src: String = srcLanguage.abbreviation
   protected def tgt: String = tgtLanguage.abbreviation
-
-  // Clone the Moses repository, if necessary.
-  val mosesDecoder: Utilities.MosesDecoder = Utilities.MosesDecoder(File(downloadsDir) / "moses")
-  if (!mosesDecoder.exists)
-    mosesDecoder.cloneRepository()
 
   /** Sequence of files to download as part of this dataset. */
   def filesToDownload: Seq[String]

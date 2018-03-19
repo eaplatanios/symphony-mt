@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.data
 
+import org.platanios.symphony.mt.data.processors._
 import org.platanios.symphony.mt.vocabulary._
 
 import java.nio.file.{Path, Paths}

@@ -19,6 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, german}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
+import org.platanios.symphony.mt.data.processors.{MosesCleaner, MosesTokenizer}
 import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.BahdanauRNNAttention

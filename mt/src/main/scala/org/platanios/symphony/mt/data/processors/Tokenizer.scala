@@ -13,13 +13,13 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data
-
-import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.Language._
+package org.platanios.symphony.mt.data.processors
 
 import better.files._
 import com.typesafe.scalalogging.Logger
+import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.Language._
+import org.platanios.symphony.mt.data.{newReader, newWriter}
 import org.slf4j.LoggerFactory
 
 import scala.util.matching.Regex

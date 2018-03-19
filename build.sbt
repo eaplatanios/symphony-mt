@@ -89,10 +89,7 @@ lazy val mt = (project in file("./mt"))
     .settings(
       libraryDependencies ++= Seq(
         "com.github.pathikrit" %% "better-files" % "3.4.0",
-        "org.apache.commons" % "commons-compress" % "1.15",
-        "org.eclipse.jgit" % "org.eclipse.jgit" % "4.9.2.201712150930-r",
-        "com.typesafe.akka" %% "akka-actor" % "2.5.9",
-        "com.typesafe.akka" %% "akka-testkit" % "2.5.9" % Test))
+        "org.apache.commons" % "commons-compress" % "1.15"))
 
 lazy val noPublishSettings = Seq(
   publish := Unit,

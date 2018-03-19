@@ -19,6 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
+import org.platanios.symphony.mt.data.processors.{MosesCleaner, NoTokenizer}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
 import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}

@@ -13,13 +13,14 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data
+package org.platanios.symphony.mt.data.processors
+
+import java.nio.charset.StandardCharsets
 
 import better.files._
 import com.typesafe.scalalogging.Logger
+import org.platanios.symphony.mt.data.{newReader, newWriter}
 import org.slf4j.LoggerFactory
-
-import java.nio.charset.StandardCharsets
 
 import scala.util.matching.Regex
 
