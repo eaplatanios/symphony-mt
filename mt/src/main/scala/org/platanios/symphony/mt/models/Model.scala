@@ -199,13 +199,9 @@ abstract class Model[S] protected (
         val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
         val tgtMapped = (tgtSequence, input._2._2)
         val state = tf.createWithVariableScope("Encoder") {
-          implicit val modeImplicit : Mode  = mode
-          implicit val stageImplicit: Stage = Encoding
           encoder(srcMapped)
         }
         val output = tf.createWithVariableScope("Decoder") {
-          implicit val modeImplicit: Mode  = mode
-          implicit val stage       : Stage = Decoding
           decoder(srcMapped, Some(tgtMapped), Some(state))
         }
         (input._1._2, output._1, output._2)
