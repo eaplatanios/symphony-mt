@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.data.loaders
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.processors.{FileProcessor, SGMConverter, TEDConverter}
+import org.platanios.symphony.mt.data.processors.{FileProcessor, Normalizer, SGMConverter, TEDConverter}
 
 import better.files._
 
@@ -59,28 +59,28 @@ class IWSLT15DatasetLoader(
       case Train => Seq((IWSLT15DatasetLoader.Train,
           File(downloadsDir) / directoryName / directoryName / s"train.tags.$directoryName.$src",
           File(downloadsDir) / directoryName / directoryName / s"train.tags.$directoryName.$tgt",
-          TEDConverter))
+          TEDConverter >> Normalizer))
       case Dev => Seq((IWSLT15DatasetLoader.Dev2010,
           File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.dev2010.$directoryName.$src.xml",
           File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.dev2010.$directoryName.$tgt.xml",
-          SGMConverter))
+          SGMConverter >> Normalizer))
       case Test => Seq(
         (IWSLT15DatasetLoader.Test2010,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2010.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2010.$directoryName.$tgt.xml",
-            SGMConverter),
+            SGMConverter >> Normalizer),
         (IWSLT15DatasetLoader.Test2011,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2011.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2011.$directoryName.$tgt.xml",
-            SGMConverter),
+            SGMConverter >> Normalizer),
         (IWSLT15DatasetLoader.Test2012,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2012.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2012.$directoryName.$tgt.xml",
-            SGMConverter),
+            SGMConverter >> Normalizer),
         (IWSLT15DatasetLoader.Test2013,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2013.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2013.$directoryName.$tgt.xml",
-            SGMConverter))
+            SGMConverter >> Normalizer))
     }
   }
 }

@@ -15,8 +15,9 @@
 
 package org.platanios.symphony.mt.data.processors
 
-import better.files._
 import org.platanios.symphony.mt.Language
+
+import better.files._
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -31,6 +32,20 @@ trait FileProcessor {
   def process(file: File, language: Language): File = file
 
   def processPair(file1: File, file2: File, language1: Language, language2: Language): (File, File) = (file1, file2)
+
+  def >>(processor: FileProcessor): ComposedFileProcessor = {
+    ComposedFileProcessor(this, processor)
+  }
 }
 
 object NoFileProcessor extends FileProcessor
+
+case class ComposedFileProcessor(fileProcessors: FileProcessor*) extends FileProcessor {
+  override def process(file: File, language: Language): File = {
+    fileProcessors.foldLeft(file)((f, p) => p.process(f, language))
+  }
+
+  override def processPair(file1: File, file2: File, language1: Language, language2: Language): (File, File) = {
+    fileProcessors.foldLeft((file1, file2))((f, p) => p.processPair(f._1, f._2, language1, language2))
+  }
+}
