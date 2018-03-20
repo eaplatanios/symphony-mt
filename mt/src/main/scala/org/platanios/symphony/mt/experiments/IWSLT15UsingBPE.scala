@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{english, vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
-import org.platanios.symphony.mt.data.processors.{MosesCleaner, NoTokenizer}
+import org.platanios.symphony.mt.data.processors.{MosesCleaner, MosesTokenizer}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
 import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}
@@ -39,7 +39,7 @@ object IWSLT15UsingBPE extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderTokenizer = NoTokenizer,
+    loaderTokenizer = MosesTokenizer(),
     loaderCleaner = MosesCleaner(1, 80),
     loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(10000)),
     numBuckets = 5,

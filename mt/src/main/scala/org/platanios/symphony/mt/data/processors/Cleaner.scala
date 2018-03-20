@@ -15,27 +15,33 @@
 
 package org.platanios.symphony.mt.data.processors
 
-import java.nio.charset.StandardCharsets
+import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.data.{newReader, newWriter}
 
 import better.files._
 import com.typesafe.scalalogging.Logger
-import org.platanios.symphony.mt.data.{newReader, newWriter}
 import org.slf4j.LoggerFactory
+
+import java.nio.charset.StandardCharsets
 
 import scala.util.matching.Regex
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Cleaner {
+trait Cleaner extends FileProcessor {
+  override def apply(file1: File, file2: File, language1: Language, language2: Language): (File, File) = {
+    cleanCorporaPair(file1, file2)
+  }
+
   def cleanFile(originalFile: File): File = {
     val fileName = originalFile.nameWithoutExtension(includeAll = false) + s".clean${originalFile.extension().get}"
     originalFile.sibling(fileName)
   }
 
-  def processPair(srcSentence: String, tgtSentence: String): Option[(String, String)]
+  def cleanSentencePair(srcSentence: String, tgtSentence: String): Option[(String, String)]
 
-  def processCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {
+  def cleanCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {
     val srcClean = cleanFile(srcFile)
     val tgtClean = cleanFile(tgtFile)
     if (srcClean.notExists || tgtClean.notExists) {
@@ -44,7 +50,7 @@ trait Cleaner {
       val tgtWriter = newWriter(tgtClean)
       newReader(srcFile).lines().toAutoClosedIterator
           .zip(newReader(tgtFile).lines().toAutoClosedIterator).foreach(pair => {
-        processPair(pair._1, pair._2) match {
+        cleanSentencePair(pair._1, pair._2) match {
           case Some((srcSentence, tgtSentence)) if srcSentence.length > 0 && tgtSentence.length > 0 =>
             srcWriter.write(s"$srcSentence\n")
             tgtWriter.write(s"$tgtSentence\n")
@@ -68,11 +74,11 @@ object Cleaner {
 object NoCleaner extends Cleaner {
   override def cleanFile(originalFile: File): File = originalFile
 
-  override def processPair(srcSentence: String, tgtSentence: String): Option[(String, String)] = {
+  override def cleanSentencePair(srcSentence: String, tgtSentence: String): Option[(String, String)] = {
     Some((srcSentence, tgtSentence))
   }
 
-  override def processCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {
+  override def cleanCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {
     (srcFile, tgtFile)
   }
 }
@@ -87,7 +93,7 @@ class MosesCleaner protected (
   protected val whitespaceRegex   : Regex = """\s+""".r
   protected val maxWordLengthRegex: Regex = s"""[\\S]{${maxWordLength + 1},}""".r
 
-  override def processPair(srcSentence: String, tgtSentence: String): Option[(String, String)] = {
+  override def cleanSentencePair(srcSentence: String, tgtSentence: String): Option[(String, String)] = {
     var src = srcSentence.trim
     var tgt = tgtSentence.trim
 

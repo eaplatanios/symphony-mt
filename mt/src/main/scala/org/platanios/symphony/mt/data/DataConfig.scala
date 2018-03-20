@@ -27,8 +27,6 @@ case class DataConfig(
     // Loader
     workingDir: Path = Paths.get("working_dir"),
     loaderBufferSize: Int = 8192,
-    loaderExtractTGZ: Boolean = true,
-    loaderConvertSGMToText: Boolean = true,
     loaderTokenizer: Tokenizer = MosesTokenizer(),
     loaderCleaner: Cleaner = MosesCleaner(),
     loaderVocab: DatasetVocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),

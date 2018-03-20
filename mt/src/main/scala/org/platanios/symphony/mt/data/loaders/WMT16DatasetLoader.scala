@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.data.loaders
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
+import org.platanios.symphony.mt.data.processors.{FileProcessor, SGMConverter}
 
 import better.files._
 
@@ -89,8 +90,9 @@ class WMT16DatasetLoader(
         WMT16DatasetLoader.testArchives.map(archive => s"${WMT16DatasetLoader.newsCommentaryUrl}/$archive.tgz")
   }
 
-  /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
-  override def corpora(datasetType: DatasetType): Seq[(String, File, File)] = datasetType match {
+  /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
+    * of this dataset type. */
+  override def corpora(datasetType: DatasetType): Seq[(String, File, File, FileProcessor)] = datasetType match {
     case Train =>
       commonCrawlDataset.map(_.corpora(Train)).getOrElse(Seq.empty) ++
           europarlV7Dataset.map(_.corpora(Train)).getOrElse(Seq.empty) ++
@@ -101,92 +103,92 @@ class WMT16DatasetLoader(
         (File(downloadsDir) / archive)
             .copyTo(File(downloadsDir) / "dev", overwrite = true)
       })
-      var corpora = Seq.empty[(String, File, File)]
+      var corpora = Seq.empty[(String, File, File, FileProcessor)]
       val supported2008Languages = Set[Language](czech, english, french, german, hungarian, spanish)
       if (supported2008Languages.contains(srcLanguage) && supported2008Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2008",
-            File(downloadsDir) / "dev" / "dev" / s"news-test2008.$src",
-            File(downloadsDir) / "dev" / "dev" / s"news-test2008.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"news-test2008-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"news-test2008-ref.$tgt.sgm", SGMConverter))
       val supported2009Languages = Set[Language](czech, english, french, german, hungarian, italian, spanish)
       if (supported2009Languages.contains(srcLanguage) && supported2009Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2009",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2009.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2009.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newstest2009-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newstest2009-ref.$tgt.sgm", SGMConverter))
       val supported2009SysCombLanguages = Set[Language](czech, english, french, german, hungarian, italian, spanish)
       if (supported2009SysCombLanguages.contains(srcLanguage) && supported2009SysCombLanguages.contains(tgtLanguage))
         corpora ++= Seq(("newssyscomb2009",
-            File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009-ref.$tgt.sgm", SGMConverter))
       val supported2010Languages = Set[Language](czech, english, french, german, spanish)
       if (supported2010Languages.contains(srcLanguage) && supported2010Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2010",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2010.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2010.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newstest2010-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newstest2010-ref.$tgt.sgm", SGMConverter))
       val supported2011Languages = Set[Language](czech, english, french, german, spanish)
       if (supported2011Languages.contains(srcLanguage) && supported2011Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2011",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2011.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2011.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newstest2011-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newstest2011-ref.$tgt.sgm", SGMConverter))
       val supported2012Languages = Set[Language](czech, english, french, german, russian, spanish)
       if (supported2012Languages.contains(srcLanguage) && supported2012Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2012",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2012.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2012.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newstest2012-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newstest2012-ref.$tgt.sgm", SGMConverter))
       val supported2013Languages = Set[Language](czech, english, french, german, russian, spanish)
       if (supported2013Languages.contains(srcLanguage) && supported2013Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2013",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2013.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2013.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newstest2013-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newstest2013-ref.$tgt.sgm", SGMConverter))
       val pair = if (reversed) s"$tgt$src" else s"$src$tgt"
       val supported2014Languages = Set[Language](czech, english, french, german, hindi, russian)
       if (supported2014Languages.contains(srcLanguage) && supported2014Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2014",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair-ref.$tgt.sgm", SGMConverter))
       val supported2014DevLanguages = Set[Language](english, hindi)
       if (supported2014DevLanguages.contains(srcLanguage) && supported2014DevLanguages.contains(tgtLanguage))
         corpora ++= Seq(("newsdev2014",
-            File(downloadsDir) / "dev" / "dev" / s"newsdev2014.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newsdev2014.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newsdev2014-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newsdev2014-ref.$tgt.sgm", SGMConverter))
       val supported2015Languages = Set[Language](czech, english, finnish, german, russian)
       if (supported2015Languages.contains(srcLanguage) && supported2015Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2015",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt-ref.$tgt.sgm", SGMConverter))
       val supported2015DevLanguages = Set[Language](english, finnish)
       if (supported2015DevLanguages.contains(srcLanguage) && supported2015DevLanguages.contains(tgtLanguage))
         corpora ++= Seq(("newsdev2015",
-            File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt-ref.$tgt.sgm", SGMConverter))
       val supported2015DiscussDevLanguages = Set[Language](english, french)
       if (supported2015DiscussDevLanguages.contains(srcLanguage) &&
           supported2015DiscussDevLanguages.contains(tgtLanguage))
         corpora ++= Seq(("newsdiscussdev2015",
-            File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt-ref.$tgt.sgm", SGMConverter))
       val supported2015DiscussTestLanguages = Set[Language](english, french)
       if (supported2015DiscussTestLanguages.contains(srcLanguage) &&
           supported2015DiscussTestLanguages.contains(tgtLanguage))
         corpora ++= Seq(("newsdiscusstest2015",
-            File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt-ref.$tgt.sgm", SGMConverter))
       val supported2016DevLanguages = Set[Language](english, romanian, turkish)
       if (supported2016DevLanguages.contains(srcLanguage) && supported2016DevLanguages.contains(tgtLanguage))
         corpora ++= Seq(("newsdev2016",
-            File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt.$src",
-            File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt.$tgt"))
+            File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt-src.$src.sgm",
+            File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt-ref.$tgt.sgm", SGMConverter))
       corpora
     case Test =>
       WMT16DatasetLoader.testArchives.foreach(archive => {
         (File(downloadsDir) / archive)
             .copyTo(File(downloadsDir) / "test", overwrite = true)
       })
-      var corpora = Seq.empty[(String, File, File)]
+      var corpora = Seq.empty[(String, File, File, FileProcessor)]
       val supported2016Languages = Set[Language](czech, english, finnish, german, romanian, russian, turkish)
       if (supported2016Languages.contains(srcLanguage) && supported2016Languages.contains(tgtLanguage))
         corpora ++= Seq(("newstest2016",
-            File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt.$src",
-            File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt.$tgt"))
+            File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt-src.$src.sgm",
+            File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt-ref.$tgt.sgm", SGMConverter))
       corpora
   }
 }

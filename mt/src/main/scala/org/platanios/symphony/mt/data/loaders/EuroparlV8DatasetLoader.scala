@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.data.loaders
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
+import org.platanios.symphony.mt.data.processors.{FileProcessor, NoFileProcessor}
 
 import better.files._
 
@@ -58,13 +59,14 @@ class EuroparlV8DatasetLoader(
   override def filesToDownload: Seq[String] = Seq(
     s"${EuroparlV8DatasetLoader.url}/${EuroparlV8DatasetLoader.archivePrefix}.tgz")
 
-  /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
-  override def corpora(datasetType: DatasetType): Seq[(String, File, File)] = datasetType match {
+  /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
+    * of this dataset type. */
+  override def corpora(datasetType: DatasetType): Seq[(String, File, File, FileProcessor)] = datasetType match {
     case Train => Seq(("EuroparlV8/Train",
         File(downloadsDir) / EuroparlV8DatasetLoader.archivePrefix /
             EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
         File(downloadsDir) / EuroparlV8DatasetLoader.archivePrefix /
-            EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt"))
+            EuroparlV8DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
     case _ => Seq.empty
   }
 }

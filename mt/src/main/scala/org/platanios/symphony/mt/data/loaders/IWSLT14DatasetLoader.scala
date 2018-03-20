@@ -27,30 +27,30 @@ import java.nio.file.Path
 /**
   * @author Emmanouil Antonios Platanios
   */
-class IWSLT15DatasetLoader(
+class IWSLT14DatasetLoader(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     val config: DataConfig
 ) extends ParallelDatasetLoader(srcLanguage, tgtLanguage) {
   require(
-    IWSLT15DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
-    "The provided language pair is not supported by the IWSLT-15 dataset.")
+    IWSLT14DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
+    "The provided language pair is not supported by the IWSLT-14 dataset.")
 
-  override def name: String = "IWSLT-15"
+  override def name: String = "IWSLT-14"
 
   override def dataConfig: DataConfig = {
     config.copy(workingDir =
         config.workingDir
-            .resolve("iwslt-15")
+            .resolve("iwslt-14")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("iwslt-15").resolve("downloads")
+  override def downloadsDir: Path = config.workingDir.resolve("iwslt-14").resolve("downloads")
 
   private[this] def directoryName: String = s"$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(s"${IWSLT15DatasetLoader.url}/$src/$tgt/$directoryName.tgz")
+  override def filesToDownload: Seq[String] = Seq(s"${IWSLT14DatasetLoader.url}/$src/$tgt/$directoryName.tgz")
 
   /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
     * of this dataset type. */
@@ -60,34 +60,32 @@ class IWSLT15DatasetLoader(
         File(downloadsDir) / directoryName / directoryName / s"train.tags.$directoryName.$tgt",
         TEDConverter))
     case Dev => Seq(("dev2010",
-        File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.dev2010.$directoryName.$src.xml",
-        File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.dev2010.$directoryName.$tgt.xml",
+        File(downloadsDir) / directoryName / directoryName / s"IWSLT14.TED.dev2010.$directoryName.$src.xml",
+        File(downloadsDir) / directoryName / directoryName / s"IWSLT14.TED.dev2010.$directoryName.$tgt.xml",
         SGMConverter))
     case Test => Seq(
       ("tst2010",
-          File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2010.$directoryName.$src.xml",
-          File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2010.$directoryName.$tgt.xml",
+          File(downloadsDir) / directoryName / directoryName / s"IWSLT14.TED.tst2010.$directoryName.$src.xml",
+          File(downloadsDir) / directoryName / directoryName / s"IWSLT14.TED.tst2010.$directoryName.$tgt.xml",
           SGMConverter),
       ("tst2011",
-          File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2011.$directoryName.$src.xml",
-          File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2011.$directoryName.$tgt.xml",
+          File(downloadsDir) / directoryName / directoryName / s"IWSLT14.TED.tst2011.$directoryName.$src.xml",
+          File(downloadsDir) / directoryName / directoryName / s"IWSLT14.TED.tst2011.$directoryName.$tgt.xml",
           SGMConverter),
       ("tst2012",
-          File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2012.$directoryName.$src.xml",
-          File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2012.$directoryName.$tgt.xml",
-          SGMConverter),
-      ("tst2013",
-          File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2013.$directoryName.$src.xml",
-          File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2013.$directoryName.$tgt.xml",
+          File(downloadsDir) / directoryName / directoryName / s"IWSLT14.TED.tst2012.$directoryName.$src.xml",
+          File(downloadsDir) / directoryName / directoryName / s"IWSLT14.TED.tst2012.$directoryName.$tgt.xml",
           SGMConverter))
   }
 }
 
-object IWSLT15DatasetLoader {
-  val url: String = "https://wit3.fbk.eu/archive/2015-01/texts"
+object IWSLT14DatasetLoader {
+  val url: String = "https://wit3.fbk.eu/archive/2014-01/texts"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (english, czech), (english, german), (english, french), (english, thai), (english, vietnamese), (english, chinese))
+    (english, arabic), (english, german), (english, spanish), (english, persian), (english, french), (english, hebrew),
+    (english, italian), (english, dutch), (english, polish), (english, portugueseBrazil), (english, romanian),
+    (english, russian), (english, slovenian), (english, turkish), (english, chinese))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
@@ -98,7 +96,7 @@ object IWSLT15DatasetLoader {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataConfig: DataConfig
-  ): IWSLT15DatasetLoader = {
-    new IWSLT15DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
+  ): IWSLT14DatasetLoader = {
+    new IWSLT14DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
   }
 }

@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.processors.SGMConverter
+import org.platanios.symphony.mt.data.processors.{FileProcessor, SGMConverter}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.symphony.mt.utilities.{CompressedFiles, MutableFile}
 
@@ -61,48 +61,18 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
 
   /** Extracted files (if needed) from `downloadedFiles`. */
   protected val extractedFiles: Seq[File] = {
-    if (!dataConfig.loaderExtractTGZ) {
-      downloadedFiles.flatMap(_.listRecursively.filter(_.isRegularFile))
-    } else {
-      ParallelDatasetLoader.logger.info(s"$name - Extracting any downloaded archives.")
-      val files = downloadedFiles.flatMap(
-        ParallelDatasetLoader.maybeExtractTGZ(_, dataConfig.loaderBufferSize)
-            .listRecursively
-            .filter(_.isRegularFile))
-      ParallelDatasetLoader.logger.info(s"$name - Extracted any downloaded archives.")
-      files
-    }
-  }
-
-  /** Preprocessed files after converting extracted SGM files to normal text files, and (optionally) tokenizing. */
-  protected val preprocessedFiles: Seq[File] = {
-    ParallelDatasetLoader.logger.info(s"$name - Preprocessing any downloaded files.")
-    val files = extractedFiles.map(file => {
-      var newFile = file
-      if (!newFile.name.startsWith(".")) {
-        if (dataConfig.loaderConvertSGMToText && newFile.extension().contains(".sgm"))
-          newFile = SGMConverter.convertSGMToText(newFile)
-        // TODO: The following file moves are hacky and non-generic (they only apply to the WMT-16 dataset).
-        if (newFile.name.endsWith(s"-src.$src") || newFile.name.endsWith(s"-ref.$src")) {
-          val renamedFile = newFile.sibling(newFile.name.dropRight(5 + src.length) + s".$src")
-          if (renamedFile.notExists)
-            newFile.copyTo(renamedFile)
-          newFile = renamedFile
-        } else if (newFile.name.endsWith(s"-src.$tgt") || newFile.name.endsWith(s"-ref.$tgt")) {
-          val renamedFile = newFile.sibling(newFile.name.dropRight(5 + tgt.length) + s".$tgt")
-          if (renamedFile.notExists)
-            newFile.copyTo(renamedFile)
-          newFile = renamedFile
-        }
-      }
-      newFile
-    })
-    ParallelDatasetLoader.logger.info(s"$name - Preprocessed any downloaded files.")
+    ParallelDatasetLoader.logger.info(s"$name - Extracting any downloaded archives.")
+    val files = downloadedFiles.flatMap(
+      ParallelDatasetLoader.maybeExtractTGZ(_, dataConfig.loaderBufferSize)
+          .listRecursively
+          .filter(_.isRegularFile))
+    ParallelDatasetLoader.logger.info(s"$name - Extracted any downloaded archives.")
     files
   }
 
-  /** Returns all the corpora (tuples containing name, source file, and target file) of this dataset type. */
-  def corpora(datasetType: DatasetType): Seq[(String, File, File)] = Seq.empty
+  /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
+    * of this dataset type. */
+  def corpora(datasetType: DatasetType): Seq[(String, File, File, FileProcessor)] = Seq.empty
 
   /** Returns the source and the target language vocabularies of this dataset. */
   def vocabularies: (Seq[File], Seq[File]) = (Seq.empty, Seq.empty)
@@ -170,6 +140,8 @@ object ParallelDatasetLoader {
   ): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
     // Collect all files.
     val files = loaders.map(loader => {
+      ParallelDatasetLoader.logger.info(s"${loader.name} - Preprocessing any downloaded files.")
+
       var srcFiles = Seq.empty[MutableFile]
       var tgtFiles = Seq.empty[MutableFile]
       var fileTypes = Seq.empty[DatasetType]
@@ -177,31 +149,35 @@ object ParallelDatasetLoader {
       DatasetType.types.foreach(datasetType => {
         val corpora = loader.corpora(datasetType)
 
-        // Tokenize source and target files.
-        srcFiles ++= corpora.map(_._2).map(f => {
+        // Apply the file processors.
+        val processedCorpora = corpora.map(c => (c._1, c._4(c._2, loader.srcLanguage), c._4(c._3, loader.tgtLanguage)))
+
+        // Tokenize the corpora.
+        val tokenizedSrcFiles = processedCorpora.map(_._2).map(f => {
           loader.dataConfig.loaderTokenizer.tokenizeCorpus(
             f, loader.srcLanguage, loader.dataConfig.loaderBufferSize)
-        }).map(MutableFile(_))
-        tgtFiles ++= corpora.map(_._3).map(f => {
+        })
+        val tokenizedTgtFiles = processedCorpora.map(_._3).map(f => {
           loader.dataConfig.loaderTokenizer.tokenizeCorpus(
             f, loader.tgtLanguage, loader.dataConfig.loaderBufferSize)
-        }).map(MutableFile(_))
+        })
 
+        // TODO: [DATA] Only clean the training data.
+
+        // Clean the corpora.
+        val dataCleaner = loader.dataConfig.loaderCleaner
+        val (cleanedSrcFiles, cleanedTgtFiles) = tokenizedSrcFiles.zip(tokenizedTgtFiles).map {
+          case (srcFile, tgtFile) => dataCleaner.cleanCorporaPair(srcFile, tgtFile, loader.dataConfig.loaderBufferSize)
+        }.unzip
+
+        // Tokenize source and target files.
+        srcFiles ++= cleanedSrcFiles.map(MutableFile(_))
+        tgtFiles ++= cleanedTgtFiles.map(MutableFile(_))
         fileTypes ++= Seq.fill(corpora.length)(datasetType)
         fileKeys ++= corpora.map(_._1)
       })
 
-      // TODO: [DATA] Only clean the training data.
-
-      // Clean the corpora.
-      val dataCleaner = loader.dataConfig.loaderCleaner
-      srcFiles.zip(tgtFiles).foreach {
-        case (srcFile, tgtFile) =>
-          val cleaned = dataCleaner.processCorporaPair(srcFile.get, tgtFile.get, loader.dataConfig.loaderBufferSize)
-          srcFile.set(cleaned._1)
-          tgtFile.set(cleaned._2)
-      }
-
+      ParallelDatasetLoader.logger.info(s"${loader.name} - Preprocessed any downloaded files.")
       (srcFiles, tgtFiles, fileTypes, fileKeys)
     })
 

@@ -15,11 +15,12 @@
 
 package org.platanios.symphony.mt.data.processors
 
-import better.files._
-import com.typesafe.scalalogging.Logger
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data.{newReader, newWriter}
+
+import better.files._
+import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
 import scala.util.matching.Regex
@@ -27,7 +28,9 @@ import scala.util.matching.Regex
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Tokenizer {
+trait Tokenizer extends FileProcessor {
+  override def process(file: File, language: Language): File = tokenizeCorpus(file, language)
+
   def tokenizedFile(originalFile: File): File = {
     val fileName = originalFile.nameWithoutExtension(includeAll = false) + s".tok${originalFile.extension().get}"
     originalFile.sibling(fileName)

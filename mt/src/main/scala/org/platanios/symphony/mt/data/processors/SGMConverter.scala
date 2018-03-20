@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.data.processors
 
+import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.{newReader, newWriter}
 
 import better.files._
@@ -25,13 +26,15 @@ import scala.util.matching.Regex
 /**
   * @author Emmanouil Antonios Platanios
   */
-object SGMConverter {
+object SGMConverter extends FileProcessor {
   private val startRegex           : Regex = """(?i)<seg[^>]+>\s*$""".r
   private val startCaptureRegex    : Regex = """(?i)<seg[^>]+>\s*(.*)\s*$""".r
   private val startStopCaptureRegex: Regex = """(?i)<seg[^>]+>\s*(.*)\s*<\/seg>""".r
   private val whitespaceRegex      : Regex = """\s+""".r
 
-  def convertedFile(originalFile: File): File = {
+  override def apply(file: File, language: Language): File = convertSGMToText(file)
+
+  private def convertedFile(originalFile: File): File = {
     originalFile.sibling(originalFile.nameWithoutExtension(includeAll = false))
   }
 
