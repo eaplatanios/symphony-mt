@@ -138,10 +138,10 @@ object ParallelDatasetLoader {
       loaders: Seq[ParallelDatasetLoader],
       workingDir: Option[File] = None
   ): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
+    ParallelDatasetLoader.logger.info("Preprocessing any downloaded files.")
+
     // Collect all files.
     val files = loaders.map(loader => {
-      ParallelDatasetLoader.logger.info(s"${loader.name} - Preprocessing any downloaded files.")
-
       var srcFiles = Seq.empty[MutableFile]
       var tgtFiles = Seq.empty[MutableFile]
       var fileTypes = Seq.empty[DatasetType]
@@ -177,9 +177,10 @@ object ParallelDatasetLoader {
         fileKeys ++= corpora.map(_._1)
       })
 
-      ParallelDatasetLoader.logger.info(s"${loader.name} - Preprocessed any downloaded files.")
       (srcFiles, tgtFiles, fileTypes, fileKeys)
     })
+
+    ParallelDatasetLoader.logger.info("Preprocessed any downloaded files.")
 
     // Generate vocabularies, if necessary.
     val vocabularies = mutable.Map.empty[Language, mutable.ListBuffer[File]]

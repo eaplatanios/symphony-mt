@@ -100,7 +100,7 @@ class ParameterManager protected (
             val merged = tf.variable(
               "Embeddings", FLOAT32, Shape(vocabSizes.sum, wordEmbeddingsSize), embeddingsInitializer).value
             val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
-            val offsets = tf.stack(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
+            val offsets = tf.concatenate(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
             Seq(merged, offsets)
           }
         }
@@ -186,8 +186,7 @@ class ParameterManager protected (
               val merged = tf.variable(
                 "ProjectionWeights", FLOAT32, Shape(inputSize, vocabSizes.sum), weightsInitializer).value
               val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
-              val offsets = tf.squeeze(
-                tf.stack(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1))), axes = Seq(1))
+              val offsets = tf.concatenate(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
               Seq(merged, offsets, sizes)
             })
         val merged = projectionsForSize(0)

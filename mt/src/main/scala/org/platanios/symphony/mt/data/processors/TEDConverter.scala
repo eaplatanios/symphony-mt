@@ -19,6 +19,8 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.{newReader, newWriter}
 
 import better.files._
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
 import scala.util.matching.Regex
 
@@ -26,6 +28,8 @@ import scala.util.matching.Regex
   * @author Emmanouil Antonios Platanios
   */
 object TEDConverter extends FileProcessor {
+  private val logger = Logger(LoggerFactory.getLogger("Data / TED Converter"))
+
   private val ignoredRegex: Regex = """.*(?:<url>|<talkid>|<keywords>|<speaker>|<reviewer>|<translator>).*""".r
   private val removeRegex : Regex = """(?:<title>|</title>|<description>|</description>)""".r
 
@@ -38,6 +42,7 @@ object TEDConverter extends FileProcessor {
   def convertTEDToText(tedFile: File): File = {
     val textFile = convertedFile(tedFile)
     if (textFile.notExists) {
+      logger.info(s"Converting TED file '$tedFile' to text file '$textFile'.")
       val reader = newReader(tedFile)
       val writer = newWriter(textFile)
       reader.lines().toAutoClosedIterator.foreach(line => {
@@ -48,6 +53,7 @@ object TEDConverter extends FileProcessor {
       })
       writer.flush()
       writer.close()
+      logger.info(s"Converted TED file '$tedFile' to text file '$textFile'.")
     }
     textFile
   }

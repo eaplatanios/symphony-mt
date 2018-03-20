@@ -19,6 +19,8 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.{newReader, newWriter}
 
 import better.files._
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.util.matching.Regex
@@ -27,6 +29,8 @@ import scala.util.matching.Regex
   * @author Emmanouil Antonios Platanios
   */
 object SGMConverter extends FileProcessor {
+  private val logger = Logger(LoggerFactory.getLogger("Data / SGM Converter"))
+
   private val startRegex           : Regex = """(?i)<seg[^>]+>\s*$""".r
   private val startCaptureRegex    : Regex = """(?i)<seg[^>]+>\s*(.*)\s*$""".r
   private val startStopCaptureRegex: Regex = """(?i)<seg[^>]+>\s*(.*)\s*<\/seg>""".r
@@ -41,6 +45,7 @@ object SGMConverter extends FileProcessor {
   def convertSGMToText(sgmFile: File): File = {
     val textFile = convertedFile(sgmFile)
     if (textFile.notExists) {
+      logger.info(s"Converting SGM file '$sgmFile' to text file '$textFile'.")
       val reader = newReader(sgmFile)
       val writer = newWriter(textFile)
       val linesIterator = reader.lines().iterator().asScala
@@ -62,6 +67,7 @@ object SGMConverter extends FileProcessor {
       }
       writer.flush()
       writer.close()
+      logger.info(s"Converted SGM file '$sgmFile' to text file '$textFile'.")
     }
     textFile
   }
