@@ -52,7 +52,7 @@ object IWSLT15UsingBPE extends App {
   }
 
   val env = Environment(
-    workingDir = workingDir.resolve(languages.mkString("-")),
+    workingDir = workingDir.resolve(languages.map(_._1.abbreviation).mkString("-")),
     allowSoftPlacement = true,
     logDevicePlacement = false,
     gpuAllowMemoryGrowth = false,
