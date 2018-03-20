@@ -62,16 +62,17 @@ object Inputs {
     val languageIds = languages.map(_._1).zipWithIndex.toMap
     val bufferSize = if (dataConfig.bufferSize == -1L) 1024L else dataConfig.bufferSize
 
-    val filteredDatasets = datasets.map(_.filterLanguages(languageIds.keys.toSeq: _*))
-    val numParallelFiles = filteredDatasets.map(_.languagePairs().size).sum // TODO: Not correct.
-
-    // Each element in `filesDataset` is a tuple: (srcLanguage, tgtLanguage, srcFile, tgtFile).
-    val filesDataset = filteredDatasets
+    val filteredDatasets = datasets
+        .map(_.filterLanguages(languageIds.keys.toSeq: _*))
         .filter(_.nonEmpty)
         .flatMap(d => {
           val currentLanguagePairs = d.languagePairs()
           languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(_ -> d)
         })
+    val numParallelFiles = filteredDatasets.map(d => d._2.files(d._1._1).size).sum
+
+    // Each element in `filesDataset` is a tuple: (srcLanguage, tgtLanguage, srcFile, tgtFile).
+    val filesDataset = filteredDatasets
         .map {
           case ((srcLanguage, tgtLanguage), dataset) =>
             val srcFiles = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString())
@@ -91,7 +92,7 @@ object Inputs {
     filesDataset
         .shuffle(numParallelFiles)
         .parallelInterleave(
-          d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles, sloppy = true,
+          d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles, sloppy = false,
           bufferOutputElements = bufferSize, prefetchInputElements = numParallelFiles, name = "Interleave")
   }
 

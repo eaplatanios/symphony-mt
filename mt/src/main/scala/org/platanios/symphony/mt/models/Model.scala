@@ -80,11 +80,7 @@ abstract class Model[S] protected (
     val summariesDir = config.env.workingDir.resolve("summaries")
 
     // Create estimator hooks.
-    var hooks = Set[tf.learn.Hook](
-      // tf.learn.LossLogger(trigger = tf.learn.StepHookTrigger(1)),
-      tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-      tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
-      tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
+    var hooks = Set[tf.learn.Hook]()
 
     // Add logging hooks.
     if (logConfig.logLossSteps > 0)
@@ -100,6 +96,14 @@ abstract class Model[S] protected (
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
+
+    // Add summaries/checkpoints hooks.
+    hooks ++= Set(
+      tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
+      tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
+      tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
+
+    // Add TensorBoard hook.
     if (logConfig.launchTensorBoard)
       hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
         summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
