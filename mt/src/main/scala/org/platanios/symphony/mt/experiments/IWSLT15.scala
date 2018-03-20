@@ -23,6 +23,7 @@ import org.platanios.symphony.mt.data.processors.{MosesCleaner, MosesTokenizer}
 import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
+import org.platanios.symphony.mt.vocabulary.{SimpleVocabularyGenerator, Vocabulary}
 import org.platanios.tensorflow.api._
 
 import java.nio.file.{Path, Paths}
@@ -33,22 +34,23 @@ import java.nio.file.{Path, Paths}
 object IWSLT15 extends App {
   val workingDir: Path = Paths.get("temp").resolve("iwslt15-rnn")
 
-  val srcLanguage: Language = English
-  val tgtLanguage: Language = Vietnamese
+  val languagePairs: Set[(Language, Language)] = Set((English, Vietnamese))
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenizer = MosesTokenizer(),
     loaderCleaner = MosesCleaner(1, 80),
-    loaderVocab = MergedVocabularies,
+    loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold = 20000)),
     numBuckets = 5,
     srcMaxLength = 80,
     tgtMaxLength = 80)
 
-  val dataset: FileParallelDataset = IWSLT15DatasetLoader(srcLanguage, tgtLanguage, dataConfig).load()
+  val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
+    loadDatasets(languagePairs.toSeq.map(l => IWSLT15DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))
+  }
 
   val env = Environment(
-    workingDir = workingDir.resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"),
+    workingDir = workingDir.resolve(languages.mkString("-")),
     allowSoftPlacement = true,
     logDevicePlacement = false,
     gpuAllowMemoryGrowth = false,
@@ -71,7 +73,7 @@ object IWSLT15 extends App {
 
   val model = RNNModel(
     name = "Model",
-    languages = Seq(srcLanguage -> dataset.vocabulary(srcLanguage), tgtLanguage -> dataset.vocabulary(tgtLanguage)),
+    languages = languages,
     dataConfig = dataConfig,
     config = RNNModel.Config(
       env,
@@ -101,11 +103,15 @@ object IWSLT15 extends App {
     optConfig = optConfig,
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
-    evalDatasets = Seq(
-      ("IWSLT15/dev", dataset.filterTypes(Dev).filterLanguages(srcLanguage, tgtLanguage)),
-      ("IWSLT15/test", dataset.filterTypes(Test).filterLanguages(srcLanguage, tgtLanguage))))
+    evalDatasets = datasets.flatMap(d => Seq(
+      // ("IWSLT15/dev2010", d.filterTags(IWSLT15DatasetLoader.Dev2010)),
+      // ("IWSLT15/tst2010", d.filterTags(IWSLT15DatasetLoader.Test2010)),
+      // ("IWSLT15/tst2011", d.filterTags(IWSLT15DatasetLoader.Test2011)),
+      // ("IWSLT15/tst2012", d.filterTags(IWSLT15DatasetLoader.Test2012)),
+      ("IWSLT15/tst2013", d.filterTags(IWSLT15DatasetLoader.Test2013)))
+    ))
 
-  model.train(dataset.filterTypes(Train), tf.learn.StopCriteria.steps(12000))
+  model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(12000))
 
   // val evaluator = BilingualEvaluator(Seq(BLEU()), srcLanguage, tgtLanguage, dataset.filterTypes(Test))
   // println(evaluator.evaluate(model).values.head.scalar.asInstanceOf[Float])

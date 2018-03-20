@@ -71,7 +71,8 @@ object WMT16LanguageEmbeddings extends App {
 
   val logConfig = Model.LogConfig(
     logLossSteps = 100,
-    logEvalSteps = 5000)
+    logEvalSteps = 5000,
+    launchTensorBoard = true)
 
   val model = RNNModel(
     name = "Model",

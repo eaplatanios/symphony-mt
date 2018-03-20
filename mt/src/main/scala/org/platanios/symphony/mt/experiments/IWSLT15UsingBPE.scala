@@ -52,9 +52,9 @@ object IWSLT15UsingBPE extends App {
   }
 
   val env = Environment(
-    workingDir = workingDir,
+    workingDir = workingDir.resolve(languages.mkString("-")),
     allowSoftPlacement = true,
-    logDevicePlacement = false,
+    logDevicePlacement = false)
     gpuAllowMemoryGrowth = false,
     useXLA = false,
     numGPUs = 1,
@@ -66,7 +66,9 @@ object IWSLT15UsingBPE extends App {
     maxGradNorm = 100.0f,
     optimizer = tf.train.AMSGrad(learningRateSummaryTag = "LearningRate"))
 
-  val logConfig = Model.LogConfig(logLossSteps = 100)
+  val logConfig = Model.LogConfig(
+    logLossSteps = 100,
+    launchTensorBoard = true)
 
   val model = RNNModel(
     name = "Model",
