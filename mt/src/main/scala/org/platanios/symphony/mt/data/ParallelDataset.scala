@@ -50,5 +50,12 @@ trait ParallelDataset {
 
   def filterLanguages(languages: Language*): ParallelDataset
   def filterTypes(fileTypes: DatasetType*): ParallelDataset
-  def filterKeys(keys: String*): ParallelDataset
+  def filterTags(tags: ParallelDataset.Tag*): ParallelDataset
+}
+
+object ParallelDataset {
+  trait Tag {
+    val value: String
+    override def toString: String = value
+  }
 }

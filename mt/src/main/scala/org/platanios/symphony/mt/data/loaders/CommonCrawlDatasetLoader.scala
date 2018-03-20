@@ -59,13 +59,15 @@ class CommonCrawlDatasetLoader(
   override def filesToDownload: Seq[String] = Seq(
     s"${CommonCrawlDatasetLoader.url}/${CommonCrawlDatasetLoader.archivePrefix}.tgz")
 
-  /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
+  /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
-  override def corpora(datasetType: DatasetType): Seq[(String, File, File, FileProcessor)] = datasetType match {
-    case Train => Seq(("CommonCrawl/Train",
-        File(downloadsDir) / CommonCrawlDatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(downloadsDir) / CommonCrawlDatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
-    case _ => Seq.empty
+  override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
+    datasetType match {
+      case Train => Seq((CommonCrawlDatasetLoader.Train,
+          File(downloadsDir) / CommonCrawlDatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
+          File(downloadsDir) / CommonCrawlDatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
+      case _ => Seq.empty
+    }
   }
 }
 
@@ -87,5 +89,9 @@ object CommonCrawlDatasetLoader {
       dataConfig: DataConfig
   ): CommonCrawlDatasetLoader = {
     new CommonCrawlDatasetLoader(srcLanguage, tgtLanguage, dataConfig)
+  }
+
+  case object Train extends ParallelDataset.Tag {
+    override val value: String = "commoncrawl/train"
   }
 }

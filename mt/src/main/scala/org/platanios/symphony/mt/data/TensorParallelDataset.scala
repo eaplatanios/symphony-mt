@@ -27,7 +27,7 @@ class TensorParallelDataset protected (
     override val vocabulary: Map[Language, Vocabulary],
     val tensors: Map[Language, Seq[(Tensor, Tensor)]],
     val tensorTypes: Seq[DatasetType] = null,
-    val tensorKeys: Seq[String] = null
+    val tensorTags: Seq[ParallelDataset.Tag] = null
 ) extends ParallelDataset {
   override def isEmpty: Boolean = tensors.head._2.isEmpty
   override def nonEmpty: Boolean = !isEmpty
@@ -36,26 +36,26 @@ class TensorParallelDataset protected (
     TensorParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
       vocabulary.filterKeys(languages.contains), tensors.filterKeys(languages.contains),
-      tensorTypes, tensorKeys)
+      tensorTypes, tensorTags)
   }
 
   override def filterTypes(types: DatasetType*): TensorParallelDataset = {
     require(tensorTypes.nonEmpty, "Cannot filter a parallel dataset by tensor type when it contains no tensor types.")
     val filteredGroupedTensors = tensors.mapValues(_.zip(tensorTypes).filter(f => types.contains(f._2)).map(_._1))
     val filteredFileTypes = tensorTypes.filter(types.contains)
-    val filteredFileKeys = tensorKeys.zip(tensorTypes).filter(f => types.contains(f._2)).map(_._1)
+    val filteredFileKeys = tensorTags.zip(tensorTypes).filter(f => types.contains(f._2)).map(_._1)
     TensorParallelDataset(
       s"$name/${types.mkString("-")}", vocabulary, filteredGroupedTensors,
       filteredFileTypes, filteredFileKeys)
   }
 
-  override def filterKeys(keys: String*): TensorParallelDataset = {
-    require(tensorKeys.nonEmpty, "Cannot filter a parallel dataset by tensor key when it contains no tensor keys.")
-    val filteredGroupedTensors = tensors.mapValues(_.zip(tensorKeys).filter(f => keys.contains(f._2)).map(_._1))
-    val filteredTensorTypes = tensorKeys.zip(tensorTypes).filter(f => keys.contains(f._1)).map(_._2)
-    val filteredTensorsKeys = tensorKeys.filter(keys.contains)
+  override def filterTags(tags: ParallelDataset.Tag*): TensorParallelDataset = {
+    require(tensorTags.nonEmpty, "Cannot filter a parallel dataset by tensor key when it contains no tensor keys.")
+    val filteredGroupedTensors = tensors.mapValues(_.zip(tensorTags).filter(f => tags.contains(f._2)).map(_._1))
+    val filteredTensorTypes = tensorTags.zip(tensorTypes).filter(f => tags.contains(f._1)).map(_._2)
+    val filteredTensorsKeys = tensorTags.filter(tags.contains)
     TensorParallelDataset(
-      s"$name/${keys.mkString("-")}", vocabulary, filteredGroupedTensors,
+      s"$name/${tags.mkString("-")}", vocabulary, filteredGroupedTensors,
       filteredTensorTypes, filteredTensorsKeys)
   }
 }
@@ -66,8 +66,8 @@ object TensorParallelDataset {
       vocabularies: Map[Language, Vocabulary],
       tensors: Map[Language, Seq[(Tensor, Tensor)]],
       tensorTypes: Seq[DatasetType] = null,
-      tensorKeys: Seq[String] = null
+      tensorTags: Seq[ParallelDataset.Tag] = null
   ): TensorParallelDataset = {
-    new TensorParallelDataset(name, vocabularies, tensors, tensorTypes, tensorKeys)
+    new TensorParallelDataset(name, vocabularies, tensors, tensorTypes, tensorTags)
   }
 }

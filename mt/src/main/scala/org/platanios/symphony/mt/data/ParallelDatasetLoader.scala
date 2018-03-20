@@ -70,9 +70,9 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
     files
   }
 
-  /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
+  /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
-  def corpora(datasetType: DatasetType): Seq[(String, File, File, FileProcessor)] = Seq.empty
+  def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = Seq.empty
 
   /** Returns the source and the target language vocabularies of this dataset. */
   def vocabularies: (Seq[File], Seq[File]) = (Seq.empty, Seq.empty)
@@ -145,7 +145,7 @@ object ParallelDatasetLoader {
       var srcFiles = Seq.empty[MutableFile]
       var tgtFiles = Seq.empty[MutableFile]
       var fileTypes = Seq.empty[DatasetType]
-      var fileKeys = Seq.empty[String]
+      var fileTags = Seq.empty[ParallelDataset.Tag]
       DatasetType.types.foreach(datasetType => {
         val corpora = loader.corpora(datasetType)
 
@@ -174,10 +174,10 @@ object ParallelDatasetLoader {
         srcFiles ++= cleanedSrcFiles.map(MutableFile(_))
         tgtFiles ++= cleanedTgtFiles.map(MutableFile(_))
         fileTypes ++= Seq.fill(corpora.length)(datasetType)
-        fileKeys ++= corpora.map(_._1)
+        fileTags ++= corpora.map(_._1)
       })
 
-      (srcFiles, tgtFiles, fileTypes, fileKeys)
+      (srcFiles, tgtFiles, fileTypes, fileTags)
     })
 
     ParallelDatasetLoader.logger.info("Preprocessed any downloaded files.")
@@ -221,10 +221,10 @@ object ParallelDatasetLoader {
     }
 
     val datasets = loaders.zip(files).map {
-      case (loader, (srcFiles, tgtFiles, fileTypes, fileKeys)) =>
+      case (loader, (srcFiles, tgtFiles, fileTypes, fileTags)) =>
         val groupedFiles = Map(loader.srcLanguage -> srcFiles.map(_.get), loader.tgtLanguage -> tgtFiles.map(_.get))
         val filteredVocabulary = vocabulary.filterKeys(l => l == loader.srcLanguage || l == loader.tgtLanguage)
-        FileParallelDataset(loader.name, filteredVocabulary, loader.dataConfig, groupedFiles, fileTypes, fileKeys)
+        FileParallelDataset(loader.name, filteredVocabulary, loader.dataConfig, groupedFiles, fileTypes, fileTags)
     }
 
     (datasets, vocabulary.toSeq)

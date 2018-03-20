@@ -101,11 +101,11 @@ object IWSLT15UsingBPE extends App {
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
     evalDatasets = datasets.flatMap(d => Seq(
-      // ("IWSLT15/dev2010", d.filterKeys("dev2010")),
-      // ("IWSLT15/tst2010", d.filterKeys("tst2010")),
-      // ("IWSLT15/tst2011", d.filterKeys("tst2011")),
-      // ("IWSLT15/tst2012", d.filterKeys("tst2012")),
-      ("IWSLT15/tst2013", d.filterKeys("tst2013")))
+      // ("IWSLT15/dev2010", d.filterTags(IWSLT15DatasetLoader.Dev2010)),
+      // ("IWSLT15/tst2010", d.filterTags(IWSLT15DatasetLoader.Test2010)),
+      // ("IWSLT15/tst2011", d.filterTags(IWSLT15DatasetLoader.Test2011)),
+      // ("IWSLT15/tst2012", d.filterTags(IWSLT15DatasetLoader.Test2012)),
+      ("IWSLT15/tst2013", d.filterTags(IWSLT15DatasetLoader.Test2013)))
     ))
 
   model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(340000))

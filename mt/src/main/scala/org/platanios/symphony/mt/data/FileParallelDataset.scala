@@ -29,7 +29,7 @@ class FileParallelDataset protected (
     val dataConfig: DataConfig,
     val files: Map[Language, Seq[File]],
     val fileTypes: Seq[DatasetType] = null,
-    val fileKeys: Seq[String] = null
+    val fileTags: Seq[ParallelDataset.Tag] = null
 ) extends ParallelDataset {
   override def isEmpty: Boolean = files.head._2.isEmpty
   override def nonEmpty: Boolean = !isEmpty
@@ -38,25 +38,25 @@ class FileParallelDataset protected (
     FileParallelDataset(
       s"$name/${languages.map(_.abbreviation).mkString("-")}",
       vocabulary.filterKeys(languages.contains), dataConfig,
-      files.filterKeys(languages.contains), fileTypes, fileKeys)
+      files.filterKeys(languages.contains), fileTypes, fileTags)
   }
 
   override def filterTypes(types: DatasetType*): FileParallelDataset = {
     val filteredGroupedFiles = files.mapValues(_.zip(fileTypes).filter(f => types.contains(f._2)).map(_._1))
     val filteredFileTypes = fileTypes.filter(types.contains)
-    val filteredFileKeys = fileKeys.zip(fileTypes).filter(f => types.contains(f._2)).map(_._1)
+    val filteredFileKeys = fileTags.zip(fileTypes).filter(f => types.contains(f._2)).map(_._1)
     FileParallelDataset(
       s"$name/${types.mkString("-")}", vocabulary, dataConfig,
       filteredGroupedFiles, filteredFileTypes, filteredFileKeys)
   }
 
-  override def filterKeys(keys: String*): FileParallelDataset = {
-    require(fileKeys.nonEmpty, "Cannot filter a parallel dataset by file key when it contains no file keys.")
-    val filteredGroupedFiles = files.mapValues(_.zip(fileKeys).filter(f => keys.contains(f._2)).map(_._1))
-    val filteredFileTypes = fileKeys.zip(fileTypes).filter(f => keys.contains(f._1)).map(_._2)
-    val filteredFileKeys = fileKeys.filter(keys.contains)
+  override def filterTags(tags: ParallelDataset.Tag*): FileParallelDataset = {
+    require(fileTags.nonEmpty, "Cannot filter a parallel dataset by file key when it contains no file keys.")
+    val filteredGroupedFiles = files.mapValues(_.zip(fileTags).filter(f => tags.contains(f._2)).map(_._1))
+    val filteredFileTypes = fileTags.zip(fileTypes).filter(f => tags.contains(f._1)).map(_._2)
+    val filteredFileKeys = fileTags.filter(tags.contains)
     FileParallelDataset(
-      s"$name/${keys.mkString("-")}", vocabulary, dataConfig,
+      s"$name/${tags.mkString("-")}", vocabulary, dataConfig,
       filteredGroupedFiles, filteredFileTypes, filteredFileKeys)
   }
 }
@@ -68,8 +68,8 @@ object FileParallelDataset {
       dataConfig: DataConfig,
       files: Map[Language, Seq[File]],
       fileTypes: Seq[DatasetType] = null,
-      fileKeys: Seq[String] = null
+      fileTags: Seq[ParallelDataset.Tag] = null
   ): FileParallelDataset = {
-    new FileParallelDataset(name, vocabularies, dataConfig, files, fileTypes, fileKeys)
+    new FileParallelDataset(name, vocabularies, dataConfig, files, fileTypes, fileTags)
   }
 }

@@ -61,13 +61,15 @@ class NewsCommentaryV11DatasetLoader(
 
   /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
     * of this dataset type. */
-  override def corpora(datasetType: DatasetType): Seq[(String, File, File, FileProcessor)] = datasetType match {
-    case Train => Seq(("NewsCommentaryV11/Train",
-        File(downloadsDir) / NewsCommentaryV11DatasetLoader.archivePrefix
-            / NewsCommentaryV11DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
-        File(downloadsDir) / NewsCommentaryV11DatasetLoader.archivePrefix
-            / NewsCommentaryV11DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
-    case _ => Seq.empty
+  override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
+    datasetType match {
+      case Train => Seq((NewsCommentaryV11DatasetLoader.Train,
+          File(downloadsDir) / NewsCommentaryV11DatasetLoader.archivePrefix
+              / NewsCommentaryV11DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
+          File(downloadsDir) / NewsCommentaryV11DatasetLoader.archivePrefix
+              / NewsCommentaryV11DatasetLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
+      case _ => Seq.empty
+    }
   }
 }
 
@@ -90,5 +92,9 @@ object NewsCommentaryV11DatasetLoader {
       dataConfig: DataConfig
   ): NewsCommentaryV11DatasetLoader = {
     new NewsCommentaryV11DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
+  }
+
+  case object Train extends ParallelDataset.Tag {
+    override val value: String = "news-commentary-v11/train"
   }
 }

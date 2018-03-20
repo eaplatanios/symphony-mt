@@ -98,7 +98,7 @@ object WMT16 extends App {
     logConfig = logConfig,
     // TODO: !!! Find a way to set the number of buckets to 1.
     evalDatasets = Seq(
-      ("WMT16/newstest2016", dataset.filterKeys("newstest2016"))))
+      ("WMT16/newstest2016", dataset.filterTags(WMT16DatasetLoader.NewsTest2016))))
 
   model.train(dataset.filterTypes(Train), tf.learn.StopCriteria.steps(340000))
 }

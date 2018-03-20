@@ -64,18 +64,20 @@ class IWSLT15StanfordDatasetLoader(
     s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.vocabPrefix}.$src",
     s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.vocabPrefix}.$tgt")
 
-  /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
+  /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
-  override def corpora(datasetType: DatasetType): Seq[(String, File, File, FileProcessor)] = datasetType match {
-    case Train => Seq(("Train",
-        File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.trainPrefix}.$src",
-        File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.trainPrefix}.$tgt", NoFileProcessor))
-    case Dev => Seq(("Dev",
-        File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.devPrefix}.$src",
-        File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.devPrefix}.$tgt", NoFileProcessor))
-    case Test => Seq(("Test",
-        File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.testPrefix}.$src",
-        File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.testPrefix}.$tgt", NoFileProcessor))
+  override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
+    datasetType match {
+      case Train => Seq((IWSLT15StanfordDatasetLoader.Train,
+          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.trainPrefix}.$src",
+          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.trainPrefix}.$tgt", NoFileProcessor))
+      case Dev => Seq((IWSLT15StanfordDatasetLoader.Test2012,
+          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.devPrefix}.$src",
+          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.devPrefix}.$tgt", NoFileProcessor))
+      case Test => Seq((IWSLT15StanfordDatasetLoader.Test2013,
+          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.testPrefix}.$src",
+          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.testPrefix}.$tgt", NoFileProcessor))
+    }
   }
 
   /** Returns the source and the target vocabulary of this dataset. */
@@ -104,5 +106,17 @@ object IWSLT15StanfordDatasetLoader {
       dataConfig: DataConfig
   ): IWSLT15StanfordDatasetLoader = {
     new IWSLT15StanfordDatasetLoader(srcLanguage, tgtLanguage, dataConfig)
+  }
+
+  case object Train extends ParallelDataset.Tag {
+    override val value: String = "iwslt-15/train"
+  }
+
+  case object Test2012 extends ParallelDataset.Tag {
+    override val value: String = "iwslt-15/tst2012"
+  }
+
+  case object Test2013 extends ParallelDataset.Tag {
+    override val value: String = "iwslt-15/tst2013"
   }
 }
