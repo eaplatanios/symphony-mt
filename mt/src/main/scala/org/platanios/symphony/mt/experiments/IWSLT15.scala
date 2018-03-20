@@ -40,7 +40,7 @@ object IWSLT15 extends App {
     workingDir = Paths.get("temp").resolve("data"),
     loaderTokenizer = MosesTokenizer(),
     loaderCleaner = MosesCleaner(),
-    loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold = 20000)),
+    loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold = 50000, countThreshold = 5)),
     numBuckets = 5,
     srcMaxLength = 50,
     tgtMaxLength = 50)

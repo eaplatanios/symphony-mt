@@ -42,6 +42,7 @@ case class TrieWordCounter() {
       val words = BoundedPriorityQueue[(Long, String)](sizeThreshold)
       rootNode.words.filter(_._2 != "").foreach {
         case (count, word) if countThreshold < 0 || count >= countThreshold => words += ((count, word))
+        case _ => ()
       }
       words
     }
