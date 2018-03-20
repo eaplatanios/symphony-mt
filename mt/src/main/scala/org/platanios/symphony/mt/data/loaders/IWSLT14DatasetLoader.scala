@@ -87,7 +87,10 @@ object IWSLT14DatasetLoader {
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
     (English, Arabic), (English, German), (English, Spanish), (English, Persian), (English, French), (English, Hebrew),
     (English, Italian), (English, Dutch), (English, Polish), (English, PortugueseBrazil), (English, Romanian),
-    (English, Russian), (English, Slovenian), (English, Turkish), (English, Chinese))
+    (English, Russian), (English, Slovenian), (English, Turkish), (English, Chinese), (Arabic, English),
+    (German, English), (Spanish, English), (Persian, English), (French, English), (Hebrew, English),
+    (Italian, English), (Dutch, English), (Polish, English), (PortugueseBrazil, English), (Romanian, English),
+    (Russian, English), (Slovenian, English), (Turkish, English), (Chinese, English))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||

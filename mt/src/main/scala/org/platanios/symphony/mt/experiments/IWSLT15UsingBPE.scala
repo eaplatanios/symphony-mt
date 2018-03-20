@@ -43,9 +43,9 @@ object IWSLT15UsingBPE extends App {
     loaderTokenizer = MosesTokenizer(),
     loaderCleaner = MosesCleaner(),
     loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000)),
-    numBuckets = 5,
-    srcMaxLength = 50,
-    tgtMaxLength = 50)
+    numBuckets = 10,
+    srcMaxLength = 100,
+    tgtMaxLength = 100)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
     loadDatasets(languagePairs.toSeq.map(l => IWSLT15DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))

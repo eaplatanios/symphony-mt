@@ -93,7 +93,8 @@ object IWSLT16DatasetLoader {
   val url: String = "https://wit3.fbk.eu/archive/2016-01/texts"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (English, Arabic), (English, Czech), (English, German), (English, French))
+    (English, Arabic), (English, Czech), (English, German), (English, French),
+    (Arabic, English), (Czech, English), (German, English), (French, English))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||

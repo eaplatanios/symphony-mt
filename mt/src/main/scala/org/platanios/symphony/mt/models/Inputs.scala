@@ -107,10 +107,12 @@ object Inputs {
         .flatMap(d => d._2.languagePairs().map(l => (d._1, l) -> d._2))
         .map {
           case ((name, (srcLanguage, tgtLanguage)), dataset) =>
-            (s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}",
-                createTrainDataset(
-                  dataConfig, config, Seq(dataset), languages, repeat = false, isEval = true,
-                  languagePairs = Some(Set((srcLanguage, tgtLanguage)))))
+            val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
+            (datasetName, () => tf.createWithNameScope(datasetName) {
+              createTrainDataset(
+                dataConfig, config, Seq(dataset), languages, repeat = false, isEval = true,
+                languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
+            })
         }
   }
 

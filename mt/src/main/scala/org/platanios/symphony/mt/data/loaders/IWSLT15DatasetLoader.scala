@@ -89,7 +89,8 @@ object IWSLT15DatasetLoader {
   val url: String = "https://wit3.fbk.eu/archive/2015-01/texts"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (English, Czech), (English, German), (English, French), (English, Thai), (English, Vietnamese), (English, Chinese))
+    (English, Czech), (English, German), (English, French), (English, Thai), (English, Vietnamese), (English, Chinese),
+    (Czech, English), (German, English), (French, English), (Thai, English), (Vietnamese, English), (Chinese, English))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
