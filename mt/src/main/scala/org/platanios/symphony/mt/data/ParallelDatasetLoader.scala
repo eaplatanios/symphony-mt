@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.processors.{FileProcessor, SGMConverter}
+import org.platanios.symphony.mt.data.processors.FileProcessor
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.symphony.mt.utilities.{CompressedFiles, MutableFile}
 
@@ -30,7 +30,7 @@ import java.nio.file.Path
 
 import scala.collection.mutable
 
-// TODO: [DATA] Placed processed files in a different directory.
+// TODO: [DATA] Place processed files in a different directory.
 
 /** Parallel dataset used for machine translation experiments.
   *
