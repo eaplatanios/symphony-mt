@@ -33,7 +33,7 @@ object TEDConverter extends FileProcessor {
   private val ignoredRegex: Regex = """.*(?:<url>|<talkid>|<keywords>|<speaker>|<reviewer>|<translator>).*""".r
   private val removeRegex : Regex = """(?:<title>|</title>|<description>|</description>)""".r
 
-  override def apply(file: File, language: Language): File = convertTEDToText(file)
+  override def process(file: File, language: Language): File = convertTEDToText(file)
 
   private def convertedFile(originalFile: File): File = {
     originalFile.sibling("converted." + originalFile.name)

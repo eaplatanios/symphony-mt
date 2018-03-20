@@ -36,7 +36,7 @@ object SGMConverter extends FileProcessor {
   private val startStopCaptureRegex: Regex = """(?i)<seg[^>]+>\s*(.*)\s*<\/seg>""".r
   private val whitespaceRegex      : Regex = """\s+""".r
 
-  override def apply(file: File, language: Language): File = convertSGMToText(file)
+  override def process(file: File, language: Language): File = convertSGMToText(file)
 
   private def convertedFile(originalFile: File): File = {
     originalFile.sibling(originalFile.nameWithoutExtension(includeAll = false))
