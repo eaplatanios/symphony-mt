@@ -35,8 +35,8 @@ object WMT16LanguageEmbeddings extends App {
   val workingDir: Path = Paths.get("temp").resolve("wmt16-gnmt-language-embeddings")
 
   val languagePairs: Set[(Language, Language)] = Set(
-    (czech, english), (finnish, english), (german, english),
-    (romanian, english), (russian, english), (turkish, english))
+    (Czech, English), (Finnish, English), (German, English),
+    (Romanian, English), (Russian, English), (Turkish, English))
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),

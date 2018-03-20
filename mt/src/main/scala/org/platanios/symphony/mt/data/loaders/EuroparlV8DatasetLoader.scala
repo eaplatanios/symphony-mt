@@ -77,7 +77,7 @@ object EuroparlV8DatasetLoader {
   val url          : String = "http://data.statmt.org/wmt16/translation-task"
   val archivePrefix: String = "training-parallel-ep-v8"
 
-  val supportedLanguagePairs: Set[(Language, Language)] = Set((finnish, english), (romanian, english))
+  val supportedLanguagePairs: Set[(Language, Language)] = Set((Finnish, English), (Romanian, English))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||

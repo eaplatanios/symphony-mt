@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.experiments
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.Language.{english, vietnamese}
+import org.platanios.symphony.mt.Language.{English, Vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
 import org.platanios.symphony.mt.data.processors.{MosesCleaner, MosesTokenizer}
@@ -33,8 +33,8 @@ import java.nio.file.{Path, Paths}
 object IWSLT15LanguageEmbeddings extends App {
   val workingDir: Path = Paths.get("temp").resolve("iwslt15-rnn-language-embeddings")
 
-  val srcLanguage: Language = english
-  val tgtLanguage: Language = vietnamese
+  val srcLanguage: Language = English
+  val tgtLanguage: Language = Vietnamese
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),

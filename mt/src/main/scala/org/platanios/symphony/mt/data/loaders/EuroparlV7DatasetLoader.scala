@@ -77,10 +77,10 @@ object EuroparlV7DatasetLoader {
   val url: String = "http://www.statmt.org/europarl/v7"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (bulgarian, english), (czech, english), (danish, english), (dutch, english), (estonian, english),
-    (finnish, english), (french, english), (german, english), (greek, english), (hungarian, english),
-    (italian, english), (lithuanian, english), (latvian, english), (polish, english), (portuguese, english),
-    (romanian, english), (slovak, english), (slovenian, english), (spanish, english), (swedish, english))
+    (Bulgarian, English), (Czech, English), (Danish, English), (Dutch, English), (Estonian, English),
+    (Finnish, English), (French, English), (German, English), (Greek, English), (Hungarian, English),
+    (Italian, English), (Lithuanian, English), (Latvian, English), (Polish, English), (Portuguese, English),
+    (Romanian, English), (Slovak, English), (Slovenian, English), (Spanish, English), (Swedish, English))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||

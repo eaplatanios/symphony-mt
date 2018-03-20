@@ -20,6 +20,8 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
+// TODO: Sample files with probability proportional to their size.
+
 /**
   * @author Emmanouil Antonios Platanios
   */

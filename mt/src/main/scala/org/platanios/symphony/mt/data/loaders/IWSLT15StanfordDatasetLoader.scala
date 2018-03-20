@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.data.loaders
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.Language.{english, vietnamese}
+import org.platanios.symphony.mt.Language.{English, Vietnamese}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.processors.{FileProcessor, NoFileProcessor}
 
@@ -93,7 +93,7 @@ object IWSLT15StanfordDatasetLoader {
   val testPrefix : String = "tst2013"
   val vocabPrefix: String = "vocab"
 
-  val supportedLanguagePairs: Set[(Language, Language)] = Set((english, vietnamese))
+  val supportedLanguagePairs: Set[(Language, Language)] = Set((English, Vietnamese))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||

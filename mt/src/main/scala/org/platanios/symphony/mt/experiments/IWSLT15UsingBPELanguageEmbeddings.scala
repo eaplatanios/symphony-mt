@@ -35,8 +35,8 @@ object IWSLT15UsingBPELanguageEmbeddings extends App {
   val workingDir: Path = Paths.get("temp").resolve("iwslt15-bpe-rnn-language-embeddings")
 
   val languagePairs: Set[(Language, Language)] = Set(
-    (english, czech), (english, german), (english, french),
-    (english, thai), (english, vietnamese), (english, chinese))
+    (English, Czech), (English, German), (English, French),
+    (English, Thai), (English, Vietnamese), (English, Chinese))
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),

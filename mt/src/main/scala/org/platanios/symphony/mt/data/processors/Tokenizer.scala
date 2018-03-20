@@ -126,7 +126,7 @@ case class MosesTokenizer(
     tokenized = ignoredRegex.replaceAllIn(tokenized, "")
 
     // Separate out all other special characters.
-    if (language == finnish || language == swedish) {
+    if (language == Finnish || language == Swedish) {
       // In Finnish and Swedish, the colon can be used inside words as an apostrophe-like character. For example:
       // "USA:n", "20:een", "EU:ssa", "USA:s", "S:t", etc.
       tokenized = fiSvColonRegex1.replaceAllIn(tokenized, " $1 ")
@@ -152,7 +152,7 @@ case class MosesTokenizer(
     tokenized = commaRegex2.replaceAllIn(tokenized, " , $1")
 
     // Handle contractions.
-    if (language == english) {
+    if (language == English) {
       // Split contractions right.
       tokenized = enContractionsRegex1.replaceAllIn(tokenized, "$1 ' $2")
       tokenized = enContractionsRegex2.replaceAllIn(tokenized, "$1 ' $2")
@@ -160,7 +160,7 @@ case class MosesTokenizer(
       tokenized = enContractionsRegex4.replaceAllIn(tokenized, "$1 '$2")
       // Special case for years, like "1990's".
       tokenized = enContractionsRegex5.replaceAllIn(tokenized, "$1 '$2")
-    } else if (language == french || language == italian || language == irish) {
+    } else if (language == French || language == Italian || language == Irish) {
       // Split contractions left.
       tokenized = frItGaContractionsRegex1.replaceAllIn(tokenized, "$1 ' $2")
       tokenized = frItGaContractionsRegex2.replaceAllIn(tokenized, "$1 ' $2")
@@ -223,19 +223,19 @@ object MosesTokenizer {
   case class NonBreakingPrefixes(prefixes: Set[String] = Set.empty, numericPrefixes: Set[String] = Set.empty)
 
   private[data] val defaultNonBreakingPrefixes = Map(
-    catalan -> NonBreakingPrefixes(
+    Catalan -> NonBreakingPrefixes(
       prefixes = Set(
         "Dr", "Dra", "pàg", "p", "c", "av", "Sr", "Sra", "adm", "esq", "Prof", "S.A", "S.L", "p.e", "ptes", "Sta", "St",
         "pl", "màx", "cast", "dir", "nre", "fra", "admdora", "Emm", "Excma", "espf", "dc", "admdor", "tel", "angl",
         "aprox", "ca", "dept", "dj", "dl", "dt", "ds", "dg", "dv", "ed", "entl", "al", "i.e", "maj", "smin", "n", "núm",
         "pta", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U",
         "V", "W", "X", "Y", "Z")),
-    chinese -> NonBreakingPrefixes(
+    Chinese -> NonBreakingPrefixes(
       prefixes = Set(
         "A", "Ā", "B", "C", "Č", "D", "E", "Ē", "F", "G", "Ģ", "H", "I", "Ī", "J", "K", "Ķ", "L", "Ļ", "M", "N", "Ņ",
         "O", "P", "Q", "R", "S", "Š", "T", "U", "Ū", "V", "W", "X", "Y", "Z", "Ž"),
       numericPrefixes = Set("No", "Nr")),
-    czech -> NonBreakingPrefixes(
+    Czech -> NonBreakingPrefixes(
       prefixes = Set(
         "Bc", "BcA", "Ing", "Ing.arch", "MUDr", "MVDr", "MgA", "Mgr", "JUDr", "PhDr", "RNDr", "PharmDr", "ThLic",
         "ThDr", "Ph.D", "Th.D", "prof", "doc", "CSc", "DrSc", "dr. h. c", "PaedDr", "Dr", "PhMr", "DiS", "abt", "ad",
@@ -265,7 +265,7 @@ object MosesTokenizer {
         "resp", "tj", "p", "br", "č. j", "čj", "č. p", "čp", "a. s", "s. r. o", "spol. s r. o", "p. o", "s. p",
         "v. o. s", "k. s", "o. p. s", "o. s", "v. r", "v z", "ml", "vč", "kr", "mld", "hod", "popř", "ap", "event",
         "rus", "slov", "rum", "švýc", "P. T", "zvl", "hor", "dol", "S.O.S")),
-    dutch -> NonBreakingPrefixes(
+    Dutch -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name.
@@ -280,7 +280,7 @@ object MosesTokenizer {
         "a.g.v", "bijv", "bijz", "bv", "d.w.z", "e.c", "e.g", "e.k", "ev", "i.p.v", "i.s.m", "i.t.t", "i.v.m", "m.a.w",
         "m.b.t", "m.b.v", "m.h.o", "m.i", "m.i.v", "v.w.t", "Nrs", "nrs"),
       numericPrefixes = Set("Nr", "nr")),
-    english -> NonBreakingPrefixes(
+    English -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name.
@@ -299,7 +299,7 @@ object MosesTokenizer {
       numericPrefixes = Set(
         // Numbers only. These should only induce breaks when followed by a numeric sequence.
         "No", "Art", "pp")),
-    finnish -> NonBreakingPrefixes(
+    Finnish -> NonBreakingPrefixes(
       // This list is compiled from the omorfi (http://code.google.com/p/omorfi) database by Tommi A Pirinen.
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
@@ -318,7 +318,7 @@ object MosesTokenizer {
         // Miscellaneous symbols - odd period-ending items that never indicate sentence breaks ("p.m." does not fall
         // into this category - it sometimes ends a sentence).
         "e.g", "ent", "esim", "huom", "i.e", "ilm", "l", "mm", "myöh", "nk", "nyk", "par", "po", "t", "v")),
-    french -> NonBreakingPrefixes(
+    French -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name. No french words end in
@@ -334,7 +334,7 @@ object MosesTokenizer {
         "NN.SS", "N.S", "N.D", "N.P.A.I", "p.c.c", "pl", "pp", "p.ex", "p.j", "P.S", "R.A.S", "R.-V", "R.P", "R.I.P",
         "SS", "S.S", "S.A", "S.A.I", "S.A.R", "S.A.S", "S.E", "sec", "sect", "sing", "S.M", "S.M.I.R", "sq", "sqq",
         "suiv", "sup", "suppl", "tél", "T.S.V.P", "vb", "vol", "vs", "X.O", "Z.I")),
-    german -> NonBreakingPrefixes(
+    German -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name. No german words end in
@@ -366,7 +366,7 @@ object MosesTokenizer {
       numericPrefixes = Set(
         // Numbers only. These should only induce breaks when followed by a numeric sequence.
         "No", "Art", "pp")),
-    greek -> NonBreakingPrefixes(
+    Greek -> NonBreakingPrefixes(
       prefixes = Set(
         // Single letters in upper-case are usually abbreviations of names.
         "Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ",
@@ -509,7 +509,7 @@ object MosesTokenizer {
         "χ.τ", "χ.χ", "ψευδ", "ψυχαν", "ψυχιατρ", "ψυχολ", "ψυχ", "ωκεαν", "όμ", "όν", "όπ.παρ", "όπ.π",
         "ό.π", "ύψ", "1Βσ", "1Εσ", "1Θσ", "1Ιν", "1Κρ", "1Μκ", "1Πρ", "1Πτ", "1Τμ", "2Βσ", "2Εσ", "2Θσ", "2Ιν",
         "2Κρ", "2Μκ", "2Πρ", "2Πτ", "2Τμ", "3Βσ", "3Ιν", "3Μκ", "4Βσ")),
-    hungarian -> NonBreakingPrefixes(
+    Hungarian -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name.
@@ -524,7 +524,7 @@ object MosesTokenizer {
         "Aug", "Szept", "szept", "okt", "Okt", "nov", "Nov", "dec", "Dec",
         // Other abbreviations.
         "tel", "Tel", "Fax", "fax")),
-    icelandic -> NonBreakingPrefixes(
+    Icelandic -> NonBreakingPrefixes(
       prefixes = Set(
         "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v",
         "w", "x", "y", "z", "^", "í", "á", "ó", "æ", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
@@ -542,14 +542,14 @@ object MosesTokenizer {
         "tbl", "tfn", "tl", "tvíhlj", "tvt", "till", "to", "umr", "uh", "us", "uppl", "útg", "vb", "Vf", "vh", "vkf",
         "Vl", "vl", "lf", "vmf", "8vo", "vsk", "vth", "þt", "þf", "þjs", "þgf", "þlt", "þolm", "þm", "þml", "þýð"),
       numericPrefixes = Set("no", "No", "nr", "Nr", "nR", "NR")),
-    irish -> NonBreakingPrefixes(
+    Irish -> NonBreakingPrefixes(
       prefixes = Set(
         "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V",
         "W", "X", "Y", "Z", "Á", "É", "Í", "Ó", "Ú", "", "Uacht", "Dr", "B.Arch", "", "m.sh", ".i", "Co", "Cf", "cf",
         "i.e", "r", "Chr"),
       numericPrefixes = Set("lch", "lgh", "uimh")
     ),
-    italian -> NonBreakingPrefixes(
+    Italian -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name.
@@ -571,7 +571,7 @@ object MosesTokenizer {
       numericPrefixes = Set(
         // Numbers only. These should only induce breaks when followed by a numeric sequence.
         "No", "Art", "pp")),
-    latvian -> NonBreakingPrefixes(
+    Latvian -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name.
@@ -585,7 +585,7 @@ object MosesTokenizer {
         "Virz", "māksl", "Māksl", "mūz", "Mūz", "akad", "Akad", "soc", "Soc", "galv", "Galv", "vad", "Vad", "sertif",
         "Sertif", "folkl", "Folkl", "hum", "Hum"),
       numericPrefixes = Set("Nr")),
-    lithuanian -> NonBreakingPrefixes(
+    Lithuanian -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name.
@@ -616,7 +616,7 @@ object MosesTokenizer {
         "škot", "šnek", "teatr", "tech", "techn", "teig", "teis", "tekst", "tel", "teol", "v", "t.p", "t", "p", "t.t",
         "t.y", "vaik", "vart", "vet", "vid", "vksm", "vns", "vok", "vulg", "zool", "žr", "ž.ū", "ž", "ū", "Em.", "Gerb",
         "gerb", "malon", "Prof", "prof", "Dr", "dr", "habil", "med", "inž", "Inž")),
-    polish -> NonBreakingPrefixes(
+    Polish -> NonBreakingPrefixes(
       prefixes = Set(
         "adw", "afr", "akad", "al", "Al", "am", "amer", "arch", "art", "Art", "artyst", "astr", "austr", "bałt", "bdb",
         "bł", "bm", "br", "bryg", "bryt", "centr", "ces", "chem", "chiń", "chir", "c.k", "c.o", "cyg", "cyw", "cyt",
@@ -636,7 +636,7 @@ object MosesTokenizer {
         "poz", "pok", "oo", "oO", "Oo", "OO", "najśw", "Najśw", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K",
         "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "Ś", "Ć", "Ż", "Ź", "Dz"),
       numericPrefixes = Set("nr", "Nr", "pkt", "str", "tab", "Tab", "ust", "par", "r", "l", "s")),
-    portuguese -> NonBreakingPrefixes(
+    Portuguese -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name.
@@ -659,11 +659,11 @@ object MosesTokenizer {
       numericPrefixes = Set(
         // Numbers only. These should only induce breaks when followed by a numeric sequence.
         "No", "Art", "pp")),
-    romanian -> NonBreakingPrefixes(
+    Romanian -> NonBreakingPrefixes(
       prefixes = Set(
         "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V",
         "W", "X", "Y", "Z", "dpdv", "etc", "șamd", "M.Ap.N", "dl", "Dl", "d-na", "D-na", "dvs", "Dvs", "pt", "Pt")),
-    russian -> NonBreakingPrefixes(
+    Russian -> NonBreakingPrefixes(
       prefixes = Set(
         "А", "Б", "В", "Г", "Д", "Е", "Ж", "З", "И", "Й", "К", "Л", "М", "Н", "О", "П", "Р", "С", "Т", "У", "Ф", "Х",
         "Ц", "Ч", "Ш", "Щ", "Ъ", "Ы", "Ь", "Э", "Ю", "Я", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L",
@@ -682,7 +682,7 @@ object MosesTokenizer {
         "ок", "ост", "отл", "п", "пер", "перераб", "пл", "пос", "пр", "просп", "проф", "р", "ред", "руб", "с", "сб",
         "св", "см", "соч", "ср", "ст", "стр", "т", "тел", "Тел", "тех", "тт", "туп", "тыс", "уд", "ул", "уч", "физ",
         "х", "хор", "ч", "чел", "шт", "экз", "э")),
-    slovak -> NonBreakingPrefixes(
+    Slovak -> NonBreakingPrefixes(
       prefixes = Set(
         "Bc", "Mgr", "RNDr", "PharmDr", "PhDr", "JUDr", "PaedDr", "ThDr", "Ing", "MUDr", "MDDr", "MVDr", "Dr", "ThLic",
         "PhD", "ArtD", "ThDr", "Dr", "DrSc", "CSs", "prof", "obr", "Obr", "Č", "č", "absol", "adj", "admin", "adr",
@@ -719,7 +719,7 @@ object MosesTokenizer {
         "záhr", "zák", "zákl", "zám", "záp", "západoeur", "zázn", "územ", "účt", "čast", "čes", "Čes", "čl", "čísl",
         "živ", "pr", "fak", "Kr", "p.n.l", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O",
         "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z")),
-    slovenian -> NonBreakingPrefixes(
+    Slovenian -> NonBreakingPrefixes(
       prefixes = Set(
         "dr", "Dr", "itd", "itn", "d", "jan", "Jan", "feb", "Feb", "mar", "Mar", "apr", "Apr", "jun", "Jun", "jul",
         "Jul", "avg", "Avg", "sept", "Sept", "sep", "Sep", "okt", "Okt", "nov", "Nov", "dec", "Dec", "tj", "Tj", "npr",
@@ -727,12 +727,12 @@ object MosesTokenizer {
         "Gl", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U",
         "V", "W", "X", "Y", "Z"),
       numericPrefixes = Set("št", "Št")),
-    swedish -> NonBreakingPrefixes(
+    Swedish -> NonBreakingPrefixes(
       prefixes = Set(
         "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", 
         "W", "X", "Y", "Z", "AB", "G", "VG", "dvs", "etc", "from", "iaf", "jfr", "kl", "kr", "mao", "mfl", "mm", "osv",
         "pga", "tex", "tom", "vs")),
-    spanish -> NonBreakingPrefixes(
+    Spanish -> NonBreakingPrefixes(
       prefixes = Set(
         // Any single upper case letter followed by a period is not at the end of a sentence (excluding "I"
         // occasionally, but we leave it in) usually upper case letters are initials in a name.
@@ -746,7 +746,7 @@ object MosesTokenizer {
         "gr ", "grs", "izq", "kg", "km", "mg", "mm", "nÃºm", "núm", "p", "p.a", "p.ej", "ptas", "pÃ¡g ", "pÃ¡gs", "pág",
         "págs", "q.e.g.e", "q.e.s.m", "s", "s.s.s", "vid", "vol")
     ),
-    tamil -> NonBreakingPrefixes(
+    Tamil -> NonBreakingPrefixes(
       prefixes = Set(
         "அ", "ஆ", "இ", "ஈ", "உ", "ஊ", "எ", "ஏ", "ஐ", "ஒ", "ஓ", "ஔ", "ஃ", "க", "கா", "கி", "கீ", "கு", "கூ", "கெ",
         "கே", "கை", "கொ", "கோ", "கௌ", "க்", "ச", "சா", "சி", "சீ", "சு", "சூ", "செ", "சே", "சை", "சொ", "சோ",

@@ -78,7 +78,7 @@ object NewsCommentaryV11DatasetLoader {
   val archivePrefix: String = "training-parallel-nc-v11"
 
   val supportedLanguagePairs: Set[(Language, Language)] = {
-    Set((czech, english), (german, english), (russian, english))
+    Set((Czech, English), (German, English), (Russian, English))
   }
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {

@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.experiments
 
 import org.platanios.symphony.mt.{Environment, Language}
-import org.platanios.symphony.mt.Language.{english, german}
+import org.platanios.symphony.mt.Language.{English, German}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
 import org.platanios.symphony.mt.data.processors.{MosesCleaner, MosesTokenizer}
@@ -33,8 +33,8 @@ import java.nio.file.{Path, Paths}
 object WMT16 extends App {
   val workingDir: Path = Paths.get("temp").resolve("wmt16-gnmt")
 
-  val srcLanguage: Language = german
-  val tgtLanguage: Language = english
+  val srcLanguage: Language = German
+  val tgtLanguage: Language = English
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),

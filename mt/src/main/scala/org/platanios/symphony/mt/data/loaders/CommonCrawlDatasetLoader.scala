@@ -76,7 +76,7 @@ object CommonCrawlDatasetLoader {
   val archivePrefix: String = "training-parallel-commoncrawl"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (czech, english), (french, english), (german, english), (russian, english), (spanish, english))
+    (Czech, English), (French, English), (German, English), (Russian, English), (Spanish, English))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
