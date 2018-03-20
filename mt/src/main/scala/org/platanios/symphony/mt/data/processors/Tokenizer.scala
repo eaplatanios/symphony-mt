@@ -109,7 +109,15 @@ case class MosesTokenizer(
   private val otherContractionsRegex        : Regex = """\'""".r
   private val wordRegex                     : Regex = """^(\S+)\.$""".r
   private val endOfSentenceRegex            : Regex = """\.\' ?$""".r
-  private val escapeRegex1                  : Regex = """\&""".r
+  private val preEscapeRegex1               : Regex = """& amp ;""".r
+  private val preEscapeRegex2               : Regex = """& #124 ;""".r
+  private val preEscapeRegex3               : Regex = """& lt ;""".r
+  private val preEscapeRegex4               : Regex = """& gt ;""".r
+  private val preEscapeRegex5               : Regex = """& apos ;""".r
+  private val preEscapeRegex6               : Regex = """& quot ;"""".r
+  private val preEscapeRegex7               : Regex = """& #91 ;""".r
+  private val preEscapeRegex8               : Regex = """& #93 ;""".r
+  private val escapeRegex1                  : Regex = """&(?!#?[a-zA-Z0-9]{2,7};)""".r
   private val escapeRegex2                  : Regex = """\|""".r
   private val escapeRegex3                  : Regex = """\<""".r
   private val escapeRegex4                  : Regex = """\>""".r
@@ -205,6 +213,14 @@ case class MosesTokenizer(
 
     // Escape special characters.
     if (escapeSpecialCharacters) {
+      tokenized = preEscapeRegex1.replaceAllIn(tokenized, "&amp;")
+      tokenized = preEscapeRegex2.replaceAllIn(tokenized, "&#124;")
+      tokenized = preEscapeRegex3.replaceAllIn(tokenized, "&lt;")
+      tokenized = preEscapeRegex4.replaceAllIn(tokenized, "&gt;")
+      tokenized = preEscapeRegex5.replaceAllIn(tokenized, "&apos;")
+      tokenized = preEscapeRegex6.replaceAllIn(tokenized, "&quot;")
+      tokenized = preEscapeRegex7.replaceAllIn(tokenized, "&#91;")
+      tokenized = preEscapeRegex8.replaceAllIn(tokenized, "&#93;")
       tokenized = escapeRegex1.replaceAllIn(tokenized, "&amp;")
       tokenized = escapeRegex2.replaceAllIn(tokenized, "&#124;")
       tokenized = escapeRegex3.replaceAllIn(tokenized, "&lt;")
