@@ -96,8 +96,7 @@ abstract class Model[S] protected (
             BLEU(),
             SentenceLength(forHypothesis = true, name = "Hypothesis Length"),
             SentenceLength(forHypothesis = false, name = "Reference Length"),
-            SentenceCount(forHypothesis = true, name = "Hypothesis Count"),
-            SentenceCount(forHypothesis = false, name = "Reference Count")),
+            SentenceCount(name = "# Sentences")),
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }

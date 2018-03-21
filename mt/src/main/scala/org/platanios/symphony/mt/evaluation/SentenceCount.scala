@@ -32,7 +32,6 @@ import org.platanios.tensorflow.api.ops.metrics.Metric._
   * @author Emmanouil Antonios Platanios
   */
 class SentenceCount protected (
-    val forHypothesis: Boolean,
     val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
     val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
     val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
@@ -40,21 +39,22 @@ class SentenceCount protected (
     override val name: String = "SentenceCount"
 ) extends MTMetric {
   // TODO: Move to the TF metric class.
-  protected def sanitize(name: String): String = name.replace(' ', '_')
+  protected def sanitize(name: String): String = {
+    name.replace(' ', '_').replace('#', 'N')
+  }
 
   override def compute(
       values: ((Output, Output, Output), (Output, Output)),
       weights: Output = null,
       name: String = this.name
   ): Output = {
-    val ((_, _, hypLen), (_, refLen)) = values
-    val len = if (forHypothesis) hypLen else refLen
-    var ops = Set(len.op)
+    val (_, (_, refLen)) = values
+    var ops = Set(refLen.op)
     if (weights != null)
       ops += weights.op
     val sanitizedName = sanitize(name)
     tf.createWithNameScope(sanitizedName, ops) {
-      tf.size(len)
+      tf.size(refLen)
     }
   }
 
@@ -63,16 +63,15 @@ class SentenceCount protected (
       weights: Output,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
-    val ((_, _, hypLen), (_, refLen)) = values
-    val len = if (forHypothesis) hypLen else refLen
-    var ops = Set(len.op)
+    val (_, (_, refLen)) = values
+    var ops = Set(refLen.op)
     if (weights != null)
       ops += weights.op
     val sanitizedName = sanitize(name)
     tf.createWithVariableScope(sanitizedName) {
       tf.createWithNameScope(sanitizedName, ops) {
         val count = variable("Count", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
-        val updateCount = count.assignAdd(tf.size(len))
+        val updateCount = count.assignAdd(tf.size(refLen))
         val value = count.value
         val update = updateCount
         val reset = count.initializer
@@ -87,14 +86,12 @@ class SentenceCount protected (
 
 object SentenceCount {
   def apply(
-      forHypothesis: Boolean,
       variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
       valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
       updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
       resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
       name: String = "SentenceCount"
   ): SentenceCount = {
-    new SentenceCount(
-      forHypothesis, variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)
+    new SentenceCount(variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)
   }
 }
