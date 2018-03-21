@@ -237,7 +237,7 @@ object Inputs {
           .prefetch(bufferSize)
 
     val parallelDataset = {
-      if (dataConfig.numBuckets == 1) {
+      if (dataConfig.numBuckets == 1 || isEval) {
         batchingFn(datasetBeforeBucketing)
       } else {
         // Calculate the bucket width by using the maximum source sequence length, if provided. Pairs with length

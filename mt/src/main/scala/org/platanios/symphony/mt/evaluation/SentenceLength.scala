@@ -73,7 +73,7 @@ class SentenceLength protected (
       tf.createWithNameScope(sanitizedName, ops) {
         val length = variable("Length", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val count = variable("Count", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
-        val updateLength = length.assignAdd(len)
+        val updateLength = length.assignAdd(tf.sum(len))
         val updateCount = count.assignAdd(tf.size(len))
         val value = tf.divide(length.value, count.value, name = "Value")
         val update = tf.divide(updateLength, updateCount, name = "Update")
