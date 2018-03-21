@@ -28,8 +28,8 @@ import scala.collection.mutable
   */
 class ParameterManager protected (
     val wordEmbeddingsSize: Int,
-    val mergedWordEmbeddings: Boolean = true,
-    val mergedWordProjections: Boolean = true,
+    val mergedWordEmbeddings: Boolean = false,
+    val mergedWordProjections: Boolean = false,
     val variableInitializer: tf.VariableInitializer = null
 ) {
   protected var environment  : Environment                 = _
@@ -204,8 +204,8 @@ class ParameterManager protected (
 object ParameterManager {
   def apply(
       wordEmbeddingsSize: Int,
-      mergedWordEmbeddings: Boolean = true,
-      mergedWordProjections: Boolean = true,
+      mergedWordEmbeddings: Boolean = false,
+      mergedWordProjections: Boolean = false,
       variableInitializer: tf.VariableInitializer = null
   ): ParameterManager = {
     new ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, variableInitializer)
@@ -240,8 +240,8 @@ object ParameterManager {
 class LanguageEmbeddingsPairParameterManager protected (
     val languageEmbeddingsSize: Int,
     override val wordEmbeddingsSize: Int,
-    override val mergedWordEmbeddings: Boolean = true,
-    override val mergedWordProjections: Boolean = true,
+    override val mergedWordEmbeddings: Boolean = false,
+    override val mergedWordProjections: Boolean = false,
     override val variableInitializer: tf.VariableInitializer = null
 ) extends ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
@@ -309,8 +309,8 @@ object LanguageEmbeddingsPairParameterManager {
   def apply(
       languageEmbeddingsSize: Int,
       wordEmbeddingsSize: Int,
-      mergedWordEmbeddings: Boolean = true,
-      mergedWordProjections: Boolean = true,
+      mergedWordEmbeddings: Boolean = false,
+      mergedWordProjections: Boolean = false,
       variableInitializer: tf.VariableInitializer = null
   ): LanguageEmbeddingsPairParameterManager = {
     new LanguageEmbeddingsPairParameterManager(
@@ -325,8 +325,8 @@ object LanguageEmbeddingsPairParameterManager {
 class LanguageEmbeddingsParameterManager protected (
     val languageEmbeddingsSize: Int,
     override val wordEmbeddingsSize: Int,
-    override val mergedWordEmbeddings: Boolean = true,
-    override val mergedWordProjections: Boolean = true,
+    override val mergedWordEmbeddings: Boolean = false,
+    override val mergedWordProjections: Boolean = false,
     override val variableInitializer: tf.VariableInitializer = null
 ) extends ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
@@ -366,7 +366,7 @@ class LanguageEmbeddingsParameterManager protected (
       val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
 
       def create(): Output = tf.createWithVariableScope(name) {
-        val language = stage match {
+        var language = stage match {
           case Encoding => context.get._1
           case Decoding => context.get._2
         }
@@ -397,8 +397,8 @@ object LanguageEmbeddingsParameterManager {
   def apply(
       languageEmbeddingsSize: Int,
       wordEmbeddingsSize: Int,
-      mergedWordEmbeddings: Boolean = true,
-      mergedWordProjections: Boolean = true,
+      mergedWordEmbeddings: Boolean = false,
+      mergedWordProjections: Boolean = false,
       variableInitializer: tf.VariableInitializer = null
   ): LanguageEmbeddingsParameterManager = {
     new LanguageEmbeddingsParameterManager(

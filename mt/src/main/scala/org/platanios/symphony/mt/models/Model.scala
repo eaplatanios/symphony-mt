@@ -17,12 +17,11 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.evaluation.BLEU
+import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.config.TensorBoardConfig
 import org.platanios.tensorflow.api.core.client.SessionConfig
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
@@ -92,7 +91,11 @@ abstract class Model[S] protected (
       datasets = datasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
         hooks += tf.learn.Evaluator(
-          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages), Seq(BLEU()),
+          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages),
+          Seq(
+            BLEU(),
+            SentenceLength(srcSentence = true, name = "Source Length"),
+            SentenceLength(srcSentence = false, name = "Target Length")),
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }

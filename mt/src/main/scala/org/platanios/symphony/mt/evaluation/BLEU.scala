@@ -24,8 +24,16 @@ import org.platanios.tensorflow.api.ops.metrics.Metric._
 
 import scala.collection.mutable
 
+// TODO: Use weights.
+
 /** Contains methods for computing the
   * [BiLingual Evaluation Understudy (BLEU)](https://en.wikipedia.org/wiki/BLEU) score for pairs of sequences.
+  *
+  * @param  variablesCollections Graph collections in which to add the metric variables (for streaming metrics).
+  * @param  valuesCollections    Graph collections in which to add the metric values.
+  * @param  updatesCollections   Graph collections in which to add the metric updates.
+  * @param  resetsCollections    Graph collections in which to add the metric resets.
+  * @param  name                 Name for this metric.
   *
   * @author Emmanouil Antonios Platanios
   */
