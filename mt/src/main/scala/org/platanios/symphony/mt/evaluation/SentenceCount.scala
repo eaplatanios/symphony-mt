@@ -31,13 +31,13 @@ import org.platanios.tensorflow.api.ops.metrics.Metric._
   *
   * @author Emmanouil Antonios Platanios
   */
-class SentenceLength protected (
+class SentenceCount protected (
     val forHypothesis: Boolean,
     val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
     val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
     val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
     val resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
-    override val name: String = "SentenceLength"
+    override val name: String = "SentenceCount"
 ) extends MTMetric {
   // TODO: Move to the TF metric class.
   protected def sanitize(name: String): String = name.replace(' ', '_')
@@ -54,7 +54,7 @@ class SentenceLength protected (
       ops += weights.op
     val sanitizedName = sanitize(name)
     tf.createWithNameScope(sanitizedName, ops) {
-      tf.mean(len)
+      tf.size(len)
     }
   }
 
@@ -71,32 +71,30 @@ class SentenceLength protected (
     val sanitizedName = sanitize(name)
     tf.createWithVariableScope(sanitizedName) {
       tf.createWithNameScope(sanitizedName, ops) {
-        val length = variable("Length", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val count = variable("Count", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
-        val updateLength = length.assignAdd(tf.sum(len))
         val updateCount = count.assignAdd(tf.size(len))
-        val value = tf.realDivide(length.value, count.value, name = "Value")
-        val update = tf.realDivide(updateLength, updateCount, name = "Update")
-        val reset = tf.group(Set(length.initializer, count.initializer), name = "Reset")
+        val value = count.value
+        val update = updateCount
+        val reset = count.initializer
         valuesCollections.foreach(tf.currentGraph.addToCollection(value, _))
         updatesCollections.foreach(tf.currentGraph.addToCollection(update, _))
         resetsCollections.foreach(tf.currentGraph.addToCollection(reset, _))
-        Metric.StreamingInstance(value, update, reset, Set(length, count))
+        Metric.StreamingInstance(value, update, reset, Set(count))
       }
     }
   }
 }
 
-object SentenceLength {
+object SentenceCount {
   def apply(
       forHypothesis: Boolean,
       variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
       valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
       updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
       resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
-      name: String = "SentenceLength"
-  ): SentenceLength = {
-    new SentenceLength(
+      name: String = "SentenceCount"
+  ): SentenceCount = {
+    new SentenceCount(
       forHypothesis, variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)
   }
 }
