@@ -20,6 +20,7 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
+import org.platanios.symphony.mt.utilities.Encoding.tfStringToUTF8
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.client.SessionConfig
@@ -152,7 +153,7 @@ abstract class Model[S] protected (
             val decodedSentences = unpackedSentences.zip(unpackedLengths).map {
               case (s, len) =>
                 val lenScalar = len.scalar.asInstanceOf[Int]
-                val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
+                val seq = s(0 :: lenScalar).entriesIterator.map(v => tfStringToUTF8(v.asInstanceOf[String])).toSeq
                 languages(languageId)._2.decodeSequence(seq)
             }
             val decodedLengths = decodedSentences.map(_.length)

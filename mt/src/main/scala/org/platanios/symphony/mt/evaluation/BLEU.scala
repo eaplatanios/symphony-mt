@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.evaluation
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.utilities.Encoding
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.Op
@@ -57,13 +58,13 @@ class BLEU protected (
     val hypSeq = hypSentences.zip(hypLengths).map {
       case (s, len) =>
         val lenScalar = len.scalar.asInstanceOf[Int]
-        val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
+        val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v.asInstanceOf[String])).toSeq
         languages(tgtLanguage)._2.decodeSequence(seq)
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
         val lenScalar = len.scalar.asInstanceOf[Int]
-        val seq = s(0 :: lenScalar).entriesIterator.map(_.asInstanceOf[String]).toSeq
+        val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v.asInstanceOf[String])).toSeq
         Seq(languages(tgtLanguage)._2.decodeSequence(seq))
     }
     val (matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen) = BLEU.nGramMatches(refSeq, hypSeq, maxOrder)
