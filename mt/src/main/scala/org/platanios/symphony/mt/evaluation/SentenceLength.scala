@@ -32,7 +32,7 @@ import org.platanios.tensorflow.api.ops.metrics.Metric._
   * @author Emmanouil Antonios Platanios
   */
 class SentenceLength protected (
-    val srcSentence: Boolean,
+    val forHypothesis: Boolean,
     val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
     val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
     val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
@@ -47,8 +47,8 @@ class SentenceLength protected (
       weights: Output = null,
       name: String = this.name
   ): Output = {
-    val ((_, _, srcLen), (_, tgtLen)) = values
-    val len = if (srcSentence) srcLen else tgtLen
+    val ((_, _, hypLen), (_, refLen)) = values
+    val len = if (forHypothesis) hypLen else refLen
     var ops = Set(len.op)
     if (weights != null)
       ops += weights.op
@@ -63,8 +63,8 @@ class SentenceLength protected (
       weights: Output,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
-    val ((_, _, srcLen), (_, tgtLen)) = values
-    val len = if (srcSentence) srcLen else tgtLen
+    val ((_, _, hypLen), (_, refLen)) = values
+    val len = if (forHypothesis) hypLen else refLen
     var ops = Set(len.op)
     if (weights != null)
       ops += weights.op
@@ -89,7 +89,7 @@ class SentenceLength protected (
 
 object SentenceLength {
   def apply(
-      srcSentence: Boolean,
+      forHypothesis: Boolean,
       variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
       valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
       updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
@@ -97,6 +97,6 @@ object SentenceLength {
       name: String = "SentenceLength"
   ): SentenceLength = {
     new SentenceLength(
-      srcSentence, variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)
+      forHypothesis, variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)
   }
 }

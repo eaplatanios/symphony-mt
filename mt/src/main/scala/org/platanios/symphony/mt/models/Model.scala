@@ -94,8 +94,8 @@ abstract class Model[S] protected (
           log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages),
           Seq(
             BLEU(),
-            SentenceLength(srcSentence = true, name = "Source Length"),
-            SentenceLength(srcSentence = false, name = "Target Length")),
+            SentenceLength(forHypothesis = true, name = "Hypothesis Length"),
+            SentenceLength(forHypothesis = false, name = "Reference Length")),
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
