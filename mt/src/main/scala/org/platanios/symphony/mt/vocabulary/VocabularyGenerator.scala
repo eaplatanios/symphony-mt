@@ -53,4 +53,6 @@ trait VocabularyGenerator {
   def getVocabulary(language: Language, vocabDir: File): Vocabulary = {
     Vocabulary(vocabDir / filename(language))
   }
+
+  override def toString: String
 }

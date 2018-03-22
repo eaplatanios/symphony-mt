@@ -27,7 +27,6 @@ case class Environment(
     gpuAllowMemoryGrowth: Boolean = false,
     useXLA: Boolean = false,
     numGPUs: Int = 0,
-    firstGPU: Int = 0,
     parallelIterations: Int = 32,
     swapMemory: Boolean = true,
     randomSeed: Option[Int] = None)

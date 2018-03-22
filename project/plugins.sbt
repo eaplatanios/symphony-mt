@@ -15,16 +15,16 @@
 
 logLevel := Level.Warn
 
-// addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "latest.release")
+// addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "latest.integration")
 
 // Plugins used for generating the library website
-addSbtPlugin("com.eed3si9n" % "sbt-unidoc"     % "0.4.1")
-addSbtPlugin("com.47deg"    % "sbt-microsites" % "0.7.15")
+addSbtPlugin("com.eed3si9n" % "sbt-unidoc"     % "latest.integration")
+addSbtPlugin("com.47deg"    % "sbt-microsites" % "latest.integration")
 
 // Packaging and publishing related plugins
-addSbtPlugin("com.github.gseitz" % "sbt-release"  % "1.0.7")
-addSbtPlugin("com.jsuereth"      % "sbt-pgp"      % "1.1.1")
-addSbtPlugin("org.xerial.sbt"    % "sbt-sonatype" % "2.0")
+addSbtPlugin("com.github.gseitz" % "sbt-release"  % "latest.integration")
+addSbtPlugin("com.jsuereth"      % "sbt-pgp"      % "latest.integration")
+addSbtPlugin("org.xerial.sbt"    % "sbt-sonatype" % "latest.integration")
 
-// Generally useful plugins
-addSbtPlugin("io.get-coursier" %  "sbt-coursier" % "1.0.0") // Provides fast dependency resolution.
+// Provides fast dependency resolution.
+addSbtPlugin("io.get-coursier" %  "sbt-coursier" % "latest.integration")

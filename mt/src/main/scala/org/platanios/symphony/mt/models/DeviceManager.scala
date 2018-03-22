@@ -32,7 +32,7 @@ case object RoundRobinDeviceManager extends DeviceManager {
       "/device:CPU:0"
     } else {
       currentGPUIndex %= env.numGPUs
-      val nextDevice = s"/device:GPU:${env.firstGPU + currentGPUIndex}"
+      val nextDevice = s"/device:GPU:$currentGPUIndex"
       currentGPUIndex += 1
       nextDevice
     }

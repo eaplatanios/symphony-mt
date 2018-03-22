@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language.{English, German}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.loaders.WMT16DatasetLoader
+import org.platanios.symphony.mt.data.loaders.WMT16Loader
 import org.platanios.symphony.mt.data.processors.{MosesCleaner, MosesTokenizer}
 import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
@@ -38,15 +38,15 @@ object WMT16 extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderTokenizer = MosesTokenizer(),
-    loaderCleaner = MosesCleaner(1, 80),
-    loaderVocab = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
+    tokenizer = MosesTokenizer(),
+    cleaner = MosesCleaner(1, 80),
+    vocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
     numBuckets = 5,
     srcMaxLength = 80,
     tgtMaxLength = 80)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    loadDatasets(languagePairs.toSeq.map(l => WMT16DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))
+    loadDatasets(languagePairs.toSeq.map(l => WMT16Loader(l._1, l._2, dataConfig)), Some(workingDir))
   }
 
   val env = Environment(
@@ -106,7 +106,7 @@ object WMT16 extends App {
     evalDatasets = datasets.flatMap(d => Seq(
       // ("WMT16/newstest2013", d.filterTags(WMT16DatasetLoader.NewsTest2013)),
       // ("WMT16/newstest2014", d.filterTags(WMT16DatasetLoader.NewsTest2014)),
-      ("WMT16/newstest2015", d.filterTags(WMT16DatasetLoader.NewsTest2015)))
+      ("WMT16/newstest2015", d.filterTags(WMT16Loader.NewsTest2015)))
       //("WMT16/newstest2016", d.filterTags(WMT16DatasetLoader.NewsTest2016)))
     ))
 

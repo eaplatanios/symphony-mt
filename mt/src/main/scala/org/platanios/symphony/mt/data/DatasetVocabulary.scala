@@ -28,11 +28,17 @@ sealed trait DatasetVocabulary {
     * @return Vocabulary file name.
     */
   def filename(language: Language): String = s"vocab.${language.abbreviation}"
+
+  override def toString: String
 }
 
-case object NoVocabulary extends DatasetVocabulary
+case object NoVocabulary extends DatasetVocabulary {
+  override def toString: String = "None"
+}
 
-case object MergedVocabularies extends DatasetVocabulary
+case object MergedVocabularies extends DatasetVocabulary {
+  override def toString: String = "Merged"
+}
 
 case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVocabulary {
   /** Returns the vocabulary file name that this vocabulary uses.
@@ -41,4 +47,6 @@ case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVo
     * @return Vocabulary file name.
     */
   override def filename(language: Language): String = generator.filename(language)
+
+  override def toString: String = s"Generated[${generator.toString}]"
 }

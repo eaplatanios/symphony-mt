@@ -52,6 +52,8 @@ trait Tokenizer extends FileProcessor {
     }
     tokenized
   }
+
+  override def toString: String
 }
 
 object Tokenizer {
@@ -62,6 +64,8 @@ object NoTokenizer extends Tokenizer {
   override def tokenizedFile(originalFile: File): File = originalFile
   override def tokenize(sentence: String, language: Language): String = sentence
   override def tokenizeCorpus(file: File, language: Language, bufferSize: Int = 8192): File = file
+
+  override def toString: String = "None"
 }
 
 /** Tokenizer used by the Moses library.
@@ -233,6 +237,8 @@ case class MosesTokenizer(
 
     tokenized
   }
+
+  override def toString: String = "Moses"
 }
 
 object MosesTokenizer {

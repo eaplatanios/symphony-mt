@@ -42,8 +42,7 @@ import scala.util.matching.Regex
   * '''NOTE:''' Our implementation is based upon the one of the original paper authors, which can be found at
   * [https://github.com/rsennrich/subword-nmt](https://github.com/rsennrich/subword-nmt).
   *
-  * @param  numSymbols      Number of BPE symbols to generate. This is equivalent to the number of BPE merge operations
-  *                         being learned when generating a new BPE vocabulary.
+  * @param  numMergeOps     Number of BPE merge operations to learn when generating a new BPE vocabulary.
   * @param  separator       Separator symbol appended to all inter-word symbols while encoding sentences. This allows
   *                         for decoding BPE-encoded sentences, after a translation is done.
   * @param  countThreshold  Symbols pairs which appears less than `countThreshold` times will be ignored.
@@ -53,7 +52,7 @@ import scala.util.matching.Regex
   * @author Emmanouil Antonios Platanios
   */
 class BPEVocabularyGenerator protected (
-    val numSymbols: Int = 32000,
+    val numMergeOps: Int = 32000,
     val separator: String = "@@",
     val glossary: Set[String] = BPEVocabularyGenerator.DEFAULT_GLOSSARY,
     val countThreshold: Int = -1,
@@ -66,14 +65,16 @@ class BPEVocabularyGenerator protected (
   protected val reversedMergePairs: mutable.Map[Language, Map[String, (String, String)]] = mutable.Map.empty
   protected val vocabularies      : mutable.Map[Language, Set[String]]                   = mutable.Map.empty
 
-  protected def mergePairsFilename(language: Language): String = s"merge_pairs.bpe.$numSymbols.${language.abbreviation}"
+  protected def mergePairsFilename(language: Language): String = {
+    s"merge_pairs.bpe.$numMergeOps.${language.abbreviation}"
+  }
 
   /** Returns the vocabulary file name that this generator uses / will use.
     *
     * @param  language Language for which a vocabulary will be generated.
     * @return Vocabulary file name.
     */
-  override def filename(language: Language): String = s"vocab.bpe.$numSymbols.${language.abbreviation}"
+  override def filename(language: Language): String = s"vocab.bpe.$numMergeOps.${language.abbreviation}"
 
   /** Generates/Replaces a vocabulary file given a sequence of tokenized text files.
     *
@@ -120,13 +121,13 @@ class BPEVocabularyGenerator protected (
       var currentSymbol = 0
       var progressLogTime = System.currentTimeMillis
 
-      while (currentSymbol < numSymbols && continue) {
+      while (currentSymbol < numMergeOps && continue) {
         val time = System.currentTimeMillis
         if (time - progressLogTime >= 1e4) {
-          val numBars = Math.floorDiv(10 * currentSymbol, numSymbols)
+          val numBars = Math.floorDiv(10 * currentSymbol, numMergeOps)
           BPEVocabularyGenerator.logger.info(
             s"│${"═" * numBars}${" " * (10 - numBars)}│ " +
-                s"%${numSymbols.toString.length}s / $numSymbols BPE symbols processed.".format(currentSymbol))
+                s"%${numMergeOps.toString.length}s / $numMergeOps BPE symbols processed.".format(currentSymbol))
           progressLogTime = time
         }
 
@@ -153,7 +154,7 @@ class BPEVocabularyGenerator protected (
       mergePairsWriter.close()
 
       BPEVocabularyGenerator.logger.info(
-        s"│${"═" * 10}│ %${numSymbols.toString.length}s / $numSymbols BPE symbols processed.".format(currentSymbol))
+        s"│${"═" * 10}│ %${numMergeOps.toString.length}s / $numMergeOps BPE symbols processed.".format(currentSymbol))
       BPEVocabularyGenerator.logger.info(s"Learned BPE coding for $language: $mergePairsFile.")
     }
 
@@ -177,7 +178,7 @@ class BPEVocabularyGenerator protected (
     val tokens = tokenizedFiles.flatMap(mutableFile => {
       val oldFile = mutableFile.get
       val file = oldFile.sibling(
-        s"${oldFile.nameWithoutExtension(includeAll = false)}.bpe.$numSymbols.${language.abbreviation}")
+        s"${oldFile.nameWithoutExtension(includeAll = false)}.bpe.$numMergeOps.${language.abbreviation}")
       mutableFile.set(file)
       if (replaceExisting || file.notExists) {
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
@@ -362,20 +363,22 @@ class BPEVocabularyGenerator protected (
     }
     decodedSentence
   }
+
+  override def toString: String = s"BPE(numMergeOps = $numMergeOps)"
 }
 
 object BPEVocabularyGenerator {
   private[BPEVocabularyGenerator] val logger = Logger(LoggerFactory.getLogger("Vocabulary / BPE Generator"))
 
   def apply(
-      numSymbols: Int = 32000,
+      numMergeOps: Int = 32000,
       separator: String = "@@",
       glossary: Set[String] = DEFAULT_GLOSSARY,
       countThreshold: Int = -1,
       replaceExisting: Boolean = false,
       bufferSize: Int = 8192
   ): BPEVocabularyGenerator = {
-    new BPEVocabularyGenerator(numSymbols, separator, glossary, countThreshold, replaceExisting, bufferSize)
+    new BPEVocabularyGenerator(numMergeOps, separator, glossary, countThreshold, replaceExisting, bufferSize)
   }
 
   /** End-of-word symbol used by the BPE vocabulary generator. */

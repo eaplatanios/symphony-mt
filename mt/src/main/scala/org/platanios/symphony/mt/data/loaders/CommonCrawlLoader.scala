@@ -27,60 +27,56 @@ import java.nio.file.Path
 /**
   * @author Emmanouil Antonios Platanios
   */
-class EuroparlV7DatasetLoader(
+class CommonCrawlLoader(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     val config: DataConfig
 ) extends ParallelDatasetLoader(srcLanguage = srcLanguage, tgtLanguage = tgtLanguage) {
   require(
-    EuroparlV7DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
-    "The provided language pair is not supported by the Europarl v7 dataset.")
+    CommonCrawlLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
+    "The provided language pair is not supported by the CommonCrawl dataset.")
 
-  override def name: String = "Europarl v7"
+  override def name: String = "CommonCrawl"
 
   override def dataConfig: DataConfig = {
     config.copy(workingDir =
         config.workingDir
-            .resolve("europarl-v7")
+            .resolve("commoncrawl")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("europarl-v7").resolve("downloads")
+  override def downloadsDir: Path = config.workingDir.resolve("commoncrawl").resolve("downloads")
 
   private[this] def reversed: Boolean = {
-    EuroparlV7DatasetLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+    CommonCrawlLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
-  private[this] def corpusArchiveFile: String = if (reversed) s"$tgt-$src" else s"$src-$tgt"
-
   private[this] def corpusFilenamePrefix: String = {
-    s"europarl-v7.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
+    s"commoncrawl.${if (reversed) s"$tgt-$src" else s"$src-$tgt"}"
   }
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(
-    s"${EuroparlV7DatasetLoader.url}/$corpusArchiveFile.tgz")
+    s"${CommonCrawlLoader.url}/${CommonCrawlLoader.archivePrefix}.tgz")
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
   override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
     datasetType match {
-      case Train => Seq((EuroparlV7DatasetLoader.Train,
-          File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
-          File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
+      case Train => Seq((CommonCrawlLoader.Train,
+          File(downloadsDir) / CommonCrawlLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
+          File(downloadsDir) / CommonCrawlLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
       case _ => Seq.empty
     }
   }
 }
 
-object EuroparlV7DatasetLoader {
-  val url: String = "http://www.statmt.org/europarl/v7"
+object CommonCrawlLoader {
+  val url          : String = "http://www.statmt.org/wmt13"
+  val archivePrefix: String = "training-parallel-commoncrawl"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
-    (Bulgarian, English), (Czech, English), (Danish, English), (Dutch, English), (Estonian, English),
-    (Finnish, English), (French, English), (German, English), (Greek, English), (Hungarian, English),
-    (Italian, English), (Lithuanian, English), (Latvian, English), (Polish, English), (Portuguese, English),
-    (Romanian, English), (Slovak, English), (Slovenian, English), (Spanish, English), (Swedish, English))
+    (Czech, English), (French, English), (German, English), (Russian, English), (Spanish, English))
 
   def isLanguagePairSupported(srcLanguage: Language, tgtLanguage: Language): Boolean = {
     supportedLanguagePairs.contains((srcLanguage, tgtLanguage)) ||
@@ -91,11 +87,11 @@ object EuroparlV7DatasetLoader {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataConfig: DataConfig
-  ): EuroparlV7DatasetLoader = {
-    new EuroparlV7DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
+  ): CommonCrawlLoader = {
+    new CommonCrawlLoader(srcLanguage, tgtLanguage, dataConfig)
   }
 
   case object Train extends ParallelDataset.Tag {
-    override val value: String = "europarl-v7/train"
+    override val value: String = "commoncrawl/train"
   }
 }

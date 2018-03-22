@@ -193,7 +193,6 @@ object Inputs {
     val datasetBeforeBucketing =
       srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset))
           .shard(dataConfig.numShards, dataConfig.shardIndex)
-          .drop(dataConfig.dropCount)
           .transform(d => {
             if (repeat)
               d.repeat()

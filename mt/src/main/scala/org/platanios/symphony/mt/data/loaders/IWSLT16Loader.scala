@@ -27,13 +27,13 @@ import java.nio.file.Path
 /**
   * @author Emmanouil Antonios Platanios
   */
-class IWSLT16DatasetLoader(
+class IWSLT16Loader(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     val config: DataConfig
 ) extends ParallelDatasetLoader(srcLanguage, tgtLanguage) {
   require(
-    IWSLT16DatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
+    IWSLT16Loader.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the IWSLT-16 dataset.")
 
   override def name: String = "IWSLT-16"
@@ -50,38 +50,38 @@ class IWSLT16DatasetLoader(
   private[this] def directoryName: String = s"$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(s"${IWSLT16DatasetLoader.url}/$src/$tgt/$directoryName.tgz")
+  override def filesToDownload: Seq[String] = Seq(s"${IWSLT16Loader.url}/$src/$tgt/$directoryName.tgz")
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
   override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
     datasetType match {
-      case Train => Seq((IWSLT16DatasetLoader.Train,
+      case Train => Seq((IWSLT16Loader.Train,
           File(downloadsDir) / directoryName / directoryName / s"train.tags.$directoryName.$src",
           File(downloadsDir) / directoryName / directoryName / s"train.tags.$directoryName.$tgt",
           TEDConverter))
-      case Dev => Seq((IWSLT16DatasetLoader.Dev2010,
+      case Dev => Seq((IWSLT16Loader.Dev2010,
           File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.dev2010.$directoryName.$src.xml",
           File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.dev2010.$directoryName.$tgt.xml",
           SGMConverter))
       case Test => Seq(
-        (IWSLT16DatasetLoader.Test2010,
+        (IWSLT16Loader.Test2010,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2010.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2010.$directoryName.$tgt.xml",
             SGMConverter),
-        (IWSLT16DatasetLoader.Test2011,
+        (IWSLT16Loader.Test2011,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2011.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2011.$directoryName.$tgt.xml",
             SGMConverter),
-        (IWSLT16DatasetLoader.Test2012,
+        (IWSLT16Loader.Test2012,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2012.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2012.$directoryName.$tgt.xml",
             SGMConverter),
-        (IWSLT16DatasetLoader.Test2013,
+        (IWSLT16Loader.Test2013,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2013.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2013.$directoryName.$tgt.xml",
             SGMConverter),
-        (IWSLT16DatasetLoader.Test2014,
+        (IWSLT16Loader.Test2014,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2014.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2014.$directoryName.$tgt.xml",
             SGMConverter))
@@ -89,7 +89,7 @@ class IWSLT16DatasetLoader(
   }
 }
 
-object IWSLT16DatasetLoader {
+object IWSLT16Loader {
   val url: String = "https://wit3.fbk.eu/archive/2016-01/texts"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
@@ -105,35 +105,51 @@ object IWSLT16DatasetLoader {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataConfig: DataConfig
-  ): IWSLT16DatasetLoader = {
-    new IWSLT16DatasetLoader(srcLanguage, tgtLanguage, dataConfig)
+  ): IWSLT16Loader = {
+    new IWSLT16Loader(srcLanguage, tgtLanguage, dataConfig)
   }
 
-  case object Train extends ParallelDataset.Tag {
-    override val value: String = "iwslt-16/train"
+  trait Tag extends ParallelDataset.Tag
+
+  object Tag {
+    @throws[IllegalArgumentException]
+    def fromName(name: String): Tag = name match {
+      case "train" => Train
+      case "dev2010" => Dev2010
+      case "tst2010" => Test2010
+      case "tst2011" => Test2011
+      case "tst2012" => Test2012
+      case "tst2013" => Test2013
+      case "tst2014" => Test2014
+      case _ => throw new IllegalArgumentException(s"'$name' is not a valid IWSLT-16 tag.")
+    }
   }
 
-  case object Dev2010 extends ParallelDataset.Tag {
-    override val value: String = "iwslt-16/dev2010"
+  case object Train extends Tag {
+    override val value: String = "train"
   }
 
-  case object Test2010 extends ParallelDataset.Tag {
-    override val value: String = "iwslt-16/tst2010"
+  case object Dev2010 extends Tag {
+    override val value: String = "dev2010"
   }
 
-  case object Test2011 extends ParallelDataset.Tag {
-    override val value: String = "iwslt-16/tst2011"
+  case object Test2010 extends Tag {
+    override val value: String = "tst2010"
   }
 
-  case object Test2012 extends ParallelDataset.Tag {
-    override val value: String = "iwslt-16/tst2012"
+  case object Test2011 extends Tag {
+    override val value: String = "tst2011"
   }
 
-  case object Test2013 extends ParallelDataset.Tag {
-    override val value: String = "iwslt-16/tst2013"
+  case object Test2012 extends Tag {
+    override val value: String = "tst2012"
   }
 
-  case object Test2014 extends ParallelDataset.Tag {
-    override val value: String = "iwslt-16/tst2014"
+  case object Test2013 extends Tag {
+    override val value: String = "tst2013"
+  }
+
+  case object Test2014 extends Tag {
+    override val value: String = "tst2014"
   }
 }

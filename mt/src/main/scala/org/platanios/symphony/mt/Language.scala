@@ -58,4 +58,84 @@ object Language {
   val Thai            : Language = Language("Thai", "th")
   val Turkish         : Language = Language("Turkish", "tr")
   val Vietnamese      : Language = Language("Vietnamese", "vi")
+
+  @throws[IllegalArgumentException]
+  def fromName(name: String): Language = name match {
+    case "Arabic" => Arabic
+    case "Bulgarian" => Bulgarian
+    case "Catalan" => Catalan
+    case "Chinese" => Chinese
+    case "Czech" => Czech
+    case "Danish" => Danish
+    case "Dutch" => Dutch
+    case "English" => English
+    case "Estonian" => Estonian
+    case "Finnish" => Finnish
+    case "French" => French
+    case "German" => German
+    case "Greek" => Greek
+    case "Hebrew" => Hebrew
+    case "Hindi" => Hindi
+    case "Hungarian" => Hungarian
+    case "Icelandic" => Icelandic
+    case "Italian" => Italian
+    case "Irish" => Irish
+    case "Lithuanian" => Lithuanian
+    case "Latvian" => Latvian
+    case "Persian" => Persian
+    case "Polish" => Polish
+    case "Portuguese" => Portuguese
+    case "PortugueseBrazil" => PortugueseBrazil
+    case "Romanian" => Romanian
+    case "Russian" => Russian
+    case "Slovak" => Slovak
+    case "Slovenian" => Slovenian
+    case "Spanish" => Spanish
+    case "Swedish" => Swedish
+    case "Tamil" => Tamil
+    case "Thai" => Thai
+    case "Turkish" => Turkish
+    case "Vietnamese" => Vietnamese
+    case _ => throw new IllegalArgumentException(s"'$name' is not a valid language name.")
+  }
+
+  @throws[IllegalArgumentException]
+  def fromAbbreviation(abbreviation: String): Language = abbreviation match {
+    case "ar" => Arabic
+    case "bg" => Bulgarian
+    case "ca" => Catalan
+    case "zh" => Chinese
+    case "cs" => Czech
+    case "da" => Danish
+    case "nl" => Dutch
+    case "en" => English
+    case "et" => Estonian
+    case "fi" => Finnish
+    case "fr" => French
+    case "de" => German
+    case "el" => Greek
+    case "he" => Hebrew
+    case "hi" => Hindi
+    case "hu" => Hungarian
+    case "is" => Icelandic
+    case "it" => Italian
+    case "ga" => Irish
+    case "lt" => Lithuanian
+    case "lv" => Latvian
+    case "fa" => Persian
+    case "pl" => Polish
+    case "pt" => Portuguese
+    case "pt-br" => PortugueseBrazil
+    case "ro" => Romanian
+    case "ru" => Russian
+    case "sk" => Slovak
+    case "sl" => Slovenian
+    case "es" => Spanish
+    case "sv" => Swedish
+    case "ta" => Tamil
+    case "th" => Thai
+    case "tr" => Turkish
+    case "vi" => Vietnamese
+    case _ => throw new IllegalArgumentException(s"'$abbreviation' is not a valid language abbreviation.")
+  }
 }

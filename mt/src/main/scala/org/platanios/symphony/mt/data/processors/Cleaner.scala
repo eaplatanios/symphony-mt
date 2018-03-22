@@ -65,6 +65,8 @@ trait Cleaner extends FileProcessor {
     }
     (srcClean, tgtClean)
   }
+
+  override def toString: String
 }
 
 object Cleaner {
@@ -81,6 +83,8 @@ object NoCleaner extends Cleaner {
   override def cleanCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {
     (srcFile, tgtFile)
   }
+
+  override def toString: String = "None"
 }
 
 class MosesCleaner protected (
@@ -132,6 +136,8 @@ class MosesCleaner protected (
       Some((src, tgt))
     }
   }
+
+  override def toString: String = "Moses"
 }
 
 object MosesCleaner {

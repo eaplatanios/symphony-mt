@@ -27,13 +27,13 @@ import java.nio.file.Path
 /**
   * @author Emmanouil Antonios Platanios
   */
-class IWSLT15StanfordDatasetLoader(
+class IWSLT15StanfordLoader(
     override val srcLanguage: Language,
     override val tgtLanguage: Language,
     val config: DataConfig
 ) extends ParallelDatasetLoader(srcLanguage, tgtLanguage) {
   require(
-    IWSLT15StanfordDatasetLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
+    IWSLT15StanfordLoader.isLanguagePairSupported(srcLanguage, tgtLanguage),
     "The provided language pair is not supported by the IWSLT-15 dataset.")
 
   override def name: String = "IWSLT-15"
@@ -48,45 +48,45 @@ class IWSLT15StanfordDatasetLoader(
   override def downloadsDir: Path = config.workingDir.resolve("iwslt-15").resolve("downloads")
 
   private[this] def reversed: Boolean = {
-    IWSLT15StanfordDatasetLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
+    IWSLT15StanfordLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
   }
 
   private[this] def directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(
-    s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.trainPrefix}.$src",
-    s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.trainPrefix}.$tgt",
-    s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.devPrefix}.$src",
-    s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.devPrefix}.$tgt",
-    s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.testPrefix}.$src",
-    s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.testPrefix}.$tgt",
-    s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.vocabPrefix}.$src",
-    s"${IWSLT15StanfordDatasetLoader.url}/$directoryName/${IWSLT15StanfordDatasetLoader.vocabPrefix}.$tgt")
+    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.trainPrefix}.$src",
+    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.trainPrefix}.$tgt",
+    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.devPrefix}.$src",
+    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.devPrefix}.$tgt",
+    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.testPrefix}.$src",
+    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.testPrefix}.$tgt",
+    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.vocabPrefix}.$src",
+    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.vocabPrefix}.$tgt")
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
   override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
     datasetType match {
-      case Train => Seq((IWSLT15StanfordDatasetLoader.Train,
-          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.trainPrefix}.$src",
-          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.trainPrefix}.$tgt", NoFileProcessor))
-      case Dev => Seq((IWSLT15StanfordDatasetLoader.Test2012,
-          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.devPrefix}.$src",
-          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.devPrefix}.$tgt", NoFileProcessor))
-      case Test => Seq((IWSLT15StanfordDatasetLoader.Test2013,
-          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.testPrefix}.$src",
-          File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.testPrefix}.$tgt", NoFileProcessor))
+      case Train => Seq((IWSLT15StanfordLoader.Train,
+          File(downloadsDir) / s"${IWSLT15StanfordLoader.trainPrefix}.$src",
+          File(downloadsDir) / s"${IWSLT15StanfordLoader.trainPrefix}.$tgt", NoFileProcessor))
+      case Dev => Seq((IWSLT15StanfordLoader.Test2012,
+          File(downloadsDir) / s"${IWSLT15StanfordLoader.devPrefix}.$src",
+          File(downloadsDir) / s"${IWSLT15StanfordLoader.devPrefix}.$tgt", NoFileProcessor))
+      case Test => Seq((IWSLT15StanfordLoader.Test2013,
+          File(downloadsDir) / s"${IWSLT15StanfordLoader.testPrefix}.$src",
+          File(downloadsDir) / s"${IWSLT15StanfordLoader.testPrefix}.$tgt", NoFileProcessor))
     }
   }
 
   /** Returns the source and the target vocabulary of this dataset. */
   override def vocabularies: (Seq[File], Seq[File]) = (
-      Seq(File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.vocabPrefix}.$src"),
-      Seq(File(downloadsDir) / s"${IWSLT15StanfordDatasetLoader.vocabPrefix}.$tgt"))
+      Seq(File(downloadsDir) / s"${IWSLT15StanfordLoader.vocabPrefix}.$src"),
+      Seq(File(downloadsDir) / s"${IWSLT15StanfordLoader.vocabPrefix}.$tgt"))
 }
 
-object IWSLT15StanfordDatasetLoader {
+object IWSLT15StanfordLoader {
   val url        : String = "https://nlp.stanford.edu/projects/nmt/data"
   val trainPrefix: String = "train"
   val devPrefix  : String = "tst2012"
@@ -104,19 +104,31 @@ object IWSLT15StanfordDatasetLoader {
       srcLanguage: Language,
       tgtLanguage: Language,
       dataConfig: DataConfig
-  ): IWSLT15StanfordDatasetLoader = {
-    new IWSLT15StanfordDatasetLoader(srcLanguage, tgtLanguage, dataConfig)
+  ): IWSLT15StanfordLoader = {
+    new IWSLT15StanfordLoader(srcLanguage, tgtLanguage, dataConfig)
   }
 
-  case object Train extends ParallelDataset.Tag {
-    override val value: String = "iwslt-15/train"
+  trait Tag extends ParallelDataset.Tag
+
+  object Tag {
+    @throws[IllegalArgumentException]
+    def fromName(name: String): Tag = name match {
+      case "train" => Train
+      case "tst2012" => Test2012
+      case "tst2013" => Test2013
+      case _ => throw new IllegalArgumentException(s"'$name' is not a valid IWSLT-15 Stanford tag.")
+    }
   }
 
-  case object Test2012 extends ParallelDataset.Tag {
-    override val value: String = "iwslt-15/tst2012"
+  case object Train extends Tag {
+    override val value: String = "train"
   }
 
-  case object Test2013 extends ParallelDataset.Tag {
-    override val value: String = "iwslt-15/tst2013"
+  case object Test2012 extends Tag {
+    override val value: String = "tst2012"
+  }
+
+  case object Test2013 extends Tag {
+    override val value: String = "tst2013"
   }
 }

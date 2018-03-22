@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
+import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.data.processors.{MosesCleaner, MosesTokenizer}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
@@ -40,15 +40,15 @@ object IWSLT15UsingBPE extends App {
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderTokenizer = MosesTokenizer(),
-    loaderCleaner = MosesCleaner(),
-    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000)),
+    tokenizer = MosesTokenizer(),
+    cleaner = MosesCleaner(),
+    vocabulary = GeneratedVocabulary(BPEVocabularyGenerator(32000)),
     numBuckets = 10,
     srcMaxLength = 100,
     tgtMaxLength = 100)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    loadDatasets(languagePairs.toSeq.map(l => IWSLT15DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))
+    loadDatasets(languagePairs.toSeq.map(l => IWSLT15Loader(l._1, l._2, dataConfig)), Some(workingDir))
   }
 
   val env = Environment(
@@ -107,7 +107,7 @@ object IWSLT15UsingBPE extends App {
       // ("IWSLT15/tst2010", d.filterTags(IWSLT15DatasetLoader.Test2010)),
       // ("IWSLT15/tst2011", d.filterTags(IWSLT15DatasetLoader.Test2011)),
       // ("IWSLT15/tst2012", d.filterTags(IWSLT15DatasetLoader.Test2012)),
-      ("IWSLT15/tst2013", d.filterTags(IWSLT15DatasetLoader.Test2013)))
+      ("IWSLT15/tst2013", d.filterTags(IWSLT15Loader.Test2013)))
     ))
 
   model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(340000))

@@ -25,11 +25,11 @@ import java.nio.file.{Path, Paths}
   */
 case class DataConfig(
     // Loader
-    workingDir: Path = Paths.get("working_dir"),
+    workingDir: Path = Paths.get("data"),
     loaderBufferSize: Int = 8192,
-    loaderTokenizer: Tokenizer = MosesTokenizer(),
-    loaderCleaner: Cleaner = MosesCleaner(),
-    loaderVocab: DatasetVocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
+    tokenizer: Tokenizer = MosesTokenizer(),
+    cleaner: Cleaner = MosesCleaner(),
+    vocabulary: DatasetVocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
     // Corpus
     trainBatchSize: Long = 128,
     inferBatchSize: Long = 32,
@@ -38,7 +38,6 @@ case class DataConfig(
     srcMaxLength: Int = 50,
     tgtMaxLength: Int = 50,
     bufferSize: Long = -1L,
-    dropCount: Int = 0,
     numShards: Long = 1,
     shardIndex: Long = 0,
     numParallelCalls: Int = 4,

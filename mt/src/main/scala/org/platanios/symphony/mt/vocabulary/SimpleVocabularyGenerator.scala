@@ -91,6 +91,8 @@ class SimpleVocabularyGenerator protected (
     }
     vocabFile
   }
+
+  override def toString: String = s"Simple(sizeThreshold = $sizeThreshold, countThreshold = $countThreshold)"
 }
 
 object SimpleVocabularyGenerator {

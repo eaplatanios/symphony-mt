@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.loaders.IWSLT15DatasetLoader
+import org.platanios.symphony.mt.data.loaders.IWSLT15Loader
 import org.platanios.symphony.mt.data.processors.{MosesCleaner, MosesTokenizer}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.LuongRNNAttention
@@ -32,23 +32,23 @@ import java.nio.file.{Path, Paths}
   * @author Emmanouil Antonios Platanios
   */
 object IWSLT15UsingBPELanguageEmbeddings extends App {
-  val workingDir: Path = Paths.get("temp").resolve("iwslt15-bpe-rnn-language-embeddings")
+  val workingDir: Path = Paths.get("temp").resolve("iwslt15-bpe-rnn-language-embeddings-non-merged-8-256-2")
 
-  val languagePairs: Set[(Language, Language)] = Set(
-    (English, Czech), (English, German), (English, French),
-    (English, Thai), (English, Vietnamese), (English, Chinese))
+  val languagePairs: Set[(Language, Language)] = Set((English, Thai), (English, Vietnamese), (English, German), (English, French))
+    // (English, Czech), (English, German), (English, French),
+    // (English, Thai), (English, Vietnamese), (English, Chinese))
 
   val dataConfig = DataConfig(
     workingDir = Paths.get("temp").resolve("data"),
-    loaderTokenizer = MosesTokenizer(),
-    loaderCleaner = MosesCleaner(),
-    loaderVocab = GeneratedVocabulary(BPEVocabularyGenerator(32000)),
-    numBuckets = 10,
-    srcMaxLength = 100,
-    tgtMaxLength = 100)
+    tokenizer = MosesTokenizer(),
+    cleaner = MosesCleaner(),
+    vocabulary = GeneratedVocabulary(BPEVocabularyGenerator(10000)),
+    numBuckets = 5,
+    srcMaxLength = 80,
+    tgtMaxLength = 80)
 
   val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    loadDatasets(languagePairs.toSeq.map(l => IWSLT15DatasetLoader(l._1, l._2, dataConfig)), Some(workingDir))
+    loadDatasets(languagePairs.toSeq.map(l => IWSLT15Loader(l._1, l._2, dataConfig)), Some(workingDir))
   }
 
   val env = Environment(
@@ -78,18 +78,18 @@ object IWSLT15UsingBPELanguageEmbeddings extends App {
       env,
       LanguageEmbeddingsParameterManager(
         languageEmbeddingsSize = 8,
-        wordEmbeddingsSize = 512),
+        wordEmbeddingsSize = 256),
       BidirectionalRNNEncoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 256,
         numLayers = 2,
-        residual = false,
+        residual = true,
         dropout = Some(0.2f)),
       UnidirectionalRNNDecoder(
         cell = BasicLSTM(forgetBias = 1.0f),
-        numUnits = 512,
+        numUnits = 256,
         numLayers = 2,
-        residual = false,
+        residual = true,
         dropout = Some(0.2f),
         attention = Some(LuongRNNAttention(scaled = true)),
         outputAttention = true),
@@ -104,7 +104,7 @@ object IWSLT15UsingBPELanguageEmbeddings extends App {
       // ("IWSLT15/tst2010", d.filterTags(IWSLT15DatasetLoader.Test2010)),
       // ("IWSLT15/tst2011", d.filterTags(IWSLT15DatasetLoader.Test2011)),
       // ("IWSLT15/tst2012", d.filterTags(IWSLT15DatasetLoader.Test2012)),
-      ("IWSLT15/tst2013", d.filterTags(IWSLT15DatasetLoader.Test2013)))
+      ("IWSLT15/tst2013", d.filterTags(IWSLT15Loader.Test2013)))
     ))
 
   model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(340000))

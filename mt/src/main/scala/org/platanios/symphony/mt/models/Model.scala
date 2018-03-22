@@ -95,9 +95,9 @@ abstract class Model[S] protected (
           log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages),
           Seq(
             BLEU(),
-            SentenceLength(forHypothesis = true, name = "Hypothesis Length"),
-            SentenceLength(forHypothesis = false, name = "Reference Length"),
-            SentenceCount(name = "# Sentences")),
+            SentenceLength(forHypothesis = true, name = "HypLen"),
+            SentenceLength(forHypothesis = false, name = "RefLen"),
+            SentenceCount(name = "#Sentences")),
           StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
@@ -331,37 +331,14 @@ object Model {
     }
   }
 
-  class OptConfig protected(
-      val maxGradNorm: Float,
-      val optimizer: Optimizer,
-      val colocateGradientsWithOps: Boolean)
+  case class OptConfig(
+      maxGradNorm: Float = 5.0f,
+      optimizer: Optimizer = GradientDescent(1.0f, learningRateSummaryTag = "LearningRate"),
+      colocateGradientsWithOps: Boolean = true)
 
-  object OptConfig {
-    def apply(
-        maxGradNorm: Float = 5.0f,
-        optimizer: Optimizer = GradientDescent(1.0f, learningRateSummaryTag = "LearningRate"),
-        colocateGradientsWithOps: Boolean = true
-    ): OptConfig = {
-      new OptConfig(maxGradNorm, optimizer, colocateGradientsWithOps)
-    }
-  }
-
-  class LogConfig protected(
-      val logLossSteps: Int,
-      val logEvalBatchSize: Int,
-      val logEvalSteps: Int,
-      val launchTensorBoard: Boolean,
-      val tensorBoardConfig: (String, Int))
-
-  object LogConfig {
-    def apply(
-        logLossSteps: Int = 100,
-        logEvalBatchSize: Int = 512,
-        logEvalSteps: Int = 1000,
-        launchTensorBoard: Boolean = false,
-        tensorBoardConfig: (String, Int) = ("localhost", 6006),
-    ): LogConfig = {
-      new LogConfig(logLossSteps, logEvalBatchSize, logEvalSteps, launchTensorBoard, tensorBoardConfig)
-    }
-  }
+  case class LogConfig(
+      logLossSteps: Int = 100,
+      logEvalSteps: Int = 1000,
+      launchTensorBoard: Boolean = false,
+      tensorBoardConfig: (String, Int) = ("localhost", 6006))
 }

@@ -154,20 +154,20 @@ object ParallelDatasetLoader {
 
         // Tokenize the corpora.
         val tokenizedSrcFiles = processedCorpora.map(_._2).map(f => {
-          loader.dataConfig.loaderTokenizer.tokenizeCorpus(
+          loader.dataConfig.tokenizer.tokenizeCorpus(
             f, loader.srcLanguage, loader.dataConfig.loaderBufferSize)
         })
         val tokenizedTgtFiles = processedCorpora.map(_._3).map(f => {
-          loader.dataConfig.loaderTokenizer.tokenizeCorpus(
+          loader.dataConfig.tokenizer.tokenizeCorpus(
             f, loader.tgtLanguage, loader.dataConfig.loaderBufferSize)
         })
 
         // TODO: [DATA] Only clean the training data.
 
         // Clean the corpora.
-        val dataCleaner = loader.dataConfig.loaderCleaner
+        val cleaner = loader.dataConfig.cleaner
         val (cleanedSrcFiles, cleanedTgtFiles) = tokenizedSrcFiles.zip(tokenizedTgtFiles).map {
-          case (srcFile, tgtFile) => dataCleaner.cleanCorporaPair(srcFile, tgtFile, loader.dataConfig.loaderBufferSize)
+          case (srcFile, tgtFile) => cleaner.cleanCorporaPair(srcFile, tgtFile, loader.dataConfig.loaderBufferSize)
         }.unzip
 
         // Tokenize source and target files.
@@ -191,8 +191,8 @@ object ParallelDatasetLoader {
     val vocabDir = workingDir.getOrElse(File(loaders.head.dataConfig.workingDir)) / "vocabularies"
     val vocabulary = vocabularies.toMap.map {
       case (l, v) =>
-        val vocabFilename = loaders.head.dataConfig.loaderVocab.filename(l)
-        loaders.head.dataConfig.loaderVocab match {
+        val vocabFilename = loaders.head.dataConfig.vocabulary.filename(l)
+        loaders.head.dataConfig.vocabulary match {
           case NoVocabulary => l -> null // TODO: Avoid using nulls.
           case GeneratedVocabulary(generator) =>
             l -> {

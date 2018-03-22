@@ -67,6 +67,8 @@ class DummyVocabularyGenerator protected (
     }
     vocabFile
   }
+
+  override def toString: String = s"Dummy(size = $size)"
 }
 
 object DummyVocabularyGenerator {
