@@ -33,11 +33,11 @@ sealed trait DatasetVocabulary {
 }
 
 case object NoVocabulary extends DatasetVocabulary {
-  override def toString: String = "None"
+  override def toString: String = "v:none"
 }
 
 case object MergedVocabularies extends DatasetVocabulary {
-  override def toString: String = "Merged"
+  override def toString: String = "v:merged"
 }
 
 case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVocabulary {
@@ -48,5 +48,5 @@ case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVo
     */
   override def filename(language: Language): String = generator.filename(language)
 
-  override def toString: String = s"Generated[${generator.toString}]"
+  override def toString: String = s"v:generated-${generator.toString}"
 }

@@ -364,7 +364,7 @@ class BPEVocabularyGenerator protected (
     decodedSentence
   }
 
-  override def toString: String = s"BPE(numMergeOps = $numMergeOps)"
+  override def toString: String = s"bpe-$numMergeOps"
 }
 
 object BPEVocabularyGenerator {

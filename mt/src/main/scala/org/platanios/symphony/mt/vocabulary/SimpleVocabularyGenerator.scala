@@ -92,7 +92,7 @@ class SimpleVocabularyGenerator protected (
     vocabFile
   }
 
-  override def toString: String = s"Simple(sizeThreshold = $sizeThreshold, countThreshold = $countThreshold)"
+  override def toString: String = s"simple-$sizeThreshold-$countThreshold"
 }
 
 object SimpleVocabularyGenerator {

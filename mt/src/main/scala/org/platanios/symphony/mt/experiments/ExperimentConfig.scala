@@ -21,10 +21,8 @@ import org.platanios.symphony.mt.data.loaders._
 import org.platanios.symphony.mt.data.processors._
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.rnn._
-import org.platanios.symphony.mt.models.rnn.attention._
 import org.platanios.symphony.mt.vocabulary._
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder
@@ -72,10 +70,9 @@ case class ExperimentConfig(
     dataConfig: DataConfig = DataConfig(),
     dataset: String = "",
     languagePairs: Seq[(Language, Language)] = Seq.empty,
-    modelArchitecture: ExperimentConfig.ModelArchitecture = ExperimentConfig.BiRNN(),
-    modelCellString: String = "lstm:tanh",
-    modelCell: Cell[_, _] = BasicLSTM(),
-    modelType: ExperimentConfig.ModelType = ExperimentConfig.Pairwise,
+    modelArchitecture: ModelArchitecture = BiRNN(),
+    modelCell: String = "lstm:tanh",
+    modelType: ModelType = Pairwise,
     languageEmbeddingsSize: Int = 16,
     wordEmbeddingsSize: Int = 256,
     residual: Boolean = false,
@@ -132,15 +129,14 @@ case class ExperimentConfig(
         case "wmt16" => evalDatasetTags.map(tag => (s"WMT-16/$tag", WMT16Loader.Tag.fromName(tag)))
       }
 
-      val evalDatasets = datasets.flatMap(d => evalTags.map(t => (t._1, d.filterTags(t._2))))
+      val evalDatasets = evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2))))
 
-      val model = modelArchitecture.model[modelCell.StateType, modelCell.StateShapeType](
+      val model = modelArchitecture.model(
         "Model", languages, dataConfig, env, parameterManager,
         // Weird casting is necessary here to avoid compiling errors.
-        modelCell.asInstanceOf[Cell[modelCell.StateType, modelCell.StateShapeType]], wordEmbeddingsSize,
-        residual, dropout, attention, labelSmoothing, summarySteps, checkpointSteps,
-        beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
-        optConfig, logConfig, evalDatasets)(modelCell.stateWhileLoopEvidence, modelCell.stateDropoutEvidence)
+        modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
+        summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
+        optConfig, logConfig, evalDatasets)
 
       model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(numSteps))
     case ExperimentConfig.Translate => ???
@@ -159,16 +155,16 @@ case class ExperimentConfig(
           Seq(
             "Architecture" -> modelArchitecture.toString,
             "Cell" -> {
-              val parts = modelCellString.split(":")
+              val parts = modelCell.split(":")
               s"${parts(0).toUpperCase()}[${parts(1)}]"
             },
             "Type" -> modelType.toString) ++ {
-            if (modelType == ExperimentConfig.HyperLanguage || modelType == ExperimentConfig.HyperLanguagePair)
+            if (modelType == HyperLanguage || modelType == HyperLanguagePair)
               Seq("Language Embeddings Size" -> languageEmbeddingsSize.toString)
             else
               Seq.empty[(String, String)]
           } ++ Seq("Word Embeddings Size" -> wordEmbeddingsSize.toString) ++ {
-            if (!modelArchitecture.isInstanceOf[ExperimentConfig.GNMT])
+            if (!modelArchitecture.isInstanceOf[GNMT])
               Seq(
                 "Residual" -> residual.toString,
                 "Attention" -> attention.toString)
@@ -238,25 +234,25 @@ case class ExperimentConfig(
   override def toString: String = {
     val stringBuilder = new StringBuilder(s"$dataset")
     stringBuilder.append(s".${languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").mkString(".")}")
-    stringBuilder.append(s".${modelArchitecture.toString.toLowerCase().replace("#", "").replaceAll("[|]", ".")}")
-    stringBuilder.append(modelCellString)
-    stringBuilder.append(modelType.toString.toLowerCase().replace(" ", "_"))
-    if (modelType == ExperimentConfig.HyperLanguage || modelType == ExperimentConfig.HyperLanguagePair)
-      stringBuilder.append(s".l-$languageEmbeddingsSize")
-    stringBuilder.append(s".w-$wordEmbeddingsSize")
-    if (!modelArchitecture.isInstanceOf[ExperimentConfig.GNMT] && residual)
+    stringBuilder.append(s".$modelArchitecture")
+    stringBuilder.append(s".$modelCell")
+    stringBuilder.append(s".$modelType")
+    if (modelType == HyperLanguage || modelType == HyperLanguagePair)
+      stringBuilder.append(s".l:$languageEmbeddingsSize")
+    stringBuilder.append(s".w:$wordEmbeddingsSize")
+    if (!modelArchitecture.isInstanceOf[GNMT] && residual)
       stringBuilder.append(".r")
-    if (!modelArchitecture.isInstanceOf[ExperimentConfig.GNMT] && attention)
+    if (!modelArchitecture.isInstanceOf[GNMT] && attention)
       stringBuilder.append(".a")
     dropout.map(d => stringBuilder.append(s".dropout:$d"))
-    stringBuilder.append(s".ls-$labelSmoothing")
-    stringBuilder.append(s".t-${dataConfig.tokenizer}")
-    stringBuilder.append(s".c-${dataConfig.cleaner}")
-    stringBuilder.append(s".v-${dataConfig.vocabulary.toString.toLowerCase().replaceAll("[|]|\\(|\\)}", "-")}")
-    stringBuilder.append(s".bs-${dataConfig.trainBatchSize}")
-    stringBuilder.append(s".nb-${dataConfig.numBuckets}")
-    stringBuilder.append(s".sml-${dataConfig.srcMaxLength}")
-    stringBuilder.append(s".tml-${dataConfig.tgtMaxLength}")
+    stringBuilder.append(s".ls:$labelSmoothing")
+    stringBuilder.append(s".${dataConfig.tokenizer}")
+    stringBuilder.append(s".${dataConfig.cleaner}")
+    stringBuilder.append(s".${dataConfig.vocabulary}")
+    stringBuilder.append(s".bs:${dataConfig.trainBatchSize}")
+    stringBuilder.append(s".nb:${dataConfig.numBuckets}")
+    stringBuilder.append(s".sml:${dataConfig.srcMaxLength}")
+    stringBuilder.append(s".tml:${dataConfig.tgtMaxLength}")
     stringBuilder.toString
   }
 }
@@ -296,327 +292,6 @@ object ExperimentConfig {
       case "evaluate" => Evaluate
       case value => throw new IllegalArgumentException(s"'$value' does not represent a valid task.")
     }
-  }
-
-  sealed trait ModelArchitecture {
-    val name: String
-
-    def model[S, SS](
-        name: String,
-        languages: Seq[(Language, Vocabulary)],
-        dataConfig: DataConfig,
-        env: Environment,
-        parameterManager: ParameterManager,
-        cell: Cell[S, SS],
-        numUnits: Int,
-        residual: Boolean,
-        dropout: Option[Float],
-        attention: Boolean,
-        labelSmoothing: Float,
-        summarySteps: Int,
-        checkpointSteps: Int,
-        beamWidth: Int,
-        lengthPenaltyWeight: Float,
-        decoderMaxLengthFactor: Float,
-        optConfig: Model.OptConfig,
-        logConfig: Model.LogConfig,
-        evalDatasets: Seq[(String, FileParallelDataset)]
-    )(implicit
-        evS: WhileLoopVariable.Aux[S, SS],
-        evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-    ): RNNModel[S, SS]
-
-    override def toString: String
-  }
-
-  case class RNN(
-      numEncoderLayers: Int = 2,
-      numDecoderLayers: Int = 2
-  ) extends ModelArchitecture {
-    override val name: String = "rnn"
-
-    override def model[S, SS](
-        name: String,
-        languages: Seq[(Language, Vocabulary)],
-        dataConfig: DataConfig,
-        env: Environment,
-        parameterManager: ParameterManager,
-        cell: Cell[S, SS],
-        numUnits: Int,
-        residual: Boolean,
-        dropout: Option[Float],
-        attention: Boolean,
-        labelSmoothing: Float,
-        summarySteps: Int,
-        checkpointSteps: Int,
-        beamWidth: Int,
-        lengthPenaltyWeight: Float,
-        decoderMaxLengthFactor: Float,
-        optConfig: Model.OptConfig,
-        logConfig: Model.LogConfig,
-        evalDatasets: Seq[(String, FileParallelDataset)]
-    )(implicit
-        evS: WhileLoopVariable.Aux[S, SS],
-        evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-    ): RNNModel[S, SS] = {
-      RNNModel(
-        name = name,
-        languages = languages,
-        dataConfig = dataConfig,
-        config = RNNModel.Config(
-          env,
-          parameterManager,
-          UnidirectionalRNNEncoder(
-            cell = cell,
-            numUnits = numUnits,
-            numLayers = numEncoderLayers,
-            residual = residual,
-            dropout = dropout),
-          UnidirectionalRNNDecoder(
-            cell = cell,
-            numUnits = numUnits,
-            numLayers = numDecoderLayers,
-            residual = residual,
-            dropout = dropout,
-            attention = if (attention) Some(LuongRNNAttention(scaled = true)) else None,
-            outputAttention = attention),
-          labelSmoothing = labelSmoothing,
-          summarySteps = summarySteps,
-          checkpointSteps = checkpointSteps,
-          beamWidth = beamWidth,
-          lengthPenaltyWeight = lengthPenaltyWeight,
-          decoderMaxLengthFactor = decoderMaxLengthFactor),
-        optConfig = optConfig,
-        logConfig = logConfig,
-        evalDatasets = evalDatasets)
-    }
-
-    override def toString: String = s"RNN[#Enc=$numEncoderLayers,#Dec=$numDecoderLayers]"
-  }
-
-  case class BiRNN(
-      numEncoderLayers: Int = 2,
-      numDecoderLayers: Int = 2
-  ) extends ModelArchitecture {
-    override val name: String = "bi_rnn"
-
-    override def model[S, SS](
-        name: String,
-        languages: Seq[(Language, Vocabulary)],
-        dataConfig: DataConfig,
-        env: Environment,
-        parameterManager: ParameterManager,
-        cell: Cell[S, SS],
-        numUnits: Int,
-        residual: Boolean,
-        dropout: Option[Float],
-        attention: Boolean,
-        labelSmoothing: Float,
-        summarySteps: Int,
-        checkpointSteps: Int,
-        beamWidth: Int,
-        lengthPenaltyWeight: Float,
-        decoderMaxLengthFactor: Float,
-        optConfig: Model.OptConfig,
-        logConfig: Model.LogConfig,
-        evalDatasets: Seq[(String, FileParallelDataset)]
-    )(implicit
-        evS: WhileLoopVariable.Aux[S, SS],
-        evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-    ): RNNModel[S, SS] = {
-      RNNModel(
-        name = name,
-        languages = languages,
-        dataConfig = dataConfig,
-        config = RNNModel.Config(
-          env,
-          parameterManager,
-          BidirectionalRNNEncoder(
-            cell = cell,
-            numUnits = numUnits,
-            numLayers = numEncoderLayers,
-            residual = residual,
-            dropout = dropout),
-          UnidirectionalRNNDecoder(
-            cell = cell,
-            numUnits = numUnits,
-            numLayers = numDecoderLayers,
-            residual = residual,
-            dropout = dropout,
-            attention = if (attention) Some(LuongRNNAttention(scaled = true)) else None,
-            outputAttention = attention),
-          labelSmoothing = labelSmoothing,
-          summarySteps = summarySteps,
-          checkpointSteps = checkpointSteps,
-          beamWidth = beamWidth,
-          lengthPenaltyWeight = lengthPenaltyWeight,
-          decoderMaxLengthFactor = decoderMaxLengthFactor),
-        optConfig = optConfig,
-        logConfig = logConfig,
-        evalDatasets = evalDatasets)
-    }
-
-    override def toString: String = s"BiRNN[#Enc=$numEncoderLayers,#Dec=$numDecoderLayers]"
-  }
-
-  case class GNMT(
-      numBiLayers: Int = 1,
-      numUniLayers: Int = 3,
-      numUniResLayers: Int = 2
-  ) extends ModelArchitecture {
-    override val name: String = "gnmt"
-
-    override def model[S, SS](
-        name: String,
-        languages: Seq[(Language, Vocabulary)],
-        dataConfig: DataConfig,
-        env: Environment,
-        parameterManager: ParameterManager,
-        cell: Cell[S, SS],
-        numUnits: Int,
-        residual: Boolean,
-        dropout: Option[Float],
-        attention: Boolean,
-        labelSmoothing: Float,
-        summarySteps: Int,
-        checkpointSteps: Int,
-        beamWidth: Int,
-        lengthPenaltyWeight: Float,
-        decoderMaxLengthFactor: Float,
-        optConfig: Model.OptConfig,
-        logConfig: Model.LogConfig,
-        evalDatasets: Seq[(String, FileParallelDataset)]
-    )(implicit
-        evS: WhileLoopVariable.Aux[S, SS],
-        evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-    ): RNNModel[S, SS] = {
-      RNNModel(
-        name = name,
-        languages = languages,
-        dataConfig = dataConfig,
-        config = RNNModel.Config(
-          env,
-          parameterManager,
-          GNMTEncoder(
-            cell = cell,
-            numUnits = numUnits,
-            numBiLayers = numBiLayers,
-            numUniLayers = numUniLayers,
-            numUniResLayers = numUniResLayers,
-            dropout = dropout),
-          GNMTDecoder(
-            cell = cell,
-            numUnits = numUnits,
-            numLayers = numBiLayers + numUniLayers,
-            numResLayers = numUniResLayers,
-            attention = BahdanauRNNAttention(normalized = true),
-            dropout = dropout,
-            useNewAttention = attention),
-          labelSmoothing = labelSmoothing,
-          summarySteps = summarySteps,
-          checkpointSteps = checkpointSteps,
-          beamWidth = beamWidth,
-          lengthPenaltyWeight = lengthPenaltyWeight,
-          decoderMaxLengthFactor = decoderMaxLengthFactor),
-        optConfig = optConfig,
-        logConfig = logConfig,
-        evalDatasets = evalDatasets)
-    }
-
-    override def toString: String = s"GNMT[#Bi=$numBiLayers,#Uni=$numUniLayers,#UniRes=$numUniResLayers]"
-  }
-
-  implicit val modelArchitectureRead: scopt.Read[ModelArchitecture] = {
-    scopt.Read.reads(value => {
-      val parts = value.split(":")
-      parts(0) match {
-        case "rnn" if parts.length == 3 => RNN(parts(1).toInt, parts(2).toInt)
-        case "bi_rnn" if parts.length == 3 => BiRNN(parts(1).toInt, parts(2).toInt)
-        case "gnmt" if parts.length == 4 => GNMT(parts(1).toInt, parts(2).toInt, parts(3).toInt)
-        case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid model architecture.")
-      }
-    })
-  }
-
-  sealed trait ModelType {
-    val name: String
-
-    def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager
-
-    override def toString: String
-  }
-
-  case object Pairwise extends ModelType {
-    override val name: String = "pair"
-    override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
-      ParameterManager(
-        wordEmbeddingsSize = wordEmbeddingsSize,
-        variableInitializer = tf.VarianceScalingInitializer(
-          1.0f,
-          tf.VarianceScalingInitializer.FanAverageScalingMode,
-          tf.VarianceScalingInitializer.UniformDistribution))
-    }
-
-    override def toString: String = "Pairwise"
-  }
-
-  case object HyperLanguage extends ModelType {
-    override val name: String = "hyper_lang"
-    override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
-      LanguageEmbeddingsParameterManager(
-        languageEmbeddingsSize = languageEmbeddingsSize,
-        wordEmbeddingsSize = wordEmbeddingsSize)
-    }
-
-    override def toString: String = "Hyper Language"
-  }
-
-  case object HyperLanguagePair extends ModelType {
-    override val name: String = "hyper_lang_pair"
-    override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
-      LanguageEmbeddingsPairParameterManager(
-        languageEmbeddingsSize = languageEmbeddingsSize,
-        wordEmbeddingsSize = wordEmbeddingsSize)
-    }
-
-    override def toString: String = "Hyper Language Pair"
-  }
-
-  implicit val modelTypeRead: scopt.Read[ModelType] = {
-    scopt.Read.reads {
-      case "pair" => Pairwise
-      case "hyper_lang" => HyperLanguage
-      case "hyper_lang_pair" => HyperLanguagePair
-      case value => throw new IllegalArgumentException(s"'$value' does not represent a valid model type.")
-    }
-  }
-
-  implicit def rnnCellRead: scopt.Read[Cell[_, _]] = {
-    scopt.Read.reads(value => {
-      val parts = value.split(":")
-      val activation: Output => Output = {
-        if (parts.length < 2) {
-          tf.tanh(_)
-        } else {
-          parts(1) match {
-            case "sigmoid" => tf.sigmoid(_)
-            case "tanh" => tf.tanh(_)
-            case "relu" => tf.relu(_)
-            case "relu6" => tf.relu6(_)
-            case "elu" => tf.elu(_)
-            case "selu" => tf.selu(_)
-            case _ => throw new IllegalArgumentException(
-              s"'${parts(1)}' does not represent a valid activation function.")
-          }
-        }
-      }
-      parts(0) match {
-        case "gru" => GRU(activation)
-        case "lstm" if parts.length == 2 => BasicLSTM(activation = activation)
-        case "lstm" if parts.length == 3 => BasicLSTM(parts(2).toFloat, activation)
-        case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid RNN cell type.")
-      }
-    })
   }
 
   implicit val tokenizerRead: scopt.Read[Tokenizer] = {
@@ -678,7 +353,6 @@ object ExperimentConfig {
     })
   }
 
-
   val parser: scopt.OptionParser[ExperimentConfig] = new scopt.OptionParser[ExperimentConfig]("MT Experiment") {
     head("MT Experiment: A simple way to run MT experiments and reproduce experimental results.")
 
@@ -719,7 +393,7 @@ object ExperimentConfig {
             "and 'gnmt:<num_bi_layers>:<num_uni_layers>:<num_uni_residual_layers>'.")
 
     opt[String]("model-cell").required().valueName("<name>")
-        .action((d, c) => c.copy(modelCell = implicitly[scopt.Read[Cell[_, _]]].reads(d), modelCellString = d))
+        .action((d, c) => c.copy(modelCell = d))
         .text("Specifies the model cell to use. " +
             "Valid values are: 'gru[:<activation>]' and 'lstm[:<activation>[:<forget_bias>]]'.")
 

@@ -65,7 +65,7 @@ object NoTokenizer extends Tokenizer {
   override def tokenize(sentence: String, language: Language): String = sentence
   override def tokenizeCorpus(file: File, language: Language, bufferSize: Int = 8192): File = file
 
-  override def toString: String = "None"
+  override def toString: String = "t:none"
 }
 
 /** Tokenizer used by the Moses library.
@@ -238,7 +238,7 @@ case class MosesTokenizer(
     tokenized
   }
 
-  override def toString: String = "Moses"
+  override def toString: String = "t:moses"
 }
 
 object MosesTokenizer {

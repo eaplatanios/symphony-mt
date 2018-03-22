@@ -84,7 +84,7 @@ object NoCleaner extends Cleaner {
     (srcFile, tgtFile)
   }
 
-  override def toString: String = "None"
+  override def toString: String = "c:none"
 }
 
 class MosesCleaner protected (
@@ -137,7 +137,7 @@ class MosesCleaner protected (
     }
   }
 
-  override def toString: String = "Moses"
+  override def toString: String = "c:moses"
 }
 
 object MosesCleaner {
