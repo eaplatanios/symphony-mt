@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.data.loaders
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.processors.{FileProcessor, NoFileProcessor}
+import org.platanios.symphony.mt.data.processors.{FileProcessor, Normalizer, PunctuationNormalizer}
 
 import better.files._
 
@@ -66,7 +66,8 @@ class EuroparlV8Loader(
           File(downloadsDir) / EuroparlV8Loader.archivePrefix /
               EuroparlV8Loader.archivePrefix / s"$corpusFilenamePrefix.$src",
           File(downloadsDir) / EuroparlV8Loader.archivePrefix /
-              EuroparlV8Loader.archivePrefix / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
+              EuroparlV8Loader.archivePrefix / s"$corpusFilenamePrefix.$tgt",
+          Normalizer >> PunctuationNormalizer))
       case _ => Seq.empty
     }
   }

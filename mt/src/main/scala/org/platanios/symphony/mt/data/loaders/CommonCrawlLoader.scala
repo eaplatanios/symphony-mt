@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.data.loaders
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.processors.{FileProcessor, NoFileProcessor}
+import org.platanios.symphony.mt.data.processors.{FileProcessor, Normalizer, PunctuationNormalizer}
 
 import better.files._
 
@@ -65,7 +65,8 @@ class CommonCrawlLoader(
     datasetType match {
       case Train => Seq((CommonCrawlLoader.Train,
           File(downloadsDir) / CommonCrawlLoader.archivePrefix / s"$corpusFilenamePrefix.$src",
-          File(downloadsDir) / CommonCrawlLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt", NoFileProcessor))
+          File(downloadsDir) / CommonCrawlLoader.archivePrefix / s"$corpusFilenamePrefix.$tgt",
+          Normalizer >> PunctuationNormalizer))
       case _ => Seq.empty
     }
   }

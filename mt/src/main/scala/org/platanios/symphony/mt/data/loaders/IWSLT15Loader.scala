@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.data.loaders
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.processors.{FileProcessor, Normalizer, SGMConverter, TEDConverter}
+import org.platanios.symphony.mt.data.processors._
 
 import better.files._
 
@@ -59,28 +59,28 @@ class IWSLT15Loader(
       case Train => Seq((IWSLT15Loader.Train,
           File(downloadsDir) / directoryName / directoryName / s"train.tags.$directoryName.$src",
           File(downloadsDir) / directoryName / directoryName / s"train.tags.$directoryName.$tgt",
-          TEDConverter >> Normalizer))
+          TEDConverter >> Normalizer >> PunctuationNormalizer))
       case Dev => Seq((IWSLT15Loader.Dev2010,
           File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.dev2010.$directoryName.$src.xml",
           File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.dev2010.$directoryName.$tgt.xml",
-          SGMConverter >> Normalizer))
+          SGMConverter >> Normalizer >> PunctuationNormalizer))
       case Test => Seq(
         (IWSLT15Loader.Test2010,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2010.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2010.$directoryName.$tgt.xml",
-            SGMConverter >> Normalizer),
+            SGMConverter >> Normalizer >> PunctuationNormalizer),
         (IWSLT15Loader.Test2011,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2011.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2011.$directoryName.$tgt.xml",
-            SGMConverter >> Normalizer),
+            SGMConverter >> Normalizer >> PunctuationNormalizer),
         (IWSLT15Loader.Test2012,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2012.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2012.$directoryName.$tgt.xml",
-            SGMConverter >> Normalizer),
+            SGMConverter >> Normalizer >> PunctuationNormalizer),
         (IWSLT15Loader.Test2013,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2013.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT15.TED.tst2013.$directoryName.$tgt.xml",
-            SGMConverter >> Normalizer))
+            SGMConverter >> Normalizer >> PunctuationNormalizer))
     }
   }
 }

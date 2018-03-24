@@ -31,7 +31,7 @@ import scala.util.matching.Regex
 object Normalizer extends FileProcessor {
   private val logger = Logger(LoggerFactory.getLogger("Data / Normalizer"))
 
-  val replacementRegexSeq: Seq[(Regex, String)] = Seq(
+  private val replacementRegexSeq: Seq[(Regex, String)] = Seq(
     ("""À""".r, "À"), ("""Ã""".r, "Ã"), ("""Ả""".r, "Ả"), ("""Á""".r, "Á"), ("""Ạ""".r, "Ạ"),
     ("""Ằ""".r, "Ằ"), ("""Ẵ""".r, "Ẵ"), ("""Ẳ""".r, "Ẳ"), ("""Ắ""".r, "Ắ"), ("""Ặ""".r, "Ặ"),
     ("""Ầ""".r, "Ầ"), ("""Ẫ""".r, "Ẫ"), ("""Ẩ""".r, "Ẩ"), ("""Ấ""".r, "Ấ"), ("""Ậ""".r, "Ậ"),

@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.data.loaders
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.processors.{FileProcessor, SGMConverter}
+import org.platanios.symphony.mt.data.processors._
 
 import better.files._
 
@@ -109,75 +109,89 @@ class WMT16Loader(
         if (supported2008Languages.contains(srcLanguage) && supported2008Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2008,
               File(downloadsDir) / "dev" / "dev" / s"news-test2008-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"news-test2008-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"news-test2008-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2009Languages = Set[Language](Czech, English, French, German, Hungarian, Italian, Spanish)
         if (supported2009Languages.contains(srcLanguage) && supported2009Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2009,
               File(downloadsDir) / "dev" / "dev" / s"newstest2009-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newstest2009-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2009-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2009SysCombLanguages = Set[Language](Czech, English, French, German, Hungarian, Italian, Spanish)
         if (supported2009SysCombLanguages.contains(srcLanguage) && supported2009SysCombLanguages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsSysComb2009,
               File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newssyscomb2009-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2010Languages = Set[Language](Czech, English, French, German, Spanish)
         if (supported2010Languages.contains(srcLanguage) && supported2010Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2010,
               File(downloadsDir) / "dev" / "dev" / s"newstest2010-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newstest2010-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2010-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2011Languages = Set[Language](Czech, English, French, German, Spanish)
         if (supported2011Languages.contains(srcLanguage) && supported2011Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2011,
               File(downloadsDir) / "dev" / "dev" / s"newstest2011-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newstest2011-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2011-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2012Languages = Set[Language](Czech, English, French, German, Russian, Spanish)
         if (supported2012Languages.contains(srcLanguage) && supported2012Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2012,
               File(downloadsDir) / "dev" / "dev" / s"newstest2012-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newstest2012-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2012-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2013Languages = Set[Language](Czech, English, French, German, Russian, Spanish)
         if (supported2013Languages.contains(srcLanguage) && supported2013Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2013,
               File(downloadsDir) / "dev" / "dev" / s"newstest2013-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newstest2013-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2013-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val pair = if (reversed) s"$tgt$src" else s"$src$tgt"
         val supported2014Languages = Set[Language](Czech, English, French, German, Hindi, Russian)
         if (supported2014Languages.contains(srcLanguage) && supported2014Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2014,
               File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2014-$pair-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2014DevLanguages = Set[Language](English, Hindi)
         if (supported2014DevLanguages.contains(srcLanguage) && supported2014DevLanguages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsDev2014,
               File(downloadsDir) / "dev" / "dev" / s"newsdev2014-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newsdev2014-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2014-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2015Languages = Set[Language](Czech, English, Finnish, German, Russian)
         if (supported2015Languages.contains(srcLanguage) && supported2015Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2015,
               File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newstest2015-$src$tgt-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2015DevLanguages = Set[Language](English, Finnish)
         if (supported2015DevLanguages.contains(srcLanguage) && supported2015DevLanguages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsDev2015,
               File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2015-$src$tgt-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2015DiscussDevLanguages = Set[Language](English, French)
         if (supported2015DiscussDevLanguages.contains(srcLanguage) &&
             supported2015DiscussDevLanguages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsDiscussDev2015,
               File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newsdiscussdev2015-$src$tgt-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2015DiscussTestLanguages = Set[Language](English, French)
         if (supported2015DiscussTestLanguages.contains(srcLanguage) &&
             supported2015DiscussTestLanguages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsDiscussTest2015,
               File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newsdiscusstest2015-$src$tgt-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         val supported2016DevLanguages = Set[Language](English, Romanian, Turkish)
         if (supported2016DevLanguages.contains(srcLanguage) && supported2016DevLanguages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsDev2016,
               File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt-src.$src.sgm",
-              File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "dev" / "dev" / s"newsdev2016-$src$tgt-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         corpora
       case Test =>
         WMT16Loader.testArchives.foreach(archive => {
@@ -189,7 +203,8 @@ class WMT16Loader(
         if (supported2016Languages.contains(srcLanguage) && supported2016Languages.contains(tgtLanguage))
           corpora ++= Seq((WMT16Loader.NewsTest2016,
               File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt-src.$src.sgm",
-              File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt-ref.$tgt.sgm", SGMConverter))
+              File(downloadsDir) / "test" / "test" / s"newstest2016-$src$tgt-ref.$tgt.sgm",
+              SGMConverter >> Normalizer >> PunctuationNormalizer))
         corpora
     }
   }
