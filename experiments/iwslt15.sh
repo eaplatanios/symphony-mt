@@ -8,6 +8,7 @@ sbt "mt/runMain org.platanios.symphony.mt.experiments.Experiment
   --dataset iwslt15
   --language-pairs en:cs,en:de,en:fr,en:th,en:vi,en:zh
   --eval-datasets dev2010,tst2011,tst2012,tst2013
+  --eval-metrics bleu,hyp_len,ref_len,sen_cnt
   --tokenizer moses
   --cleaner moses
   --vocabulary bpe:10000
@@ -17,11 +18,12 @@ sbt "mt/runMain org.platanios.symphony.mt.experiments.Experiment
   --tgt-max-length 50
   --buffer-size 1024
   --model-arch bi_rnn:4:4
-  --model-cell lstm:tanh
+  --model-cell lstm:elu
   --model-type hyper_lang
   --word-embed-size 256
   --lang-embed-size 16
   --residual
+  --attention
   --dropout 0.2
   --label-smoothing 0.1
   --beam-width 10

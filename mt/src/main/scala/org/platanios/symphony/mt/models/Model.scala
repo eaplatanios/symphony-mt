@@ -84,7 +84,7 @@ abstract class Model[S] protected (
     // Add logging hooks.
     if (logConfig.logLossSteps > 0)
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
-    if (logConfig.logEvalSteps > 0) {
+    if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
       val datasets = evalDatasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
         hooks += tf.learn.Evaluator(

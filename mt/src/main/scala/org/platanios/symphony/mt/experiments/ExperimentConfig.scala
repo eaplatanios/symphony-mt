@@ -407,6 +407,10 @@ object ExperimentConfig {
         .action((d, c) => c.copy(evalDatasetTags = d))
         .text("Specifies the datasets to use for evaluation while training. Example value: 'tst2012,tst2013'.")
 
+    opt[Seq[String]]("eval-metrics").valueName("<name1>[,<name2>[...]]")
+        .action((d, c) => c.copy(evalMetrics = d))
+        .text("Specifies the metrics to use for evaluation. Example value: 'bleu,hyp_len,ref_len,sen_cnt'.")
+
     opt[ModelArchitecture]("model-arch").required().valueName("<name>")
         .action((d, c) => c.copy(modelArchitecture = d))
         .text("Specifies the model name to use. " +
