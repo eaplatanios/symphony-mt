@@ -17,6 +17,7 @@ package org.platanios.symphony.mt.experiments
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
+import org.platanios.symphony.mt.evaluation.MTMetric
 import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
@@ -49,14 +50,15 @@ sealed trait ModelArchitecture {
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)]
+      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalMetrics: Seq[MTMetric]
   ): RNNModel[_, _] = {
     val cell = cellFromString(cellString)
     createModel[cell.StateType, cell.StateShapeType](
       name, languages, dataConfig, env, parameterManager, cell.asInstanceOf[Cell[cell.StateType, cell.StateShapeType]],
       numUnits, residual, dropout, attention, labelSmoothing, summarySteps, checkpointSteps, beamWidth,
       lengthPenaltyWeight, decoderMaxLengthFactor, optConfig, logConfig,
-      evalDatasets)(cell.stateWhileLoopEvidence, cell.stateDropoutEvidence)
+      evalDatasets, evalMetrics)(cell.stateWhileLoopEvidence, cell.stateDropoutEvidence)
   }
 
   protected def createModel[S, SS](
@@ -78,7 +80,8 @@ sealed trait ModelArchitecture {
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)]
+      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalMetrics: Seq[MTMetric]
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -152,7 +155,8 @@ case class RNN(
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)]
+      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalMetrics: Seq[MTMetric]
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -185,8 +189,10 @@ case class RNN(
         lengthPenaltyWeight = lengthPenaltyWeight,
         decoderMaxLengthFactor = decoderMaxLengthFactor),
       optConfig = optConfig,
-      logConfig = logConfig,
-      evalDatasets = evalDatasets)
+      logConfig = logConfig
+    )(
+      evalDatasets = evalDatasets,
+      evalMetrics = evalMetrics)
   }
 
   override def toString: String = s"rnn:$numEncoderLayers:$numDecoderLayers"
@@ -217,7 +223,8 @@ case class BiRNN(
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)]
+      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalMetrics: Seq[MTMetric]
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -250,8 +257,10 @@ case class BiRNN(
         lengthPenaltyWeight = lengthPenaltyWeight,
         decoderMaxLengthFactor = decoderMaxLengthFactor),
       optConfig = optConfig,
-      logConfig = logConfig,
-      evalDatasets = evalDatasets)
+      logConfig = logConfig
+    )(
+      evalDatasets = evalDatasets,
+      evalMetrics = evalMetrics)
   }
 
   override def toString: String = s"bi_rnn:$numEncoderLayers:$numDecoderLayers"
@@ -283,7 +292,8 @@ case class GNMT(
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)]
+      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalMetrics: Seq[MTMetric]
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -317,8 +327,10 @@ case class GNMT(
         lengthPenaltyWeight = lengthPenaltyWeight,
         decoderMaxLengthFactor = decoderMaxLengthFactor),
       optConfig = optConfig,
-      logConfig = logConfig,
-      evalDatasets = evalDatasets)
+      logConfig = logConfig
+    )(
+      evalDatasets = evalDatasets,
+      evalMetrics = evalMetrics)
   }
 
   override def toString: String = s"gnmt:$numBiLayers:$numUniLayers:$numUniResLayers"

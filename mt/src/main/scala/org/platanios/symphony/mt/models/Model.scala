@@ -43,17 +43,15 @@ abstract class Model[S] protected (
     val dataConfig: DataConfig,
     val config: Model.Config,
     val optConfig: Model.OptConfig,
-    val logConfig: Model.LogConfig = Model.LogConfig(),
+    val logConfig: Model.LogConfig = Model.LogConfig()
+)(
     val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
     val evalMetrics: Seq[MTMetric] = Seq(
-      BLEU(),
+      BLEU()(languages),
       SentenceLength(forHypothesis = true, name = "HypLen"),
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences"))
 ) {
-  /** Languages implicit used by evaluation metrics. */
-  protected implicit val languagesImplicit: Seq[(Language, Vocabulary)] = languages
-
   protected val languageIds: Map[Language, Int] = languages.map(_._1).zipWithIndex.toMap
 
   protected implicit val env             : Environment      = config.env
@@ -75,12 +73,7 @@ abstract class Model[S] protected (
       (TFBatchWithLanguagesD, TFBatchD), (TFBatchWithLanguagesS, TFBatchS),
       (TFBatchWithLanguage, TFBatch)] = tf.createWithNameScope(name) {
     val model = learn.Model.supervised(
-      input = input,
-      layer = inferLayer,
-      trainLayer = trainLayer,
-      trainInput = trainInput,
-      loss = lossLayer,
-      optimizer = optConfig.optimizer,
+      input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
       clipGradients = tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm),
       colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
     val summariesDir = config.env.workingDir.resolve("summaries")
@@ -185,23 +178,22 @@ abstract class Model[S] protected (
       metrics: Seq[MTMetric] = evalMetrics,
       maxSteps: Long = -1L,
       log: Boolean = true,
-      saveSummaries: Boolean = true,
-      name: String = "Evaluation"
-  ): Seq[(String, (String, Tensor))] = {
+      saveSummaries: Boolean = true
+  ): Seq[(String, Seq[(String, Tensor)])] = {
     val rowNames = datasets.map(_._1)
     val firstColWidth = rowNames.map(_.length).max
     val colWidth = math.max(metrics.map(_.name.length).max, 10)
     if (log) {
-      evaluation.logger.info(s"Step $step $name:")
+      evaluation.logger.info(s"Evaluation results:")
       evaluation.logger.info(s"╔═${"═" * firstColWidth}═╤${metrics.map(_ => "═" * (colWidth + 2)).mkString("╤")}╗")
       evaluation.logger.info(s"║ ${" " * firstColWidth} │${metrics.map(s" %${colWidth}s ".format(_)).mkString("│")}║")
       evaluation.logger.info(s"╟─${"─" * firstColWidth}─┼${metrics.map(_ => "─" * (colWidth + 2)).mkString("┼")}╢")
     }
-    val results = datasets.map(dataset => {
-      val evalDatasets = Inputs.createEvalDatasets(dataConfig, config, dataset.filter(_._2.nonEmpty), languages)
-      val values = estimator.evaluate(evalDatasets.map(_._2), metrics.map(_._2), maxSteps, saveSummaries, name)
+    val evalDatasets = Inputs.createEvalDatasets(dataConfig, config, datasets.filter(_._2.nonEmpty), languages)
+    val results = evalDatasets.map(dataset => {
+      val values = estimator.evaluate(dataset._2, metrics, maxSteps, saveSummaries, name)
       if (log) {
-        val line = s"║ %${firstColWidth}s │".format(datasetName) + values.map(value => {
+        val line = s"║ %${firstColWidth}s │".format(dataset._1) + values.map(value => {
           if (value.shape.rank == 0 && value.dataType.isFloatingPoint) {
             val castedValue = value.cast(FLOAT32).scalar.asInstanceOf[Float]
             s" %${colWidth}.4f ".format(castedValue)
@@ -214,7 +206,7 @@ abstract class Model[S] protected (
         }).mkString("│") + "║"
         evaluation.logger.info(line)
       }
-      dataset._1 -> metrics.map(_._1).zip(values)
+      dataset._1 -> metrics.map(_.name).zip(values)
     })
     if (log)
       evaluation.logger.info(s"╚═${"═" * firstColWidth}═╧${metrics.map(_ => "═" * (colWidth + 2)).mkString("╧")}╝")

@@ -23,13 +23,11 @@ import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric, SentenceCount, Sent
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.vocabulary._
 import org.platanios.tensorflow.api._
-
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.FileAppender
 import org.slf4j.{Logger, LoggerFactory}
-
 import java.io.File
 import java.nio.file.{Path, Paths}
 
@@ -89,7 +87,7 @@ case class ExperimentConfig(
     optConfig: Model.OptConfig = Model.OptConfig(),
     logConfig: Model.LogConfig = Model.LogConfig(),
     evalDatasetTags: Seq[String] = Seq.empty,
-    evalMetrics: Seq[MTMetric] = Seq.empty
+    evalMetrics: Seq[String] = Seq.empty
 ) {
   lazy val (datasets, languages) = {
     experiments.loadDatasets(dataset match {
@@ -99,6 +97,18 @@ case class ExperimentConfig(
       case "wmt16" => languagePairs.map(l => WMT16Loader(l._1, l._2, dataConfig))
     }, Some(workingDir))
   }
+
+  protected lazy val metrics: Seq[MTMetric] = evalMetrics.map(metric => {
+    metric.split(":") match {
+      case Array(name) if name == "bleu" => BLEU()(languages)
+      case Array(name, maxOrder) if name == "bleu" => BLEU(maxOrder.toInt)(languages)
+      case Array(name, maxOrder, smooth) if name == "bleu" => BLEU(maxOrder.toInt, smooth.toBoolean)(languages)
+      case Array(name) if name == "hyp_len" => SentenceLength(forHypothesis = true, name = "HypLen")
+      case Array(name) if name == "ref_len" => SentenceLength(forHypothesis = false, name = "RefLen")
+      case Array(name) if name == "sen_cnt" => SentenceCount(name = "#Sentences")
+      case _ => throw new IllegalArgumentException(s"'$metric' does not represent a valid metric.")
+    }
+  })
 
   def workingDir: Path = env.workingDir.resolve(toString)
 
@@ -139,7 +149,7 @@ case class ExperimentConfig(
       // Weird casting is necessary here to avoid compiling errors.
       modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
       summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
-      optConfig, logConfig, evalDatasets, evalMetrics)
+      optConfig, logConfig, evalDatasets, metrics)
 
     task match {
       case ExperimentConfig.Train =>
@@ -149,97 +159,97 @@ case class ExperimentConfig(
     }
   }
 
-  def logSummary(): Unit = task match {
-    case ExperimentConfig.Train =>
-      Experiment.logger.info("Running a training experiment with the following configuration:")
-      val configTable = Seq(
-        "Dataset" -> Seq(
-          "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
-          "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").mkString(", "),
-          "Evaluation Tags" -> evalDatasetTags.mkString(", "),
-          "Evaluation Metrics" -> evalMetrics.map {
-            case m: BLEU => s"${m.name}: BLEU(${m.maxOrder}, smooth = ${m.smooth})"
-            case m: SentenceLength => s"${m.name}: ${if (m.forHypothesis) "Hyp" else "Ref"}SentenceLength"
-            case m: SentenceCount => s"${m.name}: SentenceCount"
-          }.mkString(", ")),
-        "Model" -> {
-          Seq(
-            "Architecture" -> modelArchitecture.toString,
-            "Cell" -> {
-              val parts = modelCell.split(":")
-              s"${parts(0).toUpperCase()}[${parts(1)}]"
-            },
-            "Type" -> modelType.toString) ++ {
-            if (modelType == HyperLanguage || modelType == HyperLanguagePair)
-              Seq("Language Embeddings Size" -> languageEmbeddingsSize.toString)
-            else
-              Seq.empty[(String, String)]
-          } ++ Seq("Word Embeddings Size" -> wordEmbeddingsSize.toString) ++ {
-            if (!modelArchitecture.isInstanceOf[GNMT])
-              Seq(
-                "Residual" -> residual.toString,
-                "Attention" -> attention.toString)
-            else
-              Seq.empty[(String, String)]
-          } ++ Seq(
-            "Dropout" -> dropout.map(_.toString).getOrElse("Not Used"),
-            "Label Smoothing" -> labelSmoothing.toString,
-            "Beam Width" -> beamWidth.toString,
-            "Length Penalty Weight" -> lengthPenaltyWeight.toString,
-            "Decoding Max Length Factor" -> decoderMaxLengthFactor.toString,
-            "" -> "", // This acts as a separator to help improve readability of the table.
-            "Steps" -> numSteps.toString,
-            "Summary Steps" -> summarySteps.toString,
-            "Checkpoint Steps" -> checkpointSteps.toString,
-            "" -> "", // This acts as a separator to help improve readability of the table.
-            "Optimizer" -> {
-              val parts = optString.split(":")
-              s"${parts(0).capitalize}[lr=${parts(1)}]"
-            },
-            "Max Gradients Norm" -> optConfig.maxGradNorm.toString,
-            "Colocate Gradients with Ops" -> optConfig.colocateGradientsWithOps.toString,
-            "" -> "", // This acts as a separator to help improve readability of the table.
-            "Log Loss Steps" -> logConfig.logLossSteps.toString,
-            "Log Eval Steps" -> logConfig.logEvalSteps.toString,
-            "Launch TensorBoard" -> logConfig.launchTensorBoard.toString,
-            "TensorBoard Host" -> logConfig.tensorBoardConfig._1,
-            "TensorBoard Port" -> logConfig.tensorBoardConfig._2.toString
-          )
-        },
-        "Data Configuration" -> Seq(
-          "Directory" -> dataConfig.workingDir.toString,
-          "Loader Buffer Size" -> dataConfig.loaderBufferSize.toString,
-          "Tokenizer" -> dataConfig.tokenizer.toString,
-          "Cleaner" -> dataConfig.cleaner.toString,
-          "Vocabulary" -> dataConfig.vocabulary.toString,
+  def logSummary(): Unit = {
+    Experiment.logger.info("Running an experiment with the following configuration:")
+    val configTable = Seq(
+      "Experiment" -> Seq("Type" -> {
+        task match {
+          case ExperimentConfig.Train => "Train"
+          case ExperimentConfig.Translate => "Translate"
+          case ExperimentConfig.Evaluate => "Evaluate"
+        }
+      }),
+      "Dataset" -> Seq(
+        "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
+        "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").mkString(", "),
+        "Evaluation Tags" -> evalDatasetTags.mkString(", "),
+        "Evaluation Metrics" -> evalMetrics.mkString(", ")),
+      "Model" -> {
+        Seq(
+          "Architecture" -> modelArchitecture.toString,
+          "Cell" -> {
+            val parts = modelCell.split(":")
+            s"${parts(0).toUpperCase()}[${parts(1)}]"
+          },
+          "Type" -> modelType.toString) ++ {
+          if (modelType == HyperLanguage || modelType == HyperLanguagePair)
+            Seq("Language Embeddings Size" -> languageEmbeddingsSize.toString)
+          else
+            Seq.empty[(String, String)]
+        } ++ Seq("Word Embeddings Size" -> wordEmbeddingsSize.toString) ++ {
+          if (!modelArchitecture.isInstanceOf[GNMT])
+            Seq(
+              "Residual" -> residual.toString,
+              "Attention" -> attention.toString)
+          else
+            Seq.empty[(String, String)]
+        } ++ Seq(
+          "Dropout" -> dropout.map(_.toString).getOrElse("Not Used"),
+          "Label Smoothing" -> labelSmoothing.toString,
+          "Beam Width" -> beamWidth.toString,
+          "Length Penalty Weight" -> lengthPenaltyWeight.toString,
+          "Decoding Max Length Factor" -> decoderMaxLengthFactor.toString,
           "" -> "", // This acts as a separator to help improve readability of the table.
-          "Train Batch Size" -> dataConfig.trainBatchSize.toString,
-          "Inference Batch Size" -> dataConfig.inferBatchSize.toString,
-          "Evaluation Batch Size" -> dataConfig.evaluateBatchSize.toString,
-          "Number of Buckets" -> dataConfig.numBuckets.toString,
-          "Maximum Source Length" -> dataConfig.srcMaxLength.toString,
-          "Maximum Target Length" -> dataConfig.tgtMaxLength.toString,
-          "Prefetching Buffer Size" -> dataConfig.bufferSize.toString,
-          "Number of Shards" -> dataConfig.numShards.toString,
-          "Shard Index" -> dataConfig.shardIndex.toString,
-          "TF - Number of Parallel Calls" -> dataConfig.numParallelCalls.toString,
+          "Steps" -> numSteps.toString,
+          "Summary Steps" -> summarySteps.toString,
+          "Checkpoint Steps" -> checkpointSteps.toString,
           "" -> "", // This acts as a separator to help improve readability of the table.
-          "Unknown Token" -> dataConfig.unknownToken,
-          "Begin-of-Sequence Token" -> dataConfig.beginOfSequenceToken,
-          "End-of-Sequence Token" -> dataConfig.endOfSequenceToken),
-        "Environment" -> Seq(
-          "Working Directory" -> env.workingDir.toString,
-          "Number of GPUs" -> env.numGPUs.toString,
-          "Random Seed" -> env.randomSeed.getOrElse("Not Set").toString,
-          "TF - Allow Soft Placement" -> env.allowSoftPlacement.toString,
-          "TF - Log Device Placement" -> env.logDevicePlacement.toString,
-          "TF - Allow GPU Memory Growth" -> env.gpuAllowMemoryGrowth.toString,
-          "TF - Use XLA" -> env.useXLA.toString,
-          "TF - Parallel Iterations" -> env.parallelIterations.toString,
-          "TF - Swap Memory" -> env.swapMemory.toString))
-      ExperimentConfig.logTable(configTable, (message) => Experiment.logger.info(message))
-    case ExperimentConfig.Translate => ???
-    case ExperimentConfig.Evaluate => ???
+          "Optimizer" -> {
+            val parts = optString.split(":")
+            s"${parts(0).capitalize}[lr=${parts(1)}]"
+          },
+          "Max Gradients Norm" -> optConfig.maxGradNorm.toString,
+          "Colocate Gradients with Ops" -> optConfig.colocateGradientsWithOps.toString,
+          "" -> "", // This acts as a separator to help improve readability of the table.
+          "Log Loss Steps" -> logConfig.logLossSteps.toString,
+          "Log Eval Steps" -> logConfig.logEvalSteps.toString,
+          "Launch TensorBoard" -> logConfig.launchTensorBoard.toString,
+          "TensorBoard Host" -> logConfig.tensorBoardConfig._1,
+          "TensorBoard Port" -> logConfig.tensorBoardConfig._2.toString
+        )
+      },
+      "Data Configuration" -> Seq(
+        "Directory" -> dataConfig.workingDir.toString,
+        "Loader Buffer Size" -> dataConfig.loaderBufferSize.toString,
+        "Tokenizer" -> dataConfig.tokenizer.toString,
+        "Cleaner" -> dataConfig.cleaner.toString,
+        "Vocabulary" -> dataConfig.vocabulary.toString,
+        "" -> "", // This acts as a separator to help improve readability of the table.
+        "Train Batch Size" -> dataConfig.trainBatchSize.toString,
+        "Inference Batch Size" -> dataConfig.inferBatchSize.toString,
+        "Evaluation Batch Size" -> dataConfig.evaluateBatchSize.toString,
+        "Number of Buckets" -> dataConfig.numBuckets.toString,
+        "Maximum Source Length" -> dataConfig.srcMaxLength.toString,
+        "Maximum Target Length" -> dataConfig.tgtMaxLength.toString,
+        "Prefetching Buffer Size" -> dataConfig.bufferSize.toString,
+        "Number of Shards" -> dataConfig.numShards.toString,
+        "Shard Index" -> dataConfig.shardIndex.toString,
+        "TF - Number of Parallel Calls" -> dataConfig.numParallelCalls.toString,
+        "" -> "", // This acts as a separator to help improve readability of the table.
+        "Unknown Token" -> dataConfig.unknownToken,
+        "Begin-of-Sequence Token" -> dataConfig.beginOfSequenceToken,
+        "End-of-Sequence Token" -> dataConfig.endOfSequenceToken),
+      "Environment" -> Seq(
+        "Working Directory" -> env.workingDir.toString,
+        "Number of GPUs" -> env.numGPUs.toString,
+        "Random Seed" -> env.randomSeed.getOrElse("Not Set").toString,
+        "TF - Allow Soft Placement" -> env.allowSoftPlacement.toString,
+        "TF - Log Device Placement" -> env.logDevicePlacement.toString,
+        "TF - Allow GPU Memory Growth" -> env.gpuAllowMemoryGrowth.toString,
+        "TF - Use XLA" -> env.useXLA.toString,
+        "TF - Parallel Iterations" -> env.parallelIterations.toString,
+        "TF - Swap Memory" -> env.swapMemory.toString))
+    ExperimentConfig.logTable(configTable, (message) => Experiment.logger.info(message))
   }
 
   override def toString: String = {
@@ -360,20 +370,6 @@ object ExperimentConfig {
         case Array(name, learningRate) if name == "yf" =>
           tf.train.YellowFin(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid optimizer.")
-      }
-    })
-  }
-
-  implicit val metricRead: scopt.Read[MTMetric] = {
-    scopt.Read.reads(value => {
-      value.split(":") match {
-        case Array(name) if name == "bleu" => BLEU()
-        case Array(name, maxOrder) if name == "bleu" => BLEU(maxOrder.toInt)
-        case Array(name, maxOrder, smooth) if name == "bleu" => BLEU(maxOrder.toInt, smooth.toBoolean)
-        case Array(name) if name == "hyp_len" => SentenceLength(forHypothesis = true, name = "HypLen")
-        case Array(name) if name == "ref_len" => SentenceLength(forHypothesis = false, name = "RefLen")
-        case Array(name) if name == "sen_cnt" => SentenceCount(name = "#Sentences")
-        case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid metric.")
       }
     })
   }

@@ -34,10 +34,11 @@ class RNNModel[S, SS](
     override val dataConfig: DataConfig,
     override val config: RNNModel.Config[S, SS],
     override val optConfig: Model.OptConfig,
-    override val logConfig : Model.LogConfig  = Model.LogConfig(),
+    override val logConfig : Model.LogConfig  = Model.LogConfig()
+)(
     override val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
     override val evalMetrics: Seq[MTMetric] = Seq(
-      BLEU(),
+      BLEU()(languages),
       SentenceLength(forHypothesis = true, name = "HypLen"),
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences"))
@@ -45,7 +46,9 @@ class RNNModel[S, SS](
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
 ) extends Model[(Tuple[Output, Seq[S]], Output, Output)](
-  name, languages, dataConfig, config, optConfig, logConfig, evalDatasets
+  name, languages, dataConfig, config, optConfig, logConfig
+)(
+  evalDatasets, evalMetrics
 ) {
   // TODO: Make this use the parameters manager.
 
@@ -111,10 +114,11 @@ object RNNModel {
       dataConfig: DataConfig,
       config: RNNModel.Config[S, SS],
       optConfig: Model.OptConfig,
-      logConfig: Model.LogConfig,
+      logConfig: Model.LogConfig
+  )(
       evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
       evalMetrics: Seq[MTMetric] = Seq(
-        BLEU(),
+        BLEU()(languages),
         SentenceLength(forHypothesis = true, name = "HypLen"),
         SentenceLength(forHypothesis = false, name = "RefLen"),
         SentenceCount(name = "#Sentences"))
@@ -123,7 +127,7 @@ object RNNModel {
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): RNNModel[S, SS] = {
     new RNNModel[S, SS](
-      name, languages, dataConfig, config, optConfig, logConfig, evalDatasets, evalMetrics)(evS, evSDropout)
+      name, languages, dataConfig, config, optConfig, logConfig)(evalDatasets, evalMetrics)(evS, evSDropout)
   }
 
   class Config[S, SS] protected(
