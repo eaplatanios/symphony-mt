@@ -8,7 +8,7 @@ sbt "mt/runMain org.platanios.symphony.mt.experiments.Experiment
   --dataset iwslt15
   --language-pairs en:cs,en:de,en:fr,en:th,en:vi,en:zh
   --eval-datasets tst2013
-  --eval-metrics bleu,hyp_len,ref_len,sen_cnt
+  --eval-metrics bleu,meteor,hyp_len,ref_len,sen_cnt
   --tokenizer moses
   --cleaner moses
   --vocabulary generated:20000

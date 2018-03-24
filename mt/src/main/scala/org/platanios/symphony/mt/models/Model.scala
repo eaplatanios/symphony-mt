@@ -48,6 +48,7 @@ abstract class Model[S] protected (
     val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
     val evalMetrics: Seq[MTMetric] = Seq(
       BLEU()(languages),
+      Meteor()(languages),
       SentenceLength(forHypothesis = true, name = "HypLen"),
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences"))

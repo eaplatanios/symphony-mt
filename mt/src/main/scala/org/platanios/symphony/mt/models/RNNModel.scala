@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric, SentenceCount, SentenceLength}
+import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -39,6 +39,7 @@ class RNNModel[S, SS](
     override val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
     override val evalMetrics: Seq[MTMetric] = Seq(
       BLEU()(languages),
+      Meteor()(languages),
       SentenceLength(forHypothesis = true, name = "HypLen"),
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences"))
@@ -119,6 +120,7 @@ object RNNModel {
       evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
       evalMetrics: Seq[MTMetric] = Seq(
         BLEU()(languages),
+        Meteor()(languages),
         SentenceLength(forHypothesis = true, name = "HypLen"),
         SentenceLength(forHypothesis = false, name = "RefLen"),
         SentenceCount(name = "#Sentences"))

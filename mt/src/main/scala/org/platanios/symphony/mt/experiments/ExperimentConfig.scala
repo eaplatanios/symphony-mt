@@ -19,15 +19,17 @@ import org.platanios.symphony.mt.{Environment, Language, experiments}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders._
 import org.platanios.symphony.mt.data.processors._
-import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric, SentenceCount, SentenceLength}
+import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.vocabulary._
 import org.platanios.tensorflow.api._
+
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.FileAppender
 import org.slf4j.{Logger, LoggerFactory}
+
 import java.io.File
 import java.nio.file.{Path, Paths}
 
@@ -88,7 +90,7 @@ case class ExperimentConfig(
     optConfig: Model.OptConfig = Model.OptConfig(),
     logConfig: Model.LogConfig = Model.LogConfig(),
     evalDatasetTags: Seq[String] = Seq.empty,
-    evalMetrics: Seq[String] = Seq.empty
+    evalMetrics: Seq[String] = Seq("bleu", "meteor", "hyp_len", "ref_len", "sen_cnt")
 ) {
   lazy val (datasets, languages) = {
     experiments.loadDatasets(dataset match {
@@ -104,6 +106,7 @@ case class ExperimentConfig(
       case Array(name) if name == "bleu" => BLEU()(languages)
       case Array(name, maxOrder) if name == "bleu" => BLEU(maxOrder.toInt)(languages)
       case Array(name, maxOrder, smooth) if name == "bleu" => BLEU(maxOrder.toInt, smooth.toBoolean)(languages)
+      case Array(name) if name == "meteor" => Meteor()(languages)
       case Array(name) if name == "hyp_len" => SentenceLength(forHypothesis = true, name = "HypLen")
       case Array(name) if name == "ref_len" => SentenceLength(forHypothesis = false, name = "RefLen")
       case Array(name) if name == "sen_cnt" => SentenceCount(name = "#Sentences")
