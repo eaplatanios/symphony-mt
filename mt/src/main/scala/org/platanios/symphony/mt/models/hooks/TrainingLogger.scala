@@ -95,7 +95,7 @@ case class TrainingLogger(
       executableEv: Executable[E],
       fetchableEv: Fetchable.Aux[F, R]
   ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor]]] = {
-    shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt)
+    shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt + 1)
     if (average || shouldTrigger)
       Some(Hook.SessionRunArgs(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
     else
@@ -127,7 +127,7 @@ case class TrainingLogger(
       totalSrcWordCount += fetches(3).scalar.asInstanceOf[Int]
       totalTgtWordCount += fetches(4).scalar.asInstanceOf[Int]
       if (shouldTrigger) {
-        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt - 1)
+        val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt)
         val elapsedTime = elapsed.map(_._1)
         val totalWordCount = totalSrcWordCount + totalTgtWordCount
         val meanGradientsNorm = totalGradientsNorm / elapsed.map(_._2).getOrElse(1)
