@@ -170,7 +170,7 @@ object RNNModel {
     ): Config[S, SS] = {
       new Config[S, SS](
         env, parameterManager, deviceManager, labelSmoothing, encoder, decoder, timeMajor, summarySteps,
-        checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor, trainBackTranslation)
+        checkpointSteps, trainBackTranslation, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)
     }
   }
 

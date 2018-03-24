@@ -7,11 +7,12 @@ sbt "mt/runMain org.platanios.symphony.mt.experiments.Experiment
   --data-dir temp/data
   --dataset iwslt15
   --language-pairs en:cs,en:de,en:fr,en:th,en:vi,en:zh
+  --use-back-translations
   --eval-datasets tst2013
   --eval-metrics bleu,hyp_len,ref_len,sen_cnt
   --tokenizer moses
   --cleaner moses
-  --vocabulary generated:20000
+  --vocabulary bpe:10000
   --batch-size 128
   --num-buckets 5
   --src-max-length 50
@@ -19,7 +20,7 @@ sbt "mt/runMain org.platanios.symphony.mt.experiments.Experiment
   --buffer-size 1024
   --model-arch bi_rnn:2:2
   --model-cell lstm:tanh
-  --model-type pairwise
+  --model-type hyper_lang
   --word-embed-size 512
   --lang-embed-size 8
   --residual

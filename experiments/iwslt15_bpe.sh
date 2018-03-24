@@ -11,7 +11,7 @@ sbt "mt/runMain org.platanios.symphony.mt.experiments.Experiment
   --eval-metrics bleu,hyp_len,ref_len,sen_cnt
   --tokenizer moses
   --cleaner moses
-  --vocabulary generated:20000
+  --vocabulary bpe:10000
   --batch-size 128
   --num-buckets 5
   --src-max-length 50
