@@ -35,14 +35,17 @@ trait ParallelDataset {
 
   def languages: Set[Language] = vocabulary.keySet
 
-  def languagePairs(includeReversed: Boolean = true): Set[(Language, Language)] = {
-    val pairs = languages.toSeq.combinations(2)
+  def languagePairs(
+      includeIdentity: Boolean = false,
+      includeReverse: Boolean = true
+  ): Set[(Language, Language)] = {
+    var pairs = languages.toSeq.combinations(2)
         .map(c => (c(0), c(1)))
-        .filter(p => p._1 != p._2)
-    if (includeReversed)
-      pairs.flatMap(p => Seq(p, (p._2, p._1))).toSet
-    else
-      pairs.toSet
+    if (!includeIdentity)
+      pairs = pairs.filter(p => p._1 != p._2)
+    if (includeReverse)
+      pairs = pairs.flatMap(p => Seq(p, (p._2, p._1)))
+    pairs.toSet
   }
 
   def isEmpty: Boolean

@@ -7,6 +7,7 @@ sbt "mt/runMain org.platanios.symphony.mt.experiments.Experiment
   --data-dir temp/data
   --dataset iwslt15
   --language-pairs en:cs,en:de,en:fr,en:th,en:vi,en:zh
+  --use-back-translations
   --eval-datasets dev2010,tst2011,tst2012,tst2013
   --eval-metrics bleu,hyp_len,ref_len,sen_cnt
   --tokenizer moses

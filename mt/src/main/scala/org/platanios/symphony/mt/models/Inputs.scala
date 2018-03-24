@@ -55,6 +55,7 @@ object Inputs {
       config: Model.Config,
       datasets: Seq[FileParallelDataset],
       languages: Seq[(Language, Vocabulary)],
+      includeBackTranslations: Boolean = false,
       repeat: Boolean = true,
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
@@ -66,7 +67,7 @@ object Inputs {
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))
         .filter(_.nonEmpty)
         .flatMap(d => {
-          val currentLanguagePairs = d.languagePairs()
+          val currentLanguagePairs = d.languagePairs(includeBackTranslations)
           languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(_ -> d)
         })
     val numParallelFiles = filteredDatasets.map(d => d._2.files(d._1._1).size).sum
@@ -110,8 +111,8 @@ object Inputs {
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
             (datasetName, () => tf.createWithNameScope(datasetName) {
               createTrainDataset(
-                dataConfig, config, Seq(dataset), languages, repeat = false, isEval = true,
-                languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
+                dataConfig, config, Seq(dataset), languages, includeBackTranslations = false, repeat = false,
+                isEval = true, languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
             })
         }
   }

@@ -68,6 +68,7 @@ case class ExperimentConfig(
     dataConfig: DataConfig = DataConfig(),
     dataset: String = "",
     languagePairs: Seq[(Language, Language)] = Seq.empty,
+    trainBackTranslation: Boolean = false,
     modelArchitecture: ModelArchitecture = BiRNN(),
     modelCell: String = "lstm:tanh",
     modelType: ModelType = Pairwise,
@@ -145,7 +146,7 @@ case class ExperimentConfig(
     }
 
     val model = modelArchitecture.model(
-      "Model", languages, dataConfig, env, parameterManager,
+      "Model", languages, dataConfig, env, parameterManager, trainBackTranslation,
       // Weird casting is necessary here to avoid compiling errors.
       modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
       summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
@@ -402,6 +403,11 @@ object ExperimentConfig {
           (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
         })))
         .text("Specifies the language pairs to use for the experiment. Example value: 'en:vi,en:de'.")
+
+    opt[Unit]("use-back-translations")
+        .action((_, c) => c.copy(trainBackTranslation = true))
+        .text("If used, back-translation data will be used while training " +
+            "(i.e., translating back and forth from a single language.")
 
     opt[Seq[String]]("eval-datasets").valueName("<name1>[,<name2>[...]]")
         .action((d, c) => c.copy(evalDatasetTags = d))

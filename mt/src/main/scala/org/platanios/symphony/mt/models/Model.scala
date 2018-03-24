@@ -121,8 +121,10 @@ abstract class Model[S] protected (
   }
 
   def train(datasets: Seq[FileParallelDataset], stopCriteria: StopCriteria): Unit = {
-    estimator.train(Inputs.createTrainDataset(
-      dataConfig, config, datasets, languages, repeat = true, isEval = false), stopCriteria)
+    estimator.train(
+      Inputs.createTrainDataset(
+        dataConfig, config, datasets, languages, config.trainBackTranslation, repeat = true, isEval = false),
+      stopCriteria)
   }
 
   def train(dataset: FileParallelDataset, stopCriteria: StopCriteria): Unit = {
@@ -336,7 +338,8 @@ object Model {
       val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
-      val checkpointSteps: Int)
+      val checkpointSteps: Int,
+      val trainBackTranslation: Boolean)
 
   object Config {
     def apply(
@@ -346,9 +349,12 @@ object Model {
         labelSmoothing: Float = 0.0f,
         timeMajor: Boolean = false,
         summarySteps: Int = 100,
-        checkpointSteps: Int = 1000
+        checkpointSteps: Int = 1000,
+        trainBackTranslation: Boolean = false
     ): Config = {
-      new Config(env, parameterManager, deviceManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps)
+      new Config(
+        env, parameterManager, deviceManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
+        trainBackTranslation)
     }
   }
 

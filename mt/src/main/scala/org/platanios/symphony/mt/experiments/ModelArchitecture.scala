@@ -37,6 +37,7 @@ sealed trait ModelArchitecture {
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
+      trainBackTranslation: Boolean,
       cellString: String,
       numUnits: Int,
       residual: Boolean,
@@ -55,10 +56,10 @@ sealed trait ModelArchitecture {
   ): RNNModel[_, _] = {
     val cell = cellFromString(cellString)
     createModel[cell.StateType, cell.StateShapeType](
-      name, languages, dataConfig, env, parameterManager, cell.asInstanceOf[Cell[cell.StateType, cell.StateShapeType]],
-      numUnits, residual, dropout, attention, labelSmoothing, summarySteps, checkpointSteps, beamWidth,
-      lengthPenaltyWeight, decoderMaxLengthFactor, optConfig, logConfig,
-      evalDatasets, evalMetrics)(cell.stateWhileLoopEvidence, cell.stateDropoutEvidence)
+      name, languages, dataConfig, env, parameterManager, trainBackTranslation,
+      cell.asInstanceOf[Cell[cell.StateType, cell.StateShapeType]], numUnits, residual, dropout, attention,
+      labelSmoothing, summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
+      optConfig, logConfig, evalDatasets, evalMetrics)(cell.stateWhileLoopEvidence, cell.stateDropoutEvidence)
   }
 
   protected def createModel[S, SS](
@@ -67,6 +68,7 @@ sealed trait ModelArchitecture {
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
+      trainBackTranslation: Boolean,
       cell: Cell[S, SS],
       numUnits: Int,
       residual: Boolean,
@@ -142,6 +144,7 @@ case class RNN(
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
+      trainBackTranslation: Boolean,
       cell: Cell[S, SS],
       numUnits: Int,
       residual: Boolean,
@@ -185,6 +188,7 @@ case class RNN(
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
+        trainBackTranslation = trainBackTranslation,
         beamWidth = beamWidth,
         lengthPenaltyWeight = lengthPenaltyWeight,
         decoderMaxLengthFactor = decoderMaxLengthFactor),
@@ -210,6 +214,7 @@ case class BiRNN(
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
+      trainBackTranslation: Boolean,
       cell: Cell[S, SS],
       numUnits: Int,
       residual: Boolean,
@@ -253,6 +258,7 @@ case class BiRNN(
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
+        trainBackTranslation = trainBackTranslation,
         beamWidth = beamWidth,
         lengthPenaltyWeight = lengthPenaltyWeight,
         decoderMaxLengthFactor = decoderMaxLengthFactor),
@@ -279,6 +285,7 @@ case class GNMT(
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
+      trainBackTranslation: Boolean,
       cell: Cell[S, SS],
       numUnits: Int,
       residual: Boolean,
@@ -323,6 +330,7 @@ case class GNMT(
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
+        trainBackTranslation = trainBackTranslation,
         beamWidth = beamWidth,
         lengthPenaltyWeight = lengthPenaltyWeight,
         decoderMaxLengthFactor = decoderMaxLengthFactor),
