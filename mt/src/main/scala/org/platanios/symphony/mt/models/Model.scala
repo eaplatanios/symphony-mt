@@ -17,6 +17,7 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
+import org.platanios.symphony.mt.evaluation
 import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
@@ -31,7 +32,7 @@ import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Op
 
 // TODO: Move embeddings initializer to the configuration.
 // TODO: Add support for optimizer schedules (e.g., Adam for first 1000 steps and then SGD with a different learning rate.
-// TODO: Customize evaluation metrics, hooks, etc.
+// TODO: Customize hooks.
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -43,7 +44,12 @@ abstract class Model[S] protected (
     val config: Model.Config,
     val optConfig: Model.OptConfig,
     val logConfig: Model.LogConfig = Model.LogConfig(),
-    val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty
+    val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
+    val evalMetrics: Seq[MTMetric] = Seq(
+      BLEU(),
+      SentenceLength(forHypothesis = true, name = "HypLen"),
+      SentenceLength(forHypothesis = false, name = "RefLen"),
+      SentenceCount(name = "#Sentences"))
 ) {
   /** Languages implicit used by evaluation metrics. */
   protected implicit val languagesImplicit: Seq[(Language, Vocabulary)] = languages
@@ -86,19 +92,11 @@ abstract class Model[S] protected (
     if (logConfig.logLossSteps > 0)
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
     if (logConfig.logEvalSteps > 0) {
-      var datasets = Seq.empty[(String, FileParallelDataset)]
-      for (datasetType <- Seq(Train, Dev, Test))
-        datasets ++= evalDatasets.map(d => (d._1, d._2.filterTypes(datasetType)))
-      datasets = datasets.filter(_._2.nonEmpty)
+      val datasets = evalDatasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
         hooks += tf.learn.Evaluator(
           log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages),
-          Seq(
-            BLEU(),
-            SentenceLength(forHypothesis = true, name = "HypLen"),
-            SentenceLength(forHypothesis = false, name = "RefLen"),
-            SentenceCount(name = "#Sentences")),
-          StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
+          evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
 
@@ -181,16 +179,47 @@ abstract class Model[S] protected (
 //      name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
 //      tensors = Map(srcLanguage._1 -> Seq(input))))
 //  }
-//
-//  def evaluate(
-//      datasets: Seq[(String, ParallelDataset)],
-//      metrics: Seq[MTMetric],
-//      maxSteps: Long = -1L,
-//      saveSummaries: Boolean = true,
-//      name: String = null
-//  ): Seq[Tensor] = {
-//    estimator.evaluate(Model.createEvalDatasets(datasets, languageIds), metrics, maxSteps, saveSummaries, name)
-//  }
+
+  def evaluate(
+      datasets: Seq[(String, FileParallelDataset)],
+      metrics: Seq[MTMetric] = evalMetrics,
+      maxSteps: Long = -1L,
+      log: Boolean = true,
+      saveSummaries: Boolean = true,
+      name: String = "Evaluation"
+  ): Seq[(String, (String, Tensor))] = {
+    val rowNames = datasets.map(_._1)
+    val firstColWidth = rowNames.map(_.length).max
+    val colWidth = math.max(metrics.map(_.name.length).max, 10)
+    if (log) {
+      evaluation.logger.info(s"Step $step $name:")
+      evaluation.logger.info(s"╔═${"═" * firstColWidth}═╤${metrics.map(_ => "═" * (colWidth + 2)).mkString("╤")}╗")
+      evaluation.logger.info(s"║ ${" " * firstColWidth} │${metrics.map(s" %${colWidth}s ".format(_)).mkString("│")}║")
+      evaluation.logger.info(s"╟─${"─" * firstColWidth}─┼${metrics.map(_ => "─" * (colWidth + 2)).mkString("┼")}╢")
+    }
+    val results = datasets.map(dataset => {
+      val evalDatasets = Inputs.createEvalDatasets(dataConfig, config, dataset.filter(_._2.nonEmpty), languages)
+      val values = estimator.evaluate(evalDatasets.map(_._2), metrics.map(_._2), maxSteps, saveSummaries, name)
+      if (log) {
+        val line = s"║ %${firstColWidth}s │".format(datasetName) + values.map(value => {
+          if (value.shape.rank == 0 && value.dataType.isFloatingPoint) {
+            val castedValue = value.cast(FLOAT32).scalar.asInstanceOf[Float]
+            s" %${colWidth}.4f ".format(castedValue)
+          } else if (value.shape.rank == 0 && value.dataType.isInteger) {
+            val castedValue = value.cast(INT64).scalar.asInstanceOf[Long]
+            s" %${colWidth}d ".format(castedValue)
+          } else {
+            s" %${colWidth}s ".format("Not Scalar")
+          }
+        }).mkString("│") + "║"
+        evaluation.logger.info(line)
+      }
+      dataset._1 -> metrics.map(_._1).zip(values)
+    })
+    if (log)
+      evaluation.logger.info(s"╚═${"═" * firstColWidth}═╧${metrics.map(_ => "═" * (colWidth + 2)).mkString("╧")}╝")
+    results
+  }
 
   protected def trainLayer: Layer[(TFBatchWithLanguages, TFBatch), TFBatchWithLanguage] = {
     new Layer[(TFBatchWithLanguages, TFBatch), TFBatchWithLanguage](name) {

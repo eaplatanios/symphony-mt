@@ -17,6 +17,7 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
+import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric, SentenceCount, SentenceLength}
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -34,7 +35,12 @@ class RNNModel[S, SS](
     override val config: RNNModel.Config[S, SS],
     override val optConfig: Model.OptConfig,
     override val logConfig : Model.LogConfig  = Model.LogConfig(),
-    override val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty
+    override val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
+    override val evalMetrics: Seq[MTMetric] = Seq(
+      BLEU(),
+      SentenceLength(forHypothesis = true, name = "HypLen"),
+      SentenceLength(forHypothesis = false, name = "RefLen"),
+      SentenceCount(name = "#Sentences"))
 )(implicit
     evS: WhileLoopVariable.Aux[S, SS],
     evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
@@ -106,12 +112,18 @@ object RNNModel {
       config: RNNModel.Config[S, SS],
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty
+      evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
+      evalMetrics: Seq[MTMetric] = Seq(
+        BLEU(),
+        SentenceLength(forHypothesis = true, name = "HypLen"),
+        SentenceLength(forHypothesis = false, name = "RefLen"),
+        SentenceCount(name = "#Sentences"))
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): RNNModel[S, SS] = {
-    new RNNModel[S, SS](name, languages, dataConfig, config, optConfig, logConfig, evalDatasets)(evS, evSDropout)
+    new RNNModel[S, SS](
+      name, languages, dataConfig, config, optConfig, logConfig, evalDatasets, evalMetrics)(evS, evSDropout)
   }
 
   class Config[S, SS] protected(

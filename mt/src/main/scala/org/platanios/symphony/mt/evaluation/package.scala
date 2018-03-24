@@ -18,9 +18,14 @@ package org.platanios.symphony.mt
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.metrics.Metric
 
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 package object evaluation {
+  private[mt] val logger = Logger(LoggerFactory.getLogger("Evaluation"))
+
   trait MTMetric extends Metric[((Output, Output, Output), (Output, Output)), Output]
 }

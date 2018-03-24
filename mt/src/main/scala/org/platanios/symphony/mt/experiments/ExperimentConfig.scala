@@ -19,8 +19,8 @@ import org.platanios.symphony.mt.{Environment, Language, experiments}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders._
 import org.platanios.symphony.mt.data.processors._
+import org.platanios.symphony.mt.evaluation.{BLEU, MTMetric, SentenceCount, SentenceLength}
 import org.platanios.symphony.mt.models._
-import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.vocabulary._
 import org.platanios.tensorflow.api._
 
@@ -88,7 +88,8 @@ case class ExperimentConfig(
     optString: String = "gd:1.0",
     optConfig: Model.OptConfig = Model.OptConfig(),
     logConfig: Model.LogConfig = Model.LogConfig(),
-    evalDatasetTags: Seq[String] = Seq.empty
+    evalDatasetTags: Seq[String] = Seq.empty,
+    evalMetrics: Seq[MTMetric] = Seq.empty
 ) {
   lazy val (datasets, languages) = {
     experiments.loadDatasets(dataset match {
@@ -117,30 +118,35 @@ case class ExperimentConfig(
         .addAppender(fileAppender)
   }
 
-  def run(): Unit = task match {
-    case ExperimentConfig.Train =>
-      val env = this.env.copy(workingDir = workingDir)
-      val parameterManager = modelType.getParametersManager(languageEmbeddingsSize, wordEmbeddingsSize)
+  def run(): Unit = {
+    val env = this.env.copy(workingDir = workingDir)
+    val parameterManager = modelType.getParametersManager(languageEmbeddingsSize, wordEmbeddingsSize)
 
-      val evalTags = dataset match {
-        case "iwslt14" => evalDatasetTags.map(tag => (s"IWSLT-14/$tag", IWSLT14Loader.Tag.fromName(tag)))
-        case "iwslt15" => evalDatasetTags.map(tag => (s"IWSLT-15/$tag", IWSLT15Loader.Tag.fromName(tag)))
-        case "iwslt16" => evalDatasetTags.map(tag => (s"IWSLT-16/$tag", IWSLT16Loader.Tag.fromName(tag)))
-        case "wmt16" => evalDatasetTags.map(tag => (s"WMT-16/$tag", WMT16Loader.Tag.fromName(tag)))
-      }
+    val evalDatasets = task match {
+      case ExperimentConfig.Train | ExperimentConfig.Evaluate =>
+        val evalTags = dataset match {
+          case "iwslt14" => evalDatasetTags.map(tag => (s"IWSLT-14/$tag", IWSLT14Loader.Tag.fromName(tag)))
+          case "iwslt15" => evalDatasetTags.map(tag => (s"IWSLT-15/$tag", IWSLT15Loader.Tag.fromName(tag)))
+          case "iwslt16" => evalDatasetTags.map(tag => (s"IWSLT-16/$tag", IWSLT16Loader.Tag.fromName(tag)))
+          case "wmt16" => evalDatasetTags.map(tag => (s"WMT-16/$tag", WMT16Loader.Tag.fromName(tag)))
+        }
+        evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2))))
+      case ExperimentConfig.Translate => Seq.empty
+    }
 
-      val evalDatasets = evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2))))
+    val model = modelArchitecture.model(
+      "Model", languages, dataConfig, env, parameterManager,
+      // Weird casting is necessary here to avoid compiling errors.
+      modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
+      summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
+      optConfig, logConfig, evalDatasets, evalMetrics)
 
-      val model = modelArchitecture.model(
-        "Model", languages, dataConfig, env, parameterManager,
-        // Weird casting is necessary here to avoid compiling errors.
-        modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
-        summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
-        optConfig, logConfig, evalDatasets)
-
-      model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(numSteps))
-    case ExperimentConfig.Translate => ???
-    case ExperimentConfig.Evaluate => ???
+    task match {
+      case ExperimentConfig.Train =>
+        model.train(datasets.map(_.filterTypes(Train)), tf.learn.StopCriteria.steps(numSteps))
+      case ExperimentConfig.Translate => ???
+      case ExperimentConfig.Evaluate => model.evaluate(evalDatasets)
+    }
   }
 
   def logSummary(): Unit = task match {
@@ -150,7 +156,12 @@ case class ExperimentConfig(
         "Dataset" -> Seq(
           "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
           "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").mkString(", "),
-          "Evaluation Tags" -> evalDatasetTags.mkString(", ")),
+          "Evaluation Tags" -> evalDatasetTags.mkString(", "),
+          "Evaluation Metrics" -> evalMetrics.map {
+            case m: BLEU => s"${m.name}: BLEU(${m.maxOrder}, smooth = ${m.smooth})"
+            case m: SentenceLength => s"${m.name}: ${if (m.forHypothesis) "Hyp" else "Ref"}SentenceLength"
+            case m: SentenceCount => s"${m.name}: SentenceCount"
+          }.mkString(", ")),
         "Model" -> {
           Seq(
             "Architecture" -> modelArchitecture.toString,
@@ -349,6 +360,20 @@ object ExperimentConfig {
         case Array(name, learningRate) if name == "yf" =>
           tf.train.YellowFin(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid optimizer.")
+      }
+    })
+  }
+
+  implicit val metricRead: scopt.Read[MTMetric] = {
+    scopt.Read.reads(value => {
+      value.split(":") match {
+        case Array(name) if name == "bleu" => BLEU()
+        case Array(name, maxOrder) if name == "bleu" => BLEU(maxOrder.toInt)
+        case Array(name, maxOrder, smooth) if name == "bleu" => BLEU(maxOrder.toInt, smooth.toBoolean)
+        case Array(name) if name == "hyp_len" => SentenceLength(forHypothesis = true, name = "HypLen")
+        case Array(name) if name == "ref_len" => SentenceLength(forHypothesis = false, name = "RefLen")
+        case Array(name) if name == "sen_cnt" => SentenceCount(name = "#Sentences")
+        case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid metric.")
       }
     })
   }
