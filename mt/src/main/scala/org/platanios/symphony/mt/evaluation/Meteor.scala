@@ -28,6 +28,7 @@ import edu.cmu.meteor.scorer.MeteorScorer
 import edu.cmu.meteor.scorer.MeteorStats
 
 import scala.collection.JavaConverters._
+import scala.collection.concurrent
 
 /** Contains methods for computing the Meteor score for pairs of sequences.
   *
@@ -49,21 +50,25 @@ class Meteor protected (
     val resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
     override val name: String = "Meteor"
 )(implicit languages: Seq[(Language, Vocabulary)]) extends MTMetric {
+  protected val meteorScorerCache: concurrent.Map[Language, MeteorScorer] = concurrent.TrieMap.empty
+
   // TODO: Add support for more Meteor configuration options.
   // TODO: Do not ignore the weights.
 
-  protected def getMeteorConfiguration(language: Language): MeteorConfiguration = {
-    val meteorConfiguration = new MeteorConfiguration()
-    meteorConfiguration.setLanguage(language.abbreviation)
-    if (normalize && ignorePunctuation)
-      meteorConfiguration.setNormalization(3)
-    else if (normalize)
-      meteorConfiguration.setNormalization(2)
-    else if (ignoreCase)
-      meteorConfiguration.setNormalization(1)
-    else
-      meteorConfiguration.setNormalization(0)
-    meteorConfiguration
+  protected def getMeteorScorer(language: Language): MeteorScorer = {
+    meteorScorerCache.getOrElseUpdate(language, {
+      val meteorConfiguration = new MeteorConfiguration()
+      meteorConfiguration.setLanguage(language.abbreviation)
+      if (normalize && ignorePunctuation)
+        meteorConfiguration.setNormalization(3)
+      else if (normalize)
+        meteorConfiguration.setNormalization(2)
+      else if (ignoreCase)
+        meteorConfiguration.setNormalization(1)
+      else
+        meteorConfiguration.setNormalization(0)
+      new MeteorScorer(meteorConfiguration)
+    })
   }
 
   private[this] def statistics(batch: Seq[Tensor]): Tensor = {
@@ -85,8 +90,7 @@ class Meteor protected (
         languages(language)._2.decodeSequence(seq)
     }
 
-    val meteorConfiguration = getMeteorConfiguration(languages(language)._1)
-    val meteorScorer = new MeteorScorer(meteorConfiguration)
+    val meteorScorer = getMeteorScorer(languages(language)._1)
     val meteorStats = new MeteorStats()
     hypSeq.zip(refSeq).foreach(pair => {
       meteorStats.addStats(meteorScorer.getMeteorStats(
@@ -100,8 +104,7 @@ class Meteor protected (
   protected[Meteor] def score(statistics: Seq[Tensor]): Tensor = {
     val language = statistics(0).scalar.asInstanceOf[Int]
     val meteorStats = Meteor.toMeteorStats(statistics(1))
-    val meteorConfiguration = getMeteorConfiguration(languages(language)._1)
-    val meteorScorer = new MeteorScorer(meteorConfiguration)
+    val meteorScorer = getMeteorScorer(languages(language)._1)
     meteorScorer.computeMetrics(meteorStats)
     meteorStats.score.toFloat
   }
