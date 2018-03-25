@@ -93,7 +93,9 @@ lazy val mt = (project in file("./mt"))
         "com.github.scopt" %% "scopt" % "3.7.0"),
       unmanagedResourceDirectories in Compile += baseDirectory.value / "lib",
       unmanagedResourceDirectories in Test += baseDirectory.value / "lib",
-      unmanagedJars in Compile += baseDirectory.value / "lib" / "meteor-1.5.jar")
+      unmanagedJars in Compile ++= Seq(
+        baseDirectory.value / "lib" / "meteor-1.5.jar",
+        baseDirectory.value / "lib" / "tercom-0.10.0.jar"))
 
 lazy val noPublishSettings = Seq(
   publish := Unit,

@@ -40,6 +40,7 @@ class RNNModel[S, SS](
     override val evalMetrics: Seq[MTMetric] = Seq(
       BLEU()(languages),
       Meteor()(languages),
+      TER()(languages),
       SentenceLength(forHypothesis = true, name = "HypLen"),
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences"))
@@ -121,6 +122,7 @@ object RNNModel {
       evalMetrics: Seq[MTMetric] = Seq(
         BLEU()(languages),
         Meteor()(languages),
+        TER()(languages),
         SentenceLength(forHypothesis = true, name = "HypLen"),
         SentenceLength(forHypothesis = false, name = "RefLen"),
         SentenceCount(name = "#Sentences"))

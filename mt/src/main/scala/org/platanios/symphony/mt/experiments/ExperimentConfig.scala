@@ -107,6 +107,7 @@ case class ExperimentConfig(
       case Array(name, maxOrder) if name == "bleu" => BLEU(maxOrder.toInt)(languages)
       case Array(name, maxOrder, smooth) if name == "bleu" => BLEU(maxOrder.toInt, smooth.toBoolean)(languages)
       case Array(name) if name == "meteor" => Meteor()(languages)
+      case Array(name) if name == "ter" => TER()(languages)
       case Array(name) if name == "hyp_len" => SentenceLength(forHypothesis = true, name = "HypLen")
       case Array(name) if name == "ref_len" => SentenceLength(forHypothesis = false, name = "RefLen")
       case Array(name) if name == "sen_cnt" => SentenceCount(name = "#Sentences")

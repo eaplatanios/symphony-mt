@@ -49,6 +49,7 @@ abstract class Model[S] protected (
     val evalMetrics: Seq[MTMetric] = Seq(
       BLEU()(languages),
       Meteor()(languages),
+      TER()(languages),
       SentenceLength(forHypothesis = true, name = "HypLen"),
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences"))
