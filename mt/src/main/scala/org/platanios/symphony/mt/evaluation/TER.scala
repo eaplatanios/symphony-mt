@@ -108,7 +108,7 @@ class TER protected (
     tf.createWithNameScope(name, ops) {
       val _counts = tf.callback(
         counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(FLOAT32, FLOAT32), stateful = false)
-      tf.divide(_counts(0), _counts(1), name = "Value")
+      100 * tf.divide(_counts(0), _counts(1), name = "Value")
     }
   }
 
@@ -129,8 +129,8 @@ class TER protected (
           counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(FLOAT32, FLOAT32), stateful = false)
         val updateTotalEdits = totalEdits.assignAdd(_counts(0))
         val updateTotalWords = totalWords.assignAdd(_counts(1))
-        val value = tf.divide(totalEdits.value, totalWords.value, name = "Value")
-        val update = tf.divide(updateTotalEdits, updateTotalWords, name = "Update")
+        val value = 100 * tf.divide(totalEdits.value, totalWords.value, name = "Value")
+        val update = 100 * tf.divide(updateTotalEdits, updateTotalWords, name = "Update")
         val reset = tf.group(Set(totalEdits.initializer, totalWords.initializer), name = "Reset")
         valuesCollections.foreach(tf.currentGraph.addToCollection(value, _))
         updatesCollections.foreach(tf.currentGraph.addToCollection(update, _))
