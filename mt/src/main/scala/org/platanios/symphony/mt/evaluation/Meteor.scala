@@ -115,9 +115,9 @@ class Meteor protected (
         case Some(meteorScorer) =>
           meteorScorer.computeMetrics(stats)
           100 * stats.score.toFloat
-        case None => Float.NegativeInfinity
+        case None => Float.NaN
       }
-      case None => Float.NegativeInfinity
+      case None => Float.NaN
     }
   }
 
