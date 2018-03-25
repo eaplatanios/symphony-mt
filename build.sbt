@@ -91,6 +91,8 @@ lazy val mt = (project in file("./mt"))
         "com.github.pathikrit" %% "better-files" % "3.4.0",
         "org.apache.commons" % "commons-compress" % "1.16.1",
         "com.github.scopt" %% "scopt" % "3.7.0"),
+      unmanagedResourceDirectories in Compile += baseDirectory.value / "lib",
+      unmanagedResourceDirectories in Test += baseDirectory.value / "lib",
       unmanagedJars in Compile += baseDirectory.value / "lib" / "meteor-1.5.jar")
 
 lazy val noPublishSettings = Seq(
