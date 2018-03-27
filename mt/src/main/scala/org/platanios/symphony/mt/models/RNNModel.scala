@@ -60,7 +60,7 @@ class RNNModel[S, SS](
     implicit val stage: Stage = Encoding
 
     val maxDecodingLength = {
-      if (dataConfig.tgtMaxLength != -1)
+      if (!mode.isTraining && dataConfig.tgtMaxLength != -1)
         tf.constant(dataConfig.tgtMaxLength)
       else
         tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT32)
