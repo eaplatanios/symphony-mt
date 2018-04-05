@@ -146,13 +146,14 @@ object RNNModel {
       override val summarySteps: Int,
       override val checkpointSteps: Int,
       override val trainBackTranslation: Boolean,
+      override val languagePairs: Set[(Language, Language)],
       // Inference
       val beamWidth: Int,
       val lengthPenaltyWeight: Float,
       val decoderMaxLengthFactor: Float
   ) extends Model.Config(
     env, parameterManager, deviceManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
-    trainBackTranslation)
+    trainBackTranslation, languagePairs)
 
   object Config {
     def apply[S, SS](
@@ -167,6 +168,7 @@ object RNNModel {
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000,
         trainBackTranslation: Boolean = false,
+        languagePairs: Set[(Language, Language)] = Set.empty,
         // Inference
         beamWidth: Int = 10,
         lengthPenaltyWeight: Float = 0.0f,
@@ -174,7 +176,7 @@ object RNNModel {
     ): Config[S, SS] = {
       new Config[S, SS](
         env, parameterManager, deviceManager, labelSmoothing, encoder, decoder, timeMajor, summarySteps,
-        checkpointSteps, trainBackTranslation, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)
+        checkpointSteps, trainBackTranslation, languagePairs, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor)
     }
   }
 

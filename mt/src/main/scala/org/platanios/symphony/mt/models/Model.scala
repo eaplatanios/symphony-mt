@@ -123,9 +123,11 @@ abstract class Model[S] protected (
   }
 
   def train(datasets: Seq[FileParallelDataset], stopCriteria: StopCriteria): Unit = {
+    val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
     estimator.train(
       Inputs.createTrainDataset(
-        dataConfig, config, datasets, languages, config.trainBackTranslation, repeat = true, isEval = false),
+        dataConfig, config, datasets, languages, config.trainBackTranslation, repeat = true, isEval = false,
+        languagePairs = languagePairs),
       stopCriteria)
   }
 
@@ -341,7 +343,9 @@ object Model {
       val timeMajor: Boolean,
       val summarySteps: Int,
       val checkpointSteps: Int,
-      val trainBackTranslation: Boolean)
+      val trainBackTranslation: Boolean,
+      // The following is to allow training in one direction only (for a language pair).
+      val languagePairs: Set[(Language, Language)])
 
   object Config {
     def apply(
@@ -352,11 +356,12 @@ object Model {
         timeMajor: Boolean = false,
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000,
-        trainBackTranslation: Boolean = false
+        trainBackTranslation: Boolean = false,
+        languagePairs: Set[(Language, Language)] = Set.empty
     ): Config = {
       new Config(
         env, parameterManager, deviceManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
-        trainBackTranslation)
+        trainBackTranslation, languagePairs)
     }
   }
 

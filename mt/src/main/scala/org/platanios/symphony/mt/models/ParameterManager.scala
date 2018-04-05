@@ -366,7 +366,7 @@ class LanguageEmbeddingsParameterManager protected (
       val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
 
       def create(): Output = tf.createWithVariableScope(name) {
-        var language = stage match {
+        val language = stage match {
           case Encoding => context.get._1
           case Decoding => context.get._2
         }

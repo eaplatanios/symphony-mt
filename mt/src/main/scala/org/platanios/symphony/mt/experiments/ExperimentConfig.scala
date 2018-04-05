@@ -43,6 +43,8 @@ import java.nio.file.{Path, Paths}
   * @param dataConfig
   * @param dataset
   * @param languagePairs
+  * @param trainBothDirections
+  * @param trainBackTranslation
   * @param modelArchitecture
   * @param modelCell
   * @param modelType
@@ -70,6 +72,7 @@ case class ExperimentConfig(
     dataConfig: DataConfig = DataConfig(),
     dataset: String = "",
     languagePairs: Seq[(Language, Language)] = Seq.empty,
+    trainBothDirections: Boolean = true,
     trainBackTranslation: Boolean = false,
     modelArchitecture: ModelArchitecture = BiRNN(),
     modelCell: String = "lstm:tanh",
@@ -149,8 +152,11 @@ case class ExperimentConfig(
       case ExperimentConfig.Translate => Seq.empty
     }
 
+    val trainBackTranslation = if (!trainBothDirections) false else this.trainBackTranslation
+    val languagePairs = if (trainBothDirections) Set.empty[(Language, Language)] else this.languagePairs.toSet
+
     val model = modelArchitecture.model(
-      "Model", languages, dataConfig, env, parameterManager, trainBackTranslation,
+      "Model", languages, dataConfig, env, parameterManager, trainBackTranslation, languagePairs,
       // Weird casting is necessary here to avoid compiling errors.
       modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
       summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
@@ -177,6 +183,7 @@ case class ExperimentConfig(
       "Dataset" -> Seq(
         "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
         "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").mkString(", "),
+        "Both Directions" -> trainBothDirections.toString,
         "Evaluation Tags" -> evalDatasetTags.mkString(", "),
         "Evaluation Metrics" -> evalMetrics.mkString(", ")),
       "Model" -> {
@@ -201,6 +208,7 @@ case class ExperimentConfig(
         } ++ Seq(
           "Dropout" -> dropout.map(_.toString).getOrElse("Not Used"),
           "Label Smoothing" -> labelSmoothing.toString,
+          "Back-translation" -> trainBackTranslation,
           "Beam Width" -> beamWidth.toString,
           "Length Penalty Weight" -> lengthPenaltyWeight.toString,
           "Decoding Max Length Factor" -> decoderMaxLengthFactor.toString,
@@ -407,6 +415,11 @@ object ExperimentConfig {
           (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
         })))
         .text("Specifies the language pairs to use for the experiment. Example value: 'en:vi,en:de'.")
+
+    opt[Unit]("only-forward")
+        .action((_, c) => c.copy(trainBothDirections = false))
+        .text("If used, the model will be trained and evaluated only on " +
+            "forward translation for the provided language pairs.")
 
     opt[Unit]("use-back-translations")
         .action((_, c) => c.copy(trainBackTranslation = true))

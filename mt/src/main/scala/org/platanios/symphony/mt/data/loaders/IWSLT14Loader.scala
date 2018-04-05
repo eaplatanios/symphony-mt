@@ -55,6 +55,7 @@ class IWSLT14Loader(
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
   override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
+    // TODO: !!! [DATA] Some of the tags are not supported for all language pairs.
     datasetType match {
       case Train => Seq((IWSLT14Loader.Train,
           File(downloadsDir) / directoryName / directoryName / s"train.tags.$directoryName.$src",
