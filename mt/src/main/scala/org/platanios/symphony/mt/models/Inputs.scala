@@ -101,11 +101,15 @@ object Inputs {
       dataConfig: DataConfig,
       config: Model.Config,
       datasets: Seq[(String, FileParallelDataset)],
-      languages: Seq[(Language, Vocabulary)]
+      languages: Seq[(Language, Vocabulary)],
+      languagePairs: Option[Set[(Language, Language)]] = None
   ): Seq[(String, () => TFTrainDataset)] = {
     datasets
         .map(d => (d._1, d._2.filterLanguages(languages.map(_._1): _*)))
-        .flatMap(d => d._2.languagePairs().map(l => (d._1, l) -> d._2))
+        .flatMap(d => {
+          val currentLanguagePairs = d._2.languagePairs()
+          languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(l => (d._1, l) -> d._2)
+        })
         .map {
           case ((name, (srcLanguage, tgtLanguage)), dataset) =>
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"

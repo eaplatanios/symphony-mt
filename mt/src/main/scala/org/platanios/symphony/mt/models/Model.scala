@@ -87,10 +87,11 @@ abstract class Model[S] protected (
     if (logConfig.logLossSteps > 0)
       hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
     if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
+      val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
       val datasets = evalDatasets.filter(_._2.nonEmpty)
       if (datasets.nonEmpty) {
         hooks += tf.learn.Evaluator(
-          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages),
+          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs),
           evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
       }
     }
@@ -195,7 +196,9 @@ abstract class Model[S] protected (
       evaluation.logger.info(s"║ ${" " * firstColWidth} │${metrics.map(s" %${colWidth}s ".format(_)).mkString("│")}║")
       evaluation.logger.info(s"╟─${"─" * firstColWidth}─┼${metrics.map(_ => "─" * (colWidth + 2)).mkString("┼")}╢")
     }
-    val evalDatasets = Inputs.createEvalDatasets(dataConfig, config, datasets.filter(_._2.nonEmpty), languages)
+    val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
+    val evalDatasets = Inputs.createEvalDatasets(
+      dataConfig, config, datasets.filter(_._2.nonEmpty), languages, languagePairs)
     val results = evalDatasets.map(dataset => {
       val values = estimator.evaluate(dataset._2, metrics, maxSteps, saveSummaries, name)
       if (log) {
