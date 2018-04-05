@@ -208,7 +208,7 @@ case class ExperimentConfig(
         } ++ Seq(
           "Dropout" -> dropout.map(_.toString).getOrElse("Not Used"),
           "Label Smoothing" -> labelSmoothing.toString,
-          "Back-translation" -> trainBackTranslation,
+          "Back-translation" -> trainBackTranslation.toString,
           "Beam Width" -> beamWidth.toString,
           "Length Penalty Weight" -> lengthPenaltyWeight.toString,
           "Decoding Max Length Factor" -> decoderMaxLengthFactor.toString,
