@@ -238,6 +238,7 @@ case class ExperimentConfig(
         "Cleaner" -> dataConfig.cleaner.toString,
         "Vocabulary" -> dataConfig.vocabulary.toString,
         "" -> "", // This acts as a separator to help improve readability of the table.
+        "Percent Parallel" -> (dataConfig.parallelPortion * 100).toInt.toString,
         "Train Batch Size" -> dataConfig.trainBatchSize.toString,
         "Inference Batch Size" -> dataConfig.inferBatchSize.toString,
         "Evaluation Batch Size" -> dataConfig.evaluateBatchSize.toString,
@@ -268,6 +269,8 @@ case class ExperimentConfig(
   override def toString: String = {
     val stringBuilder = new StringBuilder(s"$dataset")
     stringBuilder.append(s".${languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").mkString(".")}")
+    stringBuilder.append(s".both:$trainBothDirections")
+    stringBuilder.append(s".back:$trainBackTranslation")
     stringBuilder.append(s".$modelArchitecture")
     stringBuilder.append(s".$modelCell")
     stringBuilder.append(s".$modelType")
@@ -283,6 +286,7 @@ case class ExperimentConfig(
     stringBuilder.append(s".${dataConfig.tokenizer}")
     stringBuilder.append(s".${dataConfig.cleaner}")
     stringBuilder.append(s".${dataConfig.vocabulary}")
+    stringBuilder.append(s".pp:${(dataConfig.parallelPortion * 100).toInt}")
     stringBuilder.append(s".bs:${dataConfig.trainBatchSize}")
     stringBuilder.append(s".nb:${dataConfig.numBuckets}")
     stringBuilder.append(s".sml:${dataConfig.srcMaxLength}")
@@ -425,6 +429,10 @@ object ExperimentConfig {
         .action((_, c) => c.copy(trainBackTranslation = true))
         .text("If used, back-translation data will be used while training " +
             "(i.e., translating back and forth from a single language.")
+
+    opt[Int]("percent-parallel").valueName("<number>")
+        .action((d, c) => c.copy(dataConfig = c.dataConfig.copy(parallelPortion = d / 100.0f)))
+        .text("Specifies the percentage of parallel data to use.")
 
     opt[Seq[String]]("eval-datasets").valueName("<name1>[,<name2>[...]]")
         .action((d, c) => c.copy(evalDatasetTags = d))

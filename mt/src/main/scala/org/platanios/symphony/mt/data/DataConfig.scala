@@ -31,6 +31,7 @@ case class DataConfig(
     cleaner: Cleaner = MosesCleaner(),
     vocabulary: DatasetVocabulary = GeneratedVocabulary(SimpleVocabularyGenerator(50000, -1, bufferSize = 8192)),
     // Corpus
+    parallelPortion: Float = 1.0f,
     trainBatchSize: Long = 128,
     inferBatchSize: Long = 32,
     evaluateBatchSize: Long = 32,

@@ -20,6 +20,8 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
+import java.nio.charset.StandardCharsets
+
 // TODO: Sample files with probability proportional to their size.
 
 /**
@@ -76,25 +78,32 @@ object Inputs {
     val filesDataset = filteredDatasets
         .map {
           case ((srcLanguage, tgtLanguage), dataset) =>
-            val srcFiles = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString())
-            val tgtFiles = dataset.files(tgtLanguage).map(_.path.toAbsolutePath.toString())
+            val srcFiles = dataset.files(srcLanguage)
+            val tgtFiles = dataset.files(tgtLanguage)
+            val srcLengths = srcFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
+            val tgtLengths = tgtFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
             val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor).repeat()
             val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor).repeat()
-            val srcFilesDataset = tf.data.TensorSlicesDataset(srcFiles: Tensor)
-            val tgtFilesDataset = tf.data.TensorSlicesDataset(tgtFiles: Tensor)
-            srcLanguageDataset.zip(tgtLanguageDataset).zip(srcFilesDataset.zip(tgtFilesDataset)).map(
-              d => (d._1._1, d._1._2, d._2._1, d._2._2),
+            val srcFilesDataset = tf.data.TensorSlicesDataset(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor)
+            val tgtFilesDataset = tf.data.TensorSlicesDataset(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor)
+            val srcLengthsDataset = tf.data.TensorSlicesDataset(srcLengths: Tensor)
+            val tgtLengthsDataset = tf.data.TensorSlicesDataset(tgtLengths: Tensor)
+            srcLanguageDataset.zip(tgtLanguageDataset)
+                .zip(srcFilesDataset.zip(tgtFilesDataset))
+                .zip(srcLengthsDataset.zip(tgtLengthsDataset)).map(
+              d => (d._1._1._1, d._1._1._2, d._1._2._1, d._1._2._2, d._2._1, d._2._2),
               name = "AddLanguageIDs")
         }.reduce((d1, d2) => d1.concatenate(d2))
 
-    val parallelDatasetCreator: (Output, Output, Output, Output) => TFTrainDataset =
+    val parallelDatasetCreator: (Output, Output, Output, Output, Output, Output) => TFTrainDataset =
       createSingleParallelDataset(dataConfig, config, repeat, isEval)
 
     filesDataset
         .shuffle(numParallelFiles)
         .parallelInterleave(
-          d => parallelDatasetCreator(d._1, d._2, d._3, d._4), cycleLength = numParallelFiles, sloppy = false,
-          bufferOutputElements = bufferSize, prefetchInputElements = numParallelFiles, name = "Interleave")
+          d => parallelDatasetCreator(d._1, d._2, d._3, d._4, d._5, d._6), cycleLength = numParallelFiles,
+          sloppy = true, bufferOutputElements = bufferSize, prefetchInputElements = numParallelFiles,
+          name = "Interleave")
   }
 
   def createEvalDatasets(
@@ -172,7 +181,9 @@ object Inputs {
       srcLanguage: Output,
       tgtLanguage: Output,
       srcFile: Output,
-      tgtFile: Output
+      tgtFile: Output,
+      srcLength: Output,
+      tgtLength: Output
   ): TFTrainDataset = {
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
     val bufferSize = if (dataConfig.bufferSize == -1L) 64L * batchSize else dataConfig.bufferSize
@@ -195,8 +206,11 @@ object Inputs {
                 (tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar().toOutput())))))
     }
 
+    // TODO: We currently do not use `tgtLength`, but it may be useful for invalid dataset checks.
+
     val datasetBeforeBucketing =
-      srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset))
+      srcLanguageDataset.zip(tgtLanguageDataset)
+          .zip(srcDataset.zip(tgtDataset).take((srcLength * dataConfig.parallelPortion).floor.cast(INT64)))
           .shard(dataConfig.numShards, dataConfig.shardIndex)
           .transform(d => {
             if (repeat)
