@@ -69,7 +69,9 @@ object Inputs {
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))
         .filter(_.nonEmpty)
         .flatMap(d => {
-          val currentLanguagePairs = d.languagePairs(includeBackTranslations)
+          var currentLanguagePairs = d.languagePairs(includeBackTranslations)
+          if (dataConfig.parallelPortion == 0.0f)
+            currentLanguagePairs = currentLanguagePairs.filter(p => p._1 == p._2)
           languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(_ -> d)
         })
     val numParallelFiles = filteredDatasets.map(d => d._2.files(d._1._1).size).sum
@@ -210,7 +212,9 @@ object Inputs {
 
     val datasetBeforeBucketing =
       srcLanguageDataset.zip(tgtLanguageDataset)
-          .zip(srcDataset.zip(tgtDataset).take((srcLength * dataConfig.parallelPortion).floor.cast(INT64)))
+          .zip(srcDataset.zip(tgtDataset).take(tf.cond(srcLanguage.equal(tgtLanguage),
+            () => srcLength,
+            () => srcLength * dataConfig.parallelPortion).floor.cast(INT64)))
           .shard(dataConfig.numShards, dataConfig.shardIndex)
           .transform(d => {
             if (repeat)
