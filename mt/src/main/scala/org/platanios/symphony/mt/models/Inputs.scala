@@ -209,12 +209,14 @@ object Inputs {
     }
 
     // TODO: We currently do not use `tgtLength`, but it may be useful for invalid dataset checks.
+    var linesDatasets = srcDataset.zip(tgtDataset)
+    if (!isEval)
+      linesDatasets = linesDatasets.take(tf.cond(srcLanguage.equal(tgtLanguage),
+        () => srcLength,
+        () => srcLength * dataConfig.parallelPortion).floor.cast(INT64))
 
     val datasetBeforeBucketing =
-      srcLanguageDataset.zip(tgtLanguageDataset)
-          .zip(srcDataset.zip(tgtDataset).take(tf.cond(srcLanguage.equal(tgtLanguage),
-            () => srcLength,
-            () => srcLength * dataConfig.parallelPortion).floor.cast(INT64)))
+      srcLanguageDataset.zip(tgtLanguageDataset).zip(linesDatasets)
           .shard(dataConfig.numShards, dataConfig.shardIndex)
           .transform(d => {
             if (repeat)
