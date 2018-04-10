@@ -213,7 +213,7 @@ object Inputs {
     if (!isEval)
       linesDatasets = linesDatasets.take(tf.cond(srcLanguage.equal(tgtLanguage),
         () => srcLength.cast(INT64),
-        () => srcLength * dataConfig.parallelPortion).floor.cast(INT64))
+        () => (srcLength * dataConfig.parallelPortion).floor.cast(INT64)))
 
     val datasetBeforeBucketing =
       srcLanguageDataset.zip(tgtLanguageDataset).zip(linesDatasets)
