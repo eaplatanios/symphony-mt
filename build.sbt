@@ -18,8 +18,8 @@ import sbtrelease.Vcs
 
 import scala.sys.process.Process
 
-scalaVersion in ThisBuild := "2.12.4"
-crossScalaVersions in ThisBuild := Seq("2.11.11", "2.12.4")
+scalaVersion in ThisBuild := "2.12.5"
+crossScalaVersions in ThisBuild := Seq("2.11.11", "2.12.5")
 
 organization in ThisBuild := "org.platanios"
 
@@ -30,7 +30,7 @@ organization in ThisBuild := "org.platanios"
 // every 24 hours.
 resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
 
-val tensorFlowForScalaVersion = "0.1.2-SNAPSHOT"
+val tensorFlowForScalaVersion = "0.2.0-SNAPSHOT"
 
 autoCompilerPlugins in ThisBuild := true
 
