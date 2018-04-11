@@ -103,6 +103,9 @@ abstract class Model[S] protected (
       tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
       tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
 
+    env.traceSteps.foreach(numSteps =>
+      hooks += tf.learn.TimelineHook(summariesDir, trigger = StepHookTrigger(numSteps)))
+
     // Add TensorBoard hook.
     if (logConfig.launchTensorBoard)
       hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(

@@ -22,6 +22,7 @@ import java.nio.file.Path
   */
 case class Environment(
     workingDir: Path,
+    traceSteps: Option[Int] = None,
     allowSoftPlacement: Boolean = true,
     logDevicePlacement: Boolean = false,
     gpuAllowMemoryGrowth: Boolean = false,

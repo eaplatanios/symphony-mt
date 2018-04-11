@@ -257,6 +257,7 @@ case class ExperimentConfig(
         "Working Directory" -> env.workingDir.toString,
         "Number of GPUs" -> env.numGPUs.toString,
         "Random Seed" -> env.randomSeed.getOrElse("Not Set").toString,
+        "TF - Trace Steps" -> env.traceSteps.map(_.toString).getOrElse("Not Set"),
         "TF - Allow Soft Placement" -> env.allowSoftPlacement.toString,
         "TF - Log Device Placement" -> env.logDevicePlacement.toString,
         "TF - Allow GPU Memory Growth" -> env.gpuAllowMemoryGrowth.toString,
@@ -616,6 +617,10 @@ object ExperimentConfig {
     opt[String]("end-of-sequence-token").valueName("<word>")
         .action((d, c) => c.copy(dataConfig = c.dataConfig.copy(endOfSequenceToken = d)))
         .text("Specifies the token/word to use for representing the end of a sequence/sentence.")
+
+    opt[Int]("trace-steps").valueName("<number>")
+        .action((d, c) => c.copy(env = c.env.copy(traceSteps = Some(d))))
+        .text("Specifies the frequency (number of steps) of generating Chrome traces for profiling purposes.")
 
     opt[Unit]("disallow-soft-placement")
         .action((_, c) => c.copy(env = c.env.copy(allowSoftPlacement = false)))
