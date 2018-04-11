@@ -92,7 +92,8 @@ abstract class Model[S] protected (
       if (datasets.nonEmpty) {
         hooks += tf.learn.Evaluator(
           log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs),
-          evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, name = "Evaluation")
+          evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, numDecimalPoints = 6,
+          name = "Evaluation")
       }
     }
 
