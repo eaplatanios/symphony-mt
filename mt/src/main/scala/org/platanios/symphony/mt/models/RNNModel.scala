@@ -36,7 +36,7 @@ class RNNModel[S, SS](
     override val optConfig: Model.OptConfig,
     override val logConfig : Model.LogConfig  = Model.LogConfig()
 )(
-    override val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
+    override val evalDatasets: Seq[(String, FileParallelDataset, Float)] = Seq.empty,
     override val evalMetrics: Seq[MTMetric] = Seq(
       BLEU()(languages),
       Meteor()(languages),
@@ -118,7 +118,7 @@ object RNNModel {
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig
   )(
-      evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
+      evalDatasets: Seq[(String, FileParallelDataset, Float)] = Seq.empty,
       evalMetrics: Seq[MTMetric] = Seq(
         BLEU()(languages),
         Meteor()(languages),

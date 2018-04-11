@@ -52,7 +52,7 @@ sealed trait ModelArchitecture {
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   ): RNNModel[_, _] = {
     val cell = cellFromString(cellString)
@@ -84,7 +84,7 @@ sealed trait ModelArchitecture {
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
@@ -161,7 +161,7 @@ case class RNN(
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
@@ -233,7 +233,7 @@ case class BiRNN(
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],
@@ -306,7 +306,7 @@ case class GNMT(
       decoderMaxLengthFactor: Float,
       optConfig: Model.OptConfig,
       logConfig: Model.LogConfig,
-      evalDatasets: Seq[(String, FileParallelDataset)],
+      evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   )(implicit
       evS: WhileLoopVariable.Aux[S, SS],

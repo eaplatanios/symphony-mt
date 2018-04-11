@@ -92,7 +92,7 @@ case class ExperimentConfig(
     optString: String = "gd:1.0",
     optConfig: Model.OptConfig = Model.OptConfig(),
     logConfig: Model.LogConfig = Model.LogConfig(),
-    evalDatasetTags: Seq[String] = Seq.empty,
+    evalDatasetTags: Seq[(String, Float)] = Seq.empty,
     evalMetrics: Seq[String] = Seq("bleu", "meteor", "hyp_len", "ref_len", "sen_cnt")
 ) {
   lazy val (datasets, languages) = {
@@ -143,12 +143,12 @@ case class ExperimentConfig(
     val evalDatasets = task match {
       case ExperimentConfig.Train | ExperimentConfig.Evaluate =>
         val evalTags = dataset match {
-          case "iwslt14" => evalDatasetTags.map(tag => (s"IWSLT-14/$tag", IWSLT14Loader.Tag.fromName(tag)))
-          case "iwslt15" => evalDatasetTags.map(tag => (s"IWSLT-15/$tag", IWSLT15Loader.Tag.fromName(tag)))
-          case "iwslt16" => evalDatasetTags.map(tag => (s"IWSLT-16/$tag", IWSLT16Loader.Tag.fromName(tag)))
-          case "wmt16" => evalDatasetTags.map(tag => (s"WMT-16/$tag", WMT16Loader.Tag.fromName(tag)))
+          case "iwslt14" => evalDatasetTags.map(t => (s"IWSLT-14/${t._1}", IWSLT14Loader.Tag.fromName(t._1), t._2))
+          case "iwslt15" => evalDatasetTags.map(t => (s"IWSLT-15/${t._1}", IWSLT15Loader.Tag.fromName(t._1), t._2))
+          case "iwslt16" => evalDatasetTags.map(t => (s"IWSLT-16/${t._1}", IWSLT16Loader.Tag.fromName(t._1), t._2))
+          case "wmt16" => evalDatasetTags.map(t => (s"WMT-16/${t._1}", WMT16Loader.Tag.fromName(t._1), t._2))
         }
-        evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2))))
+        evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2), t._3)))
       case ExperimentConfig.Translate => Seq.empty
     }
 
@@ -430,13 +430,17 @@ object ExperimentConfig {
         .text("If used, back-translation data will be used while training " +
             "(i.e., translating back and forth from a single language.")
 
-    opt[Int]("percent-parallel").valueName("<number>")
-        .action((d, c) => c.copy(dataConfig = c.dataConfig.copy(parallelPortion = d / 100.0f)))
+    opt[Float]("parallel-portion").valueName("<number>")
+        .action((d, c) => c.copy(dataConfig = c.dataConfig.copy(parallelPortion = d)))
         .text("Specifies the percentage of parallel data to use.")
 
-    opt[Seq[String]]("eval-datasets").valueName("<name1>[,<name2>[...]]")
-        .action((d, c) => c.copy(evalDatasetTags = d))
-        .text("Specifies the datasets to use for evaluation while training. Example value: 'tst2012,tst2013'.")
+    opt[Seq[String]]("eval-datasets").valueName("<name1>:<parallelPortion>[,<name2>:<parallelPortion>[...]]")
+        .action((d, c) => c.copy(evalDatasetTags = d.map(d => {
+          val parts = d.split(":")
+          (parts(0), parts(1).toFloat)
+        })))
+        .text("Specifies the datasets to use for evaluation while training. " +
+            "Example value: 'tst2012:0.01,tst2013:1.00'.")
 
     opt[Seq[String]]("eval-metrics").valueName("<name1>[,<name2>[...]]")
         .action((d, c) => c.copy(evalMetrics = d))

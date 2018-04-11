@@ -111,23 +111,26 @@ object Inputs {
   def createEvalDatasets(
       dataConfig: DataConfig,
       config: Model.Config,
-      datasets: Seq[(String, FileParallelDataset)],
+      datasets: Seq[(String, FileParallelDataset, Float)],
       languages: Seq[(Language, Vocabulary)],
       languagePairs: Option[Set[(Language, Language)]] = None
   ): Seq[(String, () => TFTrainDataset)] = {
     datasets
-        .map(d => (d._1, d._2.filterLanguages(languages.map(_._1): _*)))
+        .map(d => (d._1, d._2.filterLanguages(languages.map(_._1): _*), d._3))
         .flatMap(d => {
           val currentLanguagePairs = d._2.languagePairs()
-          languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(l => (d._1, l) -> d._2)
+          languagePairs.getOrElse(currentLanguagePairs)
+              .intersect(currentLanguagePairs)
+              .map(l => (d._1, l, d._3) -> d._2)
         })
         .map {
-          case ((name, (srcLanguage, tgtLanguage)), dataset) =>
+          case ((name, (srcLanguage, tgtLanguage), parallelPortion), dataset) =>
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
             (datasetName, () => tf.createWithNameScope(datasetName) {
               createTrainDataset(
-                dataConfig, config, Seq(dataset), languages, includeBackTranslations = false, repeat = false,
-                isEval = true, languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
+                dataConfig.copy(parallelPortion = parallelPortion), config, Seq(dataset), languages,
+                includeBackTranslations = false, repeat = false, isEval = true,
+                languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
             })
         }
   }
@@ -209,14 +212,13 @@ object Inputs {
     }
 
     // TODO: We currently do not use `tgtLength`, but it may be useful for invalid dataset checks.
-    var linesDatasets = srcDataset.zip(tgtDataset)
-    if (!isEval)
-      linesDatasets = linesDatasets.take(tf.cond(srcLanguage.equal(tgtLanguage),
-        () => srcLength.cast(INT64),
-        () => (srcLength * dataConfig.parallelPortion).floor.cast(INT64)))
 
     val datasetBeforeBucketing =
-      srcLanguageDataset.zip(tgtLanguageDataset).zip(linesDatasets)
+      srcLanguageDataset.zip(tgtLanguageDataset)
+          .zip(srcDataset.zip(tgtDataset)
+              .take(tf.cond(srcLanguage.equal(tgtLanguage),
+                () => srcLength.cast(INT64),
+                () => (srcLength * dataConfig.parallelPortion).floor.cast(INT64))))
           .shard(dataConfig.numShards, dataConfig.shardIndex)
           .transform(d => {
             if (repeat)

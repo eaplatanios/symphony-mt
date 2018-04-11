@@ -45,7 +45,7 @@ abstract class Model[S] protected (
     val optConfig: Model.OptConfig,
     val logConfig: Model.LogConfig = Model.LogConfig()
 )(
-    val evalDatasets: Seq[(String, FileParallelDataset)] = Seq.empty,
+    val evalDatasets: Seq[(String, FileParallelDataset, Float)] = Seq.empty,
     val evalMetrics: Seq[MTMetric] = Seq(
       BLEU()(languages),
       Meteor()(languages),
@@ -181,7 +181,7 @@ abstract class Model[S] protected (
 //  }
 
   def evaluate(
-      datasets: Seq[(String, FileParallelDataset)],
+      datasets: Seq[(String, FileParallelDataset, Float)],
       metrics: Seq[MTMetric] = evalMetrics,
       maxSteps: Long = -1L,
       log: Boolean = true,
