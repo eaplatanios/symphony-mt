@@ -68,29 +68,29 @@ class ParameterManager protected (
   }
 
   def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
-    tf.createWithVariableScope("ParameterManager/") {
+    tf.createWithVariableScope("ParameterManager") {
       languageIds.keys.filter(_.isClosed).foreach(removeGraph)
       this.languages = languages
       val graph = currentGraph
       if (!languageIds.contains(graph)) {
-        languageIds += graph -> tf.createWithVariableScope("LanguageIDs/") {
+        languageIds += graph -> tf.createWithVariableScope("LanguageIDs") {
           languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = l._1.name))
         }
 
-        tf.createWithVariableScope("StringToIndexLookupTables/") {
+        tf.createWithVariableScope("StringToIndexLookupTables") {
           val tables = languages.map(l => l._2.stringToIndexLookupTable(name = l._1.name))
           stringToIndexLookupTables += graph -> tf.stack(tables.map(_.handle))
           stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID, INT64, name = "Default")
           tables
         }
 
-        tf.createWithVariableScope("IndexToStringLookupTables/") {
+        tf.createWithVariableScope("IndexToStringLookupTables") {
           val tables = languages.map(l => l._2.indexToStringLookupTable(name = l._1.name))
           indexToStringLookupTables += graph -> tf.stack(tables.map(_.handle))
           indexToStringLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN, STRING, name = "Default")
         }
 
-        wordEmbeddings += graph -> tf.createWithVariableScope("WordEmbeddings/") {
+        wordEmbeddings += graph -> tf.createWithVariableScope("WordEmbeddings") {
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           if (!mergedWordEmbeddings) {
             languages.map(l =>
@@ -109,7 +109,7 @@ class ParameterManager protected (
   }
 
   def stringToIndexLookup(languageId: Output): (Output) => Output = (keys: Output) => {
-    tf.createWithVariableScope("ParameterManager/StringToIndexLookupTables/") {
+    tf.createWithVariableScope("ParameterManager/StringToIndexLookupTables") {
       val graph = currentGraph
       ParameterManager.lookup(
         handle = stringToIndexLookupTables(graph).gather(languageId),
@@ -119,7 +119,7 @@ class ParameterManager protected (
   }
 
   def indexToStringLookup(languageId: Output): (Output) => Output = (keys: Output) => {
-    tf.createWithVariableScope("ParameterManager/IndexToStringLookupTables/") {
+    tf.createWithVariableScope("ParameterManager/IndexToStringLookupTables") {
       val graph = currentGraph
       ParameterManager.lookup(
         handle = indexToStringLookupTables(graph).gather(languageId),
@@ -129,7 +129,7 @@ class ParameterManager protected (
   }
 
   def wordEmbeddings(languageId: Output): (Output) => Output = (keys: Output) => {
-    tf.createWithVariableScope("ParameterManager/WordEmbeddings/") {
+    tf.createWithVariableScope("ParameterManager/WordEmbeddings") {
       val graph = currentGraph
       if (!mergedWordEmbeddings) {
         val predicates = wordEmbeddings(graph).zip(languageIds(graph)).map {
@@ -156,13 +156,13 @@ class ParameterManager protected (
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   )(implicit stage: Stage): Output = {
-    tf.createWithVariableScope("ParameterManager/") {
+    tf.createWithVariableScope("ParameterManager") {
       tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value
     }
   }
 
   def getProjectionToWords(inputSize: Int, languageId: Output): Output = {
-    tf.createWithVariableScope("ParameterManager/ProjectionToWords/") {
+    tf.createWithVariableScope("ParameterManager/ProjectionToWords") {
       val graph = currentGraph
       if (!mergedWordProjections) {
         val projectionsForSize = projectionsToWords
@@ -254,11 +254,11 @@ class LanguageEmbeddingsPairParameterManager protected (
   }
 
   override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
-    tf.createWithVariableScope("ParameterManager/") {
+    tf.createWithVariableScope("ParameterManager") {
       super.initialize(languages)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {
-        languageEmbeddings += graph -> tf.createWithVariableScope("LanguageEmbeddings/") {
+        languageEmbeddings += graph -> tf.createWithVariableScope("LanguageEmbeddings") {
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           tf.variable(
             "LanguageEmbeddings", FLOAT32, Shape(languages.length, languageEmbeddingsSize),
@@ -275,7 +275,7 @@ class LanguageEmbeddingsPairParameterManager protected (
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   )(implicit stage: Stage): Output = {
-    tf.createWithVariableScope("ParameterManager/") {
+    tf.createWithVariableScope("ParameterManager") {
       val graph = currentGraph
       val variableScopeName = tf.currentVariableScope.name
       val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
@@ -339,11 +339,11 @@ class LanguageEmbeddingsParameterManager protected (
   }
 
   override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
-    tf.createWithVariableScope("ParameterManager/") {
+    tf.createWithVariableScope("ParameterManager") {
       super.initialize(languages)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {
-        languageEmbeddings += graph -> tf.createWithVariableScope("LanguageEmbeddings/") {
+        languageEmbeddings += graph -> tf.createWithVariableScope("LanguageEmbeddings") {
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           tf.variable(
             "LanguageEmbeddings", FLOAT32, Shape(languages.length, languageEmbeddingsSize),
@@ -360,7 +360,7 @@ class LanguageEmbeddingsParameterManager protected (
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   )(implicit stage: Stage): Output = {
-    tf.createWithVariableScope("ParameterManager/") {
+    tf.createWithVariableScope("ParameterManager") {
       val graph = currentGraph
       val variableScopeName = tf.currentVariableScope.name
       val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name

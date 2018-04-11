@@ -233,21 +233,23 @@ abstract class Model[S] protected (
       override protected def _forward(
           input: (TFBatchWithLanguages, TFBatch)
       )(implicit mode: Mode): TFBatchWithLanguage = {
-        parameterManager.initialize(languages)
-        parameterManager.setEnvironment(config.env)
-        parameterManager.setDeviceManager(config.deviceManager)
-        parameterManager.setContext((input._1._1, input._1._2))
-        val srcSequence = mapToWordIds(input._1._1, input._1._3)
-        val tgtSequence = mapToWordIds(input._1._2, input._2._1)
-        val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
-        val tgtMapped = (tgtSequence, input._2._2)
-        val state = tf.createWithVariableScope("Encoder") {
-          encoder(srcMapped)
+        tf.createWith(device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
+          parameterManager.initialize(languages)
+          parameterManager.setEnvironment(config.env)
+          parameterManager.setDeviceManager(config.deviceManager)
+          parameterManager.setContext((input._1._1, input._1._2))
+          val srcSequence = mapToWordIds(input._1._1, input._1._3)
+          val tgtSequence = mapToWordIds(input._1._2, input._2._1)
+          val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
+          val tgtMapped = (tgtSequence, input._2._2)
+          val state = tf.createWithVariableScope("Encoder") {
+            encoder(srcMapped)
+          }
+          val output = tf.createWithVariableScope("Decoder") {
+            decoder(srcMapped, Some(tgtMapped), Some(state))
+          }
+          (input._1._2, output._1, output._2)
         }
-        val output = tf.createWithVariableScope("Decoder") {
-          decoder(srcMapped, Some(tgtMapped), Some(state))
-        }
-        (input._1._2, output._1, output._2)
       }
     }
   }
@@ -257,20 +259,22 @@ abstract class Model[S] protected (
       override val layerType: String = "InferLayer"
 
       override protected def _forward(input: TFBatchWithLanguages)(implicit mode: Mode): TFBatchWithLanguage = {
-        parameterManager.initialize(languages)
-        parameterManager.setEnvironment(config.env)
-        parameterManager.setDeviceManager(config.deviceManager)
-        parameterManager.setContext((input._1, input._2))
-        val srcSequence = mapToWordIds(input._1, input._3)
-        val srcMapped = (input._1, input._2, srcSequence, input._4)
-        val state = tf.createWithVariableScope("Encoder") {
-          encoder(srcMapped)
+        tf.createWith(device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
+          parameterManager.initialize(languages)
+          parameterManager.setEnvironment(config.env)
+          parameterManager.setDeviceManager(config.deviceManager)
+          parameterManager.setContext((input._1, input._2))
+          val srcSequence = mapToWordIds(input._1, input._3)
+          val srcMapped = (input._1, input._2, srcSequence, input._4)
+          val state = tf.createWithVariableScope("Encoder") {
+            encoder(srcMapped)
+          }
+          val output = tf.createWithVariableScope("Decoder") {
+            decoder(srcMapped, None, Some(state))
+          }
+          val decodedSequences = mapFromWordIds(input._2, output._1)
+          (input._2, decodedSequences, output._2)
         }
-        val output = tf.createWithVariableScope("Decoder") {
-          decoder(srcMapped, None, Some(state))
-        }
-        val decodedSequences = mapFromWordIds(input._2, output._1)
-        (input._2, decodedSequences, output._2)
       }
     }
   }
@@ -280,7 +284,7 @@ abstract class Model[S] protected (
       override val layerType: String = "Loss"
 
       override protected def _forward(input: (TFBatchWithLanguage, TFBatch))(implicit mode: Mode): Output = {
-        tf.createWithNameScope("Loss") {
+        tf.createWith(nameScope = "Loss", device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
           parameterManager.initialize(languages)
           parameterManager.setEnvironment(config.env)
           parameterManager.setDeviceManager(config.deviceManager)

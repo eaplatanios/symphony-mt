@@ -21,19 +21,20 @@ import org.platanios.symphony.mt.Environment
   * @author Emmanouil Antonios Platanios
   */
 trait DeviceManager {
-  def nextDevice(env: Environment): String
+  def nextDevice(env: Environment, moveToNext: Boolean = true): String
 }
 
 case object RoundRobinDeviceManager extends DeviceManager {
   private[this] var currentGPUIndex: Int = 0
 
-  override def nextDevice(env: Environment): String = {
+  override def nextDevice(env: Environment, moveToNext: Boolean = true): String = {
     if (env.numGPUs == 0) {
       "/device:CPU:0"
     } else {
       currentGPUIndex %= env.numGPUs
       val nextDevice = s"/device:GPU:$currentGPUIndex"
-      currentGPUIndex += 1
+      if (moveToNext)
+        currentGPUIndex += 1
       nextDevice
     }
   }
