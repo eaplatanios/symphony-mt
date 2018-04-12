@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd -P -- "$(dirname -- "$0")/.."
-sbt "mt/runMain org.platanios.symphony.mt.experiments.Experiment
+sbt "experiments/runMain org.platanios.symphony.mt.experiments.Experiment
   --task train
   --working-dir temp/experiments
   --data-dir temp/data

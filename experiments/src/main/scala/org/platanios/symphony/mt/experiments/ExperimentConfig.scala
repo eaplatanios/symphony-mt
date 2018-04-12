@@ -15,13 +15,13 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.{Environment, Language, experiments}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders._
 import org.platanios.symphony.mt.data.processors._
 import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.vocabulary._
+import org.platanios.symphony.mt.{Environment, Language, experiments}
 import org.platanios.tensorflow.api._
 
 import ch.qos.logback.classic.LoggerContext

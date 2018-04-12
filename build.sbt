@@ -67,8 +67,8 @@ lazy val tensorFlowSettings = Seq(
   libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion) // classifier "linux-gpu-x86_64")
 
 lazy val all = (project in file("."))
-    .aggregate(mt)
-    .dependsOn(mt)
+    .aggregate(mt, experiments)
+    .dependsOn(mt, experiments)
     .settings(moduleName := "symphony", name := "Symphony")
     .settings(commonSettings)
     .settings(publishSettings)
@@ -89,13 +89,23 @@ lazy val mt = (project in file("./mt"))
     .settings(
       libraryDependencies ++= Seq(
         "com.github.pathikrit" %% "better-files" % "3.4.0",
-        "org.apache.commons" % "commons-compress" % "1.16.1",
-        "com.github.scopt" %% "scopt" % "3.7.0"),
+        "org.apache.commons" % "commons-compress" % "1.16.1"),
       unmanagedResourceDirectories in Compile += baseDirectory.value / "lib",
       unmanagedResourceDirectories in Test += baseDirectory.value / "lib",
       unmanagedJars in Compile ++= Seq(
         baseDirectory.value / "lib" / "meteor-1.5.jar",
         baseDirectory.value / "lib" / "tercom-0.10.0.jar"))
+
+lazy val experiments = (project in file("./experiments"))
+    .dependsOn(mt)
+    .settings(moduleName := "symphony-mt-experiments", name := "Symphony Machine Translation Experiments")
+    .settings(commonSettings)
+    .settings(testSettings)
+    .settings(publishSettings)
+    .settings(
+      libraryDependencies ++= Seq(
+        "com.github.scopt" %% "scopt" % "3.7.0",
+        "com.hierynomus" % "sshj" % "0.24.0"))
 
 lazy val noPublishSettings = Seq(
   publish := Unit,
@@ -108,7 +118,7 @@ val deletedPublishedSnapshots = taskKey[Unit]("Delete published snapshots.")
 
 lazy val publishSettings = Seq(
   publishArtifact := true,
-  homepage := Some(url("https://github.com/eaplatanios/tensorflow_scala")),
+  homepage := Some(url("https://github.com/eaplatanios/symphony-mt")),
   licenses := Seq("Apache License 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
   scmInfo := Some(ScmInfo(url("https://github.com/eaplatanios/symphony-mt"),
                           "scm:git:git@github.com:eaplatanios/symphony-mt.git")),
