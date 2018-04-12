@@ -73,58 +73,64 @@ abstract class Model[S] protected (
       TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS, TFBatchWithLanguage,
       (TFBatchWithLanguagesT, TFBatchT), (TFBatchWithLanguages, TFBatch),
       (TFBatchWithLanguagesD, TFBatchD), (TFBatchWithLanguagesS, TFBatchS),
-      (TFBatchWithLanguage, TFBatch)] = tf.createWithNameScope(name) {
-    val model = learn.Model.supervised(
-      input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
-      clipGradients = tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm),
-      colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
-    val summariesDir = config.env.workingDir.resolve("summaries")
+      (TFBatchWithLanguage, TFBatch)] = {
+    tf.createWith(
+      nameScope = name,
+      device = config.deviceManager.nextDevice(config.env, moveToNext = false)
+    ) {
+      val model = learn.Model.supervised(
+        input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
+        clipGradients = tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm),
+        colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
+      val summariesDir = config.env.workingDir.resolve("summaries")
 
-    // Create estimator hooks.
-    var hooks = Set[tf.learn.Hook]()
+      // Create estimator hooks.
+      var hooks = Set[tf.learn.Hook]()
 
-    // Add logging hooks.
-    if (logConfig.logLossSteps > 0)
-      hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
-    if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
-      val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
-      val datasets = evalDatasets.filter(_._2.nonEmpty)
-      if (datasets.nonEmpty) {
-        hooks += tf.learn.Evaluator(
-          log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs),
-          evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, numDecimalPoints = 6,
-          name = "Evaluation")
+      // Add logging hooks.
+      if (logConfig.logLossSteps > 0)
+        hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
+      if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
+        val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
+        val datasets = evalDatasets.filter(_._2.nonEmpty)
+        if (datasets.nonEmpty) {
+          hooks += tf.learn.Evaluator(
+            log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs),
+            evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, numDecimalPoints = 6,
+            name = "Evaluation")
+        }
       }
+
+      // Add summaries/checkpoints hooks.
+      hooks ++= Set(
+        tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
+        tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
+        tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
+
+      env.traceSteps.foreach(numSteps =>
+        hooks += tf.learn.TimelineHook(
+          summariesDir, showDataFlow = true, showMemory = true, trigger = StepHookTrigger(numSteps)))
+
+      // Add TensorBoard hook.
+      if (logConfig.launchTensorBoard)
+        hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
+          summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
+
+      var sessionConfig = SessionConfig(
+        allowSoftPlacement = Some(config.env.allowSoftPlacement),
+        logDevicePlacement = Some(config.env.logDevicePlacement),
+        gpuAllowMemoryGrowth = Some(config.env.gpuAllowMemoryGrowth))
+      if (config.env.useXLA)
+        sessionConfig = sessionConfig.copy(optGlobalJITLevel = Some(SessionConfig.L1GraphOptimizerGlobalJIT))
+
+      // Create estimator.
+      tf.learn.InMemoryEstimator(
+        model, tf.learn.Configuration(
+          workingDir = Some(config.env.workingDir),
+          sessionConfig = Some(sessionConfig),
+          randomSeed = config.env.randomSeed),
+        trainHooks = hooks)
     }
-
-    // Add summaries/checkpoints hooks.
-    hooks ++= Set(
-      tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-      tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
-      tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
-
-    env.traceSteps.foreach(numSteps =>
-      hooks += tf.learn.TimelineHook(summariesDir, trigger = StepHookTrigger(numSteps)))
-
-    // Add TensorBoard hook.
-    if (logConfig.launchTensorBoard)
-      hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
-        summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
-
-    var sessionConfig = SessionConfig(
-      allowSoftPlacement = Some(config.env.allowSoftPlacement),
-      logDevicePlacement = Some(config.env.logDevicePlacement),
-      gpuAllowMemoryGrowth = Some(config.env.gpuAllowMemoryGrowth))
-    if (config.env.useXLA)
-      sessionConfig = sessionConfig.copy(optGlobalJITLevel = Some(SessionConfig.L1GraphOptimizerGlobalJIT))
-
-    // Create estimator.
-    tf.learn.InMemoryEstimator(
-      model, tf.learn.Configuration(
-        workingDir = Some(config.env.workingDir),
-        sessionConfig = Some(sessionConfig),
-        randomSeed = config.env.randomSeed),
-      trainHooks = hooks)
   }
 
   def train(datasets: Seq[FileParallelDataset], stopCriteria: StopCriteria): Unit = {
