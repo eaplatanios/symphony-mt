@@ -41,8 +41,8 @@ trait ParallelDataset {
   ): Set[(Language, Language)] = {
     var pairs = languages.toSeq.combinations(2)
         .map(c => (c(0), c(1)))
-    if (!includeIdentity)
-      pairs = pairs.filter(p => p._1 != p._2)
+    if (includeIdentity)
+      pairs = pairs.flatMap(p => Seq(p, (p._1, p._1), (p._2, p._2)))
     if (includeReverse)
       pairs = pairs.flatMap(p => Seq(p, (p._2, p._1)))
     pairs.toSet
