@@ -108,7 +108,7 @@ class ParameterManager protected (
     }
   }
 
-  def stringToIndexLookup(languageId: Output): (Output) => Output = (keys: Output) => {
+  def stringToIndexLookup(languageId: Output): Output => Output = (keys: Output) => {
     tf.createWithVariableScope("ParameterManager/StringToIndexLookupTables") {
       val graph = currentGraph
       ParameterManager.lookup(
@@ -118,7 +118,7 @@ class ParameterManager protected (
     }
   }
 
-  def indexToStringLookup(languageId: Output): (Output) => Output = (keys: Output) => {
+  def indexToStringLookup(languageId: Output): Output => Output = (keys: Output) => {
     tf.createWithVariableScope("ParameterManager/IndexToStringLookupTables") {
       val graph = currentGraph
       ParameterManager.lookup(
@@ -128,7 +128,7 @@ class ParameterManager protected (
     }
   }
 
-  def wordEmbeddings(languageId: Output): (Output) => Output = (keys: Output) => {
+  def wordEmbeddings(languageId: Output): Output => Output = (keys: Output) => {
     tf.createWithVariableScope("ParameterManager/WordEmbeddings") {
       val graph = currentGraph
       if (!mergedWordEmbeddings) {
@@ -258,7 +258,7 @@ class LanguageEmbeddingsParameterManager protected (
       super.initialize(languages)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {
-        languageEmbeddings += graph -> tf.createWithVariableScope("LanguageEmbeddings") {
+        languageEmbeddings += graph -> {
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           tf.variable(
             "LanguageEmbeddings", FLOAT32, Shape(languages.length, languageEmbeddingsSize),
@@ -346,7 +346,7 @@ class LanguageEmbeddingsPairParameterManager protected (
       super.initialize(languages)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {
-        languageEmbeddings += graph -> tf.createWithVariableScope("LanguageEmbeddings") {
+        languageEmbeddings += graph -> {
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           tf.variable(
             "LanguageEmbeddings", FLOAT32, Shape(languages.length, languageEmbeddingsSize),
