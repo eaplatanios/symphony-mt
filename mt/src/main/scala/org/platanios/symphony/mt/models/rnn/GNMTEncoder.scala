@@ -51,8 +51,8 @@ class GNMTEncoder[S, SS](
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
   ): Tuple[Output, Seq[S]] = {
-    val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
-    val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage)(transposedSequences)
+    val (embeddedSequences, embeddedSequenceLengths) = embedSequences(
+      config, srcLanguage, tgtLanguage, srcSequences, srcSequenceLengths)
 
     // Bidirectional RNN layers
     val biTuple = {
@@ -65,7 +65,7 @@ class GNMTEncoder[S, SS](
           config.env.randomSeed, "MultiBiCellBw")(mode, env, parameterManager, deviceManager)
         val unmergedBiTuple = tf.bidirectionalDynamicRNN(
           biCellFw, biCellBw, embeddedSequences, null, null, config.timeMajor, config.env.parallelIterations,
-          config.env.swapMemory, srcSequenceLengths, "BidirectionalLayers")
+          config.env.swapMemory, embeddedSequenceLengths, "BidirectionalLayers")
         Tuple(tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1), unmergedBiTuple._2.state)
       } else {
         Tuple(embeddedSequences, Seq.empty[S])
@@ -78,7 +78,7 @@ class GNMTEncoder[S, SS](
       config.env.randomSeed, "MultiUniCell")(mode, env, parameterManager, deviceManager)
     val uniTuple = tf.dynamicRNN(
       uniCell, biTuple.output, null, config.timeMajor, config.env.parallelIterations, config.env.swapMemory,
-      srcSequenceLengths, "UnidirectionalLayers")
+      embeddedSequenceLengths, "UnidirectionalLayers")
 
     // Pass all of the encoder's state except for the first bi-directional layer's state, to the decoder.
     Tuple(uniTuple.output, biTuple.state ++ uniTuple.state)

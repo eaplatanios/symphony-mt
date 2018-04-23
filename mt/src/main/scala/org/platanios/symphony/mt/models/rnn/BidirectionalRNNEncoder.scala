@@ -50,8 +50,8 @@ class BidirectionalRNNEncoder[S, SS](
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
   ): Tuple[Output, Seq[S]] = {
-    val transposedSequences = if (config.timeMajor) srcSequences.transpose() else srcSequences
-    val embeddedSequences = parameterManager.wordEmbeddings(srcLanguage)(transposedSequences)
+    val (embeddedSequences, embeddedSequenceLengths) = embedSequences(
+      config, srcLanguage, tgtLanguage, srcSequences, srcSequenceLengths)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
 
     val biCellFw = RNNModel.multiCell(
@@ -63,7 +63,7 @@ class BidirectionalRNNEncoder[S, SS](
 
     val unmergedBiTuple = tf.bidirectionalDynamicRNN(
       biCellFw, biCellBw, embeddedSequences, null, null, config.timeMajor,
-      config.env.parallelIterations, config.env.swapMemory, srcSequenceLengths, "BidirectionalLayers")
+      config.env.parallelIterations, config.env.swapMemory, embeddedSequenceLengths, "BidirectionalLayers")
 
     Tuple(
       tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1),

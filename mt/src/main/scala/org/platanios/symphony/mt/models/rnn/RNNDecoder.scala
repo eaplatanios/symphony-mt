@@ -55,7 +55,7 @@ abstract class RNNDecoder[S, SS]()(implicit
       tgtSequences: Output,
       tgtSequenceLengths: Output,
       initialState: DS,
-      embeddings: (Output) => Output,
+      embeddings: Output => Output,
       cell: tf.RNNCell[Output, Shape, DS, DSS],
       tgtMaxLength: Output,
       beginOfSequenceToken: String,

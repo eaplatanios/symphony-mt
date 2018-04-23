@@ -42,4 +42,19 @@ abstract class RNNEncoder[S, SS]()(implicit
       parameterManager: ParameterManager,
       deviceManager: DeviceManager
   ): Tuple[Output, Seq[S]]
+
+  def embedSequences(
+      config: RNNModel.Config[_, _],
+      srcLanguage: Output,
+      tgtLanguage: Output,
+      srcSequences: Output,
+      srcSequenceLengths: Output
+  )(implicit
+      parameterManager: ParameterManager
+  ): (Output, Output) = {
+    var embedded = parameterManager.wordEmbeddings(srcLanguage)(srcSequences)
+    if (config.timeMajor)
+      embedded = embedded.transpose(Seq(1, 0, 2))
+    (embedded, srcSequenceLengths)
+  }
 }
