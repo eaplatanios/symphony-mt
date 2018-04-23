@@ -21,6 +21,7 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 package object models {
+  /** Contains the source language, the target language, a sentence batch, and the corresponding sentence lengths. */
   type TFBatchWithLanguages = (Output, Output, Output, Output)
   type TFBatchWithLanguagesT = (Tensor, Tensor, Tensor, Tensor)
   type TFBatchWithLanguagesD = (DataType, DataType, DataType, DataType)

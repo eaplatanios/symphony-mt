@@ -199,6 +199,15 @@ class ParameterManager protected (
       }
     }
   }
+
+  def postprocessEmbeddedSequences(
+      srcLanguage: Output,
+      tgtLanguage: Output,
+      srcSequences: Output,
+      srcSequenceLengths: Output
+  ): (Output, Output) = {
+    (srcSequences, srcSequenceLengths)
+  }
 }
 
 object ParameterManager {
@@ -403,6 +412,65 @@ object LanguageEmbeddingsPairParameterManager {
   ): LanguageEmbeddingsPairParameterManager = {
     new LanguageEmbeddingsPairParameterManager(
       languageEmbeddingsSize,
+      wordEmbeddingsSize,
+      mergedWordEmbeddings,
+      mergedWordProjections,
+      variableInitializer)
+  }
+}
+
+class GoogleMultilingualParameterManager protected (
+    override val wordEmbeddingsSize: Int,
+    override val mergedWordEmbeddings: Boolean = false,
+    override val mergedWordProjections: Boolean = false,
+    override val variableInitializer: tf.VariableInitializer = null
+) extends ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, variableInitializer) {
+  protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
+  protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
+
+  override protected def removeGraph(graph: Graph): Unit = {
+    super.removeGraph(graph)
+    languageEmbeddings -= graph
+    parameters -= graph
+  }
+
+  override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
+    tf.createWithVariableScope("ParameterManager") {
+      super.initialize(languages)
+      val graph = currentGraph
+      if (!languageEmbeddings.contains(graph)) {
+        languageEmbeddings += graph -> {
+          val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+          tf.variable(
+            "LanguageEmbeddings", FLOAT32, Shape(languages.length, wordEmbeddingsSize),
+            initializer = embeddingsInitializer).value
+        }
+      }
+    }
+  }
+
+  override def postprocessEmbeddedSequences(
+      srcLanguage: Output,
+      tgtLanguage: Output,
+      srcSequences: Output,
+      srcSequenceLengths: Output
+  ): (Output, Output) = {
+    val tgtLanguageEmbedding = languageEmbeddings(currentGraph).gather(context.get._2).reshape(Shape(1, -1))
+    val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack(Seq(tf.shape(srcSequences)(0), 1)))
+    val processedSrcSentences = tf.concatenate(Seq(tgtLanguageEmbeddingTiled, srcSequences), 1)
+    val processedSrcSentenceLengths = srcSequenceLengths + 1
+    (processedSrcSentences, processedSrcSentenceLengths)
+  }
+}
+
+object GoogleMultilingualParameterManager {
+  def apply(
+      wordEmbeddingsSize: Int,
+      mergedWordEmbeddings: Boolean = false,
+      mergedWordProjections: Boolean = false,
+      variableInitializer: tf.VariableInitializer = null
+  ): GoogleMultilingualParameterManager = {
+    new GoogleMultilingualParameterManager(
       wordEmbeddingsSize,
       mergedWordEmbeddings,
       mergedWordProjections,

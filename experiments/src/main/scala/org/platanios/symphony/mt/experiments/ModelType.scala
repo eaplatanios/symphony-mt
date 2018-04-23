@@ -35,6 +35,7 @@ object ModelType {
       case "pairwise" => Pairwise
       case "hyper_lang" => HyperLanguage
       case "hyper_lang_pair" => HyperLanguagePair
+      case "google_multilingual" => GoogleMultilingual
       case value => throw new IllegalArgumentException(s"'$value' does not represent a valid model type.")
     }
   }
@@ -42,6 +43,7 @@ object ModelType {
 
 case object Pairwise extends ModelType {
   override val name: String = "pairwise"
+
   override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
     ParameterManager(
       wordEmbeddingsSize = wordEmbeddingsSize,
@@ -56,6 +58,7 @@ case object Pairwise extends ModelType {
 
 case object HyperLanguage extends ModelType {
   override val name: String = "hyper_lang"
+
   override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
     LanguageEmbeddingsParameterManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
@@ -67,6 +70,7 @@ case object HyperLanguage extends ModelType {
 
 case object HyperLanguagePair extends ModelType {
   override val name: String = "hyper_lang_pair"
+
   override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
     LanguageEmbeddingsPairParameterManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
@@ -74,4 +78,19 @@ case object HyperLanguagePair extends ModelType {
   }
 
   override def toString: String = "hyper_lang_pair"
+}
+
+case object GoogleMultilingual extends ModelType {
+  override val name: String = "google_multilingual"
+
+  override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
+    GoogleMultilingualParameterManager(
+      wordEmbeddingsSize = wordEmbeddingsSize,
+      variableInitializer = tf.VarianceScalingInitializer(
+        1.0f,
+        tf.VarianceScalingInitializer.FanAverageScalingMode,
+        tf.VarianceScalingInitializer.UniformDistribution))
+  }
+
+  override def toString: String = "google_multilingual"
 }

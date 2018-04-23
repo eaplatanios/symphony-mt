@@ -52,9 +52,12 @@ abstract class RNNEncoder[S, SS]()(implicit
   )(implicit
       parameterManager: ParameterManager
   ): (Output, Output) = {
-    var embedded = parameterManager.wordEmbeddings(srcLanguage)(srcSequences)
+    val embeddedSrcSequences = parameterManager.wordEmbeddings(srcLanguage)(srcSequences)
+    val (embeddedSequences, embeddedSequenceLengths) = parameterManager.postprocessEmbeddedSequences(
+      srcLanguage, tgtLanguage, embeddedSrcSequences, srcSequenceLengths)
     if (config.timeMajor)
-      embedded = embedded.transpose(Seq(1, 0, 2))
-    (embedded, srcSequenceLengths)
+      (embeddedSequences.transpose(Seq(1, 0, 2)), embeddedSequenceLengths)
+    else
+      (embeddedSequences, embeddedSequenceLengths)
   }
 }
