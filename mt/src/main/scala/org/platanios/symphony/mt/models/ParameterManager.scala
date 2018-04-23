@@ -455,8 +455,8 @@ class GoogleMultilingualParameterManager protected (
       srcSequences: Output,
       srcSequenceLengths: Output
   ): (Output, Output) = {
-    val tgtLanguageEmbedding = languageEmbeddings(currentGraph).gather(context.get._2).reshape(Shape(1, -1))
-    val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack(Seq(tf.shape(srcSequences)(0), 1)))
+    val tgtLanguageEmbedding = languageEmbeddings(currentGraph).gather(context.get._2).reshape(Shape(1, 1, -1))
+    val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack(Seq(tf.shape(srcSequences)(0), 1, 1)))
     val processedSrcSentences = tf.concatenate(Seq(tgtLanguageEmbeddingTiled, srcSequences), 1)
     val processedSrcSentenceLengths = srcSequenceLengths + 1
     (processedSrcSentences, processedSrcSentenceLengths)
