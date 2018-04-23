@@ -78,10 +78,15 @@ abstract class Model[S] protected (
       nameScope = name,
       device = config.deviceManager.nextDevice(config.env, moveToNext = false)
     ) {
-      val model = learn.Model.supervised(
-        input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
-        clipGradients = tf.learn.ClipGradientsByGlobalNorm(optConfig.maxGradNorm),
-        colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
+      val model = optConfig.maxGradNorm match {
+        case Some(norm) => learn.Model.supervised(
+          input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
+          clipGradients = tf.learn.ClipGradientsByGlobalNorm(norm),
+          colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
+        case None => learn.Model.supervised(
+          input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
+          colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
+      }
       val summariesDir = config.env.workingDir.resolve("summaries")
 
       // Create estimator hooks.
@@ -383,7 +388,7 @@ object Model {
   }
 
   case class OptConfig(
-      maxGradNorm: Float = 5.0f,
+      maxGradNorm: Option[Float] = None,
       optimizer: Optimizer = GradientDescent(1.0f, learningRateSummaryTag = "LearningRate"),
       colocateGradientsWithOps: Boolean = true)
 

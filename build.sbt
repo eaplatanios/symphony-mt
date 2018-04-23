@@ -104,8 +104,14 @@ lazy val experiments = (project in file("./experiments"))
     .settings(publishSettings)
     .settings(
       libraryDependencies ++= Seq(
+        "com.github.pathikrit" %% "better-files" % "3.4.0",
         "com.github.scopt" %% "scopt" % "3.7.0",
-        "com.hierynomus" % "sshj" % "0.24.0"))
+        "com.hierynomus" % "sshj" % "0.24.0",
+        "com.jcraft" % "jzlib" % "1.1.3",
+        "io.circe" %% "circe-core" % "0.7.0",
+        "io.circe" %% "circe-generic" % "0.7.0",
+        "io.circe" %% "circe-parser" % "0.7.0",
+        "org.vegas-viz" %% "vegas" % "0.3.12-SNAPSHOT"))
 
 lazy val noPublishSettings = Seq(
   publish := Unit,

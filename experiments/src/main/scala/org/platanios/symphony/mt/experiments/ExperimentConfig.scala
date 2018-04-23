@@ -104,19 +104,7 @@ case class ExperimentConfig(
     }, Some(workingDir))
   }
 
-  protected lazy val metrics: Seq[MTMetric] = evalMetrics.map(metric => {
-    metric.split(":") match {
-      case Array(name) if name == "bleu" => BLEU()(languages)
-      case Array(name, maxOrder) if name == "bleu" => BLEU(maxOrder.toInt)(languages)
-      case Array(name, maxOrder, smooth) if name == "bleu" => BLEU(maxOrder.toInt, smooth.toBoolean)(languages)
-      case Array(name) if name == "meteor" => Meteor()(languages)
-      case Array(name) if name == "ter" => TER()(languages)
-      case Array(name) if name == "hyp_len" => SentenceLength(forHypothesis = true, name = "HypLen")
-      case Array(name) if name == "ref_len" => SentenceLength(forHypothesis = false, name = "RefLen")
-      case Array(name) if name == "sen_cnt" => SentenceCount(name = "#Sentences")
-      case _ => throw new IllegalArgumentException(s"'$metric' does not represent a valid metric.")
-    }
-  })
+  protected lazy val metrics: Seq[MTMetric] = evalMetrics.map(Metric.cliToMTMetric(_)(languages))
 
   def workingDir: Path = env.workingDir.resolve(toString)
 
@@ -518,8 +506,8 @@ object ExperimentConfig {
             "Valid values are: 'gd:<learning_rate>', 'adadelta:<learning_rate>', 'adagrad:<learning_rate>', " +
             "'adam:<learning_rate>', 'lazy_adam:<learning_rate>', 'amsgrad:<learning_rate>', and 'yf:<learning_rate>'.")
 
-    opt[Float]("opt-max-norm").required().valueName("<float>")
-        .action((d, c) => c.copy(optConfig = c.optConfig.copy(maxGradNorm = d)))
+    opt[Float]("opt-max-norm").valueName("<float>")
+        .action((d, c) => c.copy(optConfig = c.optConfig.copy(maxGradNorm = Some(d))))
         .text("Specifies the maximum gradient norm to use for global norm clipping while training.")
 
     opt[Unit]("opt-no-colocate-grads")
