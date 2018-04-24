@@ -24,7 +24,11 @@ import org.platanios.tensorflow.api._
 sealed trait ModelType {
   val name: String
 
-  def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager
+  def getParametersManager(
+      languageEmbeddingsSize: Int,
+      wordEmbeddingsSize: Int,
+      sharedWordEmbeddings: Boolean
+  ): ParameterManager
 
   override def toString: String
 }
@@ -44,9 +48,14 @@ object ModelType {
 case object Pairwise extends ModelType {
   override val name: String = "pairwise"
 
-  override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
+  override def getParametersManager(
+      languageEmbeddingsSize: Int,
+      wordEmbeddingsSize: Int,
+      sharedWordEmbeddings: Boolean
+  ): ParameterManager = {
     ParameterManager(
       wordEmbeddingsSize = wordEmbeddingsSize,
+      sharedWordEmbeddings = sharedWordEmbeddings,
       variableInitializer = tf.VarianceScalingInitializer(
         1.0f,
         tf.VarianceScalingInitializer.FanAverageScalingMode,
@@ -59,10 +68,15 @@ case object Pairwise extends ModelType {
 case object HyperLanguage extends ModelType {
   override val name: String = "hyper_lang"
 
-  override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
+  override def getParametersManager(
+      languageEmbeddingsSize: Int,
+      wordEmbeddingsSize: Int,
+      sharedWordEmbeddings: Boolean
+  ): ParameterManager = {
     LanguageEmbeddingsManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
-      wordEmbeddingsSize = wordEmbeddingsSize)
+      wordEmbeddingsSize = wordEmbeddingsSize,
+      sharedWordEmbeddings = sharedWordEmbeddings)
   }
 
   override def toString: String = "hyper_lang"
@@ -71,10 +85,15 @@ case object HyperLanguage extends ModelType {
 case object HyperLanguagePair extends ModelType {
   override val name: String = "hyper_lang_pair"
 
-  override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
+  override def getParametersManager(
+      languageEmbeddingsSize: Int,
+      wordEmbeddingsSize: Int,
+      sharedWordEmbeddings: Boolean
+  ): ParameterManager = {
     LanguageEmbeddingsPairManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
-      wordEmbeddingsSize = wordEmbeddingsSize)
+      wordEmbeddingsSize = wordEmbeddingsSize,
+      sharedWordEmbeddings = sharedWordEmbeddings)
   }
 
   override def toString: String = "hyper_lang_pair"
@@ -83,9 +102,14 @@ case object HyperLanguagePair extends ModelType {
 case object GoogleMultilingual extends ModelType {
   override val name: String = "google_multilingual"
 
-  override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
+  override def getParametersManager(
+      languageEmbeddingsSize: Int,
+      wordEmbeddingsSize: Int,
+      sharedWordEmbeddings: Boolean
+  ): ParameterManager = {
     GoogleMultilingualManager(
       wordEmbeddingsSize = wordEmbeddingsSize,
+      sharedWordEmbeddings = sharedWordEmbeddings,
       variableInitializer = tf.VarianceScalingInitializer(
         1.0f,
         tf.VarianceScalingInitializer.FanAverageScalingMode,

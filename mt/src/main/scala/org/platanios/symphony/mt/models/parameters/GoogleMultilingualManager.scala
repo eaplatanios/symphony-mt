@@ -28,8 +28,10 @@ class GoogleMultilingualManager protected (
     override val wordEmbeddingsSize: Int,
     override val mergedWordEmbeddings: Boolean = false,
     override val mergedWordProjections: Boolean = false,
+    override val sharedWordEmbeddings: Boolean = false,
     override val variableInitializer: tf.VariableInitializer = null
-) extends ParameterManager(wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, variableInitializer) {
+) extends ParameterManager(
+  wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, sharedWordEmbeddings, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
   protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
 
@@ -73,12 +75,14 @@ object GoogleMultilingualManager {
       wordEmbeddingsSize: Int,
       mergedWordEmbeddings: Boolean = false,
       mergedWordProjections: Boolean = false,
+      sharedWordEmbeddings: Boolean = false,
       variableInitializer: tf.VariableInitializer = null
   ): GoogleMultilingualManager = {
     new GoogleMultilingualManager(
       wordEmbeddingsSize,
       mergedWordEmbeddings,
       mergedWordProjections,
+      sharedWordEmbeddings,
       variableInitializer)
   }
 }

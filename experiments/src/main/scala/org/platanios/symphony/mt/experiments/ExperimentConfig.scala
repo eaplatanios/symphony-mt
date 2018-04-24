@@ -125,8 +125,14 @@ case class ExperimentConfig(
   }
 
   def run(): Unit = {
+    val sharedWordEmbeddings = dataConfig.vocabulary match {
+      case GeneratedVocabulary(_, true) => true
+      case _ => false
+    }
+
     val env = this.env.copy(workingDir = workingDir)
-    val parameterManager = modelType.getParametersManager(languageEmbeddingsSize, wordEmbeddingsSize)
+    val parameterManager = modelType.getParametersManager(
+      languageEmbeddingsSize, wordEmbeddingsSize, sharedWordEmbeddings)
 
     val evalDatasets = task match {
       case ExperimentConfig.Train | ExperimentConfig.Evaluate =>
