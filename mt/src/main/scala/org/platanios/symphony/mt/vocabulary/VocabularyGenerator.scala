@@ -102,10 +102,10 @@ trait VocabularyGenerator {
       shared: Boolean = false
   ): Seq[Vocabulary] = {
     if (shared) {
-      val vocabulary = Vocabulary(vocabDir / filename(languages))
+      val vocabulary = getVocabulary(languages, vocabDir)
       languages.map(_ => vocabulary)
     } else {
-      languages.map(l => Vocabulary(vocabDir / filename(Seq(l))))
+      languages.map(l => getVocabulary(Seq(l), vocabDir))
     }
   }
 
