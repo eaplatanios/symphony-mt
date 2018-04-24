@@ -186,7 +186,8 @@ class BPEVocabularyGenerator protected (
       val oldFile = mutableFile.get
       val file = oldFile.sibling(
         s"${oldFile.nameWithoutExtension(includeAll = false)}" +
-            s".bpe.$numMergeOps.${languages.map(_.abbreviation).sorted.mkString(".")}")
+            s".bpe.$numMergeOps.${languages.map(_.abbreviation).sorted.mkString(".")}" +
+            s".${oldFile.extension(includeDot = false, includeAll = false)}")
       mutableFile.set(file)
       if (replaceExisting || file.notExists) {
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
