@@ -101,10 +101,11 @@ class BPEVocabularyGenerator protected (
     // We first generate the merge pairs, if necessary.
     val mergePairsFile = vocabDir / mergePairsFilename(languages)
     if (mergePairsFile.exists && !replaceExisting) {
-      BPEVocabularyGenerator.logger.info(s"Loading existing BPE coding for $language: $mergePairsFile.")
+      BPEVocabularyGenerator.logger.info(
+        s"Loading existing BPE coding for ${languages.mkString(", ")}: $mergePairsFile.")
       initializeMergePairs(languages, vocabDir)
     } else {
-      BPEVocabularyGenerator.logger.info(s"Learning BPE coding for $language.")
+      BPEVocabularyGenerator.logger.info(s"Learning BPE coding for ${languages.mkString(", ")}.")
       mergePairsFile.parent.createDirectories()
       val mergePairsWriter = newWriter(mergePairsFile)
       val tokens = mutable.ArrayBuffer(tokenizedFiles.map(_.get).toIterator.flatMap(file => {
