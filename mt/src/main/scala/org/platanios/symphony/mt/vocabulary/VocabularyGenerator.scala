@@ -68,7 +68,8 @@ trait VocabularyGenerator {
     if (shared) {
       val vocabFile = vocabDir / filename(languages)
       val files = tokenizedFiles.flatten
-      languages.map(_ => generate(languages, files, vocabFile))
+      val vocabulary = generate(languages, files, vocabFile)
+      languages.map(_ => vocabulary)
     } else {
       languages.zip(tokenizedFiles).map(a => {
         val languages = Seq(a._1)
@@ -100,10 +101,12 @@ trait VocabularyGenerator {
       vocabDir: File,
       shared: Boolean = false
   ): Seq[Vocabulary] = {
-    if (shared)
-      languages.map(_ => Vocabulary(vocabDir / filename(languages)))
-    else
+    if (shared) {
+      val vocabulary = Vocabulary(vocabDir / filename(languages))
+      languages.map(_ => vocabulary)
+    } else {
       languages.map(l => Vocabulary(vocabDir / filename(Seq(l))))
+    }
   }
 
   override def toString: String
