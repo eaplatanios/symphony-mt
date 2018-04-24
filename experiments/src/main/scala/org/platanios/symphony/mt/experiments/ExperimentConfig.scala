@@ -346,13 +346,26 @@ object ExperimentConfig {
       value.split(":") match {
         case Array(name) if name == "none" => NoVocabulary
         case Array(name) if name == "merged" => MergedVocabularies
-        case Array(name) if name == "generated" => GeneratedVocabulary(SimpleVocabularyGenerator())
+        case Array(name) if name == "generated" =>
+          GeneratedVocabulary(SimpleVocabularyGenerator(), shared = false)
         case Array(name, sizeThreshold) if name == "generated" =>
-          GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold.toInt))
+          GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold.toInt), shared = false)
         case Array(name, sizeThreshold, countThreshold) if name == "generated" =>
-          GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold.toInt, countThreshold.toInt))
-        case Array(name) if name == "bpe" => GeneratedVocabulary(BPEVocabularyGenerator())
-        case Array(name, numMergeOps) if name == "bpe" => GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt))
+          GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold.toInt, countThreshold.toInt), shared = false)
+        case Array(name) if name == "generated_shared" =>
+          GeneratedVocabulary(SimpleVocabularyGenerator(), shared = true)
+        case Array(name, sizeThreshold) if name == "generated_shared" =>
+          GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold.toInt), shared = true)
+        case Array(name, sizeThreshold, countThreshold) if name == "generated_shared" =>
+          GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold.toInt, countThreshold.toInt), shared = true)
+        case Array(name) if name == "bpe" =>
+          GeneratedVocabulary(BPEVocabularyGenerator(), shared = false)
+        case Array(name, numMergeOps) if name == "bpe" =>
+          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt), shared = false)
+        case Array(name) if name == "bpe_shared" =>
+          GeneratedVocabulary(BPEVocabularyGenerator(), shared = true)
+        case Array(name, numMergeOps) if name == "bpe_shared" =>
+          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt), shared = true)
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid vocabulary.")
       }
     })

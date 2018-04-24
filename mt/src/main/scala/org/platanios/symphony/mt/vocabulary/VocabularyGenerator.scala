@@ -56,16 +56,16 @@ trait VocabularyGenerator {
     * @param  languages      Languages for which a vocabulary will be generated.
     * @param  tokenizedFiles Tokenized text files to use for generating the vocabulary files, for each language
     * @param  vocabDir       Directory in which to save the generated vocabulary files.
-    *
+    * @param  shared         If `true`, a single vocabulary will be created and shared for all languages.
     * @return The generated/replaced vocabulary files.
     */
   final def generate(
       languages: Seq[Language],
       tokenizedFiles: Seq[Seq[MutableFile]],
       vocabDir: File,
-      merged: Boolean = false
+      shared: Boolean = false
   ): Seq[File] = {
-    if (merged) {
+    if (shared) {
       val vocabFile = vocabDir / filename(languages)
       val files = tokenizedFiles.flatten
       languages.map(_ => generate(languages, files, vocabFile))
@@ -92,14 +92,15 @@ trait VocabularyGenerator {
     *
     * @param  languages Languages for which to return vocabularies.
     * @param  vocabDir  Directory in which the generated vocabulary files and any other relevant files have been saved.
+    * @param  shared    If `true`, a single vocabulary will be created and shared for all languages.
     * @return Created vocabularies.
     */
   final def getVocabularies(
       languages: Seq[Language],
       vocabDir: File,
-      merged: Boolean = false
+      shared: Boolean = false
   ): Seq[Vocabulary] = {
-    if (merged)
+    if (shared)
       languages.map(_ => Vocabulary(vocabDir / filename(languages)))
     else
       languages.map(l => Vocabulary(vocabDir / filename(Seq(l))))

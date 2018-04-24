@@ -189,23 +189,27 @@ object ParallelDatasetLoader {
       vocabularies.getOrElseUpdate(loader.tgtLanguage, mutable.ListBuffer.empty).append(loader.vocabularies._2: _*)
     })
     val vocabDir = workingDir.getOrElse(File(loaders.head.dataConfig.workingDir)) / "vocabularies"
-    val vocabulary = vocabularies.toMap.map {
-      case (l, v) =>
-        val vocabFilename = loaders.head.dataConfig.vocabulary.filename(Seq(l))
-        loaders.head.dataConfig.vocabulary match {
-          case NoVocabulary => l -> null // TODO: Avoid using nulls.
-          case GeneratedVocabulary(generator) =>
-            l -> {
-              val tokenizedFiles = loaders.zip(files).flatMap {
-                case (loader, f) if loader.srcLanguage == l => f._1
-                case (loader, f) if loader.tgtLanguage == l => f._2
-                case _ => Seq.empty
-              }
-              generator.generate(Seq(l), Seq(tokenizedFiles), vocabDir)
-              generator.getVocabularies(Seq(l), vocabDir, merged = false).head
-            }
-          case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
-          case MergedVocabularies if v.nonEmpty =>
+
+    val tokenizedFiles = vocabularies.keys.toSeq.map(language => language -> {
+      loaders.zip(files).flatMap {
+        case (loader, f) if loader.srcLanguage == language => f._1
+        case (loader, f) if loader.tgtLanguage == language => f._2
+        case _ => Seq.empty
+      }
+    })
+
+    val vocabulary = loaders.head.dataConfig.vocabulary match {
+      case NoVocabulary => vocabularies.keys.map(_ -> null).toMap // TODO: Avoid using nulls.
+      case GeneratedVocabulary(generator, shared) =>
+        val languages = tokenizedFiles.map(_._1)
+        generator.generate(languages, tokenizedFiles.map(_._2), vocabDir, shared = shared)
+        languages.zip(generator.getVocabularies(languages, vocabDir, shared = shared)).toMap
+      case MergedVocabularies => vocabularies.toMap.map {
+        case (l, v) =>
+          if (v.lengthCompare(1) == 0) {
+            l -> Vocabulary(v.head)
+          } else if (v.nonEmpty) {
+            val vocabFilename = loaders.head.dataConfig.vocabulary.filename(Seq(l))
             val vocabFile = vocabDir.createChild(vocabFilename, createParents = true)
             val writer = newWriter(vocabFile)
             v.toStream
@@ -215,9 +219,10 @@ object ParallelDatasetLoader {
             writer.flush()
             writer.close()
             l -> Vocabulary(vocabFile)
-          case MergedVocabularies if v.isEmpty =>
+          } else {
             throw new IllegalArgumentException("No existing vocabularies found to merge.")
-        }
+          }
+      }
     }
 
     val datasets = loaders.zip(files).map {

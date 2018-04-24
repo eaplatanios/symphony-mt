@@ -40,7 +40,7 @@ case object MergedVocabularies extends DatasetVocabulary {
   override def toString: String = "v:merged"
 }
 
-case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVocabulary {
+case class GeneratedVocabulary(generator: VocabularyGenerator, shared: Boolean) extends DatasetVocabulary {
   /** Returns the vocabulary file name that this vocabulary uses.
     *
     * @param  languages Languages for which a vocabulary will be generated.
