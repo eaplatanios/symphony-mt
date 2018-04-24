@@ -24,10 +24,10 @@ import org.platanios.symphony.mt.vocabulary.VocabularyGenerator
 sealed trait DatasetVocabulary {
   /** Returns the vocabulary file name that this vocabulary uses.
     *
-    * @param  language Language for which a vocabulary will be generated.
+    * @param  languages Languages for which a vocabulary will be generated.
     * @return Vocabulary file name.
     */
-  def filename(language: Language): String = s"vocab.${language.abbreviation}"
+  def filename(languages: Seq[Language]): String = s"vocab.${languages.map(_.abbreviation).sorted.mkString(".")}"
 
   override def toString: String
 }
@@ -43,10 +43,10 @@ case object MergedVocabularies extends DatasetVocabulary {
 case class GeneratedVocabulary(generator: VocabularyGenerator) extends DatasetVocabulary {
   /** Returns the vocabulary file name that this vocabulary uses.
     *
-    * @param  language Language for which a vocabulary will be generated.
+    * @param  languages Languages for which a vocabulary will be generated.
     * @return Vocabulary file name.
     */
-  override def filename(language: Language): String = generator.filename(language)
+  override def filename(languages: Seq[Language]): String = generator.filename(languages)
 
   override def toString: String = s"v:generated-${generator.toString}"
 }

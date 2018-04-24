@@ -38,32 +38,36 @@ class DummyVocabularyGenerator protected (
 ) extends VocabularyGenerator {
   /** Returns the vocabulary file name that this generator uses / will use.
     *
-    * @param  language Language for which a vocabulary will be generated.
+    * @param  languages Languages for which a vocabulary will be generated.
     * @return Vocabulary file name.
     */
-  override def filename(language: Language): String = {
-    s"vocab.dummy.$size.${language.abbreviation}"
+  override def filename(languages: Seq[Language]): String = {
+    s"vocab.dummy.$size.${languages.map(_.abbreviation).sorted.mkString(".")}"
   }
 
   /** Generates/Replaces a vocabulary file given a sequence of tokenized text files.
     *
-    * @param  language       Language for which a vocabulary will be generated.
+    * @param  languages      Languages for which a merged vocabulary will be generated.
     * @param  tokenizedFiles Tokenized text files to use for generating the vocabulary file.
-    * @param  vocabDir       Directory in which to save the generated vocabulary file.
+    * @param  vocabDir       Directory in which to save the generated vocabulary files.
     * @return The generated/replaced vocabulary file.
     */
-  def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
-    val vocabFile = vocabDir / filename(language)
+  override protected def generate(
+      languages: Seq[Language],
+      tokenizedFiles: Seq[MutableFile],
+      vocabDir: File
+  ): File = {
+    val vocabFile = vocabDir / filename(languages)
     if (replaceExisting || vocabFile.notExists) {
-      DummyVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
+      DummyVocabularyGenerator.logger.info(s"Generating vocabulary file for ${languages.mkString(", ")}.")
       vocabFile.parent.createDirectories()
       val writer = newWriter(vocabFile)
       (0 until size).foreach(wordId => writer.write(wordId + "\n"))
       writer.flush()
       writer.close()
-      DummyVocabularyGenerator.logger.info(s"Generated vocabulary file for $language.")
+      DummyVocabularyGenerator.logger.info(s"Generated vocabulary file for ${languages.mkString(", ")}.")
     } else {
-      DummyVocabularyGenerator.logger.info(s"Vocabulary file for $language already exists: $vocabFile.")
+      DummyVocabularyGenerator.logger.info(s"Vocabulary for ${languages.mkString(", ")} already exists: $vocabFile.")
     }
     vocabFile
   }

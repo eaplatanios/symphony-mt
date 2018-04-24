@@ -191,7 +191,7 @@ object ParallelDatasetLoader {
     val vocabDir = workingDir.getOrElse(File(loaders.head.dataConfig.workingDir)) / "vocabularies"
     val vocabulary = vocabularies.toMap.map {
       case (l, v) =>
-        val vocabFilename = loaders.head.dataConfig.vocabulary.filename(l)
+        val vocabFilename = loaders.head.dataConfig.vocabulary.filename(Seq(l))
         loaders.head.dataConfig.vocabulary match {
           case NoVocabulary => l -> null // TODO: Avoid using nulls.
           case GeneratedVocabulary(generator) =>
@@ -201,8 +201,8 @@ object ParallelDatasetLoader {
                 case (loader, f) if loader.tgtLanguage == l => f._2
                 case _ => Seq.empty
               }
-              generator.generate(l, tokenizedFiles, vocabDir)
-              generator.getVocabulary(l, vocabDir)
+              generator.generate(Seq(l), Seq(tokenizedFiles), vocabDir)
+              generator.getVocabularies(Seq(l), vocabDir, merged = false).head
             }
           case MergedVocabularies if v.lengthCompare(1) == 0 => l -> Vocabulary(v.head)
           case MergedVocabularies if v.nonEmpty =>

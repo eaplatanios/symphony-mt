@@ -29,8 +29,6 @@ import scala.collection.mutable
 import scala.collection.parallel.mutable.ParMap
 import scala.util.matching.Regex
 
-// TODO: Support shared BPE subword units across languages.
-
 /** Uses byte pair encoding (BPE) to learn a variable-length encoding of the vocabulary in a text.
   * Unlike the original BPE, it does not compress the plain text, but can be used to reduce the vocabulary of a text to
   * a configurable number of symbols, with only a small increase in the number of tokens.
@@ -61,42 +59,50 @@ class BPEVocabularyGenerator protected (
 ) extends VocabularyGenerator {
   protected val glossaryRegex: Regex = BPEVocabularyGenerator.glossaryRegex(glossary)
 
-  protected val mergePairs        : mutable.Map[Language, Map[(String, String), Int]]    = mutable.Map.empty
-  protected val reversedMergePairs: mutable.Map[Language, Map[String, (String, String)]] = mutable.Map.empty
-  protected val vocabularies      : mutable.Map[Language, Set[String]]                   = mutable.Map.empty
+  protected val mergePairs        : mutable.Map[Seq[Language], Map[(String, String), Int]]    = mutable.Map.empty
+  protected val reversedMergePairs: mutable.Map[Seq[Language], Map[String, (String, String)]] = mutable.Map.empty
+  protected val vocabularies      : mutable.Map[Seq[Language], Set[String]]                   = mutable.Map.empty
 
-  protected def mergePairsFilename(language: Language): String = {
-    s"merge_pairs.bpe.$numMergeOps.${language.abbreviation}"
+  protected def suffix(languages: Seq[Language]): String = {
+    languages.map(_.abbreviation).sorted.mkString(".")
+  }
+
+  protected def mergePairsFilename(languages: Seq[Language]): String = {
+    s"merge_pairs.bpe.$numMergeOps.${suffix(languages)}"
   }
 
   /** Returns the vocabulary file name that this generator uses / will use.
     *
-    * @param  language Language for which a vocabulary will be generated.
+    * @param  languages Languages for which a vocabulary will be generated.
     * @return Vocabulary file name.
     */
-  override def filename(language: Language): String = s"vocab.bpe.$numMergeOps.${language.abbreviation}"
+  override def filename(languages: Seq[Language]): String = {
+    s"vocab.bpe.$numMergeOps.${suffix(languages)}"
+  }
 
   /** Generates/Replaces a vocabulary file given a sequence of tokenized text files.
     *
-    * '''NOTE:''' This method replaces the tokenized files with new files containing the BPE tokenized text.
-    *
-    * @param  language       Language for which a vocabulary will be generated.
+    * @param  languages      Languages for which a merged vocabulary will be generated.
     * @param  tokenizedFiles Tokenized text files to use for generating the vocabulary file.
-    * @param  vocabDir       Directory in which to save the generated vocabulary file.
+    * @param  vocabDir       Directory in which to save the generated vocabulary files.
     * @return The generated/replaced vocabulary file.
     */
-  override def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
-    if (!mergePairs.contains(language)) {
-      mergePairs += language -> Map.empty
-      reversedMergePairs += language -> Map.empty
-      vocabularies += language -> Set.empty
+  override protected def generate(
+      languages: Seq[Language],
+      tokenizedFiles: Seq[MutableFile],
+      vocabDir: File
+  ): File = {
+    if (!mergePairs.contains(languages)) {
+      mergePairs += languages -> Map.empty
+      reversedMergePairs += languages -> Map.empty
+      vocabularies += languages -> Set.empty
     }
 
     // We first generate the merge pairs, if necessary.
-    val mergePairsFile = vocabDir / mergePairsFilename(language)
+    val mergePairsFile = vocabDir / mergePairsFilename(languages)
     if (mergePairsFile.exists && !replaceExisting) {
       BPEVocabularyGenerator.logger.info(s"Loading existing BPE coding for $language: $mergePairsFile.")
-      initializeMergePairs(language, vocabDir)
+      initializeMergePairs(languages, vocabDir)
     } else {
       BPEVocabularyGenerator.logger.info(s"Learning BPE coding for $language.")
       mergePairsFile.parent.createDirectories()
@@ -138,9 +144,9 @@ class BPEVocabularyGenerator protected (
             s"No pair has frequency higher than $countThreshold. Stopping the byte pair encoding (BPE) iteration.")
           continue = false
         } else {
-          if (!mergePairs(language).contains(mostFrequent._2)) {
-            mergePairs(language) += mostFrequent._2 -> currentSymbol
-            reversedMergePairs(language) += mostFrequent._2._1 + mostFrequent._2._2 -> mostFrequent._2
+          if (!mergePairs(languages).contains(mostFrequent._2)) {
+            mergePairs(languages) += mostFrequent._2 -> currentSymbol
+            reversedMergePairs(languages) += mostFrequent._2._1 + mostFrequent._2._2 -> mostFrequent._2
             mergePairsWriter.write(s"${mostFrequent._2._1}\t${mostFrequent._2._2}\n")
           }
           val changes = BPEVocabularyGenerator.replacePair(mostFrequent._2, tokens, indices)
@@ -155,18 +161,18 @@ class BPEVocabularyGenerator protected (
 
       BPEVocabularyGenerator.logger.info(
         s"│${"═" * 10}│ %${numMergeOps.toString.length}s / $numMergeOps BPE symbols processed.".format(currentSymbol))
-      BPEVocabularyGenerator.logger.info(s"Learned BPE coding for $language: $mergePairsFile.")
+      BPEVocabularyGenerator.logger.info(s"Learned BPE coding for ${languages.mkString(", ")}: $mergePairsFile.")
     }
 
     // We then generate the vocabulary, if necessary.
-    val vocabFile = vocabDir / filename(language)
+    val vocabFile = vocabDir / filename(languages)
     val vocabWriter = {
       if (vocabFile.exists && !replaceExisting) {
-        BPEVocabularyGenerator.logger.info(s"Vocabulary file for $language already exists: $vocabFile.")
-        initializeVocabularies(language, vocabDir)
+        BPEVocabularyGenerator.logger.info(s"Vocabulary for ${languages.mkString(", ")} already exists: $vocabFile.")
+        initializeVocabularies(languages, vocabDir)
         None
       } else {
-        BPEVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
+        BPEVocabularyGenerator.logger.info(s"Generating vocabulary file for ${languages.mkString(", ")}.")
         vocabFile.parent.createDirectories()
         Some(newWriter(vocabFile))
       }
@@ -178,7 +184,8 @@ class BPEVocabularyGenerator protected (
     val tokens = tokenizedFiles.flatMap(mutableFile => {
       val oldFile = mutableFile.get
       val file = oldFile.sibling(
-        s"${oldFile.nameWithoutExtension(includeAll = false)}.bpe.$numMergeOps.${language.abbreviation}")
+        s"${oldFile.nameWithoutExtension(includeAll = false)}" +
+            s".bpe.$numMergeOps.${languages.map(_.abbreviation).sorted.mkString(".")}")
       mutableFile.set(file)
       if (replaceExisting || file.notExists) {
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
@@ -188,7 +195,7 @@ class BPEVocabularyGenerator protected (
             .filter(_.length > 0)
             .flatMap(line => {
               var sentence = BPEVocabularyGenerator.whitespaceRegex.split(line)
-              sentence = encodeSentence(language, sentence, cache).toArray
+              sentence = encodeSentence(languages, sentence, cache).toArray
               if (sentence.nonEmpty)
                 fileWriter.foreach(_.write(s"${sentence.mkString(" ")}\n"))
               if (replaceExisting || vocabWriter.isDefined)
@@ -216,12 +223,12 @@ class BPEVocabularyGenerator protected (
           .map(_._2)
           .distinct
           .foreach(word => {
-            vocabularies(language) += word
+            vocabularies(languages) += word
             writer.write(word + "\n")
           })
       writer.flush()
       writer.close()
-      BPEVocabularyGenerator.logger.info(s"Generated vocabulary file for $language.")
+      BPEVocabularyGenerator.logger.info(s"Generated vocabulary file for ${languages.mkString(", ")}.")
     })
 
     fileWriters.foreach(fileWriter => {
@@ -229,64 +236,64 @@ class BPEVocabularyGenerator protected (
       fileWriter.close()
     })
 
-    BPEVocabularyGenerator.logger.info(s"Applied BPE coding to all provided files for $language.")
+    BPEVocabularyGenerator.logger.info(s"Applied BPE coding to all provided files for ${languages.mkString(", ")}.")
 
     vocabFile
   }
 
   /** Initializes the merge pairs of this BPE generators from an existing file.
     *
-    * @param  language Language for which a vocabulary has been generated.
-    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
+    * @param  languages Languages for which a vocabulary has been generated.
+    * @param  vocabDir  Directory in which the generated vocabulary file and any other relevant files have been saved.
     */
-  protected def initializeMergePairs(language: Language, vocabDir: File): Unit = {
-    val mergePairsFile = vocabDir / mergePairsFilename(language)
-    mergePairs += language -> newReader(mergePairsFile).lines().toAutoClosedIterator
+  protected def initializeMergePairs(languages: Seq[Language], vocabDir: File): Unit = {
+    val mergePairsFile = vocabDir / mergePairsFilename(languages)
+    mergePairs += languages -> newReader(mergePairsFile).lines().toAutoClosedIterator
         .filter(_ != "")
         .map(l => {
           val parts = l.split("\t")
           (parts(0), parts(1))
         }).zipWithIndex.toMap
-    reversedMergePairs += language -> mergePairs(language).toSeq.map(p => p._1._1 + p._1._2 -> p._1).toMap
+    reversedMergePairs += languages -> mergePairs(languages).toSeq.map(p => p._1._1 + p._1._2 -> p._1).toMap
   }
 
   /** Initializes the vocabularies of this BPE generators from an existing file.
     *
-    * @param  language Language for which a vocabulary has been generated.
-    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
+    * @param  languages Languages for which a vocabulary has been generated.
+    * @param  vocabDir  Directory in which the generated vocabulary file and any other relevant files have been saved.
     */
-  protected def initializeVocabularies(language: Language, vocabDir: File): Unit = {
-    val vocabFile = vocabDir / filename(language)
-    vocabularies += language -> newReader(vocabFile).lines().toAutoClosedIterator
+  protected def initializeVocabularies(languages: Seq[Language], vocabDir: File): Unit = {
+    val vocabFile = vocabDir / filename(languages)
+    vocabularies += languages -> newReader(vocabFile).lines().toAutoClosedIterator
         .filter(_ != "")
         .toSet
   }
 
-  /** Returns a vocabulary for the specified language, ready to be used by machine translation models.
+  /** Returns a vocabulary for the specified languages, ready to be used by machine translation models.
     *
-    * @param  language Language for which to return a vocabulary.
-    * @param  vocabDir Directory in which the generated vocabulary file and any other relevant files have been saved.
+    * @param  languages Languages for which to return a vocabulary.
+    * @param  vocabDir  Directory in which the generated vocabulary file and any other relevant files have been saved.
     * @return Created vocabulary.
     */
-  override def getVocabulary(language: Language, vocabDir: File): Vocabulary = {
-    CodedVocabulary(vocabDir / filename(language), s => encodeSentence(language, s), decodeSentence)
+  override protected def getVocabulary(languages: Seq[Language], vocabDir: File): Vocabulary = {
+    CodedVocabulary(vocabDir / filename(languages), s => encodeSentence(languages, s), decodeSentence)
   }
 
   /** Encodes the provided sentence to a sequence of BPE coded words.
     *
-    * @param  language Language in which the sentence is written.
-    * @param  sentence Sentence to encode as a sequence of words.
-    * @param  cache    Optional cache of already encoded words, used to speed up the encoding process.
+    * @param  languages Languages in which the sentence is written.
+    * @param  sentence  Sentence to encode as a sequence of words.
+    * @param  cache     Optional cache of already encoded words, used to speed up the encoding process.
     * @return Encoded sentence as a sequence of BPE coded words.
     */
   def encodeSentence(
-      language: Language,
+      languages: Seq[Language],
       sentence: Seq[String],
       cache: mutable.Map[String, Seq[String]] = mutable.Map.empty
   ): Seq[String] = {
     // TODO: Add support for glossaries (i.e., words that will be encoded with the identity function.
     sentence.flatMap(word => {
-      var parts = encodeWord(language, word, cache)
+      var parts = encodeWord(languages, word, cache)
       var i = 0
       while (i < parts.length - 1) {
         parts = parts.updated(i, parts(i) + separator)
@@ -298,13 +305,13 @@ class BPEVocabularyGenerator protected (
 
   /** Encodes the provided word to a sequence of BPE coded words.
     *
-    * @param  language Language in which the word is written.
-    * @param  word     Word to encode.
-    * @param  cache    Optional cache of already encoded words, used to speed up the encoding process.
+    * @param  languages Languages in which the word is written.
+    * @param  word      Word to encode.
+    * @param  cache     Optional cache of already encoded words, used to speed up the encoding process.
     * @return Encoded word as a sequence of BPE coded words.
     */
   def encodeWord(
-      language: Language,
+      languages: Seq[Language],
       word: String,
       cache: mutable.Map[String, Seq[String]] = mutable.Map.empty
   ): Seq[String] = {
@@ -318,7 +325,7 @@ class BPEVocabularyGenerator protected (
         var pairs = wordParts.sliding(2).map(p => (p(0), p(1))).toArray
         var continue = true
         while (pairs.nonEmpty && continue) {
-          val pair = pairs.map(p => (p, mergePairs(language).get(p))).minBy(_._2.getOrElse(Int.MaxValue))
+          val pair = pairs.map(p => (p, mergePairs(languages).get(p))).minBy(_._2.getOrElse(Int.MaxValue))
           if (pair._2.isEmpty) {
             continue = false
           } else {
@@ -334,7 +341,7 @@ class BPEVocabularyGenerator protected (
 
         // Check if the new words parts are in the vocabulary, and backtrack if necessary.
         wordParts = BPEVocabularyGenerator.checkVocabularyAndSplit(
-          wordParts, reversedMergePairs(language), vocabularies(language), separator)
+          wordParts, reversedMergePairs(languages), vocabularies(languages), separator)
 
         wordParts
       }

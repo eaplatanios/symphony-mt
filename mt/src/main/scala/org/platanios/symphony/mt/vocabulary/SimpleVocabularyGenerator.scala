@@ -43,31 +43,36 @@ class SimpleVocabularyGenerator protected (
 ) extends VocabularyGenerator {
   /** Returns the vocabulary file name that this generator uses / will use.
     *
-    * @param  language Language for which a vocabulary will be generated.
+    * @param  languages Languages for which a vocabulary will be generated.
     * @return Vocabulary file name.
     */
-  override def filename(language: Language): String = {
+  override def filename(languages: Seq[Language]): String = {
+    val suffix = languages.map(_.abbreviation).sorted.mkString(".")
     if (sizeThreshold == -1 && countThreshold == -1)
-      s"vocab.${language.abbreviation}"
+      s"vocab.$suffix"
     else if (countThreshold == -1)
-      s"vocab.s$sizeThreshold.${language.abbreviation}"
+      s"vocab.s$sizeThreshold.$suffix"
     else if (sizeThreshold == -1)
-      s"vocab.c$countThreshold.${language.abbreviation}"
+      s"vocab.c$countThreshold.$suffix"
     else
-      s"vocab.s$sizeThreshold.c$countThreshold.${language.abbreviation}"
+      s"vocab.s$sizeThreshold.c$countThreshold.$suffix"
   }
 
   /** Generates/Replaces a vocabulary file given a sequence of tokenized text files.
     *
-    * @param  language       Language for which a vocabulary will be generated.
+    * @param  languages      Languages for which a merged vocabulary will be generated.
     * @param  tokenizedFiles Tokenized text files to use for generating the vocabulary file.
-    * @param  vocabDir       Directory in which to save the generated vocabulary file.
+    * @param  vocabDir       Directory in which to save the generated vocabulary files.
     * @return The generated/replaced vocabulary file.
     */
-  override def generate(language: Language, tokenizedFiles: Seq[MutableFile], vocabDir: File): File = {
-    val vocabFile = vocabDir / filename(language)
+  override protected def generate(
+      languages: Seq[Language],
+      tokenizedFiles: Seq[MutableFile],
+      vocabDir: File
+  ): File = {
+    val vocabFile = vocabDir / filename(languages)
     if (replaceExisting || vocabFile.notExists) {
-      SimpleVocabularyGenerator.logger.info(s"Generating vocabulary file for $language.")
+      SimpleVocabularyGenerator.logger.info(s"Generating vocabulary file for ${languages.mkString(", ")}.")
       vocabFile.parent.createDirectories()
       val whitespaceRegex = "\\s+".r
       val writer = newWriter(vocabFile)
@@ -85,9 +90,9 @@ class SimpleVocabularyGenerator protected (
           .foreach(word => writer.write(word + "\n"))
       writer.flush()
       writer.close()
-      SimpleVocabularyGenerator.logger.info(s"Generated vocabulary file for $language.")
+      SimpleVocabularyGenerator.logger.info(s"Generated vocabulary file for ${languages.mkString(", ")}.")
     } else {
-      SimpleVocabularyGenerator.logger.info(s"Vocabulary file for $language already exists: $vocabFile.")
+      SimpleVocabularyGenerator.logger.info(s"Vocabulary for ${languages.mkString(", ")} already exists: $vocabFile.")
     }
     vocabFile
   }
