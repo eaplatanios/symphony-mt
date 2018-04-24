@@ -94,8 +94,8 @@ class ParameterManager protected (
         tf.createWithVariableScope("IndexToStringLookupTables") {
           if (sharedWordEmbeddings) {
             val table = languages.head._2.indexToStringLookupTable(name = "SharedIndexToStringLookupTable")
-            stringToIndexLookupTables += graph -> table.handle
-            stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID, INT64, name = "Default")
+            indexToStringLookupTables += graph -> table.handle
+            indexToStringLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN, STRING, name = "Default")
           } else {
             val tables = languages.map(l => l._2.indexToStringLookupTable(name = l._1.name))
             indexToStringLookupTables += graph -> tf.stack(tables.map(_.handle))
