@@ -21,6 +21,7 @@ import org.platanios.symphony.mt.evaluation
 import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
+import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.utilities.Encoding.tfStringToUTF8
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._

@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.Output
 

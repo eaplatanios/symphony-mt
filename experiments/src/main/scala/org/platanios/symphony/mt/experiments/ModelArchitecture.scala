@@ -18,7 +18,8 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
 import org.platanios.symphony.mt.evaluation.MTMetric
-import org.platanios.symphony.mt.models.{Model, ParameterManager, RNNModel}
+import org.platanios.symphony.mt.models.parameters.ParameterManager
+import org.platanios.symphony.mt.models.{Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
 import org.platanios.symphony.mt.vocabulary.Vocabulary

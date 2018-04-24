@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.models._
+import org.platanios.symphony.mt.models.parameters._
 import org.platanios.tensorflow.api._
 
 /**
@@ -60,7 +60,7 @@ case object HyperLanguage extends ModelType {
   override val name: String = "hyper_lang"
 
   override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
-    LanguageEmbeddingsParameterManager(
+    LanguageEmbeddingsManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
       wordEmbeddingsSize = wordEmbeddingsSize)
   }
@@ -72,7 +72,7 @@ case object HyperLanguagePair extends ModelType {
   override val name: String = "hyper_lang_pair"
 
   override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
-    LanguageEmbeddingsPairParameterManager(
+    LanguageEmbeddingsPairManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
       wordEmbeddingsSize = wordEmbeddingsSize)
   }
@@ -84,7 +84,7 @@ case object GoogleMultilingual extends ModelType {
   override val name: String = "google_multilingual"
 
   override def getParametersManager(languageEmbeddingsSize: Int, wordEmbeddingsSize: Int): ParameterManager = {
-    GoogleMultilingualParameterManager(
+    GoogleMultilingualManager(
       wordEmbeddingsSize = wordEmbeddingsSize,
       variableInitializer = tf.VarianceScalingInitializer(
         1.0f,

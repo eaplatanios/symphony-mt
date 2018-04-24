@@ -15,7 +15,8 @@
 
 package org.platanios.symphony.mt.models.rnn.attention
 
-import org.platanios.symphony.mt.models.{ParameterManager, Stage}
+import org.platanios.symphony.mt.models.Stage
+import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable

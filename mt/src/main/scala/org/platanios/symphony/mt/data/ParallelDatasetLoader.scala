@@ -190,6 +190,7 @@ object ParallelDatasetLoader {
     })
     val vocabDir = workingDir.getOrElse(File(loaders.head.dataConfig.workingDir)) / "vocabularies"
 
+    // Collect all tokenized files per language.
     val tokenizedFiles = vocabularies.keys.toSeq.map(language => language -> {
       loaders.zip(files).flatMap {
         case (loader, f) if loader.srcLanguage == language => f._1
@@ -198,6 +199,7 @@ object ParallelDatasetLoader {
       }
     })
 
+    // Obtain/Generate the vocabulary for each language.
     val vocabulary = loaders.head.dataConfig.vocabulary match {
       case NoVocabulary => vocabularies.keys.map(_ -> null).toMap // TODO: Avoid using nulls.
       case GeneratedVocabulary(generator, shared) =>

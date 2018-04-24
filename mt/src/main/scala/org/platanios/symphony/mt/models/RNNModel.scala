@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.evaluation._
+import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._

@@ -16,7 +16,8 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.{DeviceManager, ParameterManager, RNNModel, Stage}
+import org.platanios.symphony.mt.models.parameters.ParameterManager
+import org.platanios.symphony.mt.models.{DeviceManager, RNNModel, Stage}
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
