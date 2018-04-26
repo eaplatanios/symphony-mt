@@ -67,8 +67,8 @@ lazy val tensorFlowSettings = Seq(
   libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion) // classifier "linux-gpu-x86_64")
 
 lazy val all = (project in file("."))
-    .aggregate(mt, experiments)
-    .dependsOn(mt, experiments)
+    .aggregate(mt, experiments, docs)
+    .dependsOn(mt, experiments, docs)
     .settings(moduleName := "symphony", name := "Symphony")
     .settings(commonSettings)
     .settings(publishSettings)
@@ -112,6 +112,39 @@ lazy val experiments = (project in file("./experiments"))
         "io.circe" %% "circe-generic" % "0.7.0",
         "io.circe" %% "circe-parser" % "0.7.0",
         "org.vegas-viz" %% "vegas" % "0.3.12-SNAPSHOT"))
+
+val MT = config("mt")
+val Experiments = config("experiments")
+
+lazy val docs = (project in file("docs"))
+    .enablePlugins(SiteScaladocPlugin, ParadoxPlugin, ParadoxMaterialThemePlugin, GhpagesPlugin)
+    .settings(moduleName := "symphony-docs", name := "Symphony Documentation")
+    .settings(
+      SiteScaladocPlugin.scaladocSettings(MT, mappings in (Compile, packageDoc) in mt, "api/mt"),
+      SiteScaladocPlugin.scaladocSettings(Experiments, mappings in (Compile, packageDoc) in experiments, "api/experiments"),
+      ghpagesNoJekyll := true,
+      siteSubdirName in SiteScaladoc := "api/latest",
+      siteSourceDirectory := (target in (Compile, paradox)).value,
+      makeSite := makeSite.dependsOn(paradox in Compile).value,
+      paradoxMaterialTheme := ParadoxMaterialTheme(),
+      paradoxProperties += ("material.theme.version" -> (version in paradoxMaterialTheme).value),
+      paradoxProperties ++= paradoxMaterialTheme.value.paradoxProperties,
+      mappings in makeSite ++= (mappings in (Compile, paradoxMaterialTheme)).value,
+      mappings in makeSite ++= Seq(
+        file("LICENSE") -> "LICENSE"),
+      // file("src/assets/favicon.ico") -> "favicon.ico"),
+      scmInfo := Some(ScmInfo(
+        url("https://github.com/eaplatanios/symphony-mt"),
+        "git@github.com:eaplatanios/symphony-mt.git")),
+      git.remoteRepo := scmInfo.value.get.connection,
+      paradoxMaterialTheme in Compile ~= {
+        _.withColor("blue", "indigo")
+            .withRepository(uri("https://github.com/eaplatanios/symphony-mt"))
+            .withSocial(
+              uri("https://github.com/eaplatanios"),
+              uri("https://twitter.com/eaplatanios"))
+            .withLanguage(java.util.Locale.ENGLISH)
+      })
 
 lazy val noPublishSettings = Seq(
   publish := Unit,
