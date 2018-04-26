@@ -73,7 +73,7 @@ class IWSLT17Loader(
 }
 
 object IWSLT17Loader {
-  val url     : String = "https://wit3.fbk.eu/archive/2017-01-trnmted/texts/DeEnItNlRo/DeEnItNlRo/"
+  val url     : String = "https://wit3.fbk.eu/archive/2017-01-trnmted/texts/DeEnItNlRo/DeEnItNlRo"
   val filename: String = "DeEnItNlRo-DeEnItNlRo"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(

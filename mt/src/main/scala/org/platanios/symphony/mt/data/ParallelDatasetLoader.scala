@@ -61,13 +61,10 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
 
   /** Extracted files (if needed) from `downloadedFiles`. */
   protected val extractedFiles: Seq[File] = {
-    ParallelDatasetLoader.logger.info(s"$name - Extracting any downloaded archives.")
-    val files = downloadedFiles.flatMap(
+    downloadedFiles.flatMap(
       ParallelDatasetLoader.maybeExtractTGZ(_, dataConfig.loaderBufferSize)
           .listRecursively
           .filter(_.isRegularFile))
-    ParallelDatasetLoader.logger.info(s"$name - Extracted any downloaded archives.")
-    files
   }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
@@ -126,8 +123,11 @@ object ParallelDatasetLoader {
   def maybeExtractTGZ(file: File, bufferSize: Int = 8192): File = {
     if (file.extension(includeAll = true).exists(ext => ext == ".tgz" || ext == ".tar.gz")) {
       val processedFile = file.sibling(file.nameWithoutExtension(includeAll = true))
-      if (processedFile.notExists)
+      if (processedFile.notExists) {
+        ParallelDatasetLoader.logger.info(s"Extracting $file.")
         CompressedFiles.decompressTGZ(file, processedFile, bufferSize)
+        ParallelDatasetLoader.logger.info(s"Extracted $file.")
+      }
       processedFile
     } else {
       file
