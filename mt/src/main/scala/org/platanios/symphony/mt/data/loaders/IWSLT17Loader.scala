@@ -57,16 +57,16 @@ class IWSLT17Loader(
   override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
     datasetType match {
       case Train => Seq((IWSLT17Loader.Train,
-          File(downloadsDir) / IWSLT17Loader.filename / s"train.tags.$directoryName.$src",
-          File(downloadsDir) / IWSLT17Loader.filename / s"train.tags.$directoryName.$tgt",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"train.tags.$directoryName.$src",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"train.tags.$directoryName.$tgt",
           TEDConverter >> Normalizer >> PunctuationNormalizer))
       case Dev => Seq((IWSLT17Loader.Dev2010,
-          File(downloadsDir) / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$directoryName.$src.xml",
-          File(downloadsDir) / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$directoryName.$tgt.xml",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$directoryName.$src.xml",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$directoryName.$tgt.xml",
           SGMConverter >> Normalizer >> PunctuationNormalizer))
       case Test => Seq((IWSLT17Loader.Test2010,
-          File(downloadsDir) / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$directoryName.$src.xml",
-          File(downloadsDir) / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$directoryName.$tgt.xml",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$directoryName.$src.xml",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$directoryName.$tgt.xml",
           SGMConverter >> Normalizer >> PunctuationNormalizer))
     }
   }
