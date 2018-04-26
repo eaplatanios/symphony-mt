@@ -130,7 +130,7 @@ class BLEU protected (
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
     if (weights != null)
       ops += weights.op
-    tf.createWithVariableScope(name) {
+    tf.variableScope(name) {
       tf.createWithNameScope(name, ops) {
         val n = maxOrder
         val matches = variable("Matches", INT64, Shape(n), tf.ZerosInitializer, variablesCollections)

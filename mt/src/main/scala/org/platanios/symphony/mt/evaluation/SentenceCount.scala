@@ -68,7 +68,7 @@ class SentenceCount protected (
     if (weights != null)
       ops += weights.op
     val sanitizedName = sanitize(name)
-    tf.createWithVariableScope(sanitizedName) {
+    tf.variableScope(sanitizedName) {
       tf.createWithNameScope(sanitizedName, ops) {
         val count = variable("Count", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val updateCount = count.assignAdd(tf.size(refLen))

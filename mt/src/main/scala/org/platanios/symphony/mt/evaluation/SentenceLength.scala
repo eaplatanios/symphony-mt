@@ -69,7 +69,7 @@ class SentenceLength protected (
     if (weights != null)
       ops += weights.op
     val sanitizedName = sanitize(name)
-    tf.createWithVariableScope(sanitizedName) {
+    tf.variableScope(sanitizedName) {
       tf.createWithNameScope(sanitizedName, ops) {
         val length = variable("Length", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val count = variable("Count", INT32, Shape(), tf.ZerosInitializer, variablesCollections)

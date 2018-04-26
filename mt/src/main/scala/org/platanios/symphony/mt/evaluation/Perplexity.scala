@@ -54,7 +54,7 @@ class Perplexity(
       weights: Output = null,
       name: String = name
   ): Metric.StreamingInstance[Output] = {
-    tf.createWithVariableScope(name) {
+    tf.variableScope(name) {
       tf.createWithNameScope(name) {
         // Create accumulator variables
         val loss = variable("Loss", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)

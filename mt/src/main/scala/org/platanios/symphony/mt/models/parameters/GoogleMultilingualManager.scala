@@ -42,7 +42,7 @@ class GoogleMultilingualManager protected (
   }
 
   override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
-    tf.createWithVariableScope("ParameterManager") {
+    tf.variableScope("ParameterManager") {
       super.initialize(languages)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {

@@ -58,7 +58,7 @@ case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVaria
       stage: Stage
   ): Output = {
     val numFilters = depth.getOrElse(input.shape(-1))
-    tf.createWithVariableScope(name, reuse) {
+    tf.variableScope(name, reuse) {
       val scale = parameterManager.get("Scale", input.dataType, Shape(numFilters), tf.OnesInitializer)
       val bias = parameterManager.get("Bias", input.dataType, Shape(numFilters), tf.ZerosInitializer)
       val mean = tf.mean(input, axes = -1, keepDims = true)

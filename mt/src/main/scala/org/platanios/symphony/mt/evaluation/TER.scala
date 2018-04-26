@@ -121,7 +121,7 @@ class TER protected (
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
     if (weights != null)
       ops += weights.op
-    tf.createWithVariableScope(name) {
+    tf.variableScope(name) {
       tf.createWithNameScope(name, ops) {
         val totalEdits = variable("TotalEdits", FLOAT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val totalWords = variable("TotalWords", FLOAT32, Shape(), tf.ZerosInitializer, variablesCollections)

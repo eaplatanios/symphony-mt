@@ -147,7 +147,7 @@ class Meteor protected (
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
     if (weights != null)
       ops += weights.op
-    tf.createWithVariableScope(name) {
+    tf.variableScope(name) {
       tf.createWithNameScope(name, ops) {
         // TODO: Find a better way to deal with the language.
         val language = variable("Language", INT32, Shape(), tf.ZerosInitializer, variablesCollections)

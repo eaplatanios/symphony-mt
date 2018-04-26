@@ -254,10 +254,10 @@ abstract class Model[S] protected (
           val tgtSequence = mapToWordIds(input._1._2, input._2._1)
           val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
           val tgtMapped = (tgtSequence, input._2._2)
-          val state = tf.createWithVariableScope("Encoder") {
+          val state = tf.variableScope("Encoder") {
             encoder(srcMapped)
           }
-          val output = tf.createWithVariableScope("Decoder") {
+          val output = tf.variableScope("Decoder") {
             decoder(srcMapped, Some(tgtMapped), Some(state))
           }
           (input._1._2, output._1, output._2)
@@ -278,10 +278,10 @@ abstract class Model[S] protected (
           parameterManager.setContext((input._1, input._2))
           val srcSequence = mapToWordIds(input._1, input._3)
           val srcMapped = (input._1, input._2, srcSequence, input._4)
-          val state = tf.createWithVariableScope("Encoder") {
+          val state = tf.variableScope("Encoder") {
             encoder(srcMapped)
           }
-          val output = tf.createWithVariableScope("Decoder") {
+          val output = tf.variableScope("Decoder") {
             decoder(srcMapped, None, Some(state))
           }
           val decodedSequences = mapFromWordIds(input._2, output._1)

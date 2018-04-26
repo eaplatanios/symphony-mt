@@ -67,8 +67,8 @@
 //    var x = encoderInput
 //    var y = x
 //    (0 until config.encoderNumLayers).foreach(layer => {
-//      tf.createWithVariableScope(s"Layer$layer") {
-//        tf.createWithVariableScope("SelfAttention") {
+//      tf.variableScope(s"Layer$layer") {
+//        tf.variableScope("SelfAttention") {
 //          val queryAntecedent = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parameterManager)
 //          y = Attention.multiHeadAttention(
 //            queryAntecedent = queryAntecedent,
@@ -82,7 +82,7 @@
 //            name = "MultiHeadAttention")(mode, parameterManager)
 //          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)
 //        }
-//        tf.createWithVariableScope("FeedForward") {
+//        tf.variableScope("FeedForward") {
 //          val xx = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parameterManager)
 //          y = config.encoderFeedForwardLayer(xx, padRemover)(mode, parameterManager)
 //          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)
@@ -188,8 +188,8 @@
 //    var x = decoderInput
 //    var y = x
 //    (0 until config.decoderNumLayers).foreach(layer => {
-//      tf.createWithVariableScope(s"Layer$layer") {
-//        tf.createWithVariableScope("SelfAttention") {
+//      tf.variableScope(s"Layer$layer") {
+//        tf.variableScope("SelfAttention") {
 //          val queryAntecedent = LayerProcessor.layerPreprocess(
 //            x, config.layerPreprocessors)(mode, parameterManager)
 //          y = Attention.multiHeadAttention(
@@ -207,7 +207,7 @@
 //        }
 //        state.foreach(encOutput => {
 //          // TODO: Add caching.
-//          tf.createWithVariableScope("EncoderDecoderAttention") {
+//          tf.variableScope("EncoderDecoderAttention") {
 //            val queryAntecedent = LayerProcessor.layerPreprocess(
 //              x, config.layerPreprocessors)(mode, parameterManager)
 //            y = Attention.multiHeadAttention(
@@ -223,7 +223,7 @@
 //            x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)
 //          }
 //        })
-//        tf.createWithVariableScope("FeedForward") {
+//        tf.variableScope("FeedForward") {
 //          val xx = LayerProcessor.layerPreprocess(x, config.layerPreprocessors)(mode, parameterManager)
 //          y = config.encoderFeedForwardLayer(xx, None)(mode, parameterManager)
 //          x = LayerProcessor.layerPostprocess(x, y, config.layerPostprocessors)(mode, parameterManager)

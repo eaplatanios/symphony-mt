@@ -22,6 +22,8 @@ import org.platanios.tensorflow.api._
 
 import scala.collection.mutable
 
+// TODO: Add support for an optional language embeddings merge layer.
+
 /**
   * @author Emmanouil Antonios Platanios
   */
@@ -44,7 +46,7 @@ class LanguageEmbeddingsPairManager protected (
   }
 
   override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
-    tf.createWithVariableScope("ParameterManager") {
+    tf.variableScope("ParameterManager") {
       super.initialize(languages)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {
@@ -65,12 +67,12 @@ class LanguageEmbeddingsPairManager protected (
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   )(implicit stage: Stage): Output = {
-    tf.createWithVariableScope("ParameterManager") {
+    tf.variableScope("ParameterManager") {
       val graph = currentGraph
       val variableScopeName = tf.currentVariableScope.name
       val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
 
-      def create(): Output = tf.createWithVariableScope(name) {
+      def create(): Output = tf.variableScope(name) {
         val languagePair = tf.stack(Seq(context.get._1, context.get._2))
         val embeddings = languageEmbeddings(graph).gather(languagePair).reshape(Shape(1, -1))
         val weights = tf.variable("Dense/Weights", FLOAT32, Shape(2 * languageEmbeddingsSize, shape.numElements.toInt))

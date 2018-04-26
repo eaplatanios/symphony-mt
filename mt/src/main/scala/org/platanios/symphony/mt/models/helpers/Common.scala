@@ -395,7 +395,7 @@ object Common {
       name: String = "DenseReLUDense"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
       stage: Stage
-  ): Output = tf.createWithVariableScope(name) {
+  ): Output = tf.variableScope(name) {
     val weights1 = parameterManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
     val bias1 = parameterManager.get("Dense1/Bias", input.dataType, Shape(filterSize))
     var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")

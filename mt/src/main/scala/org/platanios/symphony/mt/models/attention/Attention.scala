@@ -242,7 +242,7 @@ object Attention {
   ): (Output, Output, Output) = {
 
     def compute(input: Output, depth: Int, numFilters: Int, paddingMode: tf.ConvPaddingMode, name: String): Output = {
-      tf.createWithVariableScope(name) {
+      tf.variableScope(name) {
         if (numFilters == 1) {
           val weights = parameterManager.get("Weights", input.dataType, Shape(input.shape(-1), depth))
           tf.linear(input, weights)
@@ -309,7 +309,7 @@ object Attention {
   ): Output = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
-    tf.createWithVariableScope(name) {
+    tf.variableScope(name) {
       var (q, k, v) = computeQKV(
         queryAntecedent, memoryAntecedent, totalKeysDepth, totalValuesDepth, qNumFilters, kvNumFilters,
         qPaddingMode, kvPaddingMode)(mode, parameterManager)

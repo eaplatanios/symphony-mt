@@ -195,7 +195,7 @@ object RNNModel {
       stage: Stage,
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): tf.RNNCell[Output, Shape, S, SS] = tf.createWithVariableScope(name) {
+  ): tf.RNNCell[Output, Shape, S, SS] = tf.variableScope(name) {
     tf.createWith(device = device) {
       // Create the main RNN cell.
       var createdCell = cellCreator.create(name, numInputs, numUnits, dataType)(mode, parameterManager)
@@ -235,7 +235,7 @@ object RNNModel {
       stage: Stage,
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): Seq[tf.RNNCell[Output, Shape, S, SS]] = tf.createWithVariableScope(name) {
+  ): Seq[tf.RNNCell[Output, Shape, S, SS]] = tf.variableScope(name) {
     (0 until numLayers).foldLeft(Seq.empty[tf.RNNCell[Output, Shape, S, SS]])((cells, i) => {
       val cellNumInputs = if (i == 0) numInputs else cells(i - 1).outputShape(-1)
       cells :+ cell(

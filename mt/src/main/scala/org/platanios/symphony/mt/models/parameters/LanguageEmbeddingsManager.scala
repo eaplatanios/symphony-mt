@@ -44,7 +44,7 @@ class LanguageEmbeddingsManager protected (
   }
 
   override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
-    tf.createWithVariableScope("ParameterManager") {
+    tf.variableScope("ParameterManager") {
       super.initialize(languages)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {
@@ -65,12 +65,12 @@ class LanguageEmbeddingsManager protected (
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
   )(implicit stage: Stage): Output = {
-    tf.createWithVariableScope("ParameterManager") {
+    tf.variableScope("ParameterManager") {
       val graph = currentGraph
       val variableScopeName = tf.currentVariableScope.name
       val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
 
-      def create(): Output = tf.createWithVariableScope(name) {
+      def create(): Output = tf.variableScope(name) {
         val language = stage match {
           case Encoding => context.get._1
           case Decoding => context.get._2

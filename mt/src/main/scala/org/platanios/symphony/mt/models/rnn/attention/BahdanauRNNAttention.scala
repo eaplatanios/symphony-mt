@@ -49,7 +49,7 @@ case class BahdanauRNNAttention(
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: tf.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, Output, Shape], AttentionWrapperState[S, SS, Seq[Output], Seq[Shape]]) = {
-    tf.createWithVariableScope("BahdanauAttention") {
+    tf.variableScope("BahdanauAttention") {
       val dataType = memory.dataType
       val memoryWeights = parameterManager.get("MemoryWeights", dataType, Shape(numUnits, numUnits))
       val queryWeights = parameterManager.get("QueryWeights", dataType, Shape(numUnits, numUnits))
