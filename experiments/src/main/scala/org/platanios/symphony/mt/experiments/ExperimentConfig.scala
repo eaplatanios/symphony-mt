@@ -100,6 +100,7 @@ case class ExperimentConfig(
       case "iwslt14" => languagePairs.map(l => IWSLT14Loader(l._1, l._2, dataConfig))
       case "iwslt15" => languagePairs.map(l => IWSLT15Loader(l._1, l._2, dataConfig))
       case "iwslt16" => languagePairs.map(l => IWSLT16Loader(l._1, l._2, dataConfig))
+      case "iwslt17" => languagePairs.map(l => IWSLT17Loader(l._1, l._2, dataConfig))
       case "wmt16" => languagePairs.map(l => WMT16Loader(l._1, l._2, dataConfig))
     }, Some(workingDir))
   }
@@ -140,6 +141,7 @@ case class ExperimentConfig(
           case "iwslt14" => evalDatasetTags.map(t => (s"IWSLT-14/${t._1}", IWSLT14Loader.Tag.fromName(t._1), t._2))
           case "iwslt15" => evalDatasetTags.map(t => (s"IWSLT-15/${t._1}", IWSLT15Loader.Tag.fromName(t._1), t._2))
           case "iwslt16" => evalDatasetTags.map(t => (s"IWSLT-16/${t._1}", IWSLT16Loader.Tag.fromName(t._1), t._2))
+          case "iwslt17" => evalDatasetTags.map(t => (s"IWSLT-17/${t._1}", IWSLT16Loader.Tag.fromName(t._1), t._2))
           case "wmt16" => evalDatasetTags.map(t => (s"WMT-16/${t._1}", WMT16Loader.Tag.fromName(t._1), t._2))
         }
         evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2), t._3)))
@@ -417,7 +419,7 @@ object ExperimentConfig {
     opt[String]("dataset").required().valueName("<name>")
         .action((d, c) => c.copy(dataset = d))
         .text("Specifies the dataset to use for the experiment. " +
-            "Valid values are: 'iwslt14', 'iwslt15', 'iwslt16', and 'wmt16'.")
+            "Valid values are: 'iwslt14', 'iwslt15', 'iwslt16', 'iwslt17', and 'wmt16'.")
 
     opt[Seq[String]]("language-pairs").required().valueName("<srcLang1>:<tgtLang1>[,<srcLang2>:<tgtLang2>[...]]")
         .action((d, c) => c.copy(languagePairs = d.map(p => {
