@@ -35,12 +35,12 @@ class ParameterManager protected (
   protected var deviceManager: Option[DeviceManager]       = None
   protected var languages    : Seq[(Language, Vocabulary)] = _
 
-  protected val languageIds                : mutable.Map[Graph, Seq[Output]] = mutable.Map.empty
-  protected val stringToIndexLookupTables  : mutable.Map[Graph, Output]      = mutable.Map.empty
-  protected val stringToIndexLookupDefaults: mutable.Map[Graph, Output]      = mutable.Map.empty
-  protected val indexToStringLookupTables  : mutable.Map[Graph, Output]      = mutable.Map.empty
-  protected val indexToStringLookupDefaults: mutable.Map[Graph, Output]      = mutable.Map.empty
-  protected val wordEmbeddings             : mutable.Map[Graph, Seq[Output]] = mutable.Map.empty
+  protected val languageIds                : mutable.Map[Graph, Seq[Output]]          = mutable.Map.empty
+  protected val stringToIndexLookupTables  : mutable.Map[Graph, Output]               = mutable.Map.empty
+  protected val stringToIndexLookupDefaults: mutable.Map[Graph, Output]               = mutable.Map.empty
+  protected val indexToStringLookupTables  : mutable.Map[Graph, Output]               = mutable.Map.empty
+  protected val indexToStringLookupDefaults: mutable.Map[Graph, Output]               = mutable.Map.empty
+  protected val wordEmbeddings             : mutable.Map[Graph, wordEmbeddingsType.T] = mutable.Map.empty
 
   protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, Seq[Output]]] = mutable.Map.empty
 
@@ -118,7 +118,7 @@ class ParameterManager protected (
   def wordEmbeddings(languageId: Output): Output => Output = (keys: Output) => {
     tf.variableScope("ParameterManager/WordEmbeddings") {
       val graph = currentGraph
-      wordEmbeddingsType.embeddingLookup(wordEmbeddings(graph), languageIds(graph), languageId, keys)
+      wordEmbeddingsType.embeddingLookup(wordEmbeddings(graph), languageIds(graph), languageId, keys, context)
     }
   }
 

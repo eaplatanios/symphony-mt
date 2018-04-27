@@ -25,19 +25,22 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 trait WordEmbeddingsType {
+  type T
+
   val embeddingsSize: Int
 
   def createStringToIndexLookupTable(languages: Seq[(Language, Vocabulary)]): Output
   def createIndexToStringLookupTable(languages: Seq[(Language, Vocabulary)]): Output
-  def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): Seq[Output]
+  def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): T
 
   def lookupTable(lookupTable: Output, languageId: Output): Output
 
   def embeddingLookup(
-      embeddingTables: Seq[Output],
+      embeddingTables: T,
       languageIds: Seq[Output],
       languageId: Output,
-      keys: Output
+      keys: Output,
+      context: Option[(Output, Output)]
   ): Output
 
   def projectionToWords(

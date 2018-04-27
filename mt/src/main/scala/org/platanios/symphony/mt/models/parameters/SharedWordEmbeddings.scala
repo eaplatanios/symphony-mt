@@ -27,6 +27,8 @@ import scala.collection.mutable
 class SharedWordEmbeddings protected (
     override val embeddingsSize: Int
 ) extends WordEmbeddingsType {
+  override type T = Output
+
   override def createStringToIndexLookupTable(languages: Seq[(Language, Vocabulary)]): Output = {
     languages.head._2.stringToIndexLookupTable(name = "SharedStringToIndexLookupTable").handle
   }
@@ -35,12 +37,12 @@ class SharedWordEmbeddings protected (
     languages.head._2.indexToStringLookupTable(name = "SharedIndexToStringLookupTable").handle
   }
 
-  override def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): Seq[Output] = {
+  override def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): Output = {
     val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
     val someLanguage = languages.head
-    Seq(tf.variable(
+    tf.variable(
       someLanguage._1.name, FLOAT32, Shape(someLanguage._2.size, embeddingsSize),
-      embeddingsInitializer).value)
+      embeddingsInitializer).value
   }
 
   override def lookupTable(lookupTable: Output, languageId: Output): Output = {
@@ -48,12 +50,13 @@ class SharedWordEmbeddings protected (
   }
 
   override def embeddingLookup(
-      embeddingTables: Seq[Output],
+      embeddingTables: Output,
       languageIds: Seq[Output],
       languageId: Output,
-      keys: Output
+      keys: Output,
+      context: Option[(Output, Output)]
   ): Output = {
-    embeddingTables.head.gather(keys)
+    embeddingTables.gather(keys)
   }
 
   override def projectionToWords(
