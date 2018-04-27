@@ -141,7 +141,7 @@ case class ExperimentConfig(
           case "iwslt14" => evalDatasetTags.map(t => (s"IWSLT-14/${t._1}", IWSLT14Loader.Tag.fromName(t._1), t._2))
           case "iwslt15" => evalDatasetTags.map(t => (s"IWSLT-15/${t._1}", IWSLT15Loader.Tag.fromName(t._1), t._2))
           case "iwslt16" => evalDatasetTags.map(t => (s"IWSLT-16/${t._1}", IWSLT16Loader.Tag.fromName(t._1), t._2))
-          case "iwslt17" => evalDatasetTags.map(t => (s"IWSLT-17/${t._1}", IWSLT16Loader.Tag.fromName(t._1), t._2))
+          case "iwslt17" => evalDatasetTags.map(t => (s"IWSLT-17/${t._1}", IWSLT17Loader.Tag.fromName(t._1), t._2))
           case "wmt16" => evalDatasetTags.map(t => (s"WMT-16/${t._1}", WMT16Loader.Tag.fromName(t._1), t._2))
         }
         evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2), t._3)))
