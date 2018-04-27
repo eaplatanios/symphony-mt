@@ -394,6 +394,8 @@ object ExperimentConfig {
           tf.train.LazyAdam(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "amsgrad" =>
           tf.train.AMSGrad(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+        case Array(name, learningRate) if name == "lazy_amsgrad" =>
+          tf.train.LazyAMSGrad(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "yf" =>
           tf.train.YellowFin(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid optimizer.")
