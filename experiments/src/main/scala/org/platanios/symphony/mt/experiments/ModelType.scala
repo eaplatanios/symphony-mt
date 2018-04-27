@@ -53,9 +53,14 @@ case object Pairwise extends ModelType {
       wordEmbeddingsSize: Int,
       sharedWordEmbeddings: Boolean
   ): ParameterManager = {
+    val wordEmbeddingsType = {
+      if (sharedWordEmbeddings)
+        SharedWordEmbeddings(wordEmbeddingsSize)
+      else
+        WordEmbeddingsPerLanguage(wordEmbeddingsSize) // TODO: !!!
+    }
     ParameterManager(
-      wordEmbeddingsSize = wordEmbeddingsSize,
-      sharedWordEmbeddings = sharedWordEmbeddings,
+      wordEmbeddingsType = wordEmbeddingsType,
       variableInitializer = tf.VarianceScalingInitializer(
         1.0f,
         tf.VarianceScalingInitializer.FanAverageScalingMode,
@@ -73,10 +78,15 @@ case object HyperLanguage extends ModelType {
       wordEmbeddingsSize: Int,
       sharedWordEmbeddings: Boolean
   ): ParameterManager = {
+    val wordEmbeddingsType = {
+      if (sharedWordEmbeddings)
+        SharedWordEmbeddings(wordEmbeddingsSize)
+      else
+        WordEmbeddingsPerLanguage(wordEmbeddingsSize)
+    }
     LanguageEmbeddingsManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
-      wordEmbeddingsSize = wordEmbeddingsSize,
-      sharedWordEmbeddings = sharedWordEmbeddings)
+      wordEmbeddingsType = wordEmbeddingsType)
   }
 
   override def toString: String = "hyper_lang"
@@ -90,10 +100,15 @@ case object HyperLanguagePair extends ModelType {
       wordEmbeddingsSize: Int,
       sharedWordEmbeddings: Boolean
   ): ParameterManager = {
+    val wordEmbeddingsType = {
+      if (sharedWordEmbeddings)
+        SharedWordEmbeddings(wordEmbeddingsSize)
+      else
+        WordEmbeddingsPerLanguage(wordEmbeddingsSize)
+    }
     LanguageEmbeddingsPairManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
-      wordEmbeddingsSize = wordEmbeddingsSize,
-      sharedWordEmbeddings = sharedWordEmbeddings)
+      wordEmbeddingsType = wordEmbeddingsType)
   }
 
   override def toString: String = "hyper_lang_pair"
@@ -107,9 +122,14 @@ case object GoogleMultilingual extends ModelType {
       wordEmbeddingsSize: Int,
       sharedWordEmbeddings: Boolean
   ): ParameterManager = {
+    val wordEmbeddingsType = {
+      if (sharedWordEmbeddings)
+        SharedWordEmbeddings(wordEmbeddingsSize)
+      else
+        WordEmbeddingsPerLanguage(wordEmbeddingsSize)
+    }
     GoogleMultilingualManager(
-      wordEmbeddingsSize = wordEmbeddingsSize,
-      sharedWordEmbeddings = sharedWordEmbeddings,
+      wordEmbeddingsType = wordEmbeddingsType,
       variableInitializer = tf.VarianceScalingInitializer(
         1.0f,
         tf.VarianceScalingInitializer.FanAverageScalingMode,

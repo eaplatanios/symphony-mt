@@ -29,13 +29,9 @@ import scala.collection.mutable
   */
 class LanguageEmbeddingsPairManager protected (
     val languageEmbeddingsSize: Int,
-    override val wordEmbeddingsSize: Int,
-    override val mergedWordEmbeddings: Boolean = false,
-    override val mergedWordProjections: Boolean = false,
-    override val sharedWordEmbeddings: Boolean = false,
+    override val wordEmbeddingsType: WordEmbeddingsType,
     override val variableInitializer: tf.VariableInitializer = null
-) extends ParameterManager(
-  wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, sharedWordEmbeddings, variableInitializer) {
+) extends ParameterManager(wordEmbeddingsType, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
   protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
 
@@ -100,18 +96,12 @@ class LanguageEmbeddingsPairManager protected (
 object LanguageEmbeddingsPairManager {
   def apply(
       languageEmbeddingsSize: Int,
-      wordEmbeddingsSize: Int,
-      mergedWordEmbeddings: Boolean = false,
-      mergedWordProjections: Boolean = false,
-      sharedWordEmbeddings: Boolean = false,
+      wordEmbeddingsType: WordEmbeddingsType,
       variableInitializer: tf.VariableInitializer = null
   ): LanguageEmbeddingsPairManager = {
     new LanguageEmbeddingsPairManager(
       languageEmbeddingsSize,
-      wordEmbeddingsSize,
-      mergedWordEmbeddings,
-      mergedWordProjections,
-      sharedWordEmbeddings,
+      wordEmbeddingsType,
       variableInitializer)
   }
 }

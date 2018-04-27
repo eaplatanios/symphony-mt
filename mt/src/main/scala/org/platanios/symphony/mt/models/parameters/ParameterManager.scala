@@ -28,10 +28,7 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 class ParameterManager protected (
-    val wordEmbeddingsSize: Int,
-    val mergedWordEmbeddings: Boolean = false,
-    val mergedWordProjections: Boolean = false,
-    val sharedWordEmbeddings: Boolean = false,
+    val wordEmbeddingsType: WordEmbeddingsType,
     val variableInitializer: tf.VariableInitializer = null
 ) {
   protected var environment  : Environment                 = _
@@ -80,49 +77,17 @@ class ParameterManager protected (
         }
 
         tf.variableScope("StringToIndexLookupTables") {
-          if (sharedWordEmbeddings) {
-            val table = languages.head._2.stringToIndexLookupTable(name = "SharedStringToIndexLookupTable")
-            stringToIndexLookupTables += graph -> table.handle
-            stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID, INT64, name = "Default")
-          } else {
-            val tables = languages.map(l => l._2.stringToIndexLookupTable(name = l._1.name))
-            stringToIndexLookupTables += graph -> tf.stack(tables.map(_.handle))
-            stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID, INT64, name = "Default")
-          }
+          stringToIndexLookupTables += graph -> wordEmbeddingsType.createStringToIndexLookupTable(languages)
+          stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID, INT64, name = "Default")
         }
 
         tf.variableScope("IndexToStringLookupTables") {
-          if (sharedWordEmbeddings) {
-            val table = languages.head._2.indexToStringLookupTable(name = "SharedIndexToStringLookupTable")
-            indexToStringLookupTables += graph -> table.handle
-            indexToStringLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN, STRING, name = "Default")
-          } else {
-            val tables = languages.map(l => l._2.indexToStringLookupTable(name = l._1.name))
-            indexToStringLookupTables += graph -> tf.stack(tables.map(_.handle))
-            indexToStringLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN, STRING, name = "Default")
-          }
+          indexToStringLookupTables += graph -> wordEmbeddingsType.createIndexToStringLookupTable(languages)
+          indexToStringLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN, STRING, name = "Default")
         }
 
         wordEmbeddings += graph -> tf.variableScope("WordEmbeddings") {
-          val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          if (sharedWordEmbeddings) {
-            val someLanguage = languages.head
-            Seq(tf.variable(
-              someLanguage._1.name, FLOAT32, Shape(someLanguage._2.size, wordEmbeddingsSize),
-              embeddingsInitializer).value)
-          } else {
-            if (!mergedWordEmbeddings) {
-              languages.map(l =>
-                tf.variable(l._1.name, FLOAT32, Shape(l._2.size, wordEmbeddingsSize), embeddingsInitializer).value)
-            } else {
-              val vocabSizes = languages.map(_._2.size)
-              val merged = tf.variable(
-                "Embeddings", FLOAT32, Shape(vocabSizes.sum, wordEmbeddingsSize), embeddingsInitializer).value
-              val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
-              val offsets = tf.concatenate(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
-              Seq(merged, offsets)
-            }
-          }
+          wordEmbeddingsType.createWordEmbeddings(languages)
         }
       }
     }
@@ -131,12 +96,7 @@ class ParameterManager protected (
   def stringToIndexLookup(languageId: Output): Output => Output = (keys: Output) => {
     tf.variableScope("ParameterManager/StringToIndexLookupTables") {
       val graph = currentGraph
-      val handle = {
-        if (sharedWordEmbeddings)
-          stringToIndexLookupTables(graph)
-        else
-          stringToIndexLookupTables(graph).gather(languageId)
-      }
+      val handle = wordEmbeddingsType.lookupTable(stringToIndexLookupTables(graph), languageId)
       ParameterManager.lookup(
         handle = handle,
         keys = keys,
@@ -147,12 +107,7 @@ class ParameterManager protected (
   def indexToStringLookup(languageId: Output): Output => Output = (keys: Output) => {
     tf.variableScope("ParameterManager/IndexToStringLookupTables") {
       val graph = currentGraph
-      val handle = {
-        if (sharedWordEmbeddings)
-          indexToStringLookupTables(graph)
-        else
-          indexToStringLookupTables(graph).gather(languageId)
-      }
+      val handle = wordEmbeddingsType.lookupTable(indexToStringLookupTables(graph), languageId)
       ParameterManager.lookup(
         handle = handle,
         keys = keys,
@@ -163,29 +118,13 @@ class ParameterManager protected (
   def wordEmbeddings(languageId: Output): Output => Output = (keys: Output) => {
     tf.variableScope("ParameterManager/WordEmbeddings") {
       val graph = currentGraph
-      if (sharedWordEmbeddings) {
-        wordEmbeddings(graph).head.gather(keys)
-      } else {
-        if (!mergedWordEmbeddings) {
-          val predicates = wordEmbeddings(graph).zip(languageIds(graph)).map {
-            case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
-          }
-          val default = () => wordEmbeddings(graph).head
-          tf.cases(predicates, default).gather(keys)
-        } else {
-          val merged = wordEmbeddings(graph)(0)
-          val offsets = wordEmbeddings(graph)(1)
-          merged.gather(keys + offsets.gather(languageId))
-        }
-      }
+      wordEmbeddingsType.embeddingLookup(wordEmbeddings(graph), languageIds(graph), languageId, keys)
     }
   }
 
   def getContext: Option[(Output, Output)] = this.context
   def setContext(context: (Output, Output)): Unit = this.context = Some(context)
   def resetContext(): Unit = this.context = None
-
-  // TODO: !!! This is not enforcing pairwise models, but rather full sharing of the parameters.
 
   def get(
       name: String,
@@ -202,52 +141,12 @@ class ParameterManager protected (
   def getProjectionToWords(inputSize: Int, languageId: Output): Output = {
     tf.variableScope("ParameterManager/ProjectionToWords") {
       val graph = currentGraph
-      if (sharedWordEmbeddings) {
-        val projectionsForSize = projectionsToWords
-            .getOrElseUpdate(graph, mutable.HashMap.empty)
-            .getOrElseUpdate(inputSize, {
-              val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-              val someLanguage = languages.head
-              Seq(tf.variable(
-                s"${someLanguage._1.name}/OutWeights", FLOAT32,
-                Shape(inputSize, someLanguage._2.size), weightsInitializer).value)
-            })
-        projectionsForSize.head
-      } else {
-        if (!mergedWordProjections) {
-          val projectionsForSize = projectionsToWords
-              .getOrElseUpdate(graph, mutable.HashMap.empty)
-              .getOrElseUpdate(inputSize, {
-                val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-                languages.map(l => tf.variable(
-                  s"${l._1.name}/OutWeights", FLOAT32, Shape(inputSize, l._2.size), weightsInitializer).value)
-              })
-          val predicates = projectionsForSize.zip(languageIds(graph)).map {
-            case (projections, langId) => (tf.equal(languageId, langId), () => projections)
-          }
-          val default = () => projectionsForSize.head
-          tf.cases(predicates, default)
-        } else {
-          val projectionsForSize = projectionsToWords
-              .getOrElseUpdate(graph, mutable.HashMap.empty)
-              .getOrElseUpdate(inputSize, {
-                val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-                val vocabSizes = languages.map(_._2.size)
-                val merged = tf.variable(
-                  "ProjectionWeights", FLOAT32, Shape(inputSize, vocabSizes.sum), weightsInitializer).value
-                val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
-                val offsets = tf.concatenate(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
-                Seq(merged, offsets, sizes)
-              })
-          val merged = projectionsForSize(0)
-          val offsets = projectionsForSize(1)
-          val sizes = projectionsForSize(2)
-          tf.slice(
-            merged,
-            tf.stack(Seq(0, offsets.gather(languageId))),
-            tf.stack(Seq(inputSize, sizes.gather(languageId))))
-        }
-      }
+      wordEmbeddingsType.projectionToWords(
+        languages,
+        languageIds(graph),
+        projectionsToWords.getOrElseUpdate(graph, mutable.HashMap.empty),
+        inputSize,
+        languageId)
     }
   }
 
@@ -263,14 +162,10 @@ class ParameterManager protected (
 
 object ParameterManager {
   def apply(
-      wordEmbeddingsSize: Int,
-      mergedWordEmbeddings: Boolean = false,
-      mergedWordProjections: Boolean = false,
-      sharedWordEmbeddings: Boolean = false,
+      wordEmbeddingsType: WordEmbeddingsType,
       variableInitializer: tf.VariableInitializer = null
   ): ParameterManager = {
-    new ParameterManager(
-      wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, sharedWordEmbeddings, variableInitializer)
+    new ParameterManager(wordEmbeddingsType, variableInitializer)
   }
 
   /** Creates an op that looks up the provided keys in the lookup table referred to by `handle` and returns the

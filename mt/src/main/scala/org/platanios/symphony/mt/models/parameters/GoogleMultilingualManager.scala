@@ -25,13 +25,9 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 class GoogleMultilingualManager protected (
-    override val wordEmbeddingsSize: Int,
-    override val mergedWordEmbeddings: Boolean = false,
-    override val mergedWordProjections: Boolean = false,
-    override val sharedWordEmbeddings: Boolean = false,
+    override val wordEmbeddingsType: WordEmbeddingsType,
     override val variableInitializer: tf.VariableInitializer = null
-) extends ParameterManager(
-  wordEmbeddingsSize, mergedWordEmbeddings, mergedWordProjections, sharedWordEmbeddings, variableInitializer) {
+) extends ParameterManager(wordEmbeddingsType, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
   protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
 
@@ -49,7 +45,7 @@ class GoogleMultilingualManager protected (
         languageEmbeddings += graph -> {
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           tf.variable(
-            "LanguageEmbeddings", FLOAT32, Shape(languages.length, wordEmbeddingsSize),
+            "LanguageEmbeddings", FLOAT32, Shape(languages.length, wordEmbeddingsType.embeddingsSize),
             initializer = embeddingsInitializer).value
         }
       }
@@ -72,17 +68,9 @@ class GoogleMultilingualManager protected (
 
 object GoogleMultilingualManager {
   def apply(
-      wordEmbeddingsSize: Int,
-      mergedWordEmbeddings: Boolean = false,
-      mergedWordProjections: Boolean = false,
-      sharedWordEmbeddings: Boolean = false,
+      wordEmbeddingsType: WordEmbeddingsType,
       variableInitializer: tf.VariableInitializer = null
   ): GoogleMultilingualManager = {
-    new GoogleMultilingualManager(
-      wordEmbeddingsSize,
-      mergedWordEmbeddings,
-      mergedWordProjections,
-      sharedWordEmbeddings,
-      variableInitializer)
+    new GoogleMultilingualManager(wordEmbeddingsType, variableInitializer)
   }
 }
