@@ -41,7 +41,7 @@ class WordEmbeddingsPerLanguage protected (
     tf.stack(tables.map(_.handle))
   }
 
-  override def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): Seq[Output] = {
+  override def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): T = {
     val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
     if (!mergedEmbeddings) {
       languages.map(l =>
@@ -61,7 +61,7 @@ class WordEmbeddingsPerLanguage protected (
   }
 
   override def embeddingLookup(
-      embeddingTables: Seq[Output],
+      embeddingTables: T,
       languageIds: Seq[Output],
       languageId: Output,
       keys: Output,
@@ -83,9 +83,10 @@ class WordEmbeddingsPerLanguage protected (
   override def projectionToWords(
       languages: Seq[(Language, Vocabulary)],
       languageIds: Seq[Output],
-      projectionsToWords: mutable.Map[Int, Seq[Output]],
+      projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
-      languageId: Output
+      languageId: Output,
+      context: Option[(Output, Output)]
   ): Output = {
     if (!mergedProjections) {
       val projectionsForSize = projectionsToWords

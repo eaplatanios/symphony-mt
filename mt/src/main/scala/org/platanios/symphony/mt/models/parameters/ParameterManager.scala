@@ -146,7 +146,8 @@ class ParameterManager protected (
         languageIds(graph),
         projectionsToWords.getOrElseUpdate(graph, mutable.HashMap.empty),
         inputSize,
-        languageId)
+        languageId,
+        context)
     }
   }
 

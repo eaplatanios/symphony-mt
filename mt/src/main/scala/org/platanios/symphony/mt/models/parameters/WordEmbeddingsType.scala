@@ -48,6 +48,7 @@ trait WordEmbeddingsType {
       languageIds: Seq[Output],
       projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
-      languageId: Output
+      languageId: Output,
+      context: Option[(Output, Output)]
   ): Output
 }

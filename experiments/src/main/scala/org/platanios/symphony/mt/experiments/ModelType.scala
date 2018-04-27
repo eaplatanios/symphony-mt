@@ -57,7 +57,7 @@ case object Pairwise extends ModelType {
       if (sharedWordEmbeddings)
         SharedWordEmbeddings(wordEmbeddingsSize)
       else
-        WordEmbeddingsPerLanguage(wordEmbeddingsSize) // TODO: !!!
+        WordEmbeddingsPerLanguagePair(wordEmbeddingsSize)
     }
     ParameterManager(
       wordEmbeddingsType = wordEmbeddingsType,

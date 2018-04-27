@@ -64,7 +64,8 @@ class SharedWordEmbeddings protected (
       languageIds: Seq[Output],
       projectionsToWords: mutable.Map[Int, Output],
       inputSize: Int,
-      languageId: Output
+      languageId: Output,
+      context: Option[(Output, Output)]
   ): Output = {
     projectionsToWords
         .getOrElseUpdate(inputSize, {
