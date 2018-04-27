@@ -25,8 +25,7 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 class WordEmbeddingsPerLanguage protected (
-    override val embeddingsSize: Int,
-    val mergedProjections: Boolean
+    override val embeddingsSize: Int
 ) extends WordEmbeddingsType {
   override type T = tf.TensorArray
 
@@ -72,49 +71,33 @@ class WordEmbeddingsPerLanguage protected (
   override def projectionToWords(
       languages: Seq[(Language, Vocabulary)],
       languageIds: Seq[Output],
-      projectionsToWords: mutable.Map[Int, Seq[Output]],
+      projectionsToWords: mutable.Map[Int, tf.TensorArray],
       inputSize: Int,
       languageId: Output
   ): Output = {
-    if (!mergedProjections) {
-      val projectionsForSize = projectionsToWords
-          .getOrElseUpdate(inputSize, {
-            val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-            languages.map(l => tf.variable(
-              s"${l._1.name}/OutWeights", FLOAT32, Shape(inputSize, l._2.size), weightsInitializer).value)
-          })
-      val predicates = projectionsForSize.zip(languageIds).map {
-        case (projections, langId) => (tf.equal(languageId, langId), () => projections)
-      }
-      val default = () => projectionsForSize.head
-      tf.cases(predicates, default)
-    } else {
-      val projectionsForSize = projectionsToWords
-          .getOrElseUpdate(inputSize, {
-            val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-            val vocabSizes = languages.map(_._2.size)
-            val merged = tf.variable(
-              "ProjectionWeights", FLOAT32, Shape(inputSize, vocabSizes.sum), weightsInitializer).value
-            val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
-            val offsets = tf.concatenate(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
-            Seq(merged, offsets, sizes)
-          })
-      val merged = projectionsForSize(0)
-      val offsets = projectionsForSize(1)
-      val sizes = projectionsForSize(2)
-      tf.slice(
-        merged,
-        tf.stack(Seq(0, offsets.gather(languageId))),
-        tf.stack(Seq(inputSize, sizes.gather(languageId))))
-    }
+    projectionsToWords
+        .getOrElseUpdate(inputSize, {
+          val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+          val tensorArray = tf.TensorArray.create(
+            size = languages.size,
+            dataType = FLOAT32,
+            dynamicSize = false,
+            clearAfterRead = false,
+            inferShape = false)
+          languages.zipWithIndex.foldLeft(tensorArray) {
+            case (ta, (language, index)) =>
+              ta.write(index, tf.variable(
+                s"${language._1.name}/OutWeights", FLOAT32, Shape(inputSize, language._2.size),
+                weightsInitializer).value)
+          }
+        }).read(languageId)
   }
 }
 
 object WordEmbeddingsPerLanguage {
   def apply(
-      embeddingsSize: Int,
-      mergedProjections: Boolean = false
+      embeddingsSize: Int
   ): WordEmbeddingsPerLanguage = {
-    new WordEmbeddingsPerLanguage(embeddingsSize, mergedProjections)
+    new WordEmbeddingsPerLanguage(embeddingsSize)
   }
 }

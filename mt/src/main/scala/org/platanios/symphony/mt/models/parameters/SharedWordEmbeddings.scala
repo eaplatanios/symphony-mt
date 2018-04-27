@@ -62,7 +62,7 @@ class SharedWordEmbeddings protected (
   override def projectionToWords(
       languages: Seq[(Language, Vocabulary)],
       languageIds: Seq[Output],
-      projectionsToWords: mutable.Map[Int, Seq[Output]],
+      projectionsToWords: mutable.Map[Int, Output],
       inputSize: Int,
       languageId: Output
   ): Output = {
@@ -70,10 +70,10 @@ class SharedWordEmbeddings protected (
         .getOrElseUpdate(inputSize, {
           val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val someLanguage = languages.head
-          Seq(tf.variable(
+          tf.variable(
             s"${someLanguage._1.name}/OutWeights", FLOAT32,
-            Shape(inputSize, someLanguage._2.size), weightsInitializer).value)
-        }).head
+            Shape(inputSize, someLanguage._2.size), weightsInitializer).value
+        })
   }
 }
 

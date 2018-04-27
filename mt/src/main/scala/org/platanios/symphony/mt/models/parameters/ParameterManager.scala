@@ -42,7 +42,7 @@ class ParameterManager protected (
   protected val indexToStringLookupDefaults: mutable.Map[Graph, Output]               = mutable.Map.empty
   protected val wordEmbeddings             : mutable.Map[Graph, wordEmbeddingsType.T] = mutable.Map.empty
 
-  protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, Seq[Output]]] = mutable.Map.empty
+  protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, wordEmbeddingsType.T]] = mutable.Map.empty
 
   protected var context: Option[(Output, Output)] = None
 

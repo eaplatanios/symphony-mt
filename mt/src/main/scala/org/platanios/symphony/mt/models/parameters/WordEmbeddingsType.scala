@@ -46,7 +46,7 @@ trait WordEmbeddingsType {
   def projectionToWords(
       languages: Seq[(Language, Vocabulary)],
       languageIds: Seq[Output],
-      projectionsToWords: mutable.Map[Int, Seq[Output]],
+      projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
       languageId: Output
   ): Output
