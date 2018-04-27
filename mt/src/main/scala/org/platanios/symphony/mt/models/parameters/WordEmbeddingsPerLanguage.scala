@@ -46,7 +46,7 @@ class WordEmbeddingsPerLanguage protected (
       dataType = FLOAT32,
       dynamicSize = false,
       clearAfterRead = false,
-      inferShape = false)
+      elementShape = Shape(-1, embeddingsSize))
     languages.zipWithIndex.foldLeft(tensorArray) {
       case (ta, (language, index)) =>
         ta.write(index, tf.variable(
@@ -83,7 +83,7 @@ class WordEmbeddingsPerLanguage protected (
             dataType = FLOAT32,
             dynamicSize = false,
             clearAfterRead = false,
-            inferShape = false)
+            elementShape = Shape(inputSize, -1))
           languages.zipWithIndex.foldLeft(tensorArray) {
             case (ta, (language, index)) =>
               ta.write(index, tf.variable(
