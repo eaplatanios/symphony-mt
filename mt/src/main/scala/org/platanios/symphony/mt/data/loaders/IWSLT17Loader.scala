@@ -47,33 +47,32 @@ class IWSLT17Loader(
 
   override def downloadsDir: Path = config.workingDir.resolve("iwslt-17").resolve("downloads")
 
-  private[this] def directoryName: String = s"$src-$tgt"
-
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(
     s"${IWSLT17Loader.url}/${IWSLT17Loader.filename}.tgz",
-    s"${IWSLT17Loader.testUrl}/$src/$tgt/$directoryName.tgz")
+    s"${IWSLT17Loader.testUrl}/$src/$tgt/$src-$tgt.tgz",
+    s"${IWSLT17Loader.testUrl}/$tgt/$src/$tgt-$src.tgz")
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
   override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
     datasetType match {
       case Train => Seq((IWSLT17Loader.Train,
-          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"train.tags.$directoryName.$src",
-          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"train.tags.$directoryName.$tgt",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"train.tags.$src-$tgt.$src",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"train.tags.$src-$tgt.$tgt",
           TEDConverter >> Normalizer >> PunctuationNormalizer))
       case Dev => Seq((IWSLT17Loader.Dev2010,
-          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$directoryName.$src.xml",
-          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$directoryName.$tgt.xml",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$src-$tgt.$src.xml",
+          File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$src-$tgt.$tgt.xml",
           SGMConverter >> Normalizer >> PunctuationNormalizer))
       case Test => Seq(
         (IWSLT17Loader.Test2010,
-            File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$directoryName.$src.xml",
-            File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$directoryName.$tgt.xml",
+            File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$src-$tgt.$src.xml",
+            File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$src-$tgt.$tgt.xml",
             SGMConverter >> Normalizer >> PunctuationNormalizer),
         (IWSLT17Loader.Test2017,
-            File(downloadsDir) / directoryName / directoryName / s"IWSLT17.TED.tst2017.mltlng.$directoryName.$src.xml",
-            File(downloadsDir) / directoryName / directoryName / s"IWSLT17.TED.tst2017.mltlng.$directoryName.$tgt.xml",
+            File(downloadsDir) / s"$src-$tgt" / s"$src-$tgt" / s"IWSLT17.TED.tst2017.mltlng.$src-$tgt.$src.xml",
+            File(downloadsDir) / s"$tgt-$src" / s"$tgt-$src" / s"IWSLT17.TED.tst2017.mltlng.$tgt-$src.$tgt.xml",
             SGMConverter >> Normalizer >> PunctuationNormalizer))
     }
   }
