@@ -123,6 +123,8 @@ object Inputs {
               .intersect(currentLanguagePairs)
               .map(l => (d._1, l, d._3) -> d._2)
         })
+        .toMap
+        .toSeq
         .map {
           case ((name, (srcLanguage, tgtLanguage), parallelPortion), dataset) =>
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
