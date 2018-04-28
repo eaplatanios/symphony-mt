@@ -59,7 +59,7 @@ case object Pairwise extends ModelType {
       else
         WordEmbeddingsPerLanguagePair(wordEmbeddingsSize)
     }
-    ParameterManager(
+    PairwiseManager(
       wordEmbeddingsType = wordEmbeddingsType,
       variableInitializer = tf.VarianceScalingInitializer(
         1.0f,
