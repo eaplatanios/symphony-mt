@@ -105,8 +105,13 @@ abstract class Model[S] protected (
       // Add hooks (if distributed using Horovod, hooks are only added for the first process).
       if (!config.env.useHorovod || hvd.localRank == 0) {
         // Add logging hooks.
-        if (logConfig.logLossSteps > 0)
-          hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
+        if (logConfig.logLossSteps > 0) {
+          val dataParallelFactor = if (config.env.useHorovod) hvd.size.toFloat else 1.0f
+          hooks += TrainingLogger(
+            log = true,
+            trigger = StepHookTrigger(logConfig.logLossSteps),
+            dataParallelFactor = dataParallelFactor)
+        }
         if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
           val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
           val datasets = evalDatasets.filter(_._2.nonEmpty)
