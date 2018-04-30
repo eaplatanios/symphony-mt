@@ -651,6 +651,11 @@ object ExperimentConfig {
         .text("If used, the TensorFlow XLA compiler will be used. " +
             "Note that TensorFlow needs to first have been compiled with XLA support.")
 
+    opt[Unit]("use-horovod")
+        .action((_, c) => c.copy(env = c.env.copy(useHorovod = true)))
+        .text("If used, Horovod will be used for data parallel distribution across the available GPUs. " +
+            "Note that OpenMPI needs to be installed (as well as CUDA and NCCL ideally).")
+
     opt[Int]("num-gpus").valueName("<number>")
         .action((d, c) => c.copy(env = c.env.copy(numGPUs = d)))
         .text("Number of GPUs to use.")

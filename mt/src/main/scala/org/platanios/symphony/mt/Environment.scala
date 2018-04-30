@@ -27,6 +27,7 @@ case class Environment(
     logDevicePlacement: Boolean = false,
     gpuAllowMemoryGrowth: Boolean = false,
     useXLA: Boolean = false,
+    useHorovod: Boolean = false,
     numGPUs: Int = 0,
     parallelIterations: Int = 32,
     swapMemory: Boolean = true,

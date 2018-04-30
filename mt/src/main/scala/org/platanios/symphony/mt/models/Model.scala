@@ -25,11 +25,13 @@ import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.utilities.Encoding.tfStringToUTF8
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.config.NoCheckpoints
 import org.platanios.tensorflow.api.core.client.SessionConfig
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
+import org.platanios.tensorflow.horovod._
 
 // TODO: Move embeddings initializer to the configuration.
 // TODO: Add support for optimizer schedules (e.g., Adam for first 1000 steps and then SGD with a different learning rate.
@@ -75,17 +77,24 @@ abstract class Model[S] protected (
       (TFBatchWithLanguagesT, TFBatchT), (TFBatchWithLanguages, TFBatch),
       (TFBatchWithLanguagesD, TFBatchD), (TFBatchWithLanguagesS, TFBatchS),
       (TFBatchWithLanguage, TFBatch)] = {
+    if (config.env.useHorovod)
+      hvd.initialize()
+
     tf.createWith(
       nameScope = name,
       device = config.deviceManager.nextDevice(config.env, moveToNext = false)
     ) {
+      var optimizer = optConfig.optimizer
+      if (config.env.useHorovod)
+        optimizer = hvd.DistributedOptimizer(optimizer)
+
       val model = optConfig.maxGradNorm match {
         case Some(norm) => learn.Model.supervised(
-          input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
+          input, inferLayer, trainLayer, trainInput, lossLayer, optimizer,
           clipGradients = tf.learn.ClipGradientsByGlobalNorm(norm),
           colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
         case None => learn.Model.supervised(
-          input, inferLayer, trainLayer, trainInput, lossLayer, optConfig.optimizer,
+          input, inferLayer, trainLayer, trainInput, lossLayer, optimizer,
           colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
       }
       val summariesDir = config.env.workingDir.resolve("summaries")
@@ -93,34 +102,40 @@ abstract class Model[S] protected (
       // Create estimator hooks.
       var hooks = Set[tf.learn.Hook]()
 
-      // Add logging hooks.
-      if (logConfig.logLossSteps > 0)
-        hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
-      if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
-        val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
-        val datasets = evalDatasets.filter(_._2.nonEmpty)
-        if (datasets.nonEmpty) {
-          hooks += tf.learn.Evaluator(
-            log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs),
-            evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, numDecimalPoints = 6,
-            name = "Evaluation")
+      // Add hooks (if distributed using Horovod, hooks are only added for the first process).
+      if (!config.env.useHorovod || hvd.rank == 0) {
+        // Add logging hooks.
+        if (logConfig.logLossSteps > 0)
+          hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))
+        if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
+          val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
+          val datasets = evalDatasets.filter(_._2.nonEmpty)
+          if (datasets.nonEmpty) {
+            hooks += tf.learn.Evaluator(
+              log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs),
+              evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, numDecimalPoints = 6,
+              name = "Evaluation")
+          }
         }
+
+        // Add summaries/checkpoints hooks.
+        hooks ++= Set(
+          tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
+          tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
+          tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
+
+        env.traceSteps.foreach(numSteps =>
+          hooks += tf.learn.TimelineHook(
+            summariesDir, showDataFlow = true, showMemory = true, trigger = StepHookTrigger(numSteps)))
+
+        // Add TensorBoard hook.
+        if (logConfig.launchTensorBoard)
+          hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
+            summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
       }
 
-      // Add summaries/checkpoints hooks.
-      hooks ++= Set(
-        tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-        tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
-        tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
-
-      env.traceSteps.foreach(numSteps =>
-        hooks += tf.learn.TimelineHook(
-          summariesDir, showDataFlow = true, showMemory = true, trigger = StepHookTrigger(numSteps)))
-
-      // Add TensorBoard hook.
-      if (logConfig.launchTensorBoard)
-        hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
-          summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
+      if (config.env.useHorovod)
+        hooks += hvd.BroadcastGlobalVariablesHook(0)
 
       var sessionConfig = SessionConfig(
         allowSoftPlacement = Some(config.env.allowSoftPlacement),
@@ -128,12 +143,15 @@ abstract class Model[S] protected (
         gpuAllowMemoryGrowth = Some(config.env.gpuAllowMemoryGrowth))
       if (config.env.useXLA)
         sessionConfig = sessionConfig.copy(optGlobalJITLevel = Some(SessionConfig.L1GraphOptimizerGlobalJIT))
+      if (config.env.useHorovod)
+        sessionConfig = sessionConfig.copy(gpuVisibleDevices = Some(Seq(hvd.localRank)))
 
       // Create estimator.
       tf.learn.InMemoryEstimator(
         model, tf.learn.Configuration(
           workingDir = Some(config.env.workingDir),
           sessionConfig = Some(sessionConfig),
+          checkpointConfig = NoCheckpoints,
           randomSeed = config.env.randomSeed),
         trainHooks = hooks)
     }
@@ -276,6 +294,9 @@ abstract class Model[S] protected (
           parameterManager.setEnvironment(config.env)
           parameterManager.setDeviceManager(config.deviceManager)
           parameterManager.setContext((input._1, input._2))
+
+          // TODO: We need to first have a check for whether the language pair is supported. If not supported, fallback multi-lingual translation method should be applied.
+
           val srcSequence = mapToWordIds(input._1, input._3)
           val srcMapped = (input._1, input._2, srcSequence, input._4)
           val state = tf.variableScope("Encoder") {

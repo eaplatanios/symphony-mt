@@ -64,7 +64,8 @@ lazy val testSettings = Seq(
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF"))
 
 lazy val tensorFlowSettings = Seq(
-  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion) // classifier "linux-gpu-x86_64")
+  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "linux-gpu-x86_64")
+  libraryDependencies += "org.platanios" %% "tensorflow-horovod" % tensorFlowForScalaVersion)
 
 lazy val all = (project in file("."))
     .aggregate(mt, experiments, docs)
@@ -110,8 +111,8 @@ lazy val experiments = (project in file("./experiments"))
         "com.jcraft" % "jzlib" % "1.1.3",
         "io.circe" %% "circe-core" % "0.7.0",
         "io.circe" %% "circe-generic" % "0.7.0",
-        "io.circe" %% "circe-parser" % "0.7.0",
-        "org.vegas-viz" %% "vegas" % "0.3.12-SNAPSHOT"))
+        "io.circe" %% "circe-parser" % "0.7.0"))
+        //"org.vegas-viz" %% "vegas" % "0.3.12-SNAPSHOT"))
 
 val MT = config("mt")
 val Experiments = config("experiments")

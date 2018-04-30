@@ -125,6 +125,7 @@ object Inputs {
         })
         .toMap
         .toSeq
+        .sortBy(d => (d._1._1, (d._1._2._1.abbreviation, d._1._2._2.abbreviation)))
         .map {
           case ((name, (srcLanguage, tgtLanguage), parallelPortion), dataset) =>
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
