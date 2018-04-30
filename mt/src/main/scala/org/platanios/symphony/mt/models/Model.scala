@@ -103,7 +103,7 @@ abstract class Model[S] protected (
       var hooks = Set[tf.learn.Hook]()
 
       // Add hooks (if distributed using Horovod, hooks are only added for the first process).
-      if (!config.env.useHorovod || hvd.rank == 0) {
+      if (!config.env.useHorovod || hvd.localRank == 0) {
         // Add logging hooks.
         if (logConfig.logLossSteps > 0)
           hooks += TrainingLogger(log = true, trigger = StepHookTrigger(logConfig.logLossSteps))

@@ -45,6 +45,7 @@ case class TrainingLogger(
     trigger: HookTrigger = StepHookTrigger(1),
     triggerAtEnd: Boolean = true,
     average: Boolean = true,
+    dataParallelFactor: Float = 1.0f,
     formatter: (Option[Double], Long, Float, Float, Option[Double]) => String = null,
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
@@ -127,27 +128,28 @@ case class TrainingLogger(
       totalSrcWordCount += fetches(3).scalar.asInstanceOf[Int]
       totalTgtWordCount += fetches(4).scalar.asInstanceOf[Int]
       if (shouldTrigger) {
+        val numSteps = (lastStep * dataParallelFactor).toInt
         val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt)
         val elapsedTime = elapsed.map(_._1)
-        val totalWordCount = totalSrcWordCount + totalTgtWordCount
+        val totalWordCount = (totalSrcWordCount + totalTgtWordCount) * dataParallelFactor
         val meanGradientsNorm = totalGradientsNorm / elapsed.map(_._2).getOrElse(1)
         val meanPerplexity = Math.exp(totalLoss / totalTgtWordCount).toFloat
         val message = {
           if (formatter != null) {
             formatter(
-              elapsedTime, lastStep, meanGradientsNorm, meanPerplexity,
+              elapsedTime, numSteps, meanGradientsNorm, meanPerplexity,
               elapsedTime.map(s => totalWordCount / (1000 * s)))
           } else {
             elapsedTime match {
               case Some(s) =>
                 val wps = totalWordCount / (1000 * s)
                 f"($s%9.3f s / $wps%5.2fk words/s ) " +
-                    f"Step: $lastStep%6d, " +
+                    f"Step: $numSteps%6d, " +
                     f"Perplexity: $meanPerplexity%12.4f, " +
                     f"Gradients Norm: $meanGradientsNorm%12.4f"
               case None =>
                 f"(    timing not available yet ) " +
-                    f"Step: $lastStep%6d, " +
+                    f"Step: $numSteps%6d, " +
                     f"Perplexity: $meanPerplexity%12.4f, " +
                     f"Gradients Norm: $meanGradientsNorm%12.4f"
             }
