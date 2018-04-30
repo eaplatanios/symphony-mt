@@ -24,6 +24,7 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.3.2")
 addSbtPlugin("com.typesafe.sbt" % "sbt-ghpages" % "0.6.2")
 
 // Packaging and publishing related plugins
+addSbtPlugin("com.eed3si9n"      % "sbt-assembly" % "latest.integration")
 addSbtPlugin("com.github.gseitz" % "sbt-release"  % "latest.integration")
 addSbtPlugin("com.jsuereth"      % "sbt-pgp"      % "latest.integration")
 addSbtPlugin("org.xerial.sbt"    % "sbt-sonatype" % "latest.integration")

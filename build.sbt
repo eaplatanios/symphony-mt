@@ -74,6 +74,9 @@ lazy val all = (project in file("."))
     .settings(commonSettings)
     .settings(publishSettings)
     .settings(
+      assemblyJarName in assembly := s"symphony-mt-${version.value}.jar",
+      mainClass in assembly := Some("org.platanios.symphony.mt.experiments.Experiment"),
+      test in assembly := {},
       sourcesInBase := false,
       unmanagedSourceDirectories in Compile := Nil,
       unmanagedSourceDirectories in Test := Nil,
@@ -104,6 +107,7 @@ lazy val experiments = (project in file("./experiments"))
     .settings(testSettings)
     .settings(publishSettings)
     .settings(
+      mainClass in assembly := Some("org.platanios.symphony.mt.experiments.Experiment"),
       libraryDependencies ++= Seq(
         "com.github.pathikrit" %% "better-files" % "3.4.0",
         "com.github.scopt" %% "scopt" % "3.7.0",
