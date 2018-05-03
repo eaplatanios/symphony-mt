@@ -72,7 +72,12 @@ object Inputs {
           var currentLanguagePairs = d.languagePairs(includeBackTranslations)
           if (dataConfig.parallelPortion == 0.0f)
             currentLanguagePairs = currentLanguagePairs.filter(p => p._1 == p._2)
-          languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(_ -> d)
+          val providedLanguagePairs = languagePairs match {
+            case Some(pairs) if includeBackTranslations => pairs.flatMap(p => Seq(p, (p._1, p._1), (p._2, p._2)))
+            case Some(pairs) => pairs
+            case None => currentLanguagePairs
+          }
+          providedLanguagePairs.intersect(currentLanguagePairs).map(_ -> d)
         })
         .groupBy(_._1)
         .mapValues(_.map(_._2))
