@@ -166,6 +166,13 @@ case class ExperimentConfig(
     }
   }
 
+  protected val languagesStringHelper: (String, Seq[String]) = {
+    if (!trainBothDirections)
+      "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").sorted
+    else
+      "Languages" -> languagePairs.flatMap(p => Seq(p._1, p._2)).toSet[Language].map(_.abbreviation).toSeq.sorted
+  }
+
   def logSummary(): Unit = {
     Experiment.logger.info("Running an experiment with the following configuration:")
     val configTable = Seq(
@@ -178,7 +185,7 @@ case class ExperimentConfig(
       }),
       "Dataset" -> Seq(
         "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
-        "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").mkString(", "),
+        languagesStringHelper._1 -> languagesStringHelper._2.mkString(", "),
         "Both Directions" -> trainBothDirections.toString,
         "Evaluation Tags" -> evalDatasetTags.mkString(", "),
         "Evaluation Metrics" -> evalMetrics.mkString(", ")),
@@ -265,7 +272,7 @@ case class ExperimentConfig(
 
   override def toString: String = {
     val stringBuilder = new StringBuilder(s"$dataset")
-    stringBuilder.append(s".${languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").mkString(".")}")
+    stringBuilder.append(s".${languagesStringHelper._2.mkString(".")}")
     stringBuilder.append(s".both:$trainBothDirections")
     stringBuilder.append(s".back:$trainBackTranslation")
     stringBuilder.append(s".$modelArchitecture")
