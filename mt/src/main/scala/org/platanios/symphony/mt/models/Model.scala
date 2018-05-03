@@ -25,7 +25,7 @@ import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.utilities.Encoding.tfStringToUTF8
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.config.NoCheckpoints
+import org.platanios.tensorflow.api.config.{NoCheckpoints, TimeBasedCheckpoints}
 import org.platanios.tensorflow.api.core.client.SessionConfig
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
@@ -151,12 +151,19 @@ abstract class Model[S] protected (
       if (config.env.useHorovod)
         sessionConfig = sessionConfig.copy(gpuVisibleDevices = Some(Seq(hvd.localRank)))
 
+      val checkpointConfig = {
+        if (!config.env.useHorovod || hvd.localRank == 0)
+          TimeBasedCheckpoints(600, 5, 10000)
+        else
+          NoCheckpoints
+      }
+
       // Create estimator.
       tf.learn.InMemoryEstimator(
         model, tf.learn.Configuration(
           workingDir = Some(config.env.workingDir),
           sessionConfig = Some(sessionConfig),
-          checkpointConfig = NoCheckpoints,
+          checkpointConfig = checkpointConfig,
           randomSeed = config.env.randomSeed),
         trainHooks = hooks)
     }
@@ -244,7 +251,7 @@ abstract class Model[S] protected (
         val line = s"║ %${firstColWidth}s │".format(dataset._1) + values.map(value => {
           if (value.shape.rank == 0 && value.dataType.isFloatingPoint) {
             val castedValue = value.cast(FLOAT32).scalar.asInstanceOf[Float]
-            s" %${colWidth}.4f ".format(castedValue)
+            s" %$colWidth.4f ".format(castedValue)
           } else if (value.shape.rank == 0 && value.dataType.isInteger) {
             val castedValue = value.cast(INT64).scalar.asInstanceOf[Long]
             s" %${colWidth}d ".format(castedValue)
