@@ -71,7 +71,8 @@ case class ExperimentConfig(
     private val env: Environment = Environment(Paths.get(".")),
     dataConfig: DataConfig = DataConfig(),
     dataset: String = "",
-    languagePairs: Seq[(Language, Language)] = Seq.empty,
+    languagePairs: Set[(Language, Language)] = Set.empty,
+    evalLanguagePairs: Set[(Language, Language)] = Set.empty,
     trainBothDirections: Boolean = true,
     trainBackTranslation: Boolean = false,
     modelArchitecture: ModelArchitecture = BiRNN(),
@@ -97,11 +98,11 @@ case class ExperimentConfig(
 ) {
   lazy val (datasets, languages) = {
     experiments.loadDatasets(dataset match {
-      case "iwslt14" => languagePairs.map(l => IWSLT14Loader(l._1, l._2, dataConfig))
-      case "iwslt15" => languagePairs.map(l => IWSLT15Loader(l._1, l._2, dataConfig))
-      case "iwslt16" => languagePairs.map(l => IWSLT16Loader(l._1, l._2, dataConfig))
-      case "iwslt17" => languagePairs.map(l => IWSLT17Loader(l._1, l._2, dataConfig))
-      case "wmt16" => languagePairs.map(l => WMT16Loader(l._1, l._2, dataConfig))
+      case "iwslt14" => languagePairs.toSeq.map(l => IWSLT14Loader(l._1, l._2, dataConfig))
+      case "iwslt15" => languagePairs.toSeq.map(l => IWSLT15Loader(l._1, l._2, dataConfig))
+      case "iwslt16" => languagePairs.toSeq.map(l => IWSLT16Loader(l._1, l._2, dataConfig))
+      case "iwslt17" => languagePairs.toSeq.map(l => IWSLT17Loader(l._1, l._2, dataConfig))
+      case "wmt16" => languagePairs.toSeq.map(l => WMT16Loader(l._1, l._2, dataConfig))
     }, Some(workingDir))
   }
 
@@ -149,11 +150,10 @@ case class ExperimentConfig(
     }
 
     val trainBackTranslation = if (!trainBothDirections) false else this.trainBackTranslation
-    val languagePairs = if (trainBothDirections) Set.empty[(Language, Language)] else this.languagePairs.toSet
 
     val model = modelArchitecture.model(
       "Model", languages, dataConfig, env, parameterManager, trainBackTranslation, languagePairs,
-      // Weird casting is necessary here to avoid compiling errors.
+      if (evalLanguagePairs.isEmpty) languagePairs else evalLanguagePairs,
       modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
       summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
       optConfig, logConfig, evalDatasets, metrics)
@@ -167,10 +167,7 @@ case class ExperimentConfig(
   }
 
   protected val languagesStringHelper: (String, Seq[String]) = {
-    if (!trainBothDirections)
-      "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").sorted
-    else
-      "Languages" -> languagePairs.flatMap(p => Seq(p._1, p._2)).toSet[Language].map(_.abbreviation).toSeq.sorted
+    "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted
   }
 
   def logSummary(): Unit = {
@@ -186,6 +183,7 @@ case class ExperimentConfig(
       "Dataset" -> Seq(
         "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
         languagesStringHelper._1 -> languagesStringHelper._2.mkString(", "),
+        "Both Directions" -> trainBothDirections.toString,
         "Evaluation Tags" -> evalDatasetTags.mkString(", "),
         "Evaluation Metrics" -> evalMetrics.mkString(", ")),
       "Model" -> {
@@ -272,7 +270,8 @@ case class ExperimentConfig(
   override def toString: String = {
     val stringBuilder = new StringBuilder(s"$dataset")
     stringBuilder.append(s".${languagesStringHelper._2.mkString(".")}")
-    stringBuilder.append(s".back:$trainBackTranslation")
+    stringBuilder.append(s".tw:$trainBothDirections")
+    stringBuilder.append(s".ae:$trainBackTranslation")
     stringBuilder.append(s".$modelArchitecture")
     stringBuilder.append(s".$modelCell")
     stringBuilder.append(s".$modelType")
@@ -434,8 +433,17 @@ object ExperimentConfig {
           if (parts.length != 2)
             throw new IllegalArgumentException(s"'$p' is not a valid language pair.")
           (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
-        })))
+        }).toSet))
         .text("Specifies the language pairs to use for the experiment. Example value: 'en:vi,en:de'.")
+
+    opt[Seq[String]]("eval-language-pairs").required().valueName("<srcLang1>:<tgtLang1>[,<srcLang2>:<tgtLang2>[...]]")
+        .action((d, c) => c.copy(evalLanguagePairs = d.map(p => {
+          val parts = p.split(":")
+          if (parts.length != 2)
+            throw new IllegalArgumentException(s"'$p' is not a valid language pair.")
+          (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
+        }).toSet))
+        .text("Specifies the language pairs to use for evaluation in the experiment. Example value: 'en:vi,en:de'.")
 
     opt[Unit]("only-forward")
         .action((_, c) => c.copy(trainBothDirections = false))

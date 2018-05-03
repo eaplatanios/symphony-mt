@@ -116,10 +116,10 @@ abstract class Model[S] protected (
           val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
           val datasets = evalDatasets.filter(_._2.nonEmpty)
           if (datasets.nonEmpty) {
+            val evalDatasets = Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs)
             hooks += tf.learn.Evaluator(
-              log = true, summariesDir, Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs),
-              evalMetrics, StepHookTrigger(logConfig.logEvalSteps), triggerAtEnd = true, numDecimalPoints = 6,
-              name = "Evaluation")
+              log = true, summariesDir, evalDatasets, evalMetrics, StepHookTrigger(logConfig.logEvalSteps),
+              triggerAtEnd = true, numDecimalPoints = 6, name = "Evaluation")
           }
         }
 
@@ -401,7 +401,8 @@ object Model {
       val checkpointSteps: Int,
       val trainBackTranslation: Boolean,
       // The following is to allow training in one direction only (for a language pair).
-      val languagePairs: Set[(Language, Language)])
+      val languagePairs: Set[(Language, Language)],
+      val evalLanguagePairs: Set[(Language, Language)])
 
   object Config {
     def apply(
@@ -413,11 +414,12 @@ object Model {
         summarySteps: Int = 100,
         checkpointSteps: Int = 1000,
         trainBackTranslation: Boolean = false,
-        languagePairs: Set[(Language, Language)] = Set.empty
+        languagePairs: Set[(Language, Language)] = Set.empty,
+        evalLanguagePairs: Set[(Language, Language)] = Set.empty
     ): Config = {
       new Config(
         env, parameterManager, deviceManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
-        trainBackTranslation, languagePairs)
+        trainBackTranslation, languagePairs, evalLanguagePairs)
     }
   }
 
