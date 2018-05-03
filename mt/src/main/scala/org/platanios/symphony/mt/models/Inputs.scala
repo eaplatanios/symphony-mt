@@ -74,14 +74,16 @@ object Inputs {
             currentLanguagePairs = currentLanguagePairs.filter(p => p._1 == p._2)
           languagePairs.getOrElse(currentLanguagePairs).intersect(currentLanguagePairs).map(_ -> d)
         })
-    val numParallelFiles = filteredDatasets.map(d => d._2.files(d._1._1).size).sum
+        .groupBy(_._1)
+        .mapValues(_.map(_._2))
+    val numParallelFiles = filteredDatasets.map(d => d._2.map(_.files(d._1._1).size).sum).sum
 
     // Each element in `filesDataset` is a tuple: (srcLanguage, tgtLanguage, srcFile, tgtFile).
     val filesDataset = filteredDatasets
         .map {
-          case ((srcLanguage, tgtLanguage), dataset) =>
-            val srcFiles = dataset.files(srcLanguage)
-            val tgtFiles = dataset.files(tgtLanguage)
+          case ((srcLanguage, tgtLanguage), parallelDatasets) =>
+            val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage))
+            val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage))
             val srcLengths = srcFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
             val tgtLengths = tgtFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
             val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor).repeat()
