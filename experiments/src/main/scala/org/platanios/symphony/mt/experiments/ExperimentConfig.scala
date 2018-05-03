@@ -186,7 +186,6 @@ case class ExperimentConfig(
       "Dataset" -> Seq(
         "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
         languagesStringHelper._1 -> languagesStringHelper._2.mkString(", "),
-        "Both Directions" -> trainBothDirections.toString,
         "Evaluation Tags" -> evalDatasetTags.mkString(", "),
         "Evaluation Metrics" -> evalMetrics.mkString(", ")),
       "Model" -> {
@@ -273,7 +272,6 @@ case class ExperimentConfig(
   override def toString: String = {
     val stringBuilder = new StringBuilder(s"$dataset")
     stringBuilder.append(s".${languagesStringHelper._2.mkString(".")}")
-    stringBuilder.append(s".both:$trainBothDirections")
     stringBuilder.append(s".back:$trainBackTranslation")
     stringBuilder.append(s".$modelArchitecture")
     stringBuilder.append(s".$modelCell")
@@ -285,7 +283,7 @@ case class ExperimentConfig(
       stringBuilder.append(".r")
     if (!modelArchitecture.isInstanceOf[GNMT] && attention)
       stringBuilder.append(".a")
-    dropout.map(d => stringBuilder.append(s".dropout:$d"))
+    dropout.map(d => stringBuilder.append(s".d:$d"))
     stringBuilder.append(s".ls:$labelSmoothing")
     stringBuilder.append(s".${dataConfig.tokenizer}")
     stringBuilder.append(s".${dataConfig.cleaner}")
