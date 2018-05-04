@@ -114,8 +114,8 @@ abstract class Model[S] protected (
         }
         if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
           val languagePairs = (config.evalLanguagePairs, config.languagePairs) match {
-            case (pairs, _) if pairs.nonEmpty => pairs
-            case (_, pairs) if pairs.nonEmpty => pairs
+            case (pairs, _) if pairs.nonEmpty => Some(pairs)
+            case (_, pairs) if pairs.nonEmpty => Some(pairs)
             case _ => None
           }
           val datasets = evalDatasets.filter(_._2.nonEmpty)
