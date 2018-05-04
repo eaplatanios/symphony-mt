@@ -33,6 +33,11 @@ import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 import org.platanios.tensorflow.horovod._
 
+import java.io.{File, PrintWriter}
+import java.nio.file.Files
+
+import scala.io.Source
+
 // TODO: Move embeddings initializer to the configuration.
 // TODO: Add support for optimizer schedules (e.g., Adam for first 1000 steps and then SGD with a different learning rate.
 // TODO: Customize hooks.
@@ -57,7 +62,26 @@ abstract class Model[S] protected (
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences"))
 ) {
-  protected val languageIds: Map[Language, Int] = languages.map(_._1).zipWithIndex.toMap
+  protected val languageIds: Map[Language, Int] = {
+    val file = config.env.workingDir.resolve("languages.index").toFile
+    if (file.exists()) {
+      val indices = Source.fromFile(file).getLines().map(line => {
+        val lineParts = line.split(',')
+        (Language.fromName(lineParts(0)), lineParts(1).toInt)
+      }).toMap
+      if (!languages.forall(l => indices.contains(l._1)))
+        throw new IllegalStateException(
+          s"The existing language index file ($file) does not contain " +
+              s"all of the provided languages (${languages.map(_._1.name).mkString(", ")}).")
+      indices
+    } else {
+      val indices = languages.map(_._1).zipWithIndex.toMap
+      val writer = new PrintWriter(file)
+      indices.foreach(i => writer.write(s"${i._1.name},${i._2}\n"))
+      writer.close()
+      indices
+    }
+  }
 
   protected implicit val env             : Environment      = config.env
   protected implicit val parameterManager: ParameterManager = config.parameterManager
