@@ -98,11 +98,11 @@ case class ExperimentConfig(
 ) {
   lazy val (datasets, languages) = {
     experiments.loadDatasets(dataset match {
-      case "iwslt14" => languagePairs.toSeq.map(l => IWSLT14Loader(l._1, l._2, dataConfig))
-      case "iwslt15" => languagePairs.toSeq.map(l => IWSLT15Loader(l._1, l._2, dataConfig))
-      case "iwslt16" => languagePairs.toSeq.map(l => IWSLT16Loader(l._1, l._2, dataConfig))
-      case "iwslt17" => languagePairs.toSeq.map(l => IWSLT17Loader(l._1, l._2, dataConfig))
-      case "wmt16" => languagePairs.toSeq.map(l => WMT16Loader(l._1, l._2, dataConfig))
+      case "iwslt14" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => IWSLT14Loader(l._1, l._2, dataConfig))
+      case "iwslt15" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => IWSLT15Loader(l._1, l._2, dataConfig))
+      case "iwslt16" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => IWSLT16Loader(l._1, l._2, dataConfig))
+      case "iwslt17" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => IWSLT17Loader(l._1, l._2, dataConfig))
+      case "wmt16" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => WMT16Loader(l._1, l._2, dataConfig))
     }, Some(workingDir))
   }
 
