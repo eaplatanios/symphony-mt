@@ -166,7 +166,7 @@ case class ExperimentConfig(
     }
   }
 
-  protected val languagesStringHelper: (String, Seq[String]) = {
+  protected def languagesStringHelper(languagePairs: Seq[(Language, Language)]): (String, Seq[String]) = {
     "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted
   }
 
@@ -182,8 +182,11 @@ case class ExperimentConfig(
       }),
       "Dataset" -> Seq(
         "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
-        languagesStringHelper._1 -> languagesStringHelper._2.mkString(", "),
         "Both Directions" -> trainBothDirections.toString,
+        "Language Pairs" ->
+            languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted.mkString(", "),
+        "Evaluation Language Pairs" ->
+            evalLanguagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted.mkString(", "),
         "Evaluation Tags" -> evalDatasetTags.mkString(", "),
         "Evaluation Metrics" -> evalMetrics.mkString(", ")),
       "Model" -> {
@@ -264,12 +267,12 @@ case class ExperimentConfig(
         "TF - Use XLA" -> env.useXLA.toString,
         "TF - Parallel Iterations" -> env.parallelIterations.toString,
         "TF - Swap Memory" -> env.swapMemory.toString))
-    ExperimentConfig.logTable(configTable, (message) => Experiment.logger.info(message))
+    ExperimentConfig.logTable(configTable, message => Experiment.logger.info(message))
   }
 
   override def toString: String = {
     val stringBuilder = new StringBuilder(s"$dataset")
-    stringBuilder.append(s".${languagesStringHelper._2.mkString(".")}")
+    stringBuilder.append(s".${languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted.mkString(".")}")
     stringBuilder.append(s".tw:$trainBothDirections")
     stringBuilder.append(s".ae:$trainBackTranslation")
     stringBuilder.append(s".$modelArchitecture")
@@ -436,7 +439,7 @@ object ExperimentConfig {
         }).toSet))
         .text("Specifies the language pairs to use for the experiment. Example value: 'en:vi,en:de'.")
 
-    opt[Seq[String]]("eval-language-pairs").required().valueName("<srcLang1>:<tgtLang1>[,<srcLang2>:<tgtLang2>[...]]")
+    opt[Seq[String]]("eval-language-pairs").valueName("<srcLang1>:<tgtLang1>[,<srcLang2>:<tgtLang2>[...]]")
         .action((d, c) => c.copy(evalLanguagePairs = d.map(p => {
           val parts = p.split(":")
           if (parts.length != 2)
