@@ -150,10 +150,16 @@ case class ExperimentConfig(
     }
 
     val trainBackTranslation = if (!trainBothDirections) false else this.trainBackTranslation
+    val effectiveLanguagePairs = {
+      if (trainBothDirections)
+        languagePairs.flatMap(p => Set(p, (p._2, p._1)))
+      else
+        languagePairs
+    }
 
     val model = modelArchitecture.model(
-      "Model", languages, dataConfig, env, parameterManager, trainBackTranslation, languagePairs,
-      if (evalLanguagePairs.isEmpty) languagePairs else evalLanguagePairs,
+      "Model", languages, dataConfig, env, parameterManager, trainBackTranslation, effectiveLanguagePairs,
+      if (evalLanguagePairs.isEmpty) effectiveLanguagePairs else evalLanguagePairs,
       modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
       summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
       optConfig, logConfig, evalDatasets, metrics)
