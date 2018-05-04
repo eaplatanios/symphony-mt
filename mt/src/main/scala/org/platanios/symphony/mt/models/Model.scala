@@ -113,10 +113,10 @@ abstract class Model[S] protected (
             dataParallelFactor = dataParallelFactor)
         }
         if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
-          val languagePairs = (config.evalLanguagePairs, config.languagePairs) match {
-            case (pairs, _) if pairs.nonEmpty => Some(pairs)
-            case (_, pairs) if pairs.nonEmpty => Some(pairs)
-            case _ => None
+          val languagePairs = {
+            if (config.evalLanguagePairs.nonEmpty) Some(config.evalLanguagePairs)
+            else if (config.languagePairs.nonEmpty) Some(config.languagePairs)
+            else None
           }
           val datasets = evalDatasets.filter(_._2.nonEmpty)
           if (datasets.nonEmpty) {
