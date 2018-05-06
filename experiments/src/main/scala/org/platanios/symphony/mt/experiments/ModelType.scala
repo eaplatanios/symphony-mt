@@ -30,7 +30,7 @@ sealed trait ModelType {
       sharedWordEmbeddings: Boolean
   ): ParameterManager
 
-  override def toString: String
+  override def toString: String = name
 }
 
 object ModelType {
@@ -70,8 +70,6 @@ case object Pairwise extends ModelType {
         tf.VarianceScalingInitializer.FanAverageScalingMode,
         tf.VarianceScalingInitializer.UniformDistribution))
   }
-
-  override def toString: String = "pairwise"
 }
 
 case class HyperLanguage(hiddenLayers: Seq[Int] = Seq.empty) extends ModelType {
@@ -98,8 +96,6 @@ case class HyperLanguage(hiddenLayers: Seq[Int] = Seq.empty) extends ModelType {
       wordEmbeddingsType = wordEmbeddingsType,
       hiddenLayers = hiddenLayers)
   }
-
-  override def toString: String = "hyper_lang"
 }
 
 case class HyperLanguagePair(hiddenLayers: Seq[Int] = Seq.empty) extends ModelType {
@@ -126,8 +122,6 @@ case class HyperLanguagePair(hiddenLayers: Seq[Int] = Seq.empty) extends ModelTy
       wordEmbeddingsType = wordEmbeddingsType,
       hiddenLayers = hiddenLayers)
   }
-
-  override def toString: String = "hyper_lang_pair"
 }
 
 case object GoogleMultilingual extends ModelType {
@@ -151,6 +145,4 @@ case object GoogleMultilingual extends ModelType {
         tf.VarianceScalingInitializer.FanAverageScalingMode,
         tf.VarianceScalingInitializer.UniformDistribution))
   }
-
-  override def toString: String = "google_multilingual"
 }
