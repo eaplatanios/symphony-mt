@@ -203,7 +203,7 @@ case class ExperimentConfig(
             s"${parts(0).toUpperCase()}[${parts(1)}]"
           },
           "Type" -> modelType.toString) ++ {
-          if (modelType == HyperLanguage || modelType == HyperLanguagePair)
+          if (modelType.isInstanceOf[HyperLanguage] || modelType.isInstanceOf[HyperLanguagePair])
             Seq("Language Embeddings Size" -> languageEmbeddingsSize.toString)
           else
             Seq.empty[(String, String)]
@@ -284,7 +284,7 @@ case class ExperimentConfig(
     stringBuilder.append(s".$modelArchitecture")
     stringBuilder.append(s".$modelCell")
     stringBuilder.append(s".$modelType")
-    if (modelType == HyperLanguage || modelType == HyperLanguagePair)
+    if (modelType.isInstanceOf[HyperLanguage] || modelType.isInstanceOf[HyperLanguagePair])
       stringBuilder.append(s".l:$languageEmbeddingsSize")
     stringBuilder.append(s".w:$wordEmbeddingsSize")
     if (!modelArchitecture.isInstanceOf[GNMT] && residual)

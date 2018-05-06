@@ -75,7 +75,12 @@ case object Pairwise extends ModelType {
 }
 
 case class HyperLanguage(hiddenLayers: Seq[Int] = Seq.empty) extends ModelType {
-  override val name: String = "hyper_lang"
+  override val name: String = {
+    if (hiddenLayers.isEmpty)
+      "hyper_lang"
+    else
+      s"hyper_lang:${hiddenLayers.mkString("-")}"
+  }
 
   override def getParametersManager(
       languageEmbeddingsSize: Int,
@@ -98,7 +103,12 @@ case class HyperLanguage(hiddenLayers: Seq[Int] = Seq.empty) extends ModelType {
 }
 
 case class HyperLanguagePair(hiddenLayers: Seq[Int] = Seq.empty) extends ModelType {
-  override val name: String = "hyper_lang_pair"
+  override val name: String = {
+    if (hiddenLayers.isEmpty)
+      "hyper_lang_pair"
+    else
+      s"hyper_lang_pair:${hiddenLayers.mkString("-")}"
+  }
 
   override def getParametersManager(
       languageEmbeddingsSize: Int,
