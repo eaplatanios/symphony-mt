@@ -81,6 +81,7 @@ object Inputs {
         })
         .groupBy(_._1)
         .mapValues(_.map(_._2))
+    val maxNumFiles = filteredDatasets.map(d => d._2.map(_.files(d._1._1).size).sum).max
     val numParallelFiles = filteredDatasets.map(d => d._2.map(_.files(d._1._1).size).sum).sum
 
     // Each element in `filesDataset` is a tuple: (srcLanguage, tgtLanguage, srcFile, tgtFile).
@@ -91,28 +92,43 @@ object Inputs {
             val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage))
             val srcLengths = srcFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
             val tgtLengths = tgtFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
-            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor).repeat()
-            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor).repeat()
-            val srcFilesDataset = tf.data.TensorSlicesDataset(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor)
-            val tgtFilesDataset = tf.data.TensorSlicesDataset(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor)
-            val srcLengthsDataset = tf.data.TensorSlicesDataset(srcLengths: Tensor)
-            val tgtLengthsDataset = tf.data.TensorSlicesDataset(tgtLengths: Tensor)
+            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor)
+            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor)
+            val srcFilesDataset = tf.data.TensorDataset(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor)
+            val tgtFilesDataset = tf.data.TensorDataset(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor)
+            val srcLengthsDataset = tf.data.TensorDataset(srcLengths: Tensor)
+            val tgtLengthsDataset = tf.data.TensorDataset(tgtLengths: Tensor)
             srcLanguageDataset.zip(tgtLanguageDataset)
                 .zip(srcFilesDataset.zip(tgtFilesDataset))
-                .zip(srcLengthsDataset.zip(tgtLengthsDataset)).map(
-              d => (d._1._1._1, d._1._1._2, d._1._2._1, d._1._2._2, d._2._1, d._2._2),
-              name = "AddLanguageIDs")
+                .zip(srcLengthsDataset.zip(tgtLengthsDataset))
+                .map(d => (d._1._1._1, d._1._1._2, d._1._2._1, d._1._2._2, d._2._1, d._2._2), name = "AddLanguageIDs")
         }.reduce((d1, d2) => d1.concatenate(d2))
 
     val parallelDatasetCreator: (Output, Output, Output, Output, Output, Output) => TFTrainDataset =
       createSingleParallelDataset(dataConfig, config, repeat, isEval)
 
     filesDataset
-        .shuffle(numParallelFiles)
+        .shuffle(filteredDatasets.size)
         .parallelInterleave(
-          d => parallelDatasetCreator(d._1, d._2, d._3, d._4, d._5, d._6), cycleLength = numParallelFiles,
-          sloppy = true, bufferOutputElements = bufferSize, prefetchInputElements = numParallelFiles,
-          name = "Interleave")
+          d => {
+            val (srcLanguage, tgtLanguage, srcFiles, tgtFiles, srcLengths, tgtLengths) = d
+            val srcLanguageDataset = tf.data.OutputDataset(srcLanguage).repeat()
+            val tgtLanguageDataset = tf.data.OutputDataset(tgtLanguage).repeat()
+            val srcFilesDataset = tf.data.OutputSlicesDataset(srcFiles)
+            val tgtFilesDataset = tf.data.OutputSlicesDataset(tgtFiles)
+            val srcLengthsDataset = tf.data.OutputSlicesDataset(srcLengths)
+            val tgtLengthsDataset = tf.data.OutputSlicesDataset(tgtLengths)
+            srcLanguageDataset.zip(tgtLanguageDataset)
+                .zip(srcFilesDataset.zip(tgtFilesDataset))
+                .zip(srcLengthsDataset.zip(tgtLengthsDataset))
+                .map(d => (d._1._1._1, d._1._1._2, d._1._2._1, d._1._2._2, d._2._1, d._2._2), name = "AddLanguageIDs")
+                .shuffle(maxNumFiles)
+                .parallelInterleave(
+                  d => parallelDatasetCreator(d._1, d._2, d._3, d._4, d._5, d._6), cycleLength = maxNumFiles,
+                  sloppy = true, bufferOutputElements = bufferSize, prefetchInputElements = maxNumFiles,
+                  name = "FilesInterleave")
+          }, cycleLength = numParallelFiles, sloppy = false, bufferOutputElements = bufferSize,
+          prefetchInputElements = numParallelFiles, name = "LanguagePairsInterleave")
   }
 
   def createEvalDatasets(
