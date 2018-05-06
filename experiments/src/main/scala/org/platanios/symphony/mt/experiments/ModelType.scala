@@ -35,13 +35,17 @@ sealed trait ModelType {
 
 object ModelType {
   implicit val modelTypeRead: scopt.Read[ModelType] = {
-    scopt.Read.reads {
-      case "pairwise" => Pairwise
-      case "hyper_lang" => HyperLanguage
-      case "hyper_lang_pair" => HyperLanguagePair
-      case "google_multilingual" => GoogleMultilingual
-      case value => throw new IllegalArgumentException(s"'$value' does not represent a valid model type.")
-    }
+    scopt.Read.reads(value => {
+      value.split(":") match {
+        case Array("pairwise") => Pairwise
+        case Array("hyper_lang") => HyperLanguage()
+        case Array("hyper_lang", hiddenLayers) => HyperLanguage(hiddenLayers.split('-').map(_.toInt))
+        case Array("hyper_lang_pair") => HyperLanguagePair()
+        case Array("hyper_lang_pair", hiddenLayers) => HyperLanguagePair(hiddenLayers.split('-').map(_.toInt))
+        case Array("google_multilingual") => GoogleMultilingual
+        case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid model type.")
+      }
+    })
   }
 }
 
@@ -70,7 +74,7 @@ case object Pairwise extends ModelType {
   override def toString: String = "pairwise"
 }
 
-case object HyperLanguage extends ModelType {
+case class HyperLanguage(hiddenLayers: Seq[Int] = Seq.empty) extends ModelType {
   override val name: String = "hyper_lang"
 
   override def getParametersManager(
@@ -86,13 +90,14 @@ case object HyperLanguage extends ModelType {
     }
     LanguageEmbeddingsManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
-      wordEmbeddingsType = wordEmbeddingsType)
+      wordEmbeddingsType = wordEmbeddingsType,
+      hiddenLayers = hiddenLayers)
   }
 
   override def toString: String = "hyper_lang"
 }
 
-case object HyperLanguagePair extends ModelType {
+case class HyperLanguagePair(hiddenLayers: Seq[Int] = Seq.empty) extends ModelType {
   override val name: String = "hyper_lang_pair"
 
   override def getParametersManager(
@@ -108,7 +113,8 @@ case object HyperLanguagePair extends ModelType {
     }
     LanguageEmbeddingsPairManager(
       languageEmbeddingsSize = languageEmbeddingsSize,
-      wordEmbeddingsType = wordEmbeddingsType)
+      wordEmbeddingsType = wordEmbeddingsType,
+      hiddenLayers = hiddenLayers)
   }
 
   override def toString: String = "hyper_lang_pair"

@@ -28,6 +28,7 @@ import scala.collection.mutable
 class LanguageEmbeddingsManager protected (
     val languageEmbeddingsSize: Int,
     override val wordEmbeddingsType: WordEmbeddingsType,
+    val hiddenLayers: Seq[Int] = Seq.empty,
     override val variableInitializer: tf.VariableInitializer = null
 ) extends ParameterManager(wordEmbeddingsType, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
@@ -72,9 +73,17 @@ class LanguageEmbeddingsManager protected (
           case Decoding => context.get._2
         }
         val embedding = languageEmbeddings(graph).gather(language).reshape(Shape(1, -1))
-        val weights = tf.variable("Dense/Weights", FLOAT32, Shape(languageEmbeddingsSize, shape.numElements.toInt))
+        var inputSize = languageEmbeddingsSize
+        var parameters = embedding
+        hiddenLayers.zipWithIndex.foreach(numUnits => {
+          val weights = tf.variable(s"Dense${numUnits._2}/Weights", FLOAT32, Shape(inputSize, numUnits._1))
+          val bias = tf.variable(s"Dense${numUnits._2}/Bias", FLOAT32, Shape(numUnits._1))
+          inputSize = numUnits._1
+          parameters = tf.linear(parameters, weights, bias, s"Dense${numUnits._2}")
+        })
+        val weights = tf.variable("Dense/Weights", FLOAT32, Shape(inputSize, shape.numElements.toInt))
         val bias = tf.variable("Dense/Bias", FLOAT32, Shape(shape.numElements.toInt))
-        val parameters = tf.linear(embedding, weights, bias, "Dense")
+        parameters = tf.linear(parameters, weights, bias, "Dense")
         parameters.cast(dataType).reshape(shape)
       }
 
@@ -98,11 +107,13 @@ object LanguageEmbeddingsManager {
   def apply(
       languageEmbeddingsSize: Int,
       wordEmbeddingsType: WordEmbeddingsType,
+      hiddenLayers: Seq[Int] = Seq.empty,
       variableInitializer: tf.VariableInitializer = null
   ): LanguageEmbeddingsManager = {
     new LanguageEmbeddingsManager(
       languageEmbeddingsSize,
       wordEmbeddingsType,
+      hiddenLayers,
       variableInitializer)
   }
 }

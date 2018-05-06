@@ -30,6 +30,7 @@ import scala.collection.mutable
 class LanguageEmbeddingsPairManager protected (
     val languageEmbeddingsSize: Int,
     override val wordEmbeddingsType: WordEmbeddingsType,
+    val hiddenLayers: Seq[Int] = Seq.empty,
     override val variableInitializer: tf.VariableInitializer = null
 ) extends ParameterManager(wordEmbeddingsType, variableInitializer) {
   protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
@@ -71,9 +72,17 @@ class LanguageEmbeddingsPairManager protected (
       def create(): Output = tf.variableScope(name) {
         val languagePair = tf.stack(Seq(context.get._1, context.get._2))
         val embeddings = languageEmbeddings(graph).gather(languagePair).reshape(Shape(1, -1))
-        val weights = tf.variable("Dense/Weights", FLOAT32, Shape(2 * languageEmbeddingsSize, shape.numElements.toInt))
+        var inputSize = 2 * languageEmbeddingsSize
+        var parameters = embeddings
+        hiddenLayers.zipWithIndex.foreach(numUnits => {
+          val weights = tf.variable(s"Dense${numUnits._2}/Weights", FLOAT32, Shape(inputSize, numUnits._1))
+          val bias = tf.variable(s"Dense${numUnits._2}/Bias", FLOAT32, Shape(numUnits._1))
+          inputSize = numUnits._1
+          parameters = tf.linear(parameters, weights, bias, s"Dense${numUnits._2}")
+        })
+        val weights = tf.variable("Dense/Weights", FLOAT32, Shape(inputSize, shape.numElements.toInt))
         val bias = tf.variable("Dense/Bias", FLOAT32, Shape(shape.numElements.toInt))
-        val parameters = tf.linear(embeddings, weights, bias, "Dense")
+        parameters = tf.linear(embeddings, weights, bias, "Dense")
         parameters.cast(dataType).reshape(shape)
       }
 
@@ -97,11 +106,13 @@ object LanguageEmbeddingsPairManager {
   def apply(
       languageEmbeddingsSize: Int,
       wordEmbeddingsType: WordEmbeddingsType,
+      hiddenLayers: Seq[Int] = Seq.empty,
       variableInitializer: tf.VariableInitializer = null
   ): LanguageEmbeddingsPairManager = {
     new LanguageEmbeddingsPairManager(
       languageEmbeddingsSize,
       wordEmbeddingsType,
+      hiddenLayers,
       variableInitializer)
   }
 }
