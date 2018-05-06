@@ -401,6 +401,8 @@ object ExperimentConfig {
           tf.train.AdaDelta(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "adagrad" =>
           tf.train.AdaGrad(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+        case Array(name, learningRate) if name == "rmsprop" =>
+          tf.train.RMSProp(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "adam" =>
           tf.train.Adam(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "lazy_adam" =>
