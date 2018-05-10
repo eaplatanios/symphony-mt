@@ -56,16 +56,16 @@ class TEDTalksLoader(
   override def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
     datasetType match {
       case Train => Seq((TEDTalksLoader.Train,
-          File(downloadsDir) / TEDTalksLoader.filename / TEDTalksLoader.filename / "all_talks_train.tsv",
-          File(downloadsDir) / TEDTalksLoader.filename / TEDTalksLoader.filename / "all_talks_train.tsv",
+          File(downloadsDir) / TEDTalksLoader.filename / "all_talks_train.tsv",
+          File(downloadsDir) / TEDTalksLoader.filename / "all_talks_train.tsv",
           TSVConverter))
       case Dev => Seq((TEDTalksLoader.Dev,
-          File(downloadsDir) / TEDTalksLoader.filename / TEDTalksLoader.filename / "all_talks_dev.tsv",
-          File(downloadsDir) / TEDTalksLoader.filename / TEDTalksLoader.filename / "all_talks_dev.tsv",
+          File(downloadsDir) / TEDTalksLoader.filename / "all_talks_dev.tsv",
+          File(downloadsDir) / TEDTalksLoader.filename / "all_talks_dev.tsv",
           TSVConverter))
       case Test => Seq((TEDTalksLoader.Test,
-          File(downloadsDir) / TEDTalksLoader.filename / TEDTalksLoader.filename / "all_talks_test.tsv",
-          File(downloadsDir) / TEDTalksLoader.filename / TEDTalksLoader.filename / "all_talks_test.tsv",
+          File(downloadsDir) / TEDTalksLoader.filename / "all_talks_test.tsv",
+          File(downloadsDir) / TEDTalksLoader.filename / "all_talks_test.tsv",
           TSVConverter))
     }
   }
