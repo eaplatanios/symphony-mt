@@ -24,7 +24,8 @@ import better.files._
 
 import java.nio.file.Path
 
-/**
+/** This is a loader for the TED talks dataset in [[https://github.com/neulab/word-embeddings-for-nmt]].
+  *
   * @author Emmanouil Antonios Platanios
   */
 class TEDTalksLoader(

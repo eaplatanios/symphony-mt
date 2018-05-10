@@ -37,33 +37,6 @@ import java.nio.file.{Path, Paths}
 // TODO: Make the optimizers more configurable (e.g., learning rate scheduling).
 
 /**
-  *
-  * @param task
-  * @param env
-  * @param dataConfig
-  * @param dataset
-  * @param languagePairs
-  * @param trainBothDirections
-  * @param trainBackTranslation
-  * @param modelArchitecture
-  * @param modelCell
-  * @param modelType
-  * @param languageEmbeddingsSize
-  * @param wordEmbeddingsSize
-  * @param residual
-  * @param dropout
-  * @param attention
-  * @param labelSmoothing
-  * @param beamWidth
-  * @param lengthPenaltyWeight
-  * @param decoderMaxLengthFactor
-  * @param numSteps
-  * @param summarySteps
-  * @param checkpointSteps
-  * @param optConfig
-  * @param logConfig
-  * @param evalDatasetTags
-  *
   * @author Emmanouil Antonios Platanios
   */
 case class ExperimentConfig(
@@ -71,8 +44,8 @@ case class ExperimentConfig(
     private val env: Environment = Environment(Paths.get(".")),
     dataConfig: DataConfig = DataConfig(),
     dataset: String = "",
-    languagePairs: Set[(Language, Language)] = Set.empty,
-    evalLanguagePairs: Set[(Language, Language)] = Set.empty,
+    providedLanguages: String = "",
+    providedEvalLanguages: String = "",
     trainBothDirections: Boolean = true,
     trainBackTranslation: Boolean = false,
     modelArchitecture: ModelArchitecture = BiRNN(),
@@ -96,6 +69,9 @@ case class ExperimentConfig(
     evalDatasetTags: Seq[(String, Float)] = Seq.empty,
     evalMetrics: Seq[String] = Seq("bleu", "meteor", "hyp_len", "ref_len", "sen_cnt")
 ) {
+  val languagePairs    : Set[(Language, Language)] = ExperimentConfig.parseLanguagePairs(providedLanguages)
+  val evalLanguagePairs: Set[(Language, Language)] = ExperimentConfig.parseLanguagePairs(providedEvalLanguages)
+
   lazy val (datasets, languages) = {
     experiments.loadDatasets(dataset match {
       case "iwslt14" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => IWSLT14Loader(l._1, l._2, dataConfig))
@@ -103,6 +79,7 @@ case class ExperimentConfig(
       case "iwslt16" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => IWSLT16Loader(l._1, l._2, dataConfig))
       case "iwslt17" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => IWSLT17Loader(l._1, l._2, dataConfig))
       case "wmt16" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => WMT16Loader(l._1, l._2, dataConfig))
+      case "ted_talks" => (languagePairs ++ evalLanguagePairs).toSeq.map(l => TEDTalksLoader(l._1, l._2, dataConfig))
     }, Some(workingDir))
   }
 
@@ -144,6 +121,7 @@ case class ExperimentConfig(
           case "iwslt16" => evalDatasetTags.map(t => (s"IWSLT-16/${t._1}", IWSLT16Loader.Tag.fromName(t._1), t._2))
           case "iwslt17" => evalDatasetTags.map(t => (s"IWSLT-17/${t._1}", IWSLT17Loader.Tag.fromName(t._1), t._2))
           case "wmt16" => evalDatasetTags.map(t => (s"WMT-16/${t._1}", WMT16Loader.Tag.fromName(t._1), t._2))
+          case "ted_talks" => evalDatasetTags.map(t => (s"TED-Talks/${t._1}", TEDTalksLoader.Tag.fromName(t._1), t._2))
         }
         evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2), t._3)))
       case ExperimentConfig.Translate => Seq.empty
@@ -189,10 +167,8 @@ case class ExperimentConfig(
       "Dataset" -> Seq(
         "Name" -> """(\p{IsAlpha}+)(\p{IsDigit}+)""".r.replaceAllIn(dataset.map(_.toUpper), "$1-$2"),
         "Both Directions" -> trainBothDirections.toString,
-        "Language Pairs" ->
-            languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted.mkString(", "),
-        "Evaluation Language Pairs" ->
-            evalLanguagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted.mkString(", "),
+        "Languages" -> providedLanguages,
+        "Evaluation Languages" -> providedEvalLanguages,
         "Evaluation Tags" -> evalDatasetTags.mkString(", "),
         "Evaluation Metrics" -> evalMetrics.mkString(", ")),
       "Model" -> {
@@ -278,7 +254,7 @@ case class ExperimentConfig(
 
   override def toString: String = {
     val stringBuilder = new StringBuilder(s"$dataset")
-    stringBuilder.append(s".${languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted.mkString(".")}")
+    stringBuilder.append(s".${providedLanguages.replace(',', '.')}")
     stringBuilder.append(s".tw:$trainBothDirections")
     stringBuilder.append(s".ae:$trainBackTranslation")
     stringBuilder.append(s".$modelArchitecture")
@@ -306,6 +282,24 @@ case class ExperimentConfig(
 }
 
 object ExperimentConfig {
+  private[ExperimentConfig] def parseLanguagePairs(languages: String): Set[(Language, Language)] = {
+    if (languages.contains(":")) {
+      languages.split(',').map(p => {
+        val parts = p.split(":")
+        if (parts.length != 2)
+          throw new IllegalArgumentException(s"'$p' is not a valid language pair.")
+        (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
+      }).toSet
+    } else {
+      languages
+          .split(',')
+          .map(Language.fromAbbreviation)
+          .combinations(2).map(p => (p(0), p(1)))
+          .flatMap(p => Seq(p, (p._2, p._1)))
+          .toSet
+    }
+  }
+
   private[ExperimentConfig] def logTable(table: Seq[(String, Seq[(String, String)])], logger: String => Unit): Unit = {
     val firstColumnWidth = Math.max(Math.max(table.map(_._1.length).max, table.flatMap(_._2.map(_._1.length)).max), 10)
     val secondColumnWidth = Math.max(table.flatMap(_._2.map(_._2.length)).max, 10)
@@ -436,25 +430,16 @@ object ExperimentConfig {
     opt[String]("dataset").required().valueName("<name>")
         .action((d, c) => c.copy(dataset = d))
         .text("Specifies the dataset to use for the experiment. " +
-            "Valid values are: 'iwslt14', 'iwslt15', 'iwslt16', 'iwslt17', and 'wmt16'.")
+            "Valid values are: 'iwslt14', 'iwslt15', 'iwslt16', 'iwslt17', 'wmt16', and 'ted_talks'.")
 
-    opt[Seq[String]]("language-pairs").required().valueName("<srcLang1>:<tgtLang1>[,<srcLang2>:<tgtLang2>[...]]")
-        .action((d, c) => c.copy(languagePairs = d.map(p => {
-          val parts = p.split(":")
-          if (parts.length != 2)
-            throw new IllegalArgumentException(s"'$p' is not a valid language pair.")
-          (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
-        }).toSet))
-        .text("Specifies the language pairs to use for the experiment. Example value: 'en:vi,en:de'.")
+    opt[String]("languages").required().valueName("<srcLang1>[:<tgtLang1>][,<srcLang2>[:<tgtLang2>][...]]")
+        .action((d, c) => c.copy(providedLanguages = d))
+        .text("Specifies the languages to use for the experiment. Example values: 'de:en,en:de' or 'en,de'.")
 
-    opt[Seq[String]]("eval-language-pairs").valueName("<srcLang1>:<tgtLang1>[,<srcLang2>:<tgtLang2>[...]]")
-        .action((d, c) => c.copy(evalLanguagePairs = d.map(p => {
-          val parts = p.split(":")
-          if (parts.length != 2)
-            throw new IllegalArgumentException(s"'$p' is not a valid language pair.")
-          (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
-        }).toSet))
-        .text("Specifies the language pairs to use for evaluation in the experiment. Example value: 'en:vi,en:de'.")
+    opt[String]("eval-languages").valueName("<srcLang1>[:<tgtLang1>][,<srcLang2>[:<tgtLang2>][...]]")
+        .action((d, c) => c.copy(providedEvalLanguages = d))
+        .text("Specifies the languages to use for evaluation in the experiment. " +
+            "Example values: 'de:en,en:de' or 'en,de'.")
 
     opt[Unit]("only-forward")
         .action((_, c) => c.copy(trainBothDirections = false))
