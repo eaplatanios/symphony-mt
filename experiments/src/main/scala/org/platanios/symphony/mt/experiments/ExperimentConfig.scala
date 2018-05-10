@@ -283,20 +283,21 @@ case class ExperimentConfig(
 
 object ExperimentConfig {
   private[ExperimentConfig] def parseLanguagePairs(languages: String): Set[(Language, Language)] = {
-    if (languages.contains(":")) {
-      languages.split(',').map(p => {
-        val parts = p.split(":")
-        if (parts.length != 2)
-          throw new IllegalArgumentException(s"'$p' is not a valid language pair.")
-        (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
-      }).toSet
-    } else {
-      languages
-          .split(',')
-          .map(Language.fromAbbreviation)
-          .combinations(2).map(p => (p(0), p(1)))
-          .flatMap(p => Seq(p, (p._2, p._1)))
-          .toSet
+    languages match {
+      case l if l == "" => Set.empty[(Language, Language)]
+      case l if l.contains(":") =>
+        languages.split(',').map(p => {
+          val parts = p.split(":")
+          if (parts.length != 2)
+            throw new IllegalArgumentException(s"'$p' is not a valid language pair.")
+          (Language.fromAbbreviation(parts(0)), Language.fromAbbreviation(parts(1)))
+        }).toSet
+      case l =>
+        l.split(',')
+            .map(Language.fromAbbreviation)
+            .combinations(2).map(p => (p(0), p(1)))
+            .flatMap(p => Seq(p, (p._2, p._1)))
+            .toSet
     }
   }
 
@@ -440,7 +441,6 @@ object ExperimentConfig {
         .action((d, c) => c.copy(providedEvalLanguages = d))
         .text("Specifies the languages to use for evaluation in the experiment. " +
             "Example values: 'de:en,en:de' or 'en,de'.")
-
     opt[Unit]("only-forward")
         .action((_, c) => c.copy(trainBothDirections = false))
         .text("If used, the model will be trained and evaluated only on " +
