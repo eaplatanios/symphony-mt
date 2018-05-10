@@ -23,6 +23,7 @@ import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -37,7 +38,7 @@ object TSVConverter extends FileProcessor {
     val reader = newReader(file1)
     val linesIterator = reader.lines().iterator().asScala
     val header = linesIterator.next()
-    val languages = header.split('\t').tail.map(Language.fromAbbreviation)
+    val languages = header.split('\t').tail.map(l => Try(Language.fromAbbreviation(l)).getOrElse(null)) // TODO: [DATA] This is very hacky (because of "calv" language".
     val language1Index = languages.indexOf(language1) + 1 // We add one to account for the first column ("talk_name").
     val language2Index = languages.indexOf(language2) + 1
     val textFileNamePrefix = s"${file1.nameWithoutExtension}.${language1.abbreviation}-${language2.abbreviation}"
