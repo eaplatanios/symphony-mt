@@ -31,7 +31,9 @@ trait FileProcessor {
 
   def process(file: File, language: Language): File = file
 
-  def processPair(file1: File, file2: File, language1: Language, language2: Language): (File, File) = (file1, file2)
+  def processPair(file1: File, file2: File, language1: Language, language2: Language): (File, File) = {
+    (process(file1, language1), process(file2, language2))
+  }
 
   def >>(processor: FileProcessor): ComposedFileProcessor = {
     ComposedFileProcessor(this, processor)

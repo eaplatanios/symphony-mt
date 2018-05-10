@@ -150,7 +150,10 @@ object ParallelDatasetLoader {
         val corpora = loader.corpora(datasetType)
 
         // Apply the file processors.
-        val processedCorpora = corpora.map(c => (c._1, c._4(c._2, loader.srcLanguage), c._4(c._3, loader.tgtLanguage)))
+        val processedCorpora = corpora.map(c => {
+          val processed = c._4(c._2, c._3, loader.srcLanguage, loader.tgtLanguage)
+          (c._1, processed._1, processed._2)
+        })
 
         // Tokenize the corpora.
         val tokenizedSrcFiles = processedCorpora.map(_._2).map(f => {
