@@ -51,5 +51,10 @@ case class GeneratedVocabulary(
     */
   override def filename(languages: Seq[Language]): String = generator.filename(languages)
 
-  override def toString: String = s"v:${generator.toString}"
+  override def toString: String = {
+    if (shared)
+      s"v:${generator.toString}:shared"
+    else
+      s"v:${generator.toString}"
+  }
 }
