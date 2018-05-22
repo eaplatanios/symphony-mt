@@ -96,7 +96,7 @@ class PriorityCounter[A] extends scala.Cloneable {
     * @return This priority counter.
     */
   def update(element: A, count: Long): this.type = {
-    internalUpdate(element, count, (_) => count)
+    internalUpdate(element, count, _ => count)
   }
 
   /** Adds the provided value to the count of the provided element.
@@ -106,7 +106,7 @@ class PriorityCounter[A] extends scala.Cloneable {
     * @return This priority counter.
     */
   def add(element: A, count: Long): this.type = {
-    internalUpdate(element, count, (location) => cast(internalArray.p_array(location))._1 + count)
+    internalUpdate(element, count, location => cast(internalArray.p_array(location))._1 + count)
   }
 
   /** Updates the count for the provided element.
