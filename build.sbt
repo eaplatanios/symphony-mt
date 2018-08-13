@@ -19,7 +19,7 @@ import sbtrelease.Vcs
 import scala.sys.process.Process
 
 scalaVersion in ThisBuild := "2.12.6"
-crossScalaVersions in ThisBuild := Seq("2.11.11", "2.12.6")
+crossScalaVersions in ThisBuild := Seq("2.11.12", "2.12.6")
 
 organization in ThisBuild := "org.platanios"
 
@@ -54,7 +54,7 @@ lazy val commonSettings = loggingSettings
 
 lazy val testSettings = Seq(
   libraryDependencies ++= Seq(
-    "junit"         %  "junit" %   "4.12",
+    "junit"         %  "junit"     % "4.12",
     "org.scalactic" %% "scalactic" % "3.0.4",
     "org.scalatest" %% "scalatest" % "3.0.4" % "test"),
   logBuffered in Test := false,
@@ -64,7 +64,7 @@ lazy val testSettings = Seq(
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF"))
 
 lazy val tensorFlowSettings = Seq(
-  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "linux-gpu-x86_64")
+  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion classifier "darwin-cpu-x86_64",
   libraryDependencies += "org.platanios" %% "tensorflow-horovod" % tensorFlowForScalaVersion)
 
 lazy val all = (project in file("."))
@@ -121,6 +121,7 @@ val MT = config("mt")
 val Experiments = config("experiments")
 
 lazy val docs = (project in file("docs"))
+    .dependsOn(mt)
     .enablePlugins(SiteScaladocPlugin, ParadoxPlugin, ParadoxMaterialThemePlugin, GhpagesPlugin)
     .settings(moduleName := "symphony-docs", name := "Symphony Documentation")
     .settings(
@@ -142,12 +143,13 @@ lazy val docs = (project in file("docs"))
         "git@github.com:eaplatanios/symphony-mt.git")),
       git.remoteRepo := scmInfo.value.get.connection,
       paradoxMaterialTheme in Compile ~= {
-        _.withColor("blue", "indigo")
+        _.withColor("red", "red")
             .withRepository(uri("https://github.com/eaplatanios/symphony-mt"))
             .withSocial(
               uri("https://github.com/eaplatanios"),
               uri("https://twitter.com/eaplatanios"))
             .withLanguage(java.util.Locale.ENGLISH)
+            .withFont("Roboto", "Source Code Pro")
       })
 
 lazy val noPublishSettings = Seq(
