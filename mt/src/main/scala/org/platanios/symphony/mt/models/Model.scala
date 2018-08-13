@@ -33,8 +33,7 @@ import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 import org.platanios.tensorflow.horovod._
 
-import java.io.{File, PrintWriter}
-import java.nio.file.Files
+import java.io.PrintWriter
 
 import scala.io.Source
 
@@ -336,17 +335,24 @@ abstract class Model[S] protected (
           parameterManager.setContext((input._1, input._2))
 
           // TODO: We need to first have a check for whether the language pair is supported. If not supported, fallback multi-lingual translation method should be applied.
+          val pivotingSequence = Seq(input._2)
 
           val srcSequence = mapToWordIds(input._1, input._3)
-          val srcMapped = (input._1, input._2, srcSequence, input._4)
-          val state = tf.variableScope("Encoder") {
-            encoder(srcMapped)
+          val srcMapped = (input._1, srcSequence, input._4)
+          val (tgtLanguage, tgtSentences, tgtLengths) = pivotingSequence.foldLeft(srcMapped) {
+            case ((srcLanguage, srcSentences, srcLengths), language) =>
+              val encoderInput = (srcLanguage, language, srcSentences, srcLengths)
+              val state = tf.variableScope("Encoder") {
+                encoder(encoderInput)
+              }
+              val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
+                decoder(encoderInput, None, Some(state))
+              }
+              (language, tgtSentences, tgtLengths)
           }
-          val output = tf.variableScope("Decoder") {
-            decoder(srcMapped, None, Some(state))
-          }
-          val decodedSequences = mapFromWordIds(input._2, output._1)
-          (input._2, decodedSequences, output._2)
+
+          val decodedSequences = mapFromWordIds(tgtLanguage, tgtSentences)
+          (tgtLanguage, decodedSequences, tgtLengths)
         }
       }
     }
@@ -391,9 +397,11 @@ abstract class Model[S] protected (
 
   /**
     *
-    * @param  input Tuple containing two tensors:
+    * @param  input Tuple containing four tensors:
+    *                 - `INT32` tensor containing the source language ID.
+    *                 - `INT32` tensor containing the target language ID.
     *                 - `INT32` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
-    *                 - `INT32` tensor with shape `[batchSize]`, containing the sequence lengths.
+    *                 - `INT32` tensor with shape `[batchSize]`, containing the sentence lengths.
     * @param  mode  Current learning mode (e.g., training or evaluation).
     * @return   Tuple containing two tensors:
     *           - Encoder output, with shape `[batchSize, inputLength, hiddenSize]`.
