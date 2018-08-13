@@ -15,8 +15,6 @@
 
 package org.platanios.symphony.mt.experiments
 
-import org.platanios.symphony.mt.experiments.results.ExperimentResult
-
 import better.files._
 
 import java.nio.charset.StandardCharsets
