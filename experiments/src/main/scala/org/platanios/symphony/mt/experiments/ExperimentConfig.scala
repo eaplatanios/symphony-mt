@@ -391,23 +391,23 @@ object ExperimentConfig {
     scopt.Read.reads(value => {
       value.split(":") match {
         case Array(name, learningRate) if name == "gd" =>
-          tf.train.GradientDescent(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.GradientDescent(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "adadelta" =>
-          tf.train.AdaDelta(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.AdaDelta(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "adagrad" =>
-          tf.train.AdaGrad(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.AdaGrad(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "rmsprop" =>
-          tf.train.RMSProp(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.RMSProp(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "adam" =>
-          tf.train.Adam(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.Adam(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "lazy_adam" =>
-          tf.train.LazyAdam(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.LazyAdam(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "amsgrad" =>
-          tf.train.AMSGrad(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.AMSGrad(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "lazy_amsgrad" =>
-          tf.train.LazyAMSGrad(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.LazyAMSGrad(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case Array(name, learningRate) if name == "yf" =>
-          tf.train.YellowFin(learningRate.toDouble, learningRateSummaryTag = "LearningRate")
+          tf.train.YellowFin(learningRate.toFloat, learningRateSummaryTag = "LearningRate")
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid optimizer.")
       }
     })
