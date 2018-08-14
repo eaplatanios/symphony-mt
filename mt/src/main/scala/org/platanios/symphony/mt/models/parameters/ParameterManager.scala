@@ -93,6 +93,10 @@ class ParameterManager protected (
     }
   }
 
+  def languageId(index: Int): Output = {
+    languageIds(currentGraph)(index)
+  }
+
   def stringToIndexLookup(languageId: Output): Output => Output = (keys: Output) => {
     tf.variableScope("ParameterManager/StringToIndexLookupTables") {
       val graph = currentGraph

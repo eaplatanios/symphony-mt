@@ -19,6 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models.parameters.ParameterManager
+import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot}
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -139,6 +140,7 @@ object RNNModel {
       override val env: Environment,
       override val parameterManager: ParameterManager,
       override val deviceManager: DeviceManager,
+      override val pivot: Pivot,
       override val labelSmoothing: Float,
       // Model
       val encoder: RNNEncoder[S, SS],
@@ -154,7 +156,7 @@ object RNNModel {
       val lengthPenaltyWeight: Float,
       val decoderMaxLengthFactor: Float
   ) extends Model.Config(
-    env, parameterManager, deviceManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
+    env, parameterManager, deviceManager, pivot, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
     trainBackTranslation, languagePairs, evalLanguagePairs)
 
   object Config {
@@ -165,6 +167,7 @@ object RNNModel {
         encoder: RNNEncoder[S, SS],
         decoder: RNNDecoder[S, SS],
         deviceManager: DeviceManager = RoundRobinDeviceManager,
+        pivot: Pivot = NoPivot,
         timeMajor: Boolean = false,
         labelSmoothing: Float = 0.1f,
         summarySteps: Int = 100,
@@ -178,7 +181,7 @@ object RNNModel {
         decoderMaxLengthFactor: Float = 2.0f
     ): Config[S, SS] = {
       new Config[S, SS](
-        env, parameterManager, deviceManager, labelSmoothing, encoder, decoder, timeMajor, summarySteps,
+        env, parameterManager, deviceManager, pivot, labelSmoothing, encoder, decoder, timeMajor, summarySteps,
         checkpointSteps, trainBackTranslation, languagePairs, evalLanguagePairs, beamWidth, lengthPenaltyWeight,
         decoderMaxLengthFactor)
     }

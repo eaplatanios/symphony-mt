@@ -22,6 +22,7 @@ import org.platanios.symphony.mt.evaluation._
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.parameters.ParameterManager
+import org.platanios.symphony.mt.models.pivoting._
 import org.platanios.symphony.mt.utilities.Encoding.tfStringToUTF8
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -281,10 +282,10 @@ abstract class Model[S] protected (
       if (log) {
         val line = s"║ %${firstColWidth}s │".format(dataset._1) + values.map(value => {
           if (value.shape.rank == 0 && value.dataType.isFloatingPoint) {
-            val castedValue = value.cast(FLOAT32).scalar.asInstanceOf[Float]
+            val castedValue = value.cast(FLOAT32).scalar
             s" %$colWidth.4f ".format(castedValue)
           } else if (value.shape.rank == 0 && value.dataType.isInteger) {
-            val castedValue = value.cast(INT64).scalar.asInstanceOf[Long]
+            val castedValue = value.cast(INT64).scalar
             s" %${colWidth}d ".format(castedValue)
           } else {
             s" %${colWidth}s ".format("Not Scalar")
@@ -311,6 +312,7 @@ abstract class Model[S] protected (
           parameterManager.setEnvironment(config.env)
           parameterManager.setDeviceManager(config.deviceManager)
           parameterManager.setContext((input._1._1, input._1._2))
+
           val srcSequence = mapToWordIds(input._1._1, input._1._3)
           val tgtSequence = mapToWordIds(input._1._2, input._2._1)
           val srcMapped = (input._1._1, input._1._2, srcSequence, input._1._4)
@@ -341,24 +343,52 @@ abstract class Model[S] protected (
           parameterManager.setContext((input._1, input._2))
 
           // TODO: We need to first have a check for whether the language pair is supported. If not supported, fallback multi-lingual translation method should be applied.
-          val pivotingSequence = Seq(input._2)
 
           val srcSequence = mapToWordIds(input._1, input._3)
-          val srcMapped = (input._1, srcSequence, input._4)
-          val (tgtLanguage, tgtSentences, tgtLengths) = pivotingSequence.foldLeft(srcMapped) {
-            case ((srcLanguage, srcSentences, srcLengths), language) =>
-              val encoderInput = (srcLanguage, language, srcSentences, srcLengths)
+
+          config.pivot match {
+            case NoPivot =>
+              val encoderInput = (input._1, input._2, srcSequence, input._4)
               val state = tf.variableScope("Encoder") {
                 encoder(encoderInput)
               }
               val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
                 decoder(encoderInput, None, Some(state))
               }
-              (language, tgtSentences, tgtLengths)
-          }
+              (input._2, tgtSentences, tgtLengths)
+            case _ =>
+              config.pivot.initialize(languages, parameterManager)
+              val pivotingSequence = config.pivot.pivotingSequence(input._1, input._2)
 
-          val decodedSequences = mapFromWordIds(tgtLanguage, tgtSentences)
-          (tgtLanguage, decodedSequences, tgtLengths)
+              type LoopVariables = (Output, Output, Output, Output, Output)
+
+              def predicateFn(loopVariables: LoopVariables): Output = {
+                tf.less(loopVariables._1, tf.shape(loopVariables._5)(0))
+              }
+
+              def bodyFn(loopVariables: LoopVariables): LoopVariables = {
+                val index = loopVariables._1
+                val srcLanguage = loopVariables._2
+                val srcSentences = loopVariables._3
+                val srcLengths = loopVariables._4
+                val language = tf.gather(loopVariables._5, index)
+                val encoderInput = (srcLanguage, language, srcSentences, srcLengths)
+                val state = tf.variableScope("Encoder") {
+                  encoder(encoderInput)
+                }
+                val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
+                  decoder(encoderInput, None, Some(state))
+                }
+                (index + 1, language, tgtSentences, tgtLengths, loopVariables._5)
+              }
+
+              val results = tf.whileLoop(predicateFn, bodyFn, (0, input._1, srcSequence, input._4, pivotingSequence))
+              val tgtLanguage = results._2
+              val tgtSentences = results._3
+              val tgtLengths = results._4
+              val decodedSequences = mapFromWordIds(tgtLanguage, tgtSentences)
+              (tgtLanguage, decodedSequences, tgtLengths)
+          }
         }
       }
     }
@@ -375,6 +405,7 @@ abstract class Model[S] protected (
           parameterManager.initialize(languages)
           parameterManager.setEnvironment(config.env)
           parameterManager.setDeviceManager(config.deviceManager)
+
           var tgtSequence = tf.createWithNameScope("TrainInputsToWordIDs") {
             mapToWordIds(input._1._1, input._2._1)
           }
@@ -435,10 +466,11 @@ abstract class Model[S] protected (
 }
 
 object Model {
-  class Config protected(
+  class Config protected (
       val env: Environment,
       val parameterManager: ParameterManager,
       val deviceManager: DeviceManager,
+      val pivot: Pivot,
       val labelSmoothing: Float,
       val timeMajor: Boolean,
       val summarySteps: Int,
@@ -453,6 +485,7 @@ object Model {
         env: Environment,
         parameterManager: ParameterManager,
         deviceManager: DeviceManager = RoundRobinDeviceManager,
+        pivot: Pivot = NoPivot,
         labelSmoothing: Float = 0.0f,
         timeMajor: Boolean = false,
         summarySteps: Int = 100,
@@ -462,7 +495,7 @@ object Model {
         evalLanguagePairs: Set[(Language, Language)] = Set.empty
     ): Config = {
       new Config(
-        env, parameterManager, deviceManager, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
+        env, parameterManager, deviceManager, pivot, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
         trainBackTranslation, languagePairs, evalLanguagePairs)
     }
   }
