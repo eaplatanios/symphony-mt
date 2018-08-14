@@ -147,12 +147,12 @@ object Common {
         val paddings = {
           if (axis == 1) {
             Seq(
-              tf.stack(Seq(tf.stack(Seq(0, 0)), tf.stack(Seq(0, lengthDiff)))),
-              tf.zeros(INT32, tf.stack(Seq(tf.rank(arg) - 2, 2))))
+              tf.stack(Seq(tf.stack(Seq(0L, 0L)), tf.stack(Seq(0L, lengthDiff)))),
+              tf.zeros(INT64, tf.stack(Seq(tf.rank(arg) - 2, 2))))
           } else {
             Seq(
-              tf.stack(Seq(tf.stack(Seq(0, 0)), tf.stack(Seq(0, 0)), tf.stack(Seq(0, lengthDiff)))),
-              tf.zeros(INT32, tf.stack(Seq(tf.rank(arg) - 3, 2))))
+              tf.stack(Seq(tf.stack(Seq(0L, 0L)), tf.stack(Seq(0L, 0L)), tf.stack(Seq(0L, lengthDiff)))),
+              tf.zeros(INT64, tf.stack(Seq(tf.rank(arg) - 3, 2))))
           }
         }
         tf.concatenate(paddings, axis = 0)
@@ -236,7 +236,7 @@ object Common {
     * @return  `FLOAT32` tensor containing weights for the provided labels.
     */
   def weightsConcatenated(labels: Output): Output = {
-    val eosMask = tf.equal(labels, 1).cast(INT32) // TODO: Standardize EOS symbol.
+    val eosMask = tf.equal(labels, 1).cast(INT64) // TODO: Standardize EOS symbol.
     val sentenceNum = tf.cumsum(eosMask, axis = 1, exclusive = true)
     val sentenceNumPlusOne = sentenceNum + 1
     val inTarget = tf.equal(tf.mod(sentenceNum, 2), 1)
@@ -290,7 +290,7 @@ object Common {
           //      # logits: [batch_size, ?, ?, ?, vocab_size]
           //      soft_targets = tf.transpose(soft_targets, perm=[1, 2, 3, 4, 0])
         } else {
-          tf.oneHot(tf.cast(labels, INT32), vocabSize, confidence, lowConfidence)
+          tf.oneHot(tf.cast(labels, INT64), vocabSize, confidence, lowConfidence)
         }
       }
       tf.softmaxCrossEntropy(logits, softTargets) - normalizingConstant
@@ -356,7 +356,7 @@ object Common {
       scaleOutput: Boolean = true,
       broadcastAxes: Set[Int] = Set.empty
   ): Output = {
-    val one = tf.constant(1, dataType = INT32)
+    val one = tf.constant(1L, dataType = INT64)
     val noiseShape = {
       if (broadcastAxes.isEmpty) {
         tf.shape(input)

@@ -107,9 +107,9 @@
 //      case Some(inputSequences) =>
 //        // TODO: Handle this shift more efficiently.
 //        // Shift the target sequence one step forward so the decoder learns to output the next word.
-//        val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+//        val tgtBosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT64)
 //        val inputTokens = tf.concatenate(Seq(
-//          tf.fill(INT32, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
+//          tf.fill(INT64, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
 //          inputSequences._1), axis = 1)
 //        val inputLengths = inputSequences._2 + 1
 //        val inputMaxLength = tf.shape(inputTokens)(1)
@@ -170,7 +170,7 @@
 //      (output, cache)
 //    }
 //
-//    val tgtEosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT32)
+//    val tgtEosId = tgtVocabulary.lookupTable().lookup(tf.constant(dataConfig.endOfSequenceToken)).cast(INT64)
 //    val decodeHelperResult = decodeHelper.decode(state, decodingFn, tgtMaxLength, tgtEosId)
 //
 //    decodeHelperResult.outputs
@@ -341,7 +341,7 @@
 //          i, currentIDs, State(encoderOutput._1, encoderOutput._2),
 //          cache.map(c => Attention.Cache(c._1, c._2)))
 //        // TODO: Add support for sampling with temperature.
-//        var nextIDs = tf.argmax(logits, axes = -1, outputDataType = INT32)
+//        var nextIDs = tf.argmax(logits, axes = -1, outputDataType = INT64)
 //        val nextFinished = tf.logicalOr(finished, tf.equal(nextIDs, endOfSequenceID))
 //        nextIDs = nextIDs(::, NewAxis)
 //        val nextDecodedIDs = tf.concatenate(Seq(decodedIDs._1, nextIDs), axis = 1)
@@ -350,10 +350,10 @@
 //            encoderOutput, nextCache.map(c => (c.k, c.v)))
 //      }
 //
-//      val decodedIDs = tf.zeros(INT32, tf.stack(Seq(batchSize, 0)))
-//      val decodedLengths = tf.zeros(INT32, batchSize(NewAxis))
+//      val decodedIDs = tf.zeros(INT64, tf.stack(Seq(batchSize, 0)))
+//      val decodedLengths = tf.zeros(INT64, batchSize(NewAxis))
 //      val finished = tf.fill(BOOLEAN, batchSize.expandDims(0))(false)
-//      val ids = tf.zeros(INT32, tf.stack(Seq(batchSize, 1)))
+//      val ids = tf.zeros(INT64, tf.stack(Seq(batchSize, 1)))
 //      val (_, _, _, finalDecodedIds, _, _) = tf.whileLoop(
 //        (lv: LoopVariables) => tf.logicalAnd(lv._1 < decodingLength, tf.logicalNot(tf.all(lv._2))),
 //        (lv: LoopVariables) => bodyFn(lv),

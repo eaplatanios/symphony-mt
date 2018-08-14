@@ -137,7 +137,7 @@ object Attention {
     * @return `FLOAT32` tensor with shape `[lengthQ, lengthK]`, containing either `0` or `-infinity` (i.e., `-1e9f`).
     */
   def attentionBiasBatch(
-      conditionFn: (Output) => Output,
+      conditionFn: Output => Output,
       batchCoordinatesQ: Output,
       batchCoordinatesK: Output
   ): Output = {

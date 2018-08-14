@@ -65,7 +65,7 @@ class RNNModel[S, SS](
       if (!mode.isTraining && dataConfig.tgtMaxLength != -1)
         tf.constant(dataConfig.tgtMaxLength)
       else
-        tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT32)
+        tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT64)
     }
     (config.encoder.create(config, input._1, input._2, input._3, input._4), input._4, maxDecodingLength)
   }
@@ -83,9 +83,9 @@ class RNNModel[S, SS](
         // TODO: Handle this shift more efficiently.
         // Shift the target sequence one step forward so the decoder learns to output the next word.
         val tgtBosId = config.parameterManager
-            .stringToIndexLookup(encoderInput._2)(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT32)
+            .stringToIndexLookup(encoderInput._2)(tf.constant(dataConfig.beginOfSequenceToken)).cast(INT64)
         val tgtSequence = tf.concatenate(Seq(
-          tf.fill(INT32, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
+          tf.fill(INT64, tf.stack(Seq(tf.shape(inputSequences._1)(0), 1)))(tgtBosId),
           inputSequences._1), axis = 1)
         val tgtSequenceLength = inputSequences._2 + 1
         val output = config.decoder.create(

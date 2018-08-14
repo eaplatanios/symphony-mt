@@ -62,7 +62,7 @@ object Inputs {
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
   ): () => TFTrainDataset = () => {
-    val languageIds = languages.map(_._1).zipWithIndex.toMap
+    val languageIds = languages.map(_._1).zipWithIndex.toMap.mapValues(_.toLong)
     val bufferSize = if (dataConfig.bufferSize == -1L) 1024L else dataConfig.bufferSize
 
     val filteredDatasets = datasets
@@ -90,14 +90,14 @@ object Inputs {
           case ((srcLanguage, tgtLanguage), parallelDatasets) =>
             val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage))
             val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage))
-            val srcLengths = srcFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
-            val tgtLengths = tgtFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
-            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor[INT32])
-            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor[INT32])
+            val srcLengths = srcFiles.map(_.lineIterator(StandardCharsets.UTF_8).size.toLong)
+            val tgtLengths = tgtFiles.map(_.lineIterator(StandardCharsets.UTF_8).size.toLong)
+            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor[INT64])
+            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor[INT64])
             val srcFilesDataset = tf.data.TensorDataset(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor[STRING])
             val tgtFilesDataset = tf.data.TensorDataset(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor[STRING])
-            val srcLengthsDataset = tf.data.TensorDataset(srcLengths: Tensor[INT32])
-            val tgtLengthsDataset = tf.data.TensorDataset(tgtLengths: Tensor[INT32])
+            val srcLengthsDataset = tf.data.TensorDataset(srcLengths: Tensor[INT64])
+            val tgtLengthsDataset = tf.data.TensorDataset(tgtLengths: Tensor[INT64])
             srcLanguageDataset.zip(tgtLanguageDataset)
                 .zip(srcFilesDataset.zip(tgtFilesDataset))
                 .zip(srcLengthsDataset.zip(tgtLengthsDataset))
@@ -164,8 +164,8 @@ object Inputs {
   /** Creates and returns a TensorFlow dataset, for the specified language.
     *
     * Each element of that dataset is a tuple containing:
-    *   - `INT32` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
-    *   - `INT32` tensor containing the input sentence lengths, with shape `[batchSize]`.
+    *   - `INT64` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
+    *   - `INT64` tensor containing the input sentence lengths, with shape `[batchSize]`.
     *
     *
     *
@@ -187,7 +187,7 @@ object Inputs {
         // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
         // not generally need to do this since later on we will be masking out calculations past
         // the true sequence.
-        (tf.constant(dataConfig.endOfSequenceToken.toTensor), tf.zeros(INT32, Shape.scalar())))
+        (tf.constant(dataConfig.endOfSequenceToken.toTensor), tf.zeros(INT64, Shape.scalar())))
     }
 
     val dataset = tf.data.DynamicTextLinesDataset(file)
@@ -197,7 +197,7 @@ object Inputs {
         // Crop based on the maximum allowed sequence length.
         .transform(d => if (dataConfig.srcMaxLength != -1) d.map(dd => dd(0 :: dataConfig.srcMaxLength)) else d)
         // Add sequence lengths.
-        .map(d => (d, tf.size(d, INT32)))
+        .map(d => (d, tf.size(d, INT64)))
 
     batchingFn(datasetBeforeBatching)
         .map(d => (srcLanguage, tgtLanguage, d._1, d._2))
@@ -232,9 +232,9 @@ object Inputs {
         ((Shape(), Shape()), ((Shape(-1), Shape()), (Shape(-1), Shape()))),
         // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
         // generally need to do this since later on we will be masking out calculations past the true sequence.
-        ((tf.zeros(INT32, Shape()), tf.zeros(INT32, Shape())),
-            ((tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar().toOutput())),
-                (tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar().toOutput())))))
+        ((tf.zeros(INT64, Shape()), tf.zeros(INT64, Shape())),
+            ((tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT64, Shape.scalar().toOutput())),
+                (tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT64, Shape.scalar().toOutput())))))
     }
 
     // TODO: We currently do not use `tgtLength`, but it may be useful for invalid dataset checks.
@@ -284,7 +284,7 @@ object Inputs {
           .prefetch(bufferSize)
           // Add sequence lengths.
           .map(
-            d => (d._1, ((d._2._1, tf.size(d._2._1, INT32)), (d._2._2, tf.size(d._2._2, INT32)))),
+            d => (d._1, ((d._2._1, tf.size(d._2._1, INT64)), (d._2._2, tf.size(d._2._2, INT64)))),
             dataConfig.numParallelCalls, name = "Map/AddLengths")
           .prefetch(bufferSize)
 

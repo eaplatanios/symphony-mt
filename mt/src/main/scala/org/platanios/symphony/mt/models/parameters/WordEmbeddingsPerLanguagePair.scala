@@ -140,6 +140,6 @@ object WordEmbeddingsPerLanguagePair {
       tgtLanguageId: Output
   ): Output = {
     srcLanguageId * (numLanguages - 1) + tgtLanguageId -
-        tf.less(srcLanguageId, tgtLanguageId).cast(INT32)
+        tf.less(srcLanguageId, tgtLanguageId).cast(INT64)
   }
 }
