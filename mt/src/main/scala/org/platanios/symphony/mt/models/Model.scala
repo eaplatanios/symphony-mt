@@ -382,7 +382,11 @@ abstract class Model[S] protected (
                 (index + 1, language, tgtSentences, tgtLengths, loopVariables._5)
               }
 
-              val results = tf.whileLoop(predicateFn, bodyFn, (0, input._1, srcSequence, input._4, pivotingSequence))
+              val results = tf.whileLoop[LoopVariables, (Shape, Shape, Shape, Shape, Shape)](
+                predicateFn,
+                bodyFn,
+                loopVariables = (0, input._1, srcSequence, input._4, pivotingSequence),
+                shapeInvariants = Some((Shape(), Shape(), Shape(-1, -1), Shape(-1), Shape(-1))))
               val tgtLanguage = results._2
               val tgtSentences = results._3
               val tgtLengths = results._4
