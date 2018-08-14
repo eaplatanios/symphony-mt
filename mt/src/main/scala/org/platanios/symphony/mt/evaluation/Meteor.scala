@@ -75,21 +75,21 @@ class Meteor protected (
       }})
   }
 
-  private[this] def statistics(batch: Seq[Tensor]): Tensor = {
+  private[this] def statistics(batch: Seq[Tensor[INT32]]): Tensor[STRING] = {
     val (languageId, hyp, hypLen, ref, refLen) = (batch(0), batch(1), batch(2), batch(3), batch(4))
-    val language = languageId.scalar.asInstanceOf[Int]
+    val language = languageId.scalar
 
     val (hypSentences, hypLengths) = (hyp.unstack(), hypLen.unstack())
     val (refSentences, refLengths) = (ref.unstack(), refLen.unstack())
     val hypSeq = hypSentences.zip(hypLengths).map {
       case (s, len) =>
-        val lenScalar = len.scalar.asInstanceOf[Int]
+        val lenScalar = len.scalar
         val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v.asInstanceOf[String])).toSeq
         languages(language)._2.decodeSequence(seq)
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
-        val lenScalar = len.scalar.asInstanceOf[Int]
+        val lenScalar = len.scalar
         val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v.asInstanceOf[String])).toSeq
         languages(language)._2.decodeSequence(seq)
     }
@@ -108,7 +108,7 @@ class Meteor protected (
     }
   }
 
-  protected[Meteor] def score(statistics: Seq[Tensor]): Tensor = {
+  protected[Meteor] def score(statistics: Seq[Tensor[STRING]]): Tensor[FLOAT32] = {
     val language = statistics(0).scalar.asInstanceOf[Int]
     Meteor.toMeteorStats(statistics(1)) match {
       case Some(stats) => getMeteorScorer(languages(language)._1) match {
@@ -123,13 +123,12 @@ class Meteor protected (
 
   override def compute(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output = null,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Output = {
     val ((languageId, src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     tf.createWithNameScope(name, ops) {
       val _statistics = tf.callback(
         statistics, Seq(languageId, src, srcLen, tgt, tgtLen), STRING, stateful = false, name = "Statistics")
@@ -140,13 +139,12 @@ class Meteor protected (
 
   override def streaming(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
     val ((languageId, src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     tf.variableScope(name) {
       tf.createWithNameScope(name, ops) {
         // TODO: Find a better way to deal with the language.
@@ -191,7 +189,7 @@ object Meteor {
       valuesCollections, updatesCollections, resetsCollections, name)(languages)
   }
 
-  protected[Meteor] def aggregateStatistics(statistics: Seq[Tensor]): Tensor = {
+  protected[Meteor] def aggregateStatistics(statistics: Seq[Tensor[STRING]]): Tensor[STRING] = {
     val meteorStats1 = toMeteorStats(statistics(0))
     val meteorStats2 = toMeteorStats(statistics(1))
     (meteorStats1, meteorStats2) match {
@@ -202,15 +200,15 @@ object Meteor {
     }
   }
 
-  protected[Meteor] def toMeteorStats(statistics: Tensor): Option[MeteorStats] = {
-    val s = statistics.scalar.asInstanceOf[String]
+  protected[Meteor] def toMeteorStats(statistics: Tensor[STRING]): Option[MeteorStats] = {
+    val s = statistics.scalar
     if (s != "")
       Some(new MeteorStats(s))
     else
       None
   }
 
-  protected[Meteor] def fromMeteorStats(meteorStats: MeteorStats): Tensor = {
+  protected[Meteor] def fromMeteorStats(meteorStats: MeteorStats): Tensor[STRING] = {
     Tensor(meteorStats.toString)
   }
 }

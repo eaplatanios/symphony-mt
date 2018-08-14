@@ -23,22 +23,22 @@ import org.platanios.tensorflow.api._
 package object models {
   /** Contains the source language, the target language, a sentence batch, and the corresponding sentence lengths. */
   type TFBatchWithLanguages = (Output, Output, Output, Output)
-  type TFBatchWithLanguagesT = (Tensor, Tensor, Tensor, Tensor)
+  type TFBatchWithLanguagesT = (Tensor[DataType], Tensor[DataType], Tensor[DataType], Tensor[DataType])
   type TFBatchWithLanguagesD = (DataType, DataType, DataType, DataType)
   type TFBatchWithLanguagesS = (Shape, Shape, Shape, Shape)
 
   type TFBatchWithLanguage = (Output, Output, Output)
-  type TFBatchWithLanguageT = (Tensor, Tensor, Tensor)
+  type TFBatchWithLanguageT = (Tensor[DataType], Tensor[DataType], Tensor[DataType])
   type TFBatchWithLanguageD = (DataType, DataType, DataType)
   type TFBatchWithLanguageS = (Shape, Shape, Shape)
 
   type TFBatch = (Output, Output)
-  type TFBatchT = (Tensor, Tensor)
+  type TFBatchT = (Tensor[DataType], Tensor[DataType])
   type TFBatchD = (DataType, DataType)
   type TFBatchS = (Shape, Shape)
 
   type TFLanguagePair = (Output, Output)
-  type TFLanguagePairT = (Tensor, Tensor)
+  type TFLanguagePairT = (Tensor[DataType], Tensor[DataType])
   type TFLanguagePairD = (DataType, DataType)
   type TFLanguagePairS = (Shape, Shape)
 

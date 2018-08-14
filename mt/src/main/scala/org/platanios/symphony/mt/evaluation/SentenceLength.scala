@@ -44,14 +44,13 @@ class SentenceLength protected (
 
   override def compute(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output = null,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Output = {
     val ((_, _, hypLen), (_, refLen)) = values
     val len = if (forHypothesis) hypLen else refLen
     var ops = Set(len.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     val sanitizedName = sanitize(name)
     tf.createWithNameScope(sanitizedName, ops) {
       tf.mean(len)
@@ -60,14 +59,13 @@ class SentenceLength protected (
 
   override def streaming(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
     val ((_, _, hypLen), (_, refLen)) = values
     val len = if (forHypothesis) hypLen else refLen
     var ops = Set(len.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
       tf.createWithNameScope(sanitizedName, ops) {

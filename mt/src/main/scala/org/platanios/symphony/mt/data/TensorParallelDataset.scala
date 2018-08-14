@@ -25,7 +25,7 @@ import org.platanios.tensorflow.api._
 class TensorParallelDataset protected (
     override val name: String,
     override val vocabulary: Map[Language, Vocabulary],
-    val tensors: Map[Language, Seq[(Tensor, Tensor)]],
+    val tensors: Map[Language, Seq[(Tensor[STRING], Tensor[INT32])]],
     val tensorTypes: Seq[DatasetType] = null,
     val tensorTags: Seq[ParallelDataset.Tag] = null
 ) extends ParallelDataset {
@@ -64,7 +64,7 @@ object TensorParallelDataset {
   def apply(
       name: String,
       vocabularies: Map[Language, Vocabulary],
-      tensors: Map[Language, Seq[(Tensor, Tensor)]],
+      tensors: Map[Language, Seq[(Tensor[STRING], Tensor[INT32])]],
       tensorTypes: Seq[DatasetType] = null,
       tensorTags: Seq[ParallelDataset.Tag] = null
   ): TensorParallelDataset = {

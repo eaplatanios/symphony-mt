@@ -49,7 +49,7 @@ class BLEU protected (
 )(implicit languages: Seq[(Language, Vocabulary)]) extends MTMetric {
   // TODO: Do not ignore the weights.
 
-  private[this] def counts(batch: Seq[Tensor]): Seq[Tensor] = {
+  private[this] def counts(batch: Seq[Tensor[DataType]]): Seq[Tensor[DataType]] = {
     val (tgtLanguageId, hyp, hypLen, ref, refLen) = (batch(0), batch(1), batch(2), batch(3), batch(4))
     val tgtLanguage = tgtLanguageId.scalar.asInstanceOf[Int]
 
@@ -68,7 +68,7 @@ class BLEU protected (
         Seq(languages(tgtLanguage)._2.decodeSequence(seq))
     }
     val (matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen) = BLEU.nGramMatches(refSeq, hypSeq, maxOrder)
-    Seq(matchesByOrder, possibleMatchesByOrder, _refLen, _hypLen)
+    Seq[Tensor[DataType]](matchesByOrder.toTensor, possibleMatchesByOrder.toTensor, _refLen, _hypLen)
   }
 
   private[this] def score(
@@ -106,16 +106,16 @@ class BLEU protected (
 
   override def compute(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output = null,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Output = {
     val ((tgtLanguageId, src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     tf.createWithNameScope(name, ops) {
       val _counts = tf.callback(
-        counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(INT64, INT64, INT32, INT32), stateful = false)
+        counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq[DataType](INT64, INT64, INT32, INT32),
+        stateful = false)
       val (_matches, _possibleMatches, _refLen, _hypLen) = (_counts(0), _counts(1), _counts(2), _counts(3))
       score(_matches, _possibleMatches, _refLen, _hypLen, name = "Value")
     }
@@ -123,13 +123,12 @@ class BLEU protected (
 
   override def streaming(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
     val ((tgtLanguageId, src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     tf.variableScope(name) {
       tf.createWithNameScope(name, ops) {
         val n = maxOrder
@@ -138,7 +137,8 @@ class BLEU protected (
         val refLen = variable("ReferenceLength", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val hypLen = variable("HypothesisLength", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
         val _counts = tf.callback(
-          counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(INT64, INT64, INT32, INT32), stateful = false)
+          counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq[DataType](INT64, INT64, INT32, INT32),
+          stateful = false)
         val (_matches, _possibleMatches, _refLen, _hypLen) = (_counts(0), _counts(1), _counts(2), _counts(3))
         val updateMatches = matches.assignAdd(_matches)
         val updatePossibleMatches = possibleMatches.assignAdd(_possibleMatches)

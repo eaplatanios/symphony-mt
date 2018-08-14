@@ -20,6 +20,7 @@ import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode
+import org.platanios.tensorflow.api.ops.NN.ConvPaddingMode
 
 import scala.language.postfixOps
 
@@ -235,13 +236,13 @@ object Attention {
       totalValuesDepth: Int,
       qNumFilters: Int = 1,
       kvNumFilters: Int = 1,
-      qPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
-      kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding
+      qPaddingMode: ConvPaddingMode = tf.ValidConvPadding,
+      kvPaddingMode: ConvPaddingMode = tf.ValidConvPadding
   )(mode: Mode, parameterManager: ParameterManager)(implicit
       stage: Stage
   ): (Output, Output, Output) = {
 
-    def compute(input: Output, depth: Int, numFilters: Int, paddingMode: tf.ConvPaddingMode, name: String): Output = {
+    def compute(input: Output, depth: Int, numFilters: Int, paddingMode: ConvPaddingMode, name: String): Output = {
       tf.variableScope(name) {
         if (numFilters == 1) {
           val weights = parameterManager.get("Weights", input.dataType, Shape(input.shape(-1), depth))
@@ -300,8 +301,8 @@ object Attention {
       attention: Attention,
       qNumFilters: Int = 1,
       kvNumFilters: Int = 1,
-      qPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
-      kvPaddingMode: tf.ConvPaddingMode = tf.ValidConvPadding,
+      qPaddingMode: ConvPaddingMode = tf.ValidConvPadding,
+      kvPaddingMode: ConvPaddingMode = tf.ValidConvPadding,
       cache: Option[Cache] = None,
       name: String = "MultiHeadAttention"
   )(mode: Mode, parameterManager: ParameterManager)(implicit

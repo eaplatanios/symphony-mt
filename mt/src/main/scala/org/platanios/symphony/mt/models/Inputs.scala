@@ -38,14 +38,14 @@ object Inputs {
   ): () => TFInputDataset = () => {
     val languageIds = languages.map(_._1).zipWithIndex.toMap
 
-    val files: Tensor = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString())
+    val files: Tensor[STRING] = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString())
     val numFiles = files.size
 
     val inputDatasetCreator: (Output, Output, Output) => TFInputDataset = createSingleInputDataset(dataConfig, config)
 
     tf.data.TensorSlicesDataset(files)
         .map(
-          d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d),
+          d => (tf.constant(languageIds(srcLanguage).toTensor), tf.constant(languageIds(tgtLanguage).toTensor), d),
           name = "AddLanguageIDs")
         .shuffle(numFiles)
         .parallelInterleave(d => inputDatasetCreator(d._1, d._2, d._3), cycleLength = numFiles, name = "Interleave")
@@ -92,12 +92,12 @@ object Inputs {
             val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage))
             val srcLengths = srcFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
             val tgtLengths = tgtFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
-            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor)
-            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor)
-            val srcFilesDataset = tf.data.TensorDataset(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor)
-            val tgtFilesDataset = tf.data.TensorDataset(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor)
-            val srcLengthsDataset = tf.data.TensorDataset(srcLengths: Tensor)
-            val tgtLengthsDataset = tf.data.TensorDataset(tgtLengths: Tensor)
+            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor[INT32])
+            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor[INT32])
+            val srcFilesDataset = tf.data.TensorDataset(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor[STRING])
+            val tgtFilesDataset = tf.data.TensorDataset(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor[STRING])
+            val srcLengthsDataset = tf.data.TensorDataset(srcLengths: Tensor[INT32])
+            val tgtLengthsDataset = tf.data.TensorDataset(tgtLengths: Tensor[INT32])
             srcLanguageDataset.zip(tgtLanguageDataset)
                 .zip(srcFilesDataset.zip(tgtFilesDataset))
                 .zip(srcLengthsDataset.zip(tgtLengthsDataset))
@@ -187,7 +187,7 @@ object Inputs {
         // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
         // not generally need to do this since later on we will be masking out calculations past
         // the true sequence.
-        (tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar())))
+        (tf.constant(dataConfig.endOfSequenceToken.toTensor), tf.zeros(INT32, Shape.scalar())))
     }
 
     val dataset = tf.data.DynamicTextLinesDataset(file)
@@ -221,8 +221,8 @@ object Inputs {
 
     val srcLanguageDataset = tf.data.OutputDataset(srcLanguage).repeat()
     val tgtLanguageDataset = tf.data.OutputDataset(tgtLanguage).repeat()
-    val srcDataset = tf.data.DynamicTextLinesDataset(srcFile)
-    val tgtDataset = tf.data.DynamicTextLinesDataset(tgtFile)
+    val srcDataset = tf.data.DynamicTextLinesDataset(srcFile).asInstanceOf[tf.data.Dataset[Tensor[DataType], Output, DataType, Shape]]
+    val tgtDataset = tf.data.DynamicTextLinesDataset(tgtFile).asInstanceOf[tf.data.Dataset[Tensor[DataType], Output, DataType, Shape]]
 
     val batchingFn = (dataset: TFSentencePairsDataset) => {
       dataset.dynamicPaddedBatch(

@@ -45,13 +45,12 @@ class SentenceCount protected (
 
   override def compute(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output = null,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Output = {
     val (_, (_, refLen)) = values
     var ops = Set(refLen.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     val sanitizedName = sanitize(name)
     tf.createWithNameScope(sanitizedName, ops) {
       tf.size(refLen)
@@ -60,13 +59,12 @@ class SentenceCount protected (
 
   override def streaming(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
     val (_, (_, refLen)) = values
     var ops = Set(refLen.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
       tf.createWithNameScope(sanitizedName, ops) {

@@ -49,9 +49,9 @@ case class TrainingLogger(
     formatter: (Option[Double], Long, Float, Float, Option[Double]) => String = null,
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
-    (Tensor, Tensor, Tensor, Tensor), (Output, Output, Output, Output),
+    (Tensor[DataType], Tensor[DataType], Tensor[DataType], Tensor[DataType]), (Output, Output, Output, Output),
     (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape), (Output, Output),
-    ((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor)),
+    ((Tensor[DataType], Tensor[DataType], Tensor[DataType], Tensor[DataType]), (Tensor[DataType], Tensor[DataType])),
     ((Output, Output, Output, Output), (Output, Output)),
     ((DataType, DataType, DataType, DataType), (DataType, DataType)),
     ((Shape, Shape, Shape, Shape), (Shape, Shape)),
@@ -95,7 +95,7 @@ case class TrainingLogger(
   override protected def beforeSessionRun[F, E, R](runContext: Hook.SessionRunContext[F, E, R])(implicit
       executableEv: Executable[E],
       fetchableEv: Fetchable.Aux[F, R]
-  ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor]]] = {
+  ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor[DataType]]]] = {
     shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt + 1)
     if (average || shouldTrigger)
       Some(Hook.SessionRunArgs(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
@@ -105,7 +105,7 @@ case class TrainingLogger(
 
   override protected def afterSessionRun[F, E, R](
       runContext: Hook.SessionRunContext[F, E, R],
-      runResult: Hook.SessionRunResult[Seq[Output], Seq[Tensor]]
+      runResult: Hook.SessionRunResult[Seq[Output], Seq[Tensor[DataType]]]
   )(implicit
       executableEv: Executable[E],
       fetchableEv: Fetchable.Aux[F, R]
@@ -120,7 +120,7 @@ case class TrainingLogger(
     }
   }
 
-  private[this] def processFetches(fetches: Seq[Tensor]): Unit = {
+  private[this] def processFetches(fetches: Seq[Tensor[DataType]]): Unit = {
     lastStep = fetches.head.scalar.asInstanceOf[Long]
     if (average || shouldTrigger) {
       totalGradientsNorm += fetches(1).scalar.asInstanceOf[Float]

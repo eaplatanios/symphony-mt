@@ -37,7 +37,7 @@ class Perplexity(
 ) extends Metric[((Output, Output), (Output, Output)), Output] {
   override def compute(
       values: ((Output, Output), (Output, Output)),
-      weights: Output = null,
+      weights: Option[Output] = None,
       name: String = name
   ): Output = {
     tf.createWithNameScope(name) {
@@ -51,14 +51,14 @@ class Perplexity(
 
   override def streaming(
       values: ((Output, Output), (Output, Output)),
-      weights: Output = null,
+      weights: Option[Output] = None,
       name: String = name
   ): Metric.StreamingInstance[Output] = {
     tf.variableScope(name) {
       tf.createWithNameScope(name) {
         // Create accumulator variables
-        val loss = variable("Loss", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)
-        val length = variable("Length", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)
+        val loss = tf.variable("Loss", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)
+        val length = tf.variable("Length", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)
 
         // Create update ops
         val mask  = tf.sequenceMask(values._1._2, tf.shape(values._1._1)(1), dataType = values._1._1.dataType)

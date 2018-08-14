@@ -65,21 +65,21 @@ class TER protected (
 
   // TODO: Do not ignore the weights.
 
-  private[this] def counts(batch: Seq[Tensor]): Seq[Tensor] = {
+  private[this] def counts(batch: Seq[Tensor[INT32]]): Seq[Tensor[FLOAT32]] = {
     val (tgtLanguageId, hyp, hypLen, ref, refLen) = (batch(0), batch(1), batch(2), batch(3), batch(4))
-    val tgtLanguage = tgtLanguageId.scalar.asInstanceOf[Int]
+    val tgtLanguage = tgtLanguageId.scalar
 
     val (hypSentences, hypLengths) = (hyp.unstack(), hypLen.unstack())
     val (refSentences, refLengths) = (ref.unstack(), refLen.unstack())
     val hypSeq = hypSentences.zip(hypLengths).map {
       case (s, len) =>
-        val lenScalar = len.scalar.asInstanceOf[Int]
+        val lenScalar = len.scalar
         val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v.asInstanceOf[String])).toSeq
         languages(tgtLanguage)._2.decodeSequence(seq)
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
-        val lenScalar = len.scalar.asInstanceOf[Int]
+        val lenScalar = len.scalar
         val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v.asInstanceOf[String])).toSeq
         languages(tgtLanguage)._2.decodeSequence(seq)
     }
@@ -98,13 +98,12 @@ class TER protected (
 
   override def compute(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output = null,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Output = {
     val ((tgtLanguageId, src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     tf.createWithNameScope(name, ops) {
       val _counts = tf.callback(
         counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(FLOAT32, FLOAT32), stateful = false)
@@ -114,13 +113,12 @@ class TER protected (
 
   override def streaming(
       values: ((Output, Output, Output), (Output, Output)),
-      weights: Output,
+      weights: Option[Output] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output] = {
     val ((tgtLanguageId, src, srcLen), (tgt, tgtLen)) = values
     var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
-    if (weights != null)
-      ops += weights.op
+    weights.foreach(ops += _.op)
     tf.variableScope(name) {
       tf.createWithNameScope(name, ops) {
         val totalEdits = variable("TotalEdits", FLOAT32, Shape(), tf.ZerosInitializer, variablesCollections)

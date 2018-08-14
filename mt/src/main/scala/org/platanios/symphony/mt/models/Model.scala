@@ -92,8 +92,8 @@ abstract class Model[S] protected (
     *   - A tensor containing a padded batch of sentences consisting of word IDs, in the source language.
     *   - A tensor containing the sentence lengths for the aforementioned padded batch.
     */
-  protected val input      = Input((INT32, INT32, STRING, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
-  protected val trainInput = Input((STRING, INT32), (Shape(-1, -1), Shape(-1)))
+  protected val input      = Input[TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS]((INT32, INT32, STRING, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
+  protected val trainInput = Input[TFBatchT, TFBatch, TFBatchD, TFBatchS]((STRING, INT32), (Shape(-1, -1), Shape(-1)))
 
   protected val estimator: tf.learn.Estimator[
       TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS, TFBatchWithLanguage,
@@ -218,7 +218,11 @@ abstract class Model[S] protected (
         .asInstanceOf[Iterator[(TFBatchWithLanguagesT, TFBatchWithLanguageT)]]
         .map(pair => {
           // TODO: We may be able to do this more efficiently.
-          def decodeSequenceBatch(language: Tensor, sequences: Tensor, lengths: Tensor): (Tensor, Tensor) = {
+          def decodeSequenceBatch(
+              language: Tensor[DataType],
+              sequences: Tensor[DataType],
+              lengths: Tensor[DataType]
+          ): (Tensor[DataType], Tensor[DataType]) = {
             val languageId = language.scalar.asInstanceOf[Int]
             val (unpackedSentences, unpackedLengths) = (sequences.unstack(), lengths.unstack())
             val decodedSentences = unpackedSentences.zip(unpackedLengths).map {
@@ -232,7 +236,7 @@ abstract class Model[S] protected (
             val paddedDecodedSentences = decodedSentences.map(s => {
               s ++ Seq.fill(maxLength - s.length)(languages(languageId)._2.endOfSequenceToken)
             })
-            (paddedDecodedSentences, decodedLengths)
+            (paddedDecodedSentences.toTensor, decodedLengths.toTensor)
           }
 
           val srcDecoded = decodeSequenceBatch(pair._1._1, pair._1._3, pair._1._4)
@@ -259,7 +263,7 @@ abstract class Model[S] protected (
       maxSteps: Long = -1L,
       log: Boolean = true,
       saveSummaries: Boolean = true
-  ): Seq[(String, Seq[(String, Tensor)])] = {
+  ): Seq[(String, Seq[(String, Tensor[FLOAT32])])] = {
     val rowNames = datasets.map(_._1)
     val firstColWidth = rowNames.map(_.length).max
     val colWidth = math.max(metrics.map(_.name.length).max, 10)
@@ -299,7 +303,7 @@ abstract class Model[S] protected (
     new Layer[(TFBatchWithLanguages, TFBatch), TFBatchWithLanguage](name) {
       override val layerType: String = "TrainLayer"
 
-      override protected def _forward(
+      override def forwardWithoutContext(
           input: (TFBatchWithLanguages, TFBatch)
       )(implicit mode: Mode): TFBatchWithLanguage = {
         tf.createWith(device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
@@ -327,7 +331,9 @@ abstract class Model[S] protected (
     new Layer[TFBatchWithLanguages, TFBatchWithLanguage](name) {
       override val layerType: String = "InferLayer"
 
-      override protected def _forward(input: TFBatchWithLanguages)(implicit mode: Mode): TFBatchWithLanguage = {
+      override def forwardWithoutContext(
+          input: TFBatchWithLanguages
+      )(implicit mode: Mode): TFBatchWithLanguage = {
         tf.createWith(device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
           parameterManager.initialize(languages)
           parameterManager.setEnvironment(config.env)
@@ -362,7 +368,9 @@ abstract class Model[S] protected (
     new Layer[(TFBatchWithLanguage, TFBatch), Output](name) {
       override val layerType: String = "Loss"
 
-      override protected def _forward(input: (TFBatchWithLanguage, TFBatch))(implicit mode: Mode): Output = {
+      override def forwardWithoutContext(
+          input: (TFBatchWithLanguage, TFBatch)
+      )(implicit mode: Mode): Output = {
         tf.createWith(nameScope = "Loss", device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
           parameterManager.initialize(languages)
           parameterManager.setEnvironment(config.env)
@@ -374,7 +382,7 @@ abstract class Model[S] protected (
           // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
           // word used as input, rather than the previous predicted word.
           val tgtEosId = parameterManager
-              .stringToIndexLookup(input._1._1)(tf.constant(dataConfig.endOfSequenceToken))
+              .stringToIndexLookup(input._1._1)(tf.constant(dataConfig.endOfSequenceToken.toTensor))
               .cast(INT32)
           tgtSequence = tf.concatenate(Seq(
             tgtSequence, tf.fill(INT32, tf.stack(Seq(tf.shape(tgtSequence)(0), 1)))(tgtEosId)), axis = 1)

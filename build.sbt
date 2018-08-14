@@ -30,7 +30,7 @@ organization in ThisBuild := "org.platanios"
 // every 24 hours.
 resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
 
-val tensorFlowForScalaVersion = "0.2.0-SNAPSHOT"
+val tensorFlowForScalaVersion = "0.3.0-SNAPSHOT"
 
 autoCompilerPlugins in ThisBuild := true
 
@@ -64,7 +64,7 @@ lazy val testSettings = Seq(
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF"))
 
 lazy val tensorFlowSettings = Seq(
-  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion classifier "darwin-cpu-x86_64",
+  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "linux-gpu-x86_64",
   libraryDependencies += "org.platanios" %% "tensorflow-horovod" % tensorFlowForScalaVersion)
 
 lazy val all = (project in file("."))
