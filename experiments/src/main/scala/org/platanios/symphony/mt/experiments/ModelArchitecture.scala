@@ -18,7 +18,8 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
 import org.platanios.symphony.mt.evaluation.MTMetric
-import org.platanios.symphony.mt.models.parameters.ParameterManager
+import org.platanios.symphony.mt.models.parameters.{PairwiseManager, ParameterManager}
+import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot, SinglePivot}
 import org.platanios.symphony.mt.models.{Model, RNNModel}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
@@ -135,6 +136,16 @@ object ModelArchitecture {
       }
     })
   }
+
+  private[experiments] def pivot(
+      parameterManager: ParameterManager,
+      languagePairs: Set[(Language, Language)]
+  ): Pivot = {
+    parameterManager match {
+      case _: PairwiseManager => SinglePivot(Language.English, languagePairs)
+      case _ => NoPivot
+    }
+  }
 }
 
 case class RNN(
@@ -192,6 +203,7 @@ case class RNN(
           dropout = dropout,
           attention = if (attention) Some(LuongRNNAttention(scaled = true)) else None,
           outputAttention = attention),
+        pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
@@ -266,6 +278,7 @@ case class BiRNN(
           dropout = dropout,
           attention = if (attention) Some(LuongRNNAttention(scaled = true)) else None,
           outputAttention = attention),
+        pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
@@ -342,6 +355,7 @@ case class GNMT(
           attention = BahdanauRNNAttention(normalized = true),
           dropout = dropout,
           useNewAttention = attention),
+        pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
