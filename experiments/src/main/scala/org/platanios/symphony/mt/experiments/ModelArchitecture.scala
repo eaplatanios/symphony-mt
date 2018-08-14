@@ -139,7 +139,7 @@ object ModelArchitecture {
 
   private[experiments] def pivot(
       parameterManager: ParameterManager,
-      languagePairs: Set[(Language, Language)]
+      languagePairs: Seq[(Language, Language)]
   ): Pivot = {
     parameterManager match {
       case _: PairwiseManager => SinglePivot(Language.English, languagePairs)

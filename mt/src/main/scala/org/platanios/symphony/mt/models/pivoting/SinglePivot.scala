@@ -25,7 +25,7 @@ import org.platanios.tensorflow.api._
   */
 case class SinglePivot(
     pivotLanguage: Language,
-    supportedPairs: Seq[(Language, Language)]
+    supportedPairs: Set[(Language, Language)]
 ) extends Pivot {
   protected var pivotLanguageId         : Output                = _
   protected var supportedLanguagePairIds: Seq[(Output, Output)] = _
@@ -35,7 +35,7 @@ case class SinglePivot(
       parameterManager: ParameterManager
   ): Unit = {
     pivotLanguageId = parameterManager.languageId(languages.map(_._1).indexOf(pivotLanguage))
-    supportedLanguagePairIds = supportedPairs.map {
+    supportedLanguagePairIds = supportedPairs.toSeq.map {
       case (src, tgt) =>
         (parameterManager.languageId(languages.map(_._1).indexOf(src)),
             parameterManager.languageId(languages.map(_._1).indexOf(tgt)))
