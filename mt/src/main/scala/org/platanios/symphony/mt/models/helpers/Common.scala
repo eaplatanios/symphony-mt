@@ -236,7 +236,7 @@ object Common {
     * @return  `FLOAT32` tensor containing weights for the provided labels.
     */
   def weightsConcatenated(labels: Output): Output = {
-    val eosMask = tf.equal(labels, 1).cast(INT64) // TODO: Standardize EOS symbol.
+    val eosMask = tf.equal(labels, 1).cast(INT32) // TODO: Standardize EOS symbol.
     val sentenceNum = tf.cumsum(eosMask, axis = 1, exclusive = true)
     val sentenceNumPlusOne = sentenceNum + 1
     val inTarget = tf.equal(tf.mod(sentenceNum, 2), 1)

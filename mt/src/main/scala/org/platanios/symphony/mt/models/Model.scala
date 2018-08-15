@@ -93,10 +93,10 @@ abstract class Model[S] protected (
     *   - A tensor containing a padded batch of sentences consisting of word IDs, in the source language.
     *   - A tensor containing the sentence lengths for the aforementioned padded batch.
     */
-  protected val input      = Input[TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS]((INT64, INT64, STRING, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
+  protected val input      = Input[TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS]((INT32, INT32, STRING, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
   protected val trainInput = Input[TFBatchT, TFBatch, TFBatchD, TFBatchS]((STRING, INT32), (Shape(-1, -1), Shape(-1)))
 
-  protected val estimator: tf.learn.Estimator[
+  protected val estimator: tf.learn.InMemoryEstimator[
       TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS, TFBatchWithLanguage,
       (TFBatchWithLanguagesT, TFBatchT), (TFBatchWithLanguages, TFBatch),
       (TFBatchWithLanguagesD, TFBatchD), (TFBatchWithLanguagesS, TFBatchS),
@@ -199,6 +199,16 @@ abstract class Model[S] protected (
 
   def train(datasets: Seq[FileParallelDataset], stopCriteria: StopCriteria): Unit = {
     val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
+    val graphField = estimator.getClass.getDeclaredField("graph")
+    graphField.setAccessible(true)
+    val ops = graphField.get(estimator).asInstanceOf[Graph].ops.toSet[Op].map(op => op.colocationOps + op).filter(_.size > 1)
+    val sets = ops.foldLeft(Set.empty[Set[Op]])((cum, cur) => {
+      val (hasCommon, rest) = cum.partition(ops => (ops & cur).nonEmpty)
+      rest + (cur ++ hasCommon.flatten)
+    })
+
+    val activeSets = sets.filter(_.exists(_.name == "Model/Estimator/Train/Model/AMSGrad/Update/Model/Decoder/ParameterManager/ProjectionToWords/en-de/German/OutWeights/Mul_4"))
+
     estimator.train(
       Inputs.createTrainDataset(
         dataConfig, config, datasets, languages, config.trainBackTranslation, repeat = true, isEval = false,
@@ -355,7 +365,7 @@ abstract class Model[S] protected (
               val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
                 decoder(encoderInput, None, Some(state))
               }
-              (input._2, tgtSentences.toInt64, tgtLengths)
+              (input._2, tgtSentences, tgtLengths)
             case _ =>
               config.pivot.initialize(languages, parameterManager)
               val pivotingSequence = config.pivot.pivotingSequence(input._1, input._2)
@@ -379,7 +389,7 @@ abstract class Model[S] protected (
                 val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
                   decoder(encoderInput, None, Some(state))
                 }
-                (index + 1, language, tgtSentences.toInt64, tgtLengths, loopVariables._5)
+                (index + 1, language, tgtSentences, tgtLengths, loopVariables._5)
               }
 
               val results = tf.whileLoop[LoopVariables, (Shape, Shape, Shape, Shape, Shape)](
@@ -418,9 +428,9 @@ abstract class Model[S] protected (
           // word used as input, rather than the previous predicted word.
           val tgtEosId = parameterManager
               .stringToIndexLookup(input._1._1)(tf.constant(dataConfig.endOfSequenceToken.toTensor))
-              .cast(INT64)
+              .cast(INT32)
           tgtSequence = tf.concatenate(Seq(
-            tgtSequence, tf.fill(INT64, tf.stack(Seq(tf.shape(tgtSequence)(0), 1)))(tgtEosId)), axis = 1)
+            tgtSequence, tf.fill(INT32, tf.stack(Seq(tf.shape(tgtSequence)(0), 1)))(tgtEosId)), axis = 1)
           val tgtSequenceLength = input._2._2 + 1
           val lossValue = loss(input._1._2, tgtSequence, tgtSequenceLength)
           tf.summary.scalar("Loss", lossValue)
@@ -431,7 +441,7 @@ abstract class Model[S] protected (
   }
 
   protected def mapToWordIds(language: Output, wordSequence: Output): Output = {
-    parameterManager.stringToIndexLookup(language)(wordSequence).cast(INT64)
+    parameterManager.stringToIndexLookup(language)(wordSequence).cast(INT32)
   }
 
   protected def mapFromWordIds(language: Output, wordIDSequence: Output): Output = {
@@ -441,9 +451,9 @@ abstract class Model[S] protected (
   /**
     *
     * @param  input Tuple containing four tensors:
-    *                 - `INT64` tensor containing the source language ID.
-    *                 - `INT64` tensor containing the target language ID.
-    *                 - `INT64` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
+    *                 - `INT32` tensor containing the source language ID.
+    *                 - `INT32` tensor containing the target language ID.
+    *                 - `INT32` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
     *                 - `INT32` tensor with shape `[batchSize]`, containing the sentence lengths.
     * @param  mode  Current learning mode (e.g., training or evaluation).
     * @return   Tuple containing two tensors:

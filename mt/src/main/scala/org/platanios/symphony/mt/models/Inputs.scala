@@ -62,7 +62,7 @@ object Inputs {
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
   ): () => TFTrainDataset = () => {
-    val languageIds = languages.map(_._1).zipWithIndex.toMap.mapValues(_.toLong)
+    val languageIds = languages.map(_._1).zipWithIndex.toMap
     val bufferSize = if (dataConfig.bufferSize == -1L) 1024L else dataConfig.bufferSize
 
     val filteredDatasets = datasets
@@ -92,8 +92,8 @@ object Inputs {
             val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage))
             val srcLengths = srcFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
             val tgtLengths = tgtFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
-            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor[INT64])
-            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor[INT64])
+            val srcLanguageDataset = tf.data.TensorDataset(languageIds(srcLanguage): Tensor[INT32])
+            val tgtLanguageDataset = tf.data.TensorDataset(languageIds(tgtLanguage): Tensor[INT32])
             val srcFilesDataset = tf.data.TensorDataset(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor[STRING])
             val tgtFilesDataset = tf.data.TensorDataset(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor[STRING])
             val srcLengthsDataset = tf.data.TensorDataset(srcLengths: Tensor[INT32])
@@ -164,7 +164,7 @@ object Inputs {
   /** Creates and returns a TensorFlow dataset, for the specified language.
     *
     * Each element of that dataset is a tuple containing:
-    *   - `INT64` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
+    *   - `INT32` tensor containing the input sentence word IDs, with shape `[batchSize, maxSentenceLength]`.
     *   - `INT32` tensor containing the input sentence lengths, with shape `[batchSize]`.
     *
     *
@@ -232,7 +232,7 @@ object Inputs {
         ((Shape(), Shape()), ((Shape(-1), Shape()), (Shape(-1), Shape()))),
         // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
         // generally need to do this since later on we will be masking out calculations past the true sequence.
-        ((tf.zeros(INT64, Shape()), tf.zeros(INT64, Shape())),
+        ((tf.zeros(INT32, Shape()), tf.zeros(INT32, Shape())),
             ((tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar().toOutput())),
                 (tf.constant(dataConfig.endOfSequenceToken), tf.zeros(INT32, Shape.scalar().toOutput())))))
     }

@@ -73,12 +73,12 @@ class ParameterManager protected (
       val graph = currentGraph
       if (!languageIds.contains(graph)) {
         languageIds += graph -> tf.variableScope("LanguageIDs") {
-          languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2.toLong, name = l._1.name))
+          languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = l._1.name))
         }
 
         tf.variableScope("StringToIndexLookupTables") {
           stringToIndexLookupTables += graph -> wordEmbeddingsType.createStringToIndexLookupTable(languages)
-          stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID.toLong, INT64, name = "Default")
+          stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID, INT64, name = "Default")
         }
 
         tf.variableScope("IndexToStringLookupTables") {
