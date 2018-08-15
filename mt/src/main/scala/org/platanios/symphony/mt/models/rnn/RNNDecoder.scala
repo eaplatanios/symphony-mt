@@ -84,26 +84,26 @@ abstract class RNNDecoder[S, SS]()(implicit
       // Decoder embeddings
       val embeddingFn = (o: Output) => embeddings(o)
       val tgtVocabLookupTable = parameterManager.stringToIndexLookup(tgtLanguage)
-      val tgtBosID = tgtVocabLookupTable(tf.constant(beginOfSequenceToken)).cast(INT64)
-      val tgtEosID = tgtVocabLookupTable(tf.constant(endOfSequenceToken)).cast(INT64)
+      val tgtBosID = tgtVocabLookupTable(tf.constant(beginOfSequenceToken)).cast(INT32)
+      val tgtEosID = tgtVocabLookupTable(tf.constant(endOfSequenceToken)).cast(INT32)
 
       // Decoder RNN
       if (config.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
-          cell, initialState, embeddingFn, tf.fill(INT64, tf.shape(srcSequenceLengths)(0).expandDims(0))(tgtBosID),
+          cell, initialState, embeddingFn, tf.fill(INT32, tf.shape(srcSequenceLengths)(0).expandDims(0))(tgtBosID),
           tgtEosID, config.beamWidth, GooglePenalty(config.lengthPenaltyWeight), outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = config.timeMajor, maximumIterations = tgtMaxLength,
           parallelIterations = config.env.parallelIterations, swapMemory = config.env.swapMemory)
-        RNNDecoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
+        RNNDecoder.Output(tuple._1.predictedIDs(---, 0).toInt64, tuple._3(---, 0).cast(INT32))
       } else {
         val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
-          embeddingFn, tf.fill(INT64, tf.shape(srcSequenceLengths)(0).expandDims(0))(tgtBosID), tgtEosID)
+          embeddingFn, tf.fill(INT32, tf.shape(srcSequenceLengths)(0).expandDims(0))(tgtBosID), tgtEosID)
         val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer)
         val tuple = decoder.decode(
           outputTimeMajor = config.timeMajor, maximumIterations = tgtMaxLength,
           parallelIterations = config.env.parallelIterations, swapMemory = config.env.swapMemory)
-        RNNDecoder.Output(tuple._1.sample, tuple._3.cast(INT32))
+        RNNDecoder.Output(tuple._1.sample.toInt64, tuple._3.cast(INT32))
       }
     }
   }
