@@ -109,7 +109,7 @@ class Meteor protected (
   }
 
   protected[Meteor] def score(statistics: Seq[Tensor[STRING]]): Tensor[FLOAT32] = {
-    val language = statistics(0).scalar.asInstanceOf[Int]
+    val language = statistics(0).scalar.asInstanceOf[Long]
     Meteor.toMeteorStats(statistics(1)) match {
       case Some(stats) => getMeteorScorer(languages(language)._1) match {
         case Some(meteorScorer) =>

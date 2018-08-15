@@ -51,7 +51,7 @@ class BLEU protected (
 
   private[this] def counts(batch: Seq[Tensor[DataType]]): Seq[Tensor[DataType]] = {
     val (tgtLanguageId, hyp, hypLen, ref, refLen) = (batch(0), batch(1), batch(2), batch(3), batch(4))
-    val tgtLanguage = tgtLanguageId.scalar.asInstanceOf[Int]
+    val tgtLanguage = tgtLanguageId.scalar.asInstanceOf[Long]
 
     val (hypSentences, hypLengths) = (hyp.unstack(), hypLen.unstack())
     val (refSentences, refLengths) = (ref.unstack(), refLen.unstack())
