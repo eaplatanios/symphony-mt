@@ -341,7 +341,7 @@
 //          i, currentIDs, State(encoderOutput._1, encoderOutput._2),
 //          cache.map(c => Attention.Cache(c._1, c._2)))
 //        // TODO: Add support for sampling with temperature.
-//        var nextIDs = tf.argmax(logits, axes = -1, outputDataType = INT64)
+//        var nextIDs = tf.argmax(logits, axes = -1, outputDataType = INT32)
 //        val nextFinished = tf.logicalOr(finished, tf.equal(nextIDs, endOfSequenceID))
 //        nextIDs = nextIDs(::, NewAxis)
 //        val nextDecodedIDs = tf.concatenate(Seq(decodedIDs._1, nextIDs), axis = 1)
@@ -351,7 +351,7 @@
 //      }
 //
 //      val decodedIDs = tf.zeros(INT64, tf.stack(Seq(batchSize, 0)))
-//      val decodedLengths = tf.zeros(INT64, batchSize(NewAxis))
+//      val decodedLengths = tf.zeros(INT32, batchSize(NewAxis))
 //      val finished = tf.fill(BOOLEAN, batchSize.expandDims(0))(false)
 //      val ids = tf.zeros(INT64, tf.stack(Seq(batchSize, 1)))
 //      val (_, _, _, finalDecodedIds, _, _) = tf.whileLoop(

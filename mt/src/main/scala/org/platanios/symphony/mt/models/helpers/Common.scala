@@ -147,12 +147,12 @@ object Common {
         val paddings = {
           if (axis == 1) {
             Seq(
-              tf.stack(Seq(tf.stack(Seq(0L, 0L)), tf.stack(Seq(0L, lengthDiff)))),
-              tf.zeros(INT64, tf.stack(Seq(tf.rank(arg) - 2, 2))))
+              tf.stack(Seq(tf.stack(Seq(0, 0)), tf.stack(Seq(0, lengthDiff)))),
+              tf.zeros(INT32, tf.stack(Seq(tf.rank(arg) - 2, 2))))
           } else {
             Seq(
-              tf.stack(Seq(tf.stack(Seq(0L, 0L)), tf.stack(Seq(0L, 0L)), tf.stack(Seq(0L, lengthDiff)))),
-              tf.zeros(INT64, tf.stack(Seq(tf.rank(arg) - 3, 2))))
+              tf.stack(Seq(tf.stack(Seq(0, 0)), tf.stack(Seq(0, 0)), tf.stack(Seq(0, lengthDiff)))),
+              tf.zeros(INT32, tf.stack(Seq(tf.rank(arg) - 3, 2))))
           }
         }
         tf.concatenate(paddings, axis = 0)
@@ -356,7 +356,7 @@ object Common {
       scaleOutput: Boolean = true,
       broadcastAxes: Set[Int] = Set.empty
   ): Output = {
-    val one = tf.constant(1L, dataType = INT64)
+    val one = tf.constant(1, dataType = INT32)
     val noiseShape = {
       if (broadcastAxes.isEmpty) {
         tf.shape(input)

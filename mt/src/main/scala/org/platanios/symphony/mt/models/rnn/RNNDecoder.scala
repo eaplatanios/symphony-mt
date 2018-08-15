@@ -95,7 +95,7 @@ abstract class RNNDecoder[S, SS]()(implicit
         val tuple = decoder.decode(
           outputTimeMajor = config.timeMajor, maximumIterations = tgtMaxLength,
           parallelIterations = config.env.parallelIterations, swapMemory = config.env.swapMemory)
-        RNNDecoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT64))
+        RNNDecoder.Output(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).cast(INT32))
       } else {
         val decHelper = BasicDecoder.GreedyEmbeddingHelper[DS](
           embeddingFn, tf.fill(INT64, tf.shape(srcSequenceLengths)(0).expandDims(0))(tgtBosID), tgtEosID)
@@ -103,7 +103,7 @@ abstract class RNNDecoder[S, SS]()(implicit
         val tuple = decoder.decode(
           outputTimeMajor = config.timeMajor, maximumIterations = tgtMaxLength,
           parallelIterations = config.env.parallelIterations, swapMemory = config.env.swapMemory)
-        RNNDecoder.Output(tuple._1.sample, tuple._3)
+        RNNDecoder.Output(tuple._1.sample, tuple._3.cast(INT32))
       }
     }
   }

@@ -93,8 +93,8 @@ abstract class Model[S] protected (
     *   - A tensor containing a padded batch of sentences consisting of word IDs, in the source language.
     *   - A tensor containing the sentence lengths for the aforementioned padded batch.
     */
-  protected val input      = Input[TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS]((INT64, INT64, STRING, INT64), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
-  protected val trainInput = Input[TFBatchT, TFBatch, TFBatchD, TFBatchS]((STRING, INT64), (Shape(-1, -1), Shape(-1)))
+  protected val input      = Input[TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS]((INT64, INT64, STRING, INT32), (Shape(), Shape(), Shape(-1, -1), Shape(-1)))
+  protected val trainInput = Input[TFBatchT, TFBatch, TFBatchD, TFBatchS]((STRING, INT32), (Shape(-1, -1), Shape(-1)))
 
   protected val estimator: tf.learn.Estimator[
       TFBatchWithLanguagesT, TFBatchWithLanguages, TFBatchWithLanguagesD, TFBatchWithLanguagesS, TFBatchWithLanguage,
@@ -444,7 +444,7 @@ abstract class Model[S] protected (
     *                 - `INT64` tensor containing the source language ID.
     *                 - `INT64` tensor containing the target language ID.
     *                 - `INT64` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
-    *                 - `INT64` tensor with shape `[batchSize]`, containing the sentence lengths.
+    *                 - `INT32` tensor with shape `[batchSize]`, containing the sentence lengths.
     * @param  mode  Current learning mode (e.g., training or evaluation).
     * @return   Tuple containing two tensors:
     *           - Encoder output, with shape `[batchSize, inputLength, hiddenSize]`.

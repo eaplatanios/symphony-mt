@@ -65,7 +65,7 @@ class RNNModel[S, SS](
       if (!mode.isTraining && dataConfig.tgtMaxLength != -1)
         tf.constant(dataConfig.tgtMaxLength)
       else
-        tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT64)
+        tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT32)
     }
     (config.encoder.create(config, input._1, input._2, input._3, input._4), input._4, maxDecodingLength)
   }

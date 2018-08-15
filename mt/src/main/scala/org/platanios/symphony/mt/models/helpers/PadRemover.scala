@@ -37,7 +37,7 @@ case class PadRemover(padMask: Output, name: String = "PadRemover") {
     * absolute value is not needed. */
   val (nonPadIndices, originAxisSize) = tf.createWithNameScope(s"$name/Initialization") {
     val flattenedPadMask = padMask.reshape(Shape(-1))
-    (tf.where(flattenedPadMask < 1e-9f).cast(INT64), tf.shape(flattenedPadMask)(0 :: 1))
+    (tf.where(flattenedPadMask < 1e-9f).cast(INT32), tf.shape(flattenedPadMask)(0 :: 1))
   }
 
   /** Removes padding from the provided `value`.
