@@ -70,7 +70,8 @@ object Metric {
     metric.split(":") match {
       case Array("bleu") => evaluation.BLEU()(languages)
       case Array("bleu", maxOrder) => evaluation.BLEU(maxOrder.toInt)(languages)
-      case Array("bleu", maxOrder, smooth) => evaluation.BLEU(maxOrder.toInt, smooth.toBoolean)(languages)
+      case Array("bleu_nist") => evaluation.BLEU(smoothing = evaluation.BLEU.NISTSmoothing)(languages)
+      case Array("bleu_nist", maxOrder) => evaluation.BLEU(maxOrder.toInt, smoothing = evaluation.BLEU.NISTSmoothing)(languages)
       case Array("meteor") => evaluation.Meteor()(languages)
       case Array("ter") => evaluation.TER()(languages)
       case Array("hyp_len") => evaluation.SentenceLength(forHypothesis = true, name = "HypLen")

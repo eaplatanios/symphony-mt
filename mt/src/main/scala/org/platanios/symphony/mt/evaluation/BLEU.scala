@@ -40,7 +40,7 @@ import scala.collection.mutable
   */
 class BLEU protected (
     val maxOrder: Int = 4,
-    val smooth: Boolean = false,
+    val smoothing: BLEU.Smoothing = BLEU.NoSmoothing,
     val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
     val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
     val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
@@ -78,29 +78,16 @@ class BLEU protected (
       hypothesisLength: Output,
       name: String = "BLEU"
   ): Output = tf.createWithNameScope(name) {
-    // Compute precisions
-    val precisions = {
-      if (smooth)
-        (matchesByOrder.cast(FLOAT32) + 1.0f) / (possibleMatchesByOrder.cast(FLOAT32) + 1.0f)
-      else
-        tf.select(
-          possibleMatchesByOrder > 0,
-          matchesByOrder.cast(FLOAT32) / possibleMatchesByOrder.cast(FLOAT32),
-          tf.zerosLike(matchesByOrder, FLOAT32))
-    }
+    // Compute precisions.
+    val precisions = tf.select(
+      possibleMatchesByOrder > 0,
+      tf.log(smoothing(matchesByOrder, possibleMatchesByOrder, referenceLength, hypothesisLength)),
+      tf.zerosLike(matchesByOrder, FLOAT32))
 
-    // Compute the BLEU score
-    val geometricMean = tf.cond(
-      tf.min(precisions) > 0,
-      () => tf.exp(tf.sum(tf.log(precisions) / maxOrder)),
-      () => tf.zeros(FLOAT32, Shape()))
-
-    val lengthRatio = hypothesisLength.cast(FLOAT32) / referenceLength.cast(FLOAT32)
-    val brevityPenalty = tf.cond(
-      lengthRatio > 1,
-      () => tf.ones(FLOAT32, Shape()),
-      () => tf.exp(1.0f - (1.0f / lengthRatio)))
-
+    // Compute the BLEU score.
+    val geometricMean = tf.exp(tf.sum(precisions) / maxOrder)
+    val lengthRatio = referenceLength.cast(FLOAT32) / hypothesisLength.cast(FLOAT32)
+    val brevityPenalty = tf.minimum(1.0f, tf.exp(1.0f - lengthRatio))
     geometricMean * brevityPenalty * 100
   }
 
@@ -161,7 +148,7 @@ class BLEU protected (
 object BLEU {
   def apply(
       maxOrder: Int = 4,
-      smooth: Boolean = false,
+      smoothing: Smoothing = NoSmoothing,
       variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
       valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
       updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
@@ -169,67 +156,70 @@ object BLEU {
       name: String = "BLEU"
   )(implicit languages: Seq[(Language, Vocabulary)]): BLEU = {
     new BLEU(
-      maxOrder, smooth, variablesCollections,
+      maxOrder, smoothing, variablesCollections,
       valuesCollections, updatesCollections, resetsCollections, name)(languages)
   }
 
-  /** BLEU score computation result.
-    *
-    * @param  score       Actual BLEU score.
-    * @param  precisions  Precisions computed for each n-gram order.
-    * @param  lengthRatio Ratio of hypothesis sequence lengths to reference sequence lengths. If multiple reference
-    *                     sequences are provided, the minimum length of these sequences is used each time.
-    * @param  smooth      Boolean value indicating whether the BLEU score was smoothed using the method described in
-    *                     [Lin et al. 2004](https://dl.acm.org/citation.cfm?id=1219032).
-    */
-  case class BLEUScore(
-      score: Double, precisions: Seq[Double], lengthRatio: Double, smooth: Boolean) {
-    /** Maximum n-gram order used while computing the BLEU score. */
-    val maxOrder: Int = precisions.size
-
-    /** Brevity penalty computed for the BLEU score. */
-    val brevityPenalty: Double = if (lengthRatio > 1) 1.0 else Math.exp(1.0 - 1.0 / lengthRatio)
+  trait Smoothing {
+    def apply(
+        matchesByOrder: Output,
+        possibleMatchesByOrder: Output,
+        referenceLength: Output,
+        hypothesisLength: Output
+    ): Output
   }
 
-  /** Computes the BLEU score for the provided hypothesis sequences against one or more reference sequences.
-    *
-    * @param  referenceCorpus  Sequence of sequences of reference sequences to use as reference for each translation
-    *                          sequence. Each reference and hypothesis sequence is supposed to be a sequence over
-    *                          tokens of type `T` (typically `String`).
-    * @param  hypothesisCorpus Sequence of hypothesis sequences to score.
-    * @param  maxOrder         Maximum n-gram order to use when computing the BLEU score.
-    * @param  smooth           Boolean value indicating to use the smoothing method described in
-    *                          [Lin et al. 2004](https://dl.acm.org/citation.cfm?id=1219032).
-    * @return Computed BLEU score.
-    */
-  def bleu[T](
-      referenceCorpus: Seq[Seq[Seq[T]]],
-      hypothesisCorpus: Seq[Seq[T]],
-      maxOrder: Int = 4,
-      smooth: Boolean = false): BLEUScore = {
-    // Compute counts for matches and possible matches
-    val (matchesByOrder, possibleMatchesByOrder, referenceLength, hypothesisLength) =
-      nGramMatches(referenceCorpus, hypothesisCorpus, maxOrder)
-
-    // Compute precisions
-    val precisions = matchesByOrder.zip(possibleMatchesByOrder).map {
-      case (matches, possibleMatches) =>
-        if (smooth) {
-          (matches + 1.0) / (possibleMatches + 1.0)
-        } else {
-          if (possibleMatches > 0)
-            matches.toDouble / possibleMatches
-          else
-            0.0
-        }
+  case object NoSmoothing extends Smoothing {
+    override def apply(
+        matchesByOrder: Output,
+        possibleMatchesByOrder: Output,
+        referenceLength: Output,
+        hypothesisLength: Output
+    ): Output = {
+      matchesByOrder.cast(FLOAT32) / possibleMatchesByOrder.cast(FLOAT32)
     }
+  }
 
-    // Compute the BLEU score
-    val geometricMean = if (precisions.min > 0) Math.exp(precisions.map(Math.log(_) / maxOrder).sum) else 0.0
-    val lengthRatio = hypothesisLength.toDouble / referenceLength.toDouble
-    val brevityPenalty = if (lengthRatio > 1) 1.0 else Math.exp(1.0 - 1.0 / lengthRatio)
-    val bleu = geometricMean * brevityPenalty * 100
-    BLEUScore(bleu, precisions, lengthRatio, smooth)
+  case class EpsilonSmoothing(epsilon: Float) extends Smoothing {
+    override def apply(
+        matchesByOrder: Output,
+        possibleMatchesByOrder: Output,
+        referenceLength: Output,
+        hypothesisLength: Output
+    ): Output = {
+      tf.select(
+        tf.equal(matchesByOrder, 0),
+        tf.fill(FLOAT32, tf.shape(matchesByOrder))(epsilon) / possibleMatchesByOrder.cast(FLOAT32),
+        matchesByOrder.cast(FLOAT32) / possibleMatchesByOrder.cast(FLOAT32))
+    }
+  }
+
+  case object LinOchSmoothing extends Smoothing {
+    override def apply(
+        matchesByOrder: Output,
+        possibleMatchesByOrder: Output,
+        referenceLength: Output,
+        hypothesisLength: Output
+    ): Output = {
+      val ones = tf.concatenate(Seq(tf.zeros(FLOAT32, Shape(1)), tf.ones(FLOAT32, tf.shape(matchesByOrder)(0) - 1)))
+      (matchesByOrder.cast(FLOAT32) + ones) / (possibleMatchesByOrder.cast(FLOAT32) + ones)
+    }
+  }
+
+  case object NISTSmoothing extends Smoothing {
+    override def apply(
+        matchesByOrder: Output,
+        possibleMatchesByOrder: Output,
+        referenceLength: Output,
+        hypothesisLength: Output
+    ): Output = {
+      val zeros = tf.equal(matchesByOrder, 0).cast(FLOAT32)
+      val factors = 1.0f / tf.pow(2.0f, tf.cumsum(zeros))
+      tf.select(
+        tf.equal(matchesByOrder, 0),
+        factors * matchesByOrder.cast(FLOAT32) / possibleMatchesByOrder.cast(FLOAT32),
+        matchesByOrder.cast(FLOAT32) / possibleMatchesByOrder.cast(FLOAT32))
+    }
   }
 
   private[evaluation] def nGramMatches[T](
