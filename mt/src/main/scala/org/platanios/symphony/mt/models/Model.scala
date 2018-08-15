@@ -355,7 +355,7 @@ abstract class Model[S] protected (
               val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
                 decoder(encoderInput, None, Some(state))
               }
-              (input._2, tgtSentences, tgtLengths)
+              (input._2, tgtSentences.toInt64, tgtLengths)
             case _ =>
               config.pivot.initialize(languages, parameterManager)
               val pivotingSequence = config.pivot.pivotingSequence(input._1, input._2)
@@ -379,7 +379,7 @@ abstract class Model[S] protected (
                 val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
                   decoder(encoderInput, None, Some(state))
                 }
-                (index + 1, language, tgtSentences, tgtLengths, loopVariables._5)
+                (index + 1, language, tgtSentences.toInt64, tgtLengths, loopVariables._5)
               }
 
               val results = tf.whileLoop[LoopVariables, (Shape, Shape, Shape, Shape, Shape)](
