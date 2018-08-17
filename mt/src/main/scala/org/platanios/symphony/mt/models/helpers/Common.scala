@@ -373,36 +373,36 @@ object Common {
     tf.dropout(input, keepProbability, scaleOutput, noiseShape)
   }
 
-  /** Applies a fully connected layer to `input`, followed by a ReLU activation, optionally a dropout, and finally,
-    * another fully connected layer.
-    *
-    * @param  input                    Input tensor.
-    * @param  filterSize               First layer projection size.
-    * @param  outputSize               Output layer projection size.
-    * @param  reluDropoutRate          Dropout rate for the output of the ReLU activation.
-    * @param  reluDropoutBroadcastAxes Specifies along which axes of the attention weights the dropout is broadcast.
-    * @param  name                     Name for this alayer that also specifies a variable scope.
-    * @param  mode                     Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager        Parameter manager to use, if parameters are required.
-    * @return Output of the last fully connected layer.
-    */
-  def denseReLUDense(
-      input: Output,
-      filterSize: Int,
-      outputSize: Int,
-      reluDropoutRate: Float = 0.0f,
-      reluDropoutBroadcastAxes: Set[Int] = Set.empty,
-      name: String = "DenseReLUDense"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
-  ): Output = tf.variableScope(name) {
-    val weights1 = parameterManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
-    val bias1 = parameterManager.get("Dense1/Bias", input.dataType, Shape(filterSize))
-    var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")
-    if (mode.isTraining)
-      hidden = dropoutWithBroadcastAxes(hidden, 1.0f - reluDropoutRate, scaleOutput = true, reluDropoutBroadcastAxes)
-    val weights2 = parameterManager.get("Dense2/Weights", input.dataType, Shape(filterSize, outputSize))
-    val bias2 = parameterManager.get("Dense2/Bias", input.dataType, Shape(outputSize))
-    tf.linear(hidden, weights2, bias2, "Dense2")
-  }
+//  /** Applies a fully connected layer to `input`, followed by a ReLU activation, optionally a dropout, and finally,
+//    * another fully connected layer.
+//    *
+//    * @param  input                    Input tensor.
+//    * @param  filterSize               First layer projection size.
+//    * @param  outputSize               Output layer projection size.
+//    * @param  reluDropoutRate          Dropout rate for the output of the ReLU activation.
+//    * @param  reluDropoutBroadcastAxes Specifies along which axes of the attention weights the dropout is broadcast.
+//    * @param  name                     Name for this alayer that also specifies a variable scope.
+//    * @param  mode                     Current learning mode (e.g., training or evaluation).
+//    * @param  parameterManager        Parameter manager to use, if parameters are required.
+//    * @return Output of the last fully connected layer.
+//    */
+//  def denseReLUDense(
+//      input: Output,
+//      filterSize: Int,
+//      outputSize: Int,
+//      reluDropoutRate: Float = 0.0f,
+//      reluDropoutBroadcastAxes: Set[Int] = Set.empty,
+//      name: String = "DenseReLUDense"
+//  )(mode: Mode, parameterManager: ParameterManager)(implicit
+//      stage: Stage
+//  ): Output = tf.variableScope(name) {
+//    val weights1 = parameterManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
+//    val bias1 = parameterManager.get("Dense1/Bias", input.dataType, Shape(filterSize))
+//    var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")
+//    if (mode.isTraining)
+//      hidden = dropoutWithBroadcastAxes(hidden, 1.0f - reluDropoutRate, scaleOutput = true, reluDropoutBroadcastAxes)
+//    val weights2 = parameterManager.get("Dense2/Weights", input.dataType, Shape(filterSize, outputSize))
+//    val bias2 = parameterManager.get("Dense2/Bias", input.dataType, Shape(outputSize))
+//    tf.linear(hidden, weights2, bias2, "Dense2")
+//  }
 }
