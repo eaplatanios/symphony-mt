@@ -101,7 +101,7 @@ class BLEU protected (
     weights.foreach(ops += _.op)
     tf.createWithNameScope(name, ops) {
       val _counts = tf.callback(
-        counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq[DataType](INT64, INT64, INT32, INT32),
+        counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq[DataType](INT64, INT64, INT64, INT64),
         stateful = false)
       val (_matches, _possibleMatches, _refLen, _hypLen) = (_counts(0), _counts(1), _counts(2), _counts(3))
       score(_matches, _possibleMatches, _refLen, _hypLen, name = "Value")
@@ -121,10 +121,10 @@ class BLEU protected (
         val n = maxOrder
         val matches = variable("Matches", INT64, Shape(n), tf.ZerosInitializer, variablesCollections)
         val possibleMatches = variable("PossibleMatches", INT64, Shape(n), tf.ZerosInitializer, variablesCollections)
-        val refLen = variable("ReferenceLength", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
-        val hypLen = variable("HypothesisLength", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
+        val refLen = variable("ReferenceLength", INT64, Shape(), tf.ZerosInitializer, variablesCollections)
+        val hypLen = variable("HypothesisLength", INT64, Shape(), tf.ZerosInitializer, variablesCollections)
         val _counts = tf.callback(
-          counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq[DataType](INT64, INT64, INT32, INT32),
+          counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq[DataType](INT64, INT64, INT64, INT64),
           stateful = false)
         val (_matches, _possibleMatches, _refLen, _hypLen) = (_counts(0), _counts(1), _counts(2), _counts(3))
         val updateMatches = matches.assignAdd(_matches)
@@ -217,7 +217,7 @@ object BLEU {
       val factors = 1.0f / tf.pow(2.0f, tf.cumsum(zeros))
       tf.select(
         tf.equal(matchesByOrder, 0),
-        factors * matchesByOrder.cast(FLOAT32) / possibleMatchesByOrder.cast(FLOAT32),
+        factors,
         matchesByOrder.cast(FLOAT32) / possibleMatchesByOrder.cast(FLOAT32))
     }
   }
@@ -226,12 +226,12 @@ object BLEU {
       referenceCorpus: Seq[Seq[Seq[T]]],
       hypothesisCorpus: Seq[Seq[T]],
       maxOrder: Int = 4
-  ): (Array[Long], Array[Long], Int, Int) = {
+  ): (Array[Long], Array[Long], Long, Long) = {
     // Compute counts for matches and possible matches
     val matchesByOrder = mutable.ArrayBuffer.fill(maxOrder)(0L)
     val possibleMatchesByOrder = mutable.ArrayBuffer.fill(maxOrder)(0L)
-    var referenceLength: Int = 0
-    var hypothesisLength: Int = 0
+    var referenceLength: Long = 0L
+    var hypothesisLength: Long = 0L
     referenceCorpus.zip(hypothesisCorpus).foreach {
       case (references, hypothesis) =>
         referenceLength += references.map(_.size).min

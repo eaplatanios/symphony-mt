@@ -68,8 +68,8 @@ class SentenceCount protected (
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
       tf.createWithNameScope(sanitizedName, ops) {
-        val count = variable("Count", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
-        val updateCount = count.assignAdd(tf.size(refLen))
+        val count = variable("Count", INT64, Shape(), tf.ZerosInitializer, variablesCollections)
+        val updateCount = count.assignAdd(tf.size(refLen, INT64))
         val value = count.value
         val update = updateCount
         val reset = count.initializer

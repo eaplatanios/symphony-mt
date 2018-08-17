@@ -69,10 +69,10 @@ class SentenceLength protected (
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
       tf.createWithNameScope(sanitizedName, ops) {
-        val length = variable("Length", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
-        val count = variable("Count", INT32, Shape(), tf.ZerosInitializer, variablesCollections)
-        val updateLength = length.assignAdd(tf.sum(len))
-        val updateCount = count.assignAdd(tf.size(len))
+        val length = variable("Length", INT64, Shape(), tf.ZerosInitializer, variablesCollections)
+        val count = variable("Count", INT64, Shape(), tf.ZerosInitializer, variablesCollections)
+        val updateLength = length.assignAdd(tf.sum(len).toInt64)
+        val updateCount = count.assignAdd(tf.size(len, INT64))
         val value = tf.divide(length.value.cast(FLOAT32), count.value, name = "Value")
         val update = tf.divide(updateLength.cast(FLOAT32), updateCount.cast(FLOAT32), name = "Update")
         val reset = tf.group(Set(length.initializer, count.initializer), name = "Reset")
