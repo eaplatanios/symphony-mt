@@ -355,7 +355,9 @@ abstract class Model[S] protected (
               val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
                 decoder(encoderInput, None, Some(state))
               }
-              (input._2, tgtSentences, tgtLengths)
+              val tgtLanguage = input._2
+              val decodedSequences = mapFromWordIds(tgtLanguage, tgtSentences)
+              (tgtLanguage, decodedSequences, tgtLengths)
             case _ =>
               config.pivot.initialize(languages, parameterManager)
               val pivotingSequence = config.pivot.pivotingSequence(input._1, input._2)
