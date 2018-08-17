@@ -67,7 +67,7 @@ abstract class RNNDecoder[S, SS]()(implicit
       evS: WhileLoopVariable.Aux[DS, DSS]
   ): RNNDecoder.Output = {
     val outputWeights = parameterManager.getProjectionToWords(cell.outputShape(-1), tgtLanguage)
-    val outputLayer = (logits: Output) => tf.linear(logits, outputWeights)
+    val outputLayer = (logits: Output) => tf.matmul(logits, outputWeights)
     if (mode.isTraining) {
       // Time-major transpose
       val transposedSequences = if (config.timeMajor) tgtSequences.transpose() else tgtSequences

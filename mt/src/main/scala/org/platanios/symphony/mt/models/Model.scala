@@ -199,16 +199,6 @@ abstract class Model[S] protected (
 
   def train(datasets: Seq[FileParallelDataset], stopCriteria: StopCriteria): Unit = {
     val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
-    val graphField = estimator.getClass.getDeclaredField("graph")
-    graphField.setAccessible(true)
-    val ops = graphField.get(estimator).asInstanceOf[Graph].ops.toSet[Op].map(op => op.colocationOps + op).filter(_.size > 1)
-    val sets = ops.foldLeft(Set.empty[Set[Op]])((cum, cur) => {
-      val (hasCommon, rest) = cum.partition(ops => (ops & cur).nonEmpty)
-      rest + (cur ++ hasCommon.flatten)
-    })
-
-    val activeSets = sets.filter(_.exists(_.name == "Model/Estimator/Train/Model/AMSGrad/Update/Model/Decoder/ParameterManager/ProjectionToWords/en-de/German/OutWeights/Mul_4"))
-
     estimator.train(
       Inputs.createTrainDataset(
         dataConfig, config, datasets, languages, config.trainBackTranslation, repeat = true, isEval = false,

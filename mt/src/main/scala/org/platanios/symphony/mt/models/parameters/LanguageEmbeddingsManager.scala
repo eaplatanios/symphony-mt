@@ -79,11 +79,11 @@ class LanguageEmbeddingsManager protected (
           val weights = tf.variable(s"Dense${numUnits._2}/Weights", FLOAT32, Shape(inputSize, numUnits._1))
           val bias = tf.variable(s"Dense${numUnits._2}/Bias", FLOAT32, Shape(numUnits._1))
           inputSize = numUnits._1
-          parameters = tf.linear(parameters, weights, bias, s"Dense${numUnits._2}")
+          parameters = tf.addBias(tf.matmul(parameters, weights), bias)
         })
         val weights = tf.variable("Dense/Weights", FLOAT32, Shape(inputSize, shape.numElements.toInt))
         val bias = tf.variable("Dense/Bias", FLOAT32, Shape(shape.numElements.toInt))
-        parameters = tf.linear(parameters, weights, bias, "Dense")
+        parameters = tf.addBias(tf.matmul(parameters, weights), bias)
         parameters.cast(dataType).reshape(shape)
       }
 
