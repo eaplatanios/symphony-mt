@@ -64,7 +64,7 @@ lazy val testSettings = Seq(
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF"))
 
 lazy val tensorFlowSettings = Seq(
-  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "linux-gpu-x86_64",
+  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "darwin-cpu-x86_64",
   libraryDependencies += "org.platanios" %% "tensorflow-horovod" % tensorFlowForScalaVersion)
 
 lazy val all = (project in file("."))
