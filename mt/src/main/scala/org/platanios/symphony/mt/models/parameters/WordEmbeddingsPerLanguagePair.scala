@@ -44,7 +44,11 @@ class WordEmbeddingsPerLanguagePair protected (
   }
 
   override def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): T = {
-    val languagePairs = languages.combinations(2).map(c => (c(0), c(1))).toSeq
+    val languagePairs = languages
+        .combinations(2)
+        .map(c => (c(0), c(1)))
+        .flatMap(p => Seq(p, (p._2, p._1)))
+        .toSeq
     val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
     if (!mergedEmbeddings) {
       languagePairs.map(pair => tf.variableScope(s"${pair._1._1.abbreviation}-${pair._2._1.abbreviation}") {
@@ -68,7 +72,11 @@ class WordEmbeddingsPerLanguagePair protected (
       context: Option[(Output, Output)]
   ): Output = {
     if (!mergedEmbeddings) {
-      val languageIdPairs = languageIds.combinations(2).map(c => (c(0), c(1))).toSeq
+      val languageIdPairs = languageIds
+          .combinations(2)
+          .map(c => (c(0), c(1)))
+          .flatMap(p => Seq(p, (p._2, p._1)))
+          .toSeq
       val predicates = embeddingTables.zip(languageIdPairs).flatMap {
         case (embeddings, (srcLangId, tgtLangId)) =>
           val pairPredicate = tf.logicalAnd(
@@ -78,7 +86,10 @@ class WordEmbeddingsPerLanguagePair protected (
             (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => embeddings._1),
             (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => embeddings._2))
       }
-      val default = () => embeddingTables.head._1
+      val assertion = tf.assert(false, Seq("No word embeddings table found for the provided language pair."))
+      val default = () => tf.createWith(controlDependencies = Set(assertion)) {
+        tf.identity(embeddingTables.head._1)
+      }
       tf.cases(predicates, default).gather(keys)
     } else {
       ???
@@ -96,7 +107,11 @@ class WordEmbeddingsPerLanguagePair protected (
     if (!mergedProjections) {
       val projectionsForSize = projectionsToWords
           .getOrElseUpdate(inputSize, {
-            val languagePairs = languages.combinations(2).map(c => (c(0), c(1))).toSeq
+            val languagePairs = languages
+                .combinations(2)
+                .map(c => (c(0), c(1)))
+                .flatMap(p => Seq(p, (p._2, p._1)))
+                .toSeq
             val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
             languagePairs.map(pair => tf.variableScope(s"${pair._1._1.abbreviation}-${pair._2._1.abbreviation}") {
               (tf.variable(
@@ -107,7 +122,11 @@ class WordEmbeddingsPerLanguagePair protected (
                     weightsInitializer).value)
             })
           })
-      val languageIdPairs = languageIds.combinations(2).map(c => (c(0), c(1))).toSeq
+      val languageIdPairs = languageIds
+          .combinations(2)
+          .map(c => (c(0), c(1)))
+          .flatMap(p => Seq(p, (p._2, p._1)))
+          .toSeq
       val predicates = projectionsForSize.zip(languageIdPairs).flatMap {
         case (projections, (srcLangId, tgtLangId)) =>
           val pairPredicate = tf.logicalAnd(
@@ -117,7 +136,10 @@ class WordEmbeddingsPerLanguagePair protected (
             (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => projections._1),
             (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => projections._2))
       }
-      val default = () => projectionsForSize.head._1
+      val assertion = tf.assert(false, Seq("No projections found for the provided language pair."))
+      val default = () => tf.createWith(controlDependencies = Set(assertion)) {
+        tf.identity(projectionsForSize.head._1)
+      }
       tf.cases(predicates, default)
     } else {
       ???

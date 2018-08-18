@@ -37,7 +37,9 @@ class PairwiseManager protected (
 
       // Obtain the variable values for all language pairs.
       val variableValues = languages.map(_._1)
-          .combinations(2).map(c => (c(0), c(1)))
+          .combinations(2)
+          .map(c => (c(0), c(1)))
+          .flatMap(p => Seq(p, (p._2, p._1)))
           .toSeq
           .map(pair => {
             tf.variable(
@@ -47,14 +49,21 @@ class PairwiseManager protected (
 
       // Choose the variable for the current language pair.
       tf.createWithNameScope(name) {
-        val languageIdPairs = languageIds(graph).combinations(2).map(c => (c(0), c(1))).toSeq
+        val languageIdPairs = languageIds(graph)
+            .combinations(2)
+            .map(c => (c(0), c(1)))
+            .flatMap(p => Seq(p, (p._2, p._1)))
+            .toSeq
         val predicates = variableValues.zip(languageIdPairs).map {
           case (v, (srcLangId, tgtLangId)) =>
             (tf.logicalAnd(
               tf.equal(context.get._1, srcLangId),
               tf.equal(context.get._2, tgtLangId)), () => v)
         }
-        val default = () => variableValues.head
+        val assertion = tf.assert(false, Seq("No variables found for the provided language pair."))
+        val default = () => tf.createWith(controlDependencies = Set(assertion)) {
+          tf.identity(variableValues.head)
+        }
         tf.cases(predicates, default)
       }
     }
