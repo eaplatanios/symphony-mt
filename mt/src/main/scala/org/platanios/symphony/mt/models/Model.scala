@@ -376,13 +376,12 @@ abstract class Model[S] protected (
 
               def bodyFn(loopVariables: LoopVariables): LoopVariables = {
                 val index = loopVariables._1
-                val srcLanguage = loopVariables._2
+                val srcLanguage = currentSrcLang.assign(loopVariables._2)
                 val srcSentences = loopVariables._3
                 val srcLengths = loopVariables._4
-                val language = tf.gather(loopVariables._5, index)
+                val language = currentTgtLang.assign(tf.gather(loopVariables._5, index))
                 val encoderInput = (srcLanguage, language, srcSentences, srcLengths)
-                val context = tf.group(Set(currentSrcLang.assign(srcLanguage).op, currentTgtLang.assign(language).op))
-                tf.createWith(controlDependencies = Set(context)) {
+                tf.createWith(controlDependencies = Set(srcLanguage.op, language.op)) {
                   val state = tf.variableScope("Encoder") {
                     encoder(encoderInput)
                   }
