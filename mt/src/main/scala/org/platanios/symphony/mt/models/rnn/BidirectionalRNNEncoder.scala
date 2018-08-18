@@ -49,7 +49,8 @@ class BidirectionalRNNEncoder[S, SS](
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
-      deviceManager: DeviceManager
+      deviceManager: DeviceManager,
+      context: Output
   ): Tuple[Output, Seq[S]] = {
     val (embeddedSequences, embeddedSequenceLengths) = embedSequences(
       config, srcLanguage, tgtLanguage, srcSequences, srcSequenceLengths)

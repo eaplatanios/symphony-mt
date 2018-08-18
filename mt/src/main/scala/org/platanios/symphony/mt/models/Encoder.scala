@@ -35,6 +35,7 @@ trait Encoder[O] {
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
-      deviceManager: DeviceManager
+      deviceManager: DeviceManager,
+      context: Output
   ): O
 }

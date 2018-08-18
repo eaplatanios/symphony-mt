@@ -61,7 +61,10 @@ class LanguageEmbeddingsManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit stage: Stage): Output = {
+  )(implicit
+      stage: Stage,
+      context: Output
+  ): Output = {
     tf.variableScope("ParameterManager") {
       val graph = currentGraph
       val variableScopeName = tf.currentVariableScope.name
@@ -69,8 +72,8 @@ class LanguageEmbeddingsManager protected (
 
       def create(): Output = tf.variableScope(name) {
         val language = stage match {
-          case Encoding => context.get._1
-          case Decoding => context.get._2
+          case Encoding => context(0)
+          case Decoding => context(1)
         }
         val embedding = languageEmbeddings(graph).gather(language).reshape(Shape(1, -1))
         var inputSize = languageEmbeddingsSize

@@ -44,8 +44,6 @@ class ParameterManager protected (
 
   protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, wordEmbeddingsType.T]] = mutable.Map.empty
 
-  protected var context: Option[(Output, Output)] = None
-
   def setEnvironment(environment: Environment): Unit = this.environment = environment
   def setDeviceManager(deviceManager: DeviceManager): Unit = this.deviceManager = Some(deviceManager)
 
@@ -119,16 +117,12 @@ class ParameterManager protected (
     }
   }
 
-  def wordEmbeddings(languageId: Output): Output => Output = (keys: Output) => {
+  def wordEmbeddings(languageId: Output)(implicit context: Output): Output => Output = (keys: Output) => {
     tf.variableScope("ParameterManager/WordEmbeddings") {
       val graph = currentGraph
-      wordEmbeddingsType.embeddingLookup(wordEmbeddings(graph), languageIds(graph), languageId, keys, context)
+      wordEmbeddingsType.embeddingLookup(wordEmbeddings(graph), languageIds(graph), languageId, keys)
     }
   }
-
-  def getContext: Option[(Output, Output)] = this.context
-  def setContext(context: (Output, Output)): Unit = this.context = Some(context)
-  def resetContext(): Unit = this.context = None
 
   def get(
       name: String,
@@ -136,13 +130,19 @@ class ParameterManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit stage: Stage): Output = {
+  )(implicit
+      stage: Stage,
+      context: Output
+  ): Output = {
     tf.variableScope("ParameterManager") {
       tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value
     }
   }
 
-  def getProjectionToWords(inputSize: Int, languageId: Output): Output = {
+  def getProjectionToWords(
+      inputSize: Int,
+      languageId: Output
+  )(implicit context: Output): Output = {
     tf.variableScope("ParameterManager/ProjectionToWords") {
       val graph = currentGraph
       wordEmbeddingsType.projectionToWords(
@@ -150,8 +150,7 @@ class ParameterManager protected (
         languageIds(graph),
         projectionsToWords.getOrElseUpdate(graph, mutable.HashMap.empty),
         inputSize,
-        languageId,
-        context)
+        languageId)
     }
   }
 
@@ -160,7 +159,7 @@ class ParameterManager protected (
       tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
-  ): (Output, Output) = {
+  )(implicit context: Output): (Output, Output) = {
     (srcSequences, srcSequenceLengths)
   }
 }

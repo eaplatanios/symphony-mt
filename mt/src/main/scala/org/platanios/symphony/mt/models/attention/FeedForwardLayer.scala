@@ -31,7 +31,8 @@ trait FeedForwardLayer {
       input: Output,
       paddingRemover: Option[PadRemover]
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output
 }
 
@@ -46,7 +47,8 @@ class DenseReLUDenseFeedForwardLayer protected (
       input: Output,
       paddingRemover: Option[PadRemover]
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-    stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     val inputShape = tf.shape(input)
     val processedInput = paddingRemover.map(pr => {

@@ -39,16 +39,14 @@ trait WordEmbeddingsType {
       embeddingTables: T,
       languageIds: Seq[Output],
       languageId: Output,
-      keys: Output,
-      context: Option[(Output, Output)]
-  ): Output
+      keys: Output
+  )(implicit context: Output): Output
 
   def projectionToWords(
       languages: Seq[(Language, Vocabulary)],
       languageIds: Seq[Output],
       projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
-      languageId: Output,
-      context: Option[(Output, Output)]
-  ): Output
+      languageId: Output
+  )(implicit context: Output): Output
 }

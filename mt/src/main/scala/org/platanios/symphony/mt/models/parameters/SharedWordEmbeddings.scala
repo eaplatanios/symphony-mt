@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.tensorflow.api.{FLOAT32, Output, Shape, tf}
+import org.platanios.tensorflow.api._
 
 import scala.collection.mutable
 
@@ -53,9 +53,8 @@ class SharedWordEmbeddings protected (
       embeddingTables: Output,
       languageIds: Seq[Output],
       languageId: Output,
-      keys: Output,
-      context: Option[(Output, Output)]
-  ): Output = {
+      keys: Output
+  )(implicit context: Output): Output = {
     embeddingTables.gather(keys)
   }
 
@@ -64,9 +63,8 @@ class SharedWordEmbeddings protected (
       languageIds: Seq[Output],
       projectionsToWords: mutable.Map[Int, Output],
       inputSize: Int,
-      languageId: Output,
-      context: Option[(Output, Output)]
-  ): Output = {
+      languageId: Output
+  )(implicit context: Output): Output = {
     projectionsToWords
         .getOrElseUpdate(inputSize, {
           val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)

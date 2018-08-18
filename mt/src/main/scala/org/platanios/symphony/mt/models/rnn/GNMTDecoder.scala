@@ -58,7 +58,8 @@ class GNMTDecoder[S, SS, AS, ASS](
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
-      deviceManager: DeviceManager
+      deviceManager: DeviceManager,
+      context: Output
   ): RNNDecoder.Output = {
     // Embeddings
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)

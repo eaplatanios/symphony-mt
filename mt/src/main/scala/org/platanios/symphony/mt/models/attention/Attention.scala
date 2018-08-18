@@ -239,7 +239,8 @@ object Attention {
       qPaddingMode: ConvPaddingMode = tf.ValidConvPadding,
       kvPaddingMode: ConvPaddingMode = tf.ValidConvPadding
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): (Output, Output, Output) = {
 
     def compute(input: Output, depth: Int, numFilters: Int, paddingMode: ConvPaddingMode, name: String): Output = {
@@ -306,7 +307,8 @@ object Attention {
       cache: Option[Cache] = None,
       name: String = "MultiHeadAttention"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")

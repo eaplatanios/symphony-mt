@@ -31,7 +31,10 @@ class PairwiseManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit stage: Stage): Output = {
+  )(implicit
+      stage: Stage,
+      context: Output
+  ): Output = {
     tf.variableScope("ParameterManager") {
       val graph = currentGraph
 
@@ -57,12 +60,15 @@ class PairwiseManager protected (
         val predicates = variableValues.zip(languageIdPairs).map {
           case (v, (srcLangId, tgtLangId)) =>
             (tf.logicalAnd(
-              tf.equal(context.get._1, srcLangId),
-              tf.equal(context.get._2, tgtLangId)), () => v)
+              tf.equal(context(0), srcLangId),
+              tf.equal(context(1), tgtLangId)), () => v)
         }
         val assertion = tf.assert(
           tf.any(tf.stack(predicates.map(_._1))),
-          Seq("No variables found for the provided language pair."))
+          Seq(
+            "No variables found for the provided language pair.",
+            "Context source language: ", context(0),
+            "Context target language: ", context(1)))
         val default = () => tf.createWith(controlDependencies = Set(assertion)) {
           tf.identity(variableValues.head)
         }

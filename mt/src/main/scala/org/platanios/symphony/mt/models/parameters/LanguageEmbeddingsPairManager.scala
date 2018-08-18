@@ -63,14 +63,17 @@ class LanguageEmbeddingsPairManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit stage: Stage): Output = {
+  )(implicit
+      stage: Stage,
+      context: Output
+  ): Output = {
     tf.variableScope("ParameterManager") {
       val graph = currentGraph
       val variableScopeName = tf.currentVariableScope.name
       val fullName = if (variableScopeName != null && variableScopeName != "") s"$variableScopeName/$name" else name
 
       def create(): Output = tf.variableScope(name) {
-        val languagePair = tf.stack(Seq(context.get._1, context.get._2))
+        val languagePair = tf.stack(Seq(context(0), context(1)))
         val embeddings = languageEmbeddings(graph).gather(languagePair).reshape(Shape(1, -1))
         var inputSize = 2 * languageEmbeddingsSize
         var parameters = embeddings

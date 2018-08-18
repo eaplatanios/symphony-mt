@@ -41,7 +41,8 @@ abstract class RNNEncoder[S, SS]()(implicit
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
-      deviceManager: DeviceManager
+      deviceManager: DeviceManager,
+      context: Output
   ): Tuple[Output, Seq[S]]
 
   def embedSequences(
@@ -51,9 +52,10 @@ abstract class RNNEncoder[S, SS]()(implicit
       srcSequences: Output,
       srcSequenceLengths: Output
   )(implicit
-      parameterManager: ParameterManager
+      parameterManager: ParameterManager,
+      context: Output
   ): (Output, Output) = {
-    val embeddedSrcSequences = parameterManager.wordEmbeddings(srcLanguage)(srcSequences)
+    val embeddedSrcSequences = parameterManager.wordEmbeddings(srcLanguage)(context)(srcSequences)
     val (embeddedSequences, embeddedSequenceLengths) = parameterManager.postprocessEmbeddedSequences(
       srcLanguage, tgtLanguage, embeddedSrcSequences, srcSequenceLengths)
     if (config.timeMajor)

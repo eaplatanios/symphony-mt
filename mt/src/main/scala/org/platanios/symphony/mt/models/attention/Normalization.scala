@@ -30,7 +30,8 @@ trait Normalization {
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output
 }
 
@@ -42,7 +43,8 @@ case object NoNormalization extends Normalization {
       epsilon: Float = 1e-12f,
       name: String = "NoNormalization"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     input
   }
@@ -55,7 +57,8 @@ case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVaria
       epsilon: Float = 1e-12f,
       name: String = "LayerNormalization"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     val numFilters = depth.getOrElse(input.shape(-1))
     tf.variableScope(name, reuse) {
@@ -77,7 +80,8 @@ case object BatchNormalization extends Normalization {
       epsilon: Float = 1e-12f,
       name: String = "BatchNormalization"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     ???
   }
@@ -90,7 +94,8 @@ case object NoamNormalization extends Normalization {
       epsilon: Float = 1e-12f,
       name: String = "NoamNormalization"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = tf.createWithNameScope(name) {
     tf.l2Normalize(input, input.rank - 1, epsilon) * tf.sqrt(tf.constant(input.shape(-1), FLOAT32))
   }

@@ -31,7 +31,8 @@ trait LayerProcessor {
       previousValue: Option[Output],
       name: String = "LayerProcessor"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output
 }
 
@@ -42,7 +43,8 @@ case object AddResidualConnection extends LayerProcessor {
       previousValue: Option[Output],
       name: String = "AddResidualConnection"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     previousValue match {
       case Some(v) => value + v
@@ -59,7 +61,8 @@ case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) exte
       previousValue: Option[Output],
       name: String = "Normalize"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     normalization(value, epsilon = epsilon, name = name)(mode, parameterManager)
   }
@@ -76,7 +79,8 @@ case class Dropout(
       previousValue: Option[Output],
       name: String = "Normalize"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     if (mode.isTraining)
       Common.dropoutWithBroadcastAxes(value, 1.0f - dropoutRate, scaleOutput, broadcastAxes)
@@ -98,7 +102,8 @@ object LayerProcessor {
       input: Output,
       processors: Seq[LayerProcessor]
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     processors.foldLeft(input) {
       case (value, processor) => processor(value, None)(mode, parameterManager)
@@ -119,7 +124,8 @@ object LayerProcessor {
       output: Output,
       processors: Seq[LayerProcessor]
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = {
     processors.foldLeft(output) {
       case (value, processor) => processor(value, Some(input))(mode, parameterManager)

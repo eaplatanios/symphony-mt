@@ -394,7 +394,8 @@ object Common {
       reluDropoutBroadcastAxes: Set[Int] = Set.empty,
       name: String = "DenseReLUDense"
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): Output = tf.variableScope(name) {
     val weights1 = parameterManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
     val bias1 = parameterManager.get("Dense1/Bias", input.dataType, Shape(filterSize))

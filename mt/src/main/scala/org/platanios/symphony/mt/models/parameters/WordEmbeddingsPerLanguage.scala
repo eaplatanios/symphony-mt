@@ -64,16 +64,17 @@ class WordEmbeddingsPerLanguage protected (
       embeddingTables: T,
       languageIds: Seq[Output],
       languageId: Output,
-      keys: Output,
-      context: Option[(Output, Output)]
-  ): Output = {
+      keys: Output
+  )(implicit context: Output): Output = {
     if (!mergedEmbeddings) {
       val predicates = embeddingTables.zip(languageIds).map {
         case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
       }
       val assertion = tf.assert(
         tf.any(tf.stack(predicates.map(_._1))),
-        Seq("No word embeddings table found for the provided language."))
+        Seq(
+          "No word embeddings table found for the provided language.",
+          "Current language: ", languageId))
       val default = () => tf.createWith(controlDependencies = Set(assertion)) {
         tf.identity(embeddingTables.head)
       }
@@ -90,9 +91,8 @@ class WordEmbeddingsPerLanguage protected (
       languageIds: Seq[Output],
       projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
-      languageId: Output,
-      context: Option[(Output, Output)]
-  ): Output = {
+      languageId: Output
+  )(implicit context: Output): Output = {
     if (!mergedProjections) {
       val projectionsForSize = projectionsToWords
           .getOrElseUpdate(inputSize, {
@@ -105,7 +105,9 @@ class WordEmbeddingsPerLanguage protected (
       }
       val assertion = tf.assert(
         tf.any(tf.stack(predicates.map(_._1))),
-        Seq("No projections found for the provided language."))
+        Seq(
+          "No projections found for the provided language.",
+          "Current language: ", languageId))
       val default = () => tf.createWith(controlDependencies = Set(assertion)) {
         tf.identity(projectionsForSize.head)
       }

@@ -36,7 +36,8 @@ trait Cell[S, SS] {
       numUnits: Int,
       dataType: DataType
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): RNNCell[Output, Shape, S, SS]
 
   // The following two evidence variables are used in the experiments package.
@@ -51,7 +52,8 @@ case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, S
       numUnits: Int,
       dataType: DataType
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): RNNCell[Output, Shape, Output, Shape] = {
     val gateKernel = parameterManager.get("Gate/Weights", dataType, Shape(numInputs + numUnits, 2 * numUnits))
     val gateBias = parameterManager.get("Gate/Bias", dataType, Shape(2 * numUnits), tf.ZerosInitializer)
@@ -77,7 +79,8 @@ case class BasicLSTM(forgetBias: Float = 1.0f, activation: Output => Output = tf
       numUnits: Int,
       dataType: DataType
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): BasicLSTMCell = {
     val kernel = parameterManager.get("Weights", dataType, Shape(numInputs + numUnits, 4 * numUnits))
     val bias = parameterManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
@@ -107,7 +110,8 @@ case class LSTM(
       numUnits: Int,
       dataType: DataType
   )(mode: Mode, parameterManager: ParameterManager)(implicit
-      stage: Stage
+      stage: Stage,
+      context: Output
   ): LSTMCell = {
     val hiddenDepth = if (projectionSize != -1) projectionSize else numUnits
     val kernel = parameterManager.get("Weights", dataType, Shape(numInputs + hiddenDepth, 4 * numUnits))

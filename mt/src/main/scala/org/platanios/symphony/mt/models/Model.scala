@@ -311,7 +311,8 @@ abstract class Model[S] protected (
           parameterManager.initialize(languages)
           parameterManager.setEnvironment(config.env)
           parameterManager.setDeviceManager(config.deviceManager)
-          parameterManager.setContext((input._1._1, input._1._2))
+
+          implicit val context: Output = tf.stack(Seq(input._1._1, input._1._2))
 
           val srcSequence = mapToWordIds(input._1._1, input._1._3)
           val tgtSequence = mapToWordIds(input._1._2, input._2._1)
@@ -340,12 +341,13 @@ abstract class Model[S] protected (
           parameterManager.initialize(languages)
           parameterManager.setEnvironment(config.env)
           parameterManager.setDeviceManager(config.deviceManager)
-          parameterManager.setContext((input._1, input._2))
 
           val srcSequence = mapToWordIds(input._1, input._3)
 
           config.pivot match {
             case NoPivot =>
+              implicit val context: Output = tf.stack(Seq(input._1, input._2))
+
               val encoderInput = (input._1, input._2, srcSequence, input._4)
               val state = tf.variableScope("Encoder") {
                 encoder(encoderInput)
@@ -357,14 +359,10 @@ abstract class Model[S] protected (
               val decodedSequences = mapFromWordIds(tgtLanguage, tgtSentences)
               (tgtLanguage, decodedSequences, tgtLengths)
             case _ =>
+              implicit val context: Output = tf.stack(Seq(input._1, input._2))
+
               config.pivot.initialize(languages, parameterManager)
               val pivotingSequence = config.pivot.pivotingSequence(input._1, input._2)
-
-              val currentSrcLang = tf.variable(
-                "CurrentSrcLanguage", INT32, Shape(), trainable = false, initializer = tf.ZerosInitializer)
-              val currentTgtLang = tf.variable(
-                "CurrentTgtLanguage", INT32, Shape(), trainable = false, initializer = tf.OnesInitializer)
-              parameterManager.setContext((currentSrcLang, currentTgtLang))
 
               type LoopVariables = (Output, Output, Output, Output, Output)
 
@@ -374,20 +372,23 @@ abstract class Model[S] protected (
 
               def bodyFn(loopVariables: LoopVariables): LoopVariables = {
                 val index = loopVariables._1
-                val srcLanguage = currentSrcLang.assign(loopVariables._2)
+
+                implicit val context: Output = tf.stack(Seq(loopVariables._2, tf.gather(loopVariables._5, index)))
+
+                var srcLanguage = context(0)
                 val srcSentences = loopVariables._3
                 val srcLengths = loopVariables._4
-                val language = currentTgtLang.assign(tf.gather(loopVariables._5, index))
+                val language = context(1)
                 val encoderInput = (srcLanguage, language, srcSentences, srcLengths)
-                tf.createWith(controlDependencies = Set(srcLanguage.op, language.op)) {
-                  val state = tf.variableScope("Encoder") {
-                    encoder(encoderInput)
-                  }
-                  val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
-                    decoder(encoderInput, None, Some(state))
-                  }
-                  (index + 1, language, tgtSentences, tgtLengths, loopVariables._5)
+                srcLanguage = tf.print(
+                  srcLanguage, Seq(srcLanguage, language), "Languages: ", 1000, 1000)
+                val state = tf.variableScope("Encoder") {
+                  encoder(encoderInput)
                 }
+                val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
+                  decoder(encoderInput, None, Some(state))
+                }
+                (index + 1, language, tgtSentences, tgtLengths, loopVariables._5)
               }
 
               val results = tf.whileLoop[LoopVariables, (Shape, Shape, Shape, Shape, Shape)](
@@ -458,7 +459,10 @@ abstract class Model[S] protected (
     *           - Encoder output, with shape `[batchSize, inputLength, hiddenSize]`.
     *           - Encoder-decoder attention bias and mask weights, with shape `[batchSize, inputLength]`.
     */
-  protected def encoder(input: TFBatchWithLanguages)(implicit mode: Mode): S
+  protected def encoder(input: TFBatchWithLanguages)(implicit
+      mode: Mode,
+      context: Output
+  ): S
 
   /**
     *
@@ -468,7 +472,10 @@ abstract class Model[S] protected (
       encoderInput: TFBatchWithLanguages,
       input: Option[TFBatch],
       state: Option[S]
-  )(implicit mode: Mode): TFBatch
+  )(implicit
+      mode: Mode,
+      context: Output
+  ): TFBatch
 
   protected def loss(predictedSequences: Output, targetSequences: Output, targetSequenceLengths: Output): Output = {
     val (lossSum, _) = Common.paddedCrossEntropy(

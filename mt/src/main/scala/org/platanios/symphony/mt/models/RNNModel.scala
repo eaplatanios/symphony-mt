@@ -58,7 +58,10 @@ class RNNModel[S, SS](
 
   override protected def encoder(
       input: TFBatchWithLanguages
-  )(implicit mode: Mode): (Tuple[Output, Seq[S]], Output, Output) = {
+  )(implicit
+      mode: Mode,
+      context: Output
+  ): (Tuple[Output, Seq[S]], Output, Output) = {
     implicit val stage: Stage = Encoding
 
     val maxDecodingLength = {
@@ -74,7 +77,10 @@ class RNNModel[S, SS](
       encoderInput: TFBatchWithLanguages,
       input: Option[TFBatch],
       state: Option[(Tuple[Output, Seq[S]], Output, Output)]
-  )(implicit mode: Mode): TFBatch = {
+  )(implicit
+      mode: Mode,
+      context: Output
+  ): TFBatch = {
     implicit val stage: Stage = Decoding
 
     // TODO: What if the state is `None`?
@@ -199,6 +205,7 @@ object RNNModel {
       name: String
   )(mode: Mode, parameterManager: ParameterManager)(implicit
       stage: Stage,
+      context: Output,
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.RNNCell[Output, Shape, S, SS] = tf.variableScope(name) {
@@ -239,6 +246,7 @@ object RNNModel {
       deviceManager: DeviceManager
   )(implicit
       stage: Stage,
+      context: Output,
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): Seq[tf.RNNCell[Output, Shape, S, SS]] = tf.variableScope(name) {
@@ -269,6 +277,7 @@ object RNNModel {
       deviceManager: DeviceManager
   )(implicit
       stage: Stage,
+      context: Output,
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
   ): tf.RNNCell[Output, Shape, Seq[S], Seq[SS]] = {

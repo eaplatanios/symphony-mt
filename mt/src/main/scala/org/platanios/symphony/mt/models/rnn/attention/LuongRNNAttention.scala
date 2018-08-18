@@ -46,6 +46,7 @@ case class LuongRNNAttention(
       stage: Stage,
       mode: Mode,
       parameterManager: ParameterManager,
+      context: Output,
       evS: WhileLoopVariable.Aux[S, SS],
       evSDropout: tf.DropoutWrapper.Supported[S]
   ): (AttentionWrapperCell[S, SS, Output, Shape], AttentionWrapperState[S, SS, Seq[Output], Seq[Shape]]) = {
