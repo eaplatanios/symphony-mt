@@ -73,7 +73,13 @@ abstract class RNNDecoder[S, SS]()(implicit
       if (logits.rank == 3) {
         val reshapedLogits = tf.reshape(logits, Shape(-1, logits.shape(-1)))
         val product = tf.matmul(reshapedLogits, outputWeights)
-        tf.reshape(product, logits.shape(0 :: -1) + outputWeights.shape(1))
+        if (logits.shape(1) == -1 || outputWeights.shape(1) == -1) {
+          tf.reshape(
+            product,
+            tf.concatenate(Seq(tf.shape(logits)(0 :: -1), tf.shape(outputWeights)(1, NewAxis)), axis = 0))
+        } else {
+          tf.reshape(product, logits.shape(0 :: -1) + outputWeights.shape(1))
+        }
       } else {
         tf.matmul(logits, outputWeights)
       }
