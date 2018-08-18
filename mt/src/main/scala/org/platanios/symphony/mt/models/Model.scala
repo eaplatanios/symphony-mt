@@ -342,8 +342,6 @@ abstract class Model[S] protected (
           parameterManager.setDeviceManager(config.deviceManager)
           parameterManager.setContext((input._1, input._2))
 
-          // TODO: We need to first have a check for whether the language pair is supported. If not supported, fallback multi-lingual translation method should be applied.
-
           val srcSequence = mapToWordIds(input._1, input._3)
 
           config.pivot match {
@@ -362,6 +360,14 @@ abstract class Model[S] protected (
               config.pivot.initialize(languages, parameterManager)
               val pivotingSequence = config.pivot.pivotingSequence(input._1, input._2)
 
+              val currentSrcLang = tf.variable(
+                "CurrentSrcLanguage", INT32, Shape(), trainable = false,
+                initializer = tf.ConstantInitializer(input._1))
+              val currentTgtLang = tf.variable(
+                "CurrentTgtLanguage", INT32, Shape(), trainable = false,
+                initializer = tf.ConstantInitializer(pivotingSequence(0)))
+              parameterManager.setContext((currentSrcLang, currentTgtLang))
+
               type LoopVariables = (Output, Output, Output, Output, Output)
 
               def predicateFn(loopVariables: LoopVariables): Output = {
@@ -375,13 +381,16 @@ abstract class Model[S] protected (
                 val srcLengths = loopVariables._4
                 val language = tf.gather(loopVariables._5, index)
                 val encoderInput = (srcLanguage, language, srcSentences, srcLengths)
-                val state = tf.variableScope("Encoder") {
-                  encoder(encoderInput)
+                val context = tf.group(Set(currentSrcLang.assign(srcLanguage).op, currentTgtLang.assign(language).op))
+                tf.createWith(controlDependencies = Set(context)) {
+                  val state = tf.variableScope("Encoder") {
+                    encoder(encoderInput)
+                  }
+                  val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
+                    decoder(encoderInput, None, Some(state))
+                  }
+                  (index + 1, language, tgtSentences, tgtLengths, loopVariables._5)
                 }
-                val (tgtSentences, tgtLengths) = tf.variableScope("Decoder") {
-                  decoder(encoderInput, None, Some(state))
-                }
-                (index + 1, language, tgtSentences, tgtLengths, loopVariables._5)
               }
 
               val results = tf.whileLoop[LoopVariables, (Shape, Shape, Shape, Shape, Shape)](
