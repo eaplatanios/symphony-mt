@@ -71,7 +71,9 @@ class WordEmbeddingsPerLanguage protected (
       val predicates = embeddingTables.zip(languageIds).map {
         case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
       }
-      val assertion = tf.assert(false, Seq("No word embeddings table found for the provided language."))
+      val assertion = tf.assert(
+        tf.any(tf.stack(predicates.map(_._1))),
+        Seq("No word embeddings table found for the provided language."))
       val default = () => tf.createWith(controlDependencies = Set(assertion)) {
         tf.identity(embeddingTables.head)
       }
@@ -101,7 +103,9 @@ class WordEmbeddingsPerLanguage protected (
       val predicates = projectionsForSize.zip(languageIds).map {
         case (projections, langId) => (tf.equal(languageId, langId), () => projections)
       }
-      val assertion = tf.assert(false, Seq("No projections found for the provided language."))
+      val assertion = tf.assert(
+        tf.any(tf.stack(predicates.map(_._1))),
+        Seq("No projections found for the provided language."))
       val default = () => tf.createWith(controlDependencies = Set(assertion)) {
         tf.identity(projectionsForSize.head)
       }

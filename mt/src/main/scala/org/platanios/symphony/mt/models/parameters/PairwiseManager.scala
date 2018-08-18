@@ -60,7 +60,9 @@ class PairwiseManager protected (
               tf.equal(context.get._1, srcLangId),
               tf.equal(context.get._2, tgtLangId)), () => v)
         }
-        val assertion = tf.assert(false, Seq("No variables found for the provided language pair."))
+        val assertion = tf.assert(
+          tf.any(tf.stack(predicates.map(_._1))),
+          Seq("No variables found for the provided language pair."))
         val default = () => tf.createWith(controlDependencies = Set(assertion)) {
           tf.identity(variableValues.head)
         }
