@@ -361,11 +361,9 @@ abstract class Model[S] protected (
               val pivotingSequence = config.pivot.pivotingSequence(input._1, input._2)
 
               val currentSrcLang = tf.variable(
-                "CurrentSrcLanguage", INT32, Shape(), trainable = false,
-                initializer = tf.ConstantInitializer(input._1))
+                "CurrentSrcLanguage", INT32, Shape(), trainable = false, initializer = tf.ZerosInitializer)
               val currentTgtLang = tf.variable(
-                "CurrentTgtLanguage", INT32, Shape(), trainable = false,
-                initializer = tf.ConstantInitializer(pivotingSequence(0)))
+                "CurrentTgtLanguage", INT32, Shape(), trainable = false, initializer = tf.OnesInitializer)
               parameterManager.setContext((currentSrcLang, currentTgtLang))
 
               type LoopVariables = (Output, Output, Output, Output, Output)
