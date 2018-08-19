@@ -342,6 +342,7 @@ object ExperimentConfig {
       value.split(":") match {
         case Array(name) if name == "none" => NoTokenizer
         case Array(name) if name == "moses" => MosesTokenizer()
+        case Array(name) if name == "mteval13" => MTEval13Tokenizer(preserveCase = true)
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid tokenizer.")
       }
     })

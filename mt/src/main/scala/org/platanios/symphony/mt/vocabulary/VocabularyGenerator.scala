@@ -20,18 +20,18 @@ import org.platanios.symphony.mt.utilities.MutableFile
 
 import better.files.File
 
-/** Vocabulary creator.
+/** Vocabulary generator.
   *
   * Given a sequence of tokenized (i.e., words separated by spaces) text files, vocabulary generators can be used to
-  * generated vocabulary files.
+  * generate vocabulary files.
   *
   * @author Emmanouil Antonios Platanios
   */
 trait VocabularyGenerator {
-  /** Returns the vocabulary file name that this generator uses / will use.
+  /** Returns the vocabulary filename that this generator uses / will use.
     *
     * @param  languages Languages for which a vocabulary will be generated.
-    * @return Vocabulary file name.
+    * @return Vocabulary filename.
     */
   def filename(languages: Seq[Language]): String = {
     s"vocab.${languages.map(_.abbreviation).sorted.mkString(".")}"
