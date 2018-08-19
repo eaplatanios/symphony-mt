@@ -60,20 +60,20 @@ class IWSLT17Loader(
       case Train => Seq((IWSLT17Loader.Train,
           File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"train.tags.$src-$tgt.$src",
           File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"train.tags.$src-$tgt.$tgt",
-          TEDConverter >> Normalizer >> PunctuationNormalizer))
+          TEDConverter >> Normalizer))
       case Dev => Seq((IWSLT17Loader.Dev2010,
           File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$src-$tgt.$src.xml",
           File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.dev2010.$src-$tgt.$tgt.xml",
-          SGMConverter >> Normalizer >> PunctuationNormalizer))
+          SGMConverter >> Normalizer))
       case Test => Seq(
         (IWSLT17Loader.Test2010,
             File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$src-$tgt.$src.xml",
             File(downloadsDir) / IWSLT17Loader.filename / IWSLT17Loader.filename / s"IWSLT17.TED.tst2010.$src-$tgt.$tgt.xml",
-            SGMConverter >> Normalizer >> PunctuationNormalizer),
+            SGMConverter >> Normalizer),
         (IWSLT17Loader.Test2017,
             File(downloadsDir) / s"$src-$tgt" / s"$src-$tgt" / s"IWSLT17.TED.tst2017.mltlng.$src-$tgt.$src.xml",
             File(downloadsDir) / s"$tgt-$src" / s"$tgt-$src" / s"IWSLT17.TED.tst2017.mltlng.$tgt-$src.$tgt.xml",
-            SGMConverter >> Normalizer >> PunctuationNormalizer))
+            SGMConverter >> Normalizer))
     }
   }
 }

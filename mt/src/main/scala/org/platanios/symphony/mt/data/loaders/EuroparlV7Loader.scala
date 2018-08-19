@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.data.loaders
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.Language._
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.processors.{FileProcessor, Normalizer, PunctuationNormalizer}
+import org.platanios.symphony.mt.data.processors.{FileProcessor, Normalizer}
 
 import better.files._
 
@@ -67,7 +67,7 @@ class EuroparlV7Loader(
       case Train => Seq((EuroparlV7Loader.Train,
           File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$src",
           File(downloadsDir) / corpusArchiveFile / s"$corpusFilenamePrefix.$tgt",
-          Normalizer >> PunctuationNormalizer))
+          Normalizer))
       case _ => Seq.empty
     }
   }

@@ -68,7 +68,7 @@ class NewsCommentaryV11Loader(
               / NewsCommentaryV11Loader.archivePrefix / s"$corpusFilenamePrefix.$src",
           File(downloadsDir) / NewsCommentaryV11Loader.archivePrefix
               / NewsCommentaryV11Loader.archivePrefix / s"$corpusFilenamePrefix.$tgt",
-          Normalizer >> PunctuationNormalizer))
+          Normalizer))
       case _ => Seq.empty
     }
   }
