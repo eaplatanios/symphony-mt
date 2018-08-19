@@ -373,7 +373,12 @@ class BPEVocabularyGenerator protected (
     decodedSentence
   }
 
-  override def toString: String = s"bpe-$numMergeOps"
+  override def toString: String = {
+    if (countThreshold > 0)
+      s"bpe-$numMergeOps-$countThreshold"
+    else
+      s"bpe-$numMergeOps"
+  }
 }
 
 object BPEVocabularyGenerator {
