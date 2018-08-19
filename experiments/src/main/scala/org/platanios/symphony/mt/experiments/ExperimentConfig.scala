@@ -378,10 +378,14 @@ object ExperimentConfig {
           GeneratedVocabulary(BPEVocabularyGenerator(), shared = false)
         case Array(name, numMergeOps) if name == "bpe" =>
           GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt), shared = false)
+        case Array(name, numMergeOps, countThreshold) if name == "bpe" =>
+          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt, countThreshold = countThreshold.toInt), shared = false)
         case Array(name) if name == "bpe_shared" =>
           GeneratedVocabulary(BPEVocabularyGenerator(), shared = true)
         case Array(name, numMergeOps) if name == "bpe_shared" =>
           GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt), shared = true)
+        case Array(name, numMergeOps, countThreshold) if name == "bpe_shared" =>
+          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt, countThreshold = countThreshold.toInt), shared = true)
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid vocabulary.")
       }
     })
