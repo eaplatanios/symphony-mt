@@ -17,6 +17,8 @@ package org.platanios.symphony.mt.data.processors
 
 import org.platanios.symphony.mt.Language
 
+import better.files.File
+
 import scala.util.matching.Regex
 
 /** Tokenizer used by the official `mteval-v13a.perl` script.
@@ -45,6 +47,11 @@ case class MTEval13Tokenizer(
   private val whitespaceRegex                      : Regex = """\s+""".r
   private val leadingWhitespaceRegex               : Regex = """^\s+""".r
   private val trailingWhitespaceRegex              : Regex = """\s+$""".r
+
+  override def tokenizedFile(originalFile: File): File = {
+    val fileName = originalFile.nameWithoutExtension(includeAll = false)
+    originalFile.sibling(fileName + s".tok:mteval13${originalFile.extension().get}")
+  }
 
   override def tokenize(sentence: String, language: Language): String = {
     var tokenized = sentence.trim

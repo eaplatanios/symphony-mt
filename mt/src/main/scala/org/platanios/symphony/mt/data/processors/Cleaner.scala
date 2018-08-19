@@ -34,11 +34,7 @@ trait Cleaner extends FileProcessor {
     cleanCorporaPair(file1, file2)
   }
 
-  def cleanFile(originalFile: File): File = {
-    val fileName = originalFile.nameWithoutExtension(includeAll = false) + s".clean${originalFile.extension().get}"
-    originalFile.sibling(fileName)
-  }
-
+  def cleanFile(originalFile: File): File
   def cleanSentencePair(srcSentence: String, tgtSentence: String): Option[(String, String)]
 
   def cleanCorporaPair(srcFile: File, tgtFile: File, bufferSize: Int = 8192): (File, File) = {
@@ -96,6 +92,11 @@ class MosesCleaner protected (
   protected val ignoredRegex      : Regex = """\|""".r
   protected val whitespaceRegex   : Regex = """\s+""".r
   protected val maxWordLengthRegex: Regex = s"""[\\S]{${maxWordLength + 1},}""".r
+
+  override def cleanFile(originalFile: File): File = {
+    val fileName = originalFile.nameWithoutExtension(includeAll = false)
+    originalFile.sibling(fileName + s".clean:moses${originalFile.extension().get}")
+  }
 
   override def cleanSentencePair(srcSentence: String, tgtSentence: String): Option[(String, String)] = {
     var src = srcSentence.trim

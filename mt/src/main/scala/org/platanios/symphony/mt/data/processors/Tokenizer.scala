@@ -31,11 +31,7 @@ import scala.util.matching.Regex
 trait Tokenizer extends FileProcessor {
   override def process(file: File, language: Language): File = tokenizeCorpus(file, language)
 
-  def tokenizedFile(originalFile: File): File = {
-    val fileName = originalFile.nameWithoutExtension(includeAll = false) + s".tok${originalFile.extension().get}"
-    originalFile.sibling(fileName)
-  }
-
+  def tokenizedFile(originalFile: File): File
   def tokenize(sentence: String, language: Language): String
 
   def tokenizeCorpus(file: File, language: Language, bufferSize: Int = 8192): File = {
@@ -129,6 +125,11 @@ case class MosesTokenizer(
   private val escapeRegex6                  : Regex = """\"""".r
   private val escapeRegex7                  : Regex = """\[""".r
   private val escapeRegex8                  : Regex = """\]""".r
+
+  override def tokenizedFile(originalFile: File): File = {
+    val fileName = originalFile.nameWithoutExtension(includeAll = false)
+    originalFile.sibling(fileName + s".tok:moses${originalFile.extension().get}")
+  }
 
   override def tokenize(sentence: String, language: Language): String = {
     var tokenized = sentence.trim
