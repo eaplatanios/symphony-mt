@@ -73,6 +73,7 @@ case class MTEval13Tokenizer(
     tokenized = periodCommaUnlessPrecededByDigitRegex.replaceAllIn(tokenized, "$1 $2 ")
     tokenized = periodCommaUnlessFollowedByDigitRegex.replaceAllIn(tokenized, " $1 $2")
     tokenized = dashPrecededByDigitRegex.replaceAllIn(tokenized, "$1 $2 ")
+
     tokenized = whitespaceRegex.replaceAllIn(tokenized, " ")
     tokenized = leadingWhitespaceRegex.replaceAllIn(tokenized, "")
     tokenized = trailingWhitespaceRegex.replaceAllIn(tokenized, "")
