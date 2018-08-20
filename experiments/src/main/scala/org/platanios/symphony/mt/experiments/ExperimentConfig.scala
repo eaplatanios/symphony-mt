@@ -376,17 +376,17 @@ object ExperimentConfig {
         case Array(name, sizeThreshold, countThreshold) if name == "generated_shared" =>
           GeneratedVocabulary(SimpleVocabularyGenerator(sizeThreshold.toInt, countThreshold.toInt), shared = true)
         case Array(name) if name == "bpe" =>
-          GeneratedVocabulary(BPEVocabularyGenerator(), shared = false)
+          GeneratedVocabulary(BPEVocabularyGenerator(caseSensitive = false), shared = false)
         case Array(name, numMergeOps) if name == "bpe" =>
-          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt), shared = false)
+          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt, caseSensitive = false), shared = false)
         case Array(name, numMergeOps, countThreshold) if name == "bpe" =>
-          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt, countThreshold = countThreshold.toInt), shared = false)
+          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt, caseSensitive = false, countThreshold = countThreshold.toInt), shared = false)
         case Array(name) if name == "bpe_shared" =>
-          GeneratedVocabulary(BPEVocabularyGenerator(), shared = true)
+          GeneratedVocabulary(BPEVocabularyGenerator(caseSensitive = false), shared = true)
         case Array(name, numMergeOps) if name == "bpe_shared" =>
-          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt), shared = true)
+          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt, caseSensitive = false), shared = true)
         case Array(name, numMergeOps, countThreshold) if name == "bpe_shared" =>
-          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt, countThreshold = countThreshold.toInt), shared = true)
+          GeneratedVocabulary(BPEVocabularyGenerator(numMergeOps.toInt, caseSensitive = false, countThreshold = countThreshold.toInt), shared = true)
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid vocabulary.")
       }
     })

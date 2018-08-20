@@ -130,10 +130,7 @@ class ParameterManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit
-      stage: Stage,
-      context: Output
-  ): Output = {
+  )(implicit stage: Stage, context: Output): Output = {
     tf.variableScope("ParameterManager") {
       tf.variable(name, dataType, shape, initializer = variableInitializer, reuse = variableReuse).value
     }

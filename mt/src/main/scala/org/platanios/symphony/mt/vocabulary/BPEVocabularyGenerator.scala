@@ -43,6 +43,8 @@ import scala.util.matching.Regex
   * @param  numMergeOps     Number of BPE merge operations to learn when generating a new BPE vocabulary.
   * @param  separator       Separator symbol appended to all inter-word symbols while encoding sentences. This allows
   *                         for decoding BPE-encoded sentences, after a translation is done.
+  * @param  glossary
+  * @param  caseSensitive
   * @param  countThreshold  Symbols pairs which appears less than `countThreshold` times will be ignored.
   * @param  replaceExisting If `true`, existing vocabulary files will be replaced, if found.
   * @param  bufferSize      Buffer size to use while reading and writing files.
@@ -53,6 +55,7 @@ class BPEVocabularyGenerator protected (
     val numMergeOps: Int = 32000,
     val separator: String = "@@",
     val glossary: Set[String] = BPEVocabularyGenerator.DEFAULT_GLOSSARY,
+    val caseSensitive: Boolean = true,
     val countThreshold: Int = -1,
     val replaceExisting: Boolean = false,
     val bufferSize: Int = 8192
@@ -115,7 +118,12 @@ class BPEVocabularyGenerator protected (
         counter.insertWord(word)
         counter
       }).words().map(p => (p._1, {
-        val parts = p._2.toCharArray.map(_.toString)
+        val parts = {
+          if (caseSensitive)
+            p._2.toCharArray.map(_.toString)
+          else
+            p._2.toLowerCase().toCharArray.map(_.toString)
+        }
         parts.update(parts.length - 1, parts.last + BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
         parts.toSeq
       })).toSeq: _*)
@@ -187,7 +195,7 @@ class BPEVocabularyGenerator protected (
       val file = oldFile.sibling(
         s"${oldFile.nameWithoutExtension(includeAll = false)}" +
             s".bpe.$numMergeOps.${languages.map(_.abbreviation).sorted.mkString(".")}" +
-            s".${oldFile.extension(includeDot = false, includeAll = false)}")
+            s".${oldFile.extension(includeDot = false, includeAll = false).get}")
       mutableFile.set(file)
       if (replaceExisting || file.notExists) {
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
@@ -324,15 +332,27 @@ class BPEVocabularyGenerator protected (
       } else {
         wordParts = wordParts.updated(
           wordParts.length - 1, wordParts.last + BPEVocabularyGenerator.END_OF_WORD_SYMBOL)
-        var pairs = wordParts.sliding(2).map(p => (p(0), p(1))).toArray
+        var pairs = {
+          if (caseSensitive)
+            wordParts.sliding(2).map(p => (p(0), p(1))).toArray
+          else
+            wordParts.sliding(2).map(p => (p(0).toLowerCase(), p(1).toLowerCase())).toArray
+        }
         var continue = true
         while (pairs.nonEmpty && continue) {
           val pair = pairs.map(p => (p, mergePairs(languages).get(p))).minBy(_._2.getOrElse(Int.MaxValue))
           if (pair._2.isEmpty) {
             continue = false
           } else {
-            wordParts = BPEVocabularyGenerator.replacePair(pair._1, wordParts)(pair._1._1 + pair._1._2)
-            pairs = if (wordParts.length < 2) Array.empty else wordParts.sliding(2).map(p => (p(0), p(1))).toArray
+            wordParts = BPEVocabularyGenerator.replacePair(pair._1, wordParts, caseSensitive)
+            pairs = {
+              if (wordParts.length < 2)
+                Array.empty
+              else if (caseSensitive)
+                wordParts.sliding(2).map(p => (p(0), p(1))).toArray
+              else
+                wordParts.sliding(2).map(p => (p(0).toLowerCase(), p(1).toLowerCase())).toArray
+            }
           }
         }
 
@@ -388,11 +408,13 @@ object BPEVocabularyGenerator {
       numMergeOps: Int = 32000,
       separator: String = "@@",
       glossary: Set[String] = DEFAULT_GLOSSARY,
+      caseSensitive: Boolean = true,
       countThreshold: Int = -1,
       replaceExisting: Boolean = false,
       bufferSize: Int = 8192
   ): BPEVocabularyGenerator = {
-    new BPEVocabularyGenerator(numMergeOps, separator, glossary, countThreshold, replaceExisting, bufferSize)
+    new BPEVocabularyGenerator(
+      numMergeOps, separator, glossary, caseSensitive, countThreshold, replaceExisting, bufferSize)
   }
 
   /** End-of-word symbol used by the BPE vocabulary generator. */
@@ -492,10 +514,9 @@ object BPEVocabularyGenerator {
       words: mutable.Seq[(Long, Seq[String])],
       indices: ParMap[(String, String), mutable.LongMap[Long]]
   ): Seq[Change] = {
-    val joinedPair = pair._1 + pair._2
     indices(pair).toSeq.filter(_._2 >= 1).map(_._1.toInt).map(index => {
       val (count, word) = words(index)
-      val newWord = replacePair(pair, word)(joinedPair)
+      val newWord = replacePair(pair, word, caseSensitive = false)
       words.update(index, (count, newWord))
       Change(index, word, newWord, count)
     }).seq
@@ -512,13 +533,16 @@ object BPEVocabularyGenerator {
   @inline
   private[BPEVocabularyGenerator] final def replacePair(
       pair: (String, String),
-      word: Seq[String]
-  )(joinedPair: String = pair._1 + pair._2): Seq[String] = {
+      word: Seq[String],
+      caseSensitive: Boolean
+  ): Seq[String] = {
     val newWord = mutable.ListBuffer.empty[String]
     var j = 0
     while (j < word.length - 1) {
+      val joinedPair = word(j) + word(j + 1)
       (word(j), word(j + 1)) match {
-        case p if p == pair => newWord += joinedPair; j += 2
+        case p if caseSensitive && p == pair => newWord += joinedPair; j += 2
+        case p if (p._1.toLowerCase(), p._2.toLowerCase()) == pair => newWord += joinedPair; j += 2
         case _ => newWord += word(j); j += 1
       }
     }
@@ -626,6 +650,8 @@ object BPEVocabularyGenerator {
         reversedMergePairs.get(wordPart)
       }
     }
+
+    // TODO: !!! What about the case-insensitive case?
 
     pair match {
       case None => Seq(wordPart)
