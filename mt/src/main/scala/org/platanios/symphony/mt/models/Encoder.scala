@@ -26,8 +26,6 @@ import org.platanios.tensorflow.api.Output
 trait Encoder[O] {
   def create(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
   )(implicit

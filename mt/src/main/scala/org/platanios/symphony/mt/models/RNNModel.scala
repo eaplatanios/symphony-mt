@@ -70,7 +70,7 @@ class RNNModel[S, SS](
       else
         tf.round(tf.max(tf.max(input._4)) * config.decoderMaxLengthFactor).cast(INT32)
     }
-    (config.encoder.create(config, input._1, input._2, input._3, input._4), input._4, maxDecodingLength)
+    (config.encoder.create(config, input._3, input._4), input._4, maxDecodingLength)
   }
 
   override protected def decoder(
@@ -95,12 +95,12 @@ class RNNModel[S, SS](
           inputSequences._1), axis = 1)
         val tgtSequenceLength = inputSequences._2 + 1
         val output = config.decoder.create(
-          config, encoderInput._1, encoderInput._2, state.get, dataConfig.beginOfSequenceToken,
+          config, state.get, dataConfig.beginOfSequenceToken,
           dataConfig.endOfSequenceToken, tgtSequence, tgtSequenceLength)
         (output.sequences, output.sequenceLengths)
       case None =>
         val output = config.decoder.create(
-          config, encoderInput._1, encoderInput._2, state.get, dataConfig.beginOfSequenceToken,
+          config, state.get, dataConfig.beginOfSequenceToken,
           dataConfig.endOfSequenceToken, null, null)
         // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
         // when using beam search.

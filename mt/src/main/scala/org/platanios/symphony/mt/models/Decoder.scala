@@ -27,8 +27,6 @@ import org.platanios.tensorflow.api.ops.Output
 trait Decoder[O] {
   def create(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       encoderState: O,
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
