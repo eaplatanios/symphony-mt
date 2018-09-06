@@ -32,8 +32,6 @@ case class BahdanauRNNAttention(
     scoreMask: Float = Float.NegativeInfinity
 ) extends RNNAttention[Output, Shape] {
   override def create[S, SS](
-      srcLanguage: Output,
-      tgtLanguage: Output,
       cell: tf.RNNCell[Output, Shape, S, SS],
       memory: Output,
       memorySequenceLengths: Output,

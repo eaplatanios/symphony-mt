@@ -46,8 +46,6 @@ class GNMTDecoder[S, SS, AS, ASS](
 ) extends RNNDecoder[S, SS]()(evS, evSDropout) {
   override def create(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       encoderState: (Tuple[Output, Seq[S]], Output, Output),
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
@@ -62,6 +60,7 @@ class GNMTDecoder[S, SS, AS, ASS](
       context: Output
   ): RNNDecoder.Output = {
     // Embeddings
+    val tgtLanguage = context(1)
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
 
     // RNN cells
@@ -84,11 +83,11 @@ class GNMTDecoder[S, SS, AS, ASS](
       memorySequenceLengths = BeamSearchDecoder.tileForBeamSearch(memorySequenceLengths, config.beamWidth)
     }
     val (attentionCell, attentionInitialState) = attention.create[S, SS](
-      srcLanguage, tgtLanguage, cells.head, memory, memorySequenceLengths, numUnits,
+      cells.head, memory, memorySequenceLengths, numUnits,
       numUnits, initialState.head, useAttentionLayer = false, outputAttention = false)
     val multiCell = GNMTDecoder.MultiCell[S, SS, AS, ASS](attentionCell, cells.tail, useNewAttention)
     decode(
-      config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
+      config, encoderState._2, tgtSequences, tgtSequenceLengths,
       (attentionInitialState, initialState.tail), embeddings, multiCell, encoderState._3,
       beginOfSequenceToken, endOfSequenceToken)
   }

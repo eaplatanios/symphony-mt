@@ -32,8 +32,6 @@ abstract class RNNEncoder[S, SS]()(implicit
 ) extends Encoder[Tuple[Output, Seq[S]]] {
   override def create(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
   )(implicit
@@ -47,17 +45,15 @@ abstract class RNNEncoder[S, SS]()(implicit
 
   def embedSequences(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
   )(implicit
       parameterManager: ParameterManager,
       context: Output
   ): (Output, Output) = {
-    val embeddedSrcSequences = parameterManager.wordEmbeddings(srcLanguage)(context)(srcSequences)
+    val embeddedSrcSequences = parameterManager.wordEmbeddings(context(0))(context)(srcSequences)
     val (embeddedSequences, embeddedSequenceLengths) = parameterManager.postprocessEmbeddedSequences(
-      srcLanguage, tgtLanguage, embeddedSrcSequences, srcSequenceLengths)
+      context(0), context(1), embeddedSrcSequences, srcSequenceLengths)
     if (config.timeMajor)
       (embeddedSequences.transpose(Seq(1, 0, 2)), embeddedSequenceLengths)
     else

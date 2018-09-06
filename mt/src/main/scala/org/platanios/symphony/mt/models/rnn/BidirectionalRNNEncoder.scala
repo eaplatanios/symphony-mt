@@ -40,8 +40,6 @@ class BidirectionalRNNEncoder[S, SS](
 ) extends RNNEncoder[S, SS]()(evS, evSDropout) {
   override def create(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
   )(implicit
@@ -52,8 +50,7 @@ class BidirectionalRNNEncoder[S, SS](
       deviceManager: DeviceManager,
       context: Output
   ): Tuple[Output, Seq[S]] = {
-    val (embeddedSequences, embeddedSequenceLengths) = embedSequences(
-      config, srcLanguage, tgtLanguage, srcSequences, srcSequenceLengths)
+    val (embeddedSequences, embeddedSequenceLengths) = embedSequences(config, srcSequences, srcSequenceLengths)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
 
     val biCellFw = RNNModel.multiCell(

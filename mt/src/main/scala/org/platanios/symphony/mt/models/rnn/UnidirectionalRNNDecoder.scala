@@ -46,8 +46,6 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
 ) extends RNNDecoder[S, SS]()(evS, evSDropout) {
   override def create(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       encoderState: (Tuple[Output, Seq[S]], Output, Output),
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
@@ -62,6 +60,7 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
       context: Output
   ): RNNDecoder.Output = {
     // Embeddings
+    val tgtLanguage = context(1)
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
 
     // RNN cell
@@ -91,15 +90,14 @@ class UnidirectionalRNNDecoder[S, SS, AS, ASS](
     attention match {
       case None =>
         decode(
-          config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths, initialState,
+          config, encoderState._2, tgtSequences, tgtSequenceLengths, initialState,
           embeddings, uniCell, encoderState._3, beginOfSequenceToken, endOfSequenceToken)
       case Some(attentionCreator) =>
         val (attentionCell, attentionInitialState) = attentionCreator.create(
-          srcLanguage, tgtLanguage, uniCell, memory, memorySequenceLengths,
-          numUnits, numUnits, initialState, useAttentionLayer = true,
+          uniCell, memory, memorySequenceLengths, numUnits, numUnits, initialState, useAttentionLayer = true,
           outputAttention = outputAttention)
         decode(
-          config, encoderState._2, tgtLanguage, tgtSequences, tgtSequenceLengths,
+          config, encoderState._2, tgtSequences, tgtSequenceLengths,
           attentionInitialState, embeddings, attentionCell, encoderState._3, beginOfSequenceToken,
           endOfSequenceToken)
     }

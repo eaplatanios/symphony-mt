@@ -34,8 +34,6 @@ abstract class RNNDecoder[S, SS]()(implicit
 ) extends Decoder[(Tuple[Output, Seq[S]], Output, Output)] {
   def create(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       encoderState: (Tuple[Output, Seq[S]], Output, Output),
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
@@ -53,7 +51,6 @@ abstract class RNNDecoder[S, SS]()(implicit
   protected def decode[DS, DSS](
       config: RNNModel.Config[_, _],
       srcSequenceLengths: Output,
-      tgtLanguage: Output,
       tgtSequences: Output,
       tgtSequenceLengths: Output,
       initialState: DS,
@@ -68,7 +65,7 @@ abstract class RNNDecoder[S, SS]()(implicit
       context: Output,
       evS: WhileLoopVariable.Aux[DS, DSS]
   ): RNNDecoder.Output = {
-    val outputWeights = parameterManager.getProjectionToWords(cell.outputShape(-1), tgtLanguage)
+    val outputWeights = parameterManager.getProjectionToWords(cell.outputShape(-1), context(1))
     def outputLayer(logits: Output): Output = {
       if (logits.rank == 3) {
         val reshapedLogits = tf.reshape(logits, Shape(-1, logits.shape(-1)))
@@ -100,7 +97,7 @@ abstract class RNNDecoder[S, SS]()(implicit
     } else {
       // Decoder embeddings
       val embeddingFn = (o: Output) => embeddings(o)
-      val tgtVocabLookupTable = parameterManager.stringToIndexLookup(tgtLanguage)
+      val tgtVocabLookupTable = parameterManager.stringToIndexLookup(context(1))
       val tgtBosID = tgtVocabLookupTable(tf.constant(beginOfSequenceToken)).cast(INT32)
       val tgtEosID = tgtVocabLookupTable(tf.constant(endOfSequenceToken)).cast(INT32)
 

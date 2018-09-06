@@ -41,8 +41,6 @@ class GNMTEncoder[S, SS](
 ) extends RNNEncoder[S, SS]()(evS, evSDropout) {
   override def create(
       config: RNNModel.Config[_, _],
-      srcLanguage: Output,
-      tgtLanguage: Output,
       srcSequences: Output,
       srcSequenceLengths: Output
   )(implicit
@@ -53,8 +51,7 @@ class GNMTEncoder[S, SS](
       deviceManager: DeviceManager,
       context: Output
   ): Tuple[Output, Seq[S]] = {
-    val (embeddedSequences, embeddedSequenceLengths) = embedSequences(
-      config, srcLanguage, tgtLanguage, srcSequences, srcSequenceLengths)
+    val (embeddedSequences, embeddedSequenceLengths) = embedSequences(config, srcSequences, srcSequenceLengths)
 
     // Bidirectional RNN layers
     val biTuple = {

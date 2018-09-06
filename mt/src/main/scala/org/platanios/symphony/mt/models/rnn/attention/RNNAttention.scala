@@ -27,8 +27,6 @@ import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, Att
   */
 abstract class RNNAttention[AS, ASS](implicit evAS: WhileLoopVariable.Aux[AS, ASS]) {
   def create[S, SS](
-      srcLanguage: Output,
-      tgtLanguage: Output,
       cell: tf.RNNCell[Output, Shape, S, SS],
       memory: Output,
       memorySequenceLengths: Output,
