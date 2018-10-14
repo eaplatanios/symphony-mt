@@ -16,10 +16,10 @@
 package org.platanios.symphony.mt.evaluation
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithTgtLanguage}
 import org.platanios.symphony.mt.utilities.Encoding
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.Op
 import org.platanios.tensorflow.api.ops.metrics.Metric
 import org.platanios.tensorflow.api.ops.metrics.Metric._
 
@@ -41,10 +41,10 @@ class TER protected (
     val deleteCost: Float = 1.0f,
     val insertCost: Float = 1.0f,
     val substituteCost: Float = 1.0f,
-    val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
-    val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
-    val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
-    val resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
+    val variablesCollections: Set[Graph.Key[Variable[Any]]] = Set(METRIC_VARIABLES),
+    val valuesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_VALUES),
+    val updatesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_UPDATES),
+    val resetsCollections: Set[Graph.Key[UntypedOp]] = Set(METRIC_RESETS),
     override val name: String = "TER"
 )(implicit languages: Seq[(Language, Vocabulary)]) extends MTMetric {
   protected val terScorer: TerScorer = new TerScorer()
@@ -65,22 +65,26 @@ class TER protected (
 
   // TODO: Do not ignore the weights.
 
-  private[this] def counts(batch: Seq[Tensor[INT32]]): Seq[Tensor[FLOAT32]] = {
-    val (tgtLanguageId, hyp, hypLen, ref, refLen) = (batch(0), batch(1), batch(2), batch(3), batch(4))
+  private def counts(
+      tgtLanguageId: Tensor[Int],
+      hypotheses: Tensor[String],
+      hypothesisLengths: Tensor[Int],
+      references: Tensor[String],
+      referenceLengths: Tensor[Int]
+  ): (Tensor[Float], Tensor[Float]) = {
     val tgtLanguage = tgtLanguageId.scalar
-
-    val (hypSentences, hypLengths) = (hyp.unstack(), hypLen.unstack())
-    val (refSentences, refLengths) = (ref.unstack(), refLen.unstack())
+    val (hypSentences, hypLengths) = (hypotheses.unstack(), hypothesisLengths.unstack())
+    val (refSentences, refLengths) = (references.unstack(), referenceLengths.unstack())
     val hypSeq = hypSentences.zip(hypLengths).map {
       case (s, len) =>
         val lenScalar = len.scalar
-        val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v.asInstanceOf[String])).toSeq
+        val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v)).toSeq
         languages(tgtLanguage)._2.decodeSequence(seq)
     }
     val refSeq = refSentences.zip(refLengths).map {
       case (s, len) =>
         val lenScalar = len.scalar
-        val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v.asInstanceOf[String])).toSeq
+        val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v)).toSeq
         languages(tgtLanguage)._2.decodeSequence(seq)
     }
 
@@ -93,46 +97,58 @@ class TER protected (
         totalWords += result.numWords.toFloat
     }
 
-    Seq(Tensor(totalEdits), Tensor(totalWords))
+    (Tensor(totalEdits), Tensor(totalWords))
   }
 
   override def compute(
-      values: ((Output, Output, Output), (Output, Output)),
-      weights: Option[Output] = None,
+      values: (SentencesWithTgtLanguage, Sentences),
+      weights: Option[Output[Float]] = None,
       name: String = this.name
-  ): Output = {
-    val ((tgtLanguageId, src, srcLen), (tgt, tgtLen)) = values
-    var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
-    weights.foreach(ops += _.op)
-    tf.createWithNameScope(name, ops) {
+  ): Output[Float] = {
+    val tgtLanguageId = values._1.tgtLanguage
+    val srcSentences = values._1.srcSentences
+    val srcSentenceLengths = values._1.srcSentenceLengths
+    val tgtSentences = values._2.sentences
+    val tgtSentenceLengths = values._2.lengths
+    tf.nameScope(name) {
       val _counts = tf.callback(
-        counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(FLOAT32, FLOAT32), stateful = false)
-      100 * tf.divide(_counts(0), _counts(1), name = "Value")
+        function = Function.tupled(counts _),
+        input = (tgtLanguageId, srcSentences, srcSentenceLengths, tgtSentences, tgtSentenceLengths),
+        outputDataType = (FLOAT32, FLOAT32),
+        stateful = false,
+        name = "Counts")
+      100.0f * tf.divide(_counts._1, _counts._2, name = "Value")
     }
   }
 
   override def streaming(
-      values: ((Output, Output, Output), (Output, Output)),
-      weights: Option[Output] = None,
+      values: (SentencesWithTgtLanguage, Sentences),
+      weights: Option[Output[Float]] = None,
       name: String = this.name
-  ): Metric.StreamingInstance[Output] = {
-    val ((tgtLanguageId, src, srcLen), (tgt, tgtLen)) = values
-    var ops = Set(src.op, srcLen.op, tgt.op, tgtLen.op)
-    weights.foreach(ops += _.op)
+  ): Metric.StreamingInstance[Output[Float]] = {
+    val tgtLanguageId = values._1.tgtLanguage
+    val srcSentences = values._1.srcSentences
+    val srcSentenceLengths = values._1.srcSentenceLengths
+    val tgtSentences = values._2.sentences
+    val tgtSentenceLengths = values._2.lengths
     tf.variableScope(name) {
-      tf.createWithNameScope(name, ops) {
-        val totalEdits = variable("TotalEdits", FLOAT32, Shape(), tf.ZerosInitializer, variablesCollections)
-        val totalWords = variable("TotalWords", FLOAT32, Shape(), tf.ZerosInitializer, variablesCollections)
+      tf.nameScope(name) {
+        val totalEdits = variable[Float]("TotalEdits", Shape(), tf.ZerosInitializer, variablesCollections)
+        val totalWords = variable[Float]("TotalWords", Shape(), tf.ZerosInitializer, variablesCollections)
         val _counts = tf.callback(
-          counts, Seq(tgtLanguageId, src, srcLen, tgt, tgtLen), Seq(FLOAT32, FLOAT32), stateful = false)
-        val updateTotalEdits = totalEdits.assignAdd(_counts(0))
-        val updateTotalWords = totalWords.assignAdd(_counts(1))
-        val value = 100 * tf.divide(totalEdits.value, totalWords.value, name = "Value")
-        val update = 100 * tf.divide(updateTotalEdits, updateTotalWords, name = "Update")
+          function = Function.tupled(counts _),
+          input = (tgtLanguageId, srcSentences, srcSentenceLengths, tgtSentences, tgtSentenceLengths),
+          outputDataType = (FLOAT32, FLOAT32),
+          stateful = false,
+          name = "Counts")
+        val updateTotalEdits = totalEdits.assignAdd(_counts._1)
+        val updateTotalWords = totalWords.assignAdd(_counts._2)
+        val value = 100.0f * tf.divide(totalEdits.value, totalWords.value, name = "Value")
+        val update = 100.0f * tf.divide(updateTotalEdits, updateTotalWords, name = "Update")
         val reset = tf.group(Set(totalEdits.initializer, totalWords.initializer), name = "Reset")
-        valuesCollections.foreach(tf.currentGraph.addToCollection(value, _))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(update, _))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(reset, _))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset))
         Metric.StreamingInstance(value, update, reset, Set(totalEdits, totalWords))
       }
     }
@@ -153,10 +169,10 @@ object TER {
       deleteCost: Float = 1.0f,
       insertCost: Float = 1.0f,
       substituteCost: Float = 1.0f,
-      variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
-      valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
-      updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
-      resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
+      variablesCollections: Set[Graph.Key[Variable[Any]]] = Set(METRIC_VARIABLES),
+      valuesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_VALUES),
+      updatesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_UPDATES),
+      resetsCollections: Set[Graph.Key[UntypedOp]] = Set(METRIC_RESETS),
       name: String = "TER"
   )(implicit languages: Seq[(Language, Vocabulary)]): TER = {
     new TER(
