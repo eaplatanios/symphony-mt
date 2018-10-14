@@ -24,10 +24,17 @@ import better.files.File
   * @author Emmanouil Antonios Platanios
   */
 private[mt] class MutableFile protected (protected var file: File) {
-  def set(file: File): Unit = this.file = file
-  def get: File = file
+  def set(file: File): Unit = {
+    this.file = file
+  }
+
+  def get: File = {
+    file
+  }
 }
 
 private[mt] object MutableFile {
-  def apply(file: File): MutableFile = new MutableFile(file)
+  def apply(file: File): MutableFile = {
+    new MutableFile(file)
+  }
 }

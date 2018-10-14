@@ -47,7 +47,9 @@ class CodedVocabulary protected (
     * @param  sequence Sequence of tokens to encode.
     * @return Encoded sequence of tokens that may differ in size from the input sequence.
     */
-  override def encodeSequence(sequence: Seq[String]): Seq[String] = encoder(sequence)
+  override def encodeSequence(sequence: Seq[String]): Seq[String] = {
+    encoder(sequence)
+  }
 
   /** Decodes the provided sequence using this vocabulary. This is typically an identity function.
     *
@@ -56,7 +58,9 @@ class CodedVocabulary protected (
     * @param  sequence Sequence of tokens to decode.
     * @return Decoded sequence of tokens that may differ in size from the input sequence.
     */
-  override def decodeSequence(sequence: Seq[String]): Seq[String] = decoder(sequence)
+  override def decodeSequence(sequence: Seq[String]): Seq[String] = {
+    decoder(sequence)
+  }
 }
 
 object CodedVocabulary {

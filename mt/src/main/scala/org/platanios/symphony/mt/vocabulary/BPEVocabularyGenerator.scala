@@ -524,10 +524,9 @@ object BPEVocabularyGenerator {
 
   /** Replaces all occurrences of the provided symbol pair in `word` with the joined symbol.
     *
-    * @param  pair       Symbol pair to replace in `word`.
-    * @param  word       Word as a sequence of symbols.
-    * @param  joinedPair Optionally, the precomputed joined pair to replace in `word`. This can sometimes help with
-    *                    performance.
+    * @param  pair          Symbol pair to replace in `word`.
+    * @param  word          Word as a sequence of symbols.
+    * @param  caseSensitive Boolean indicating whether to be case-sensitive.
     * @return New word with `pair` replaced in `word`.
     */
   @inline
