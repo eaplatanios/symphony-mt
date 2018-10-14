@@ -27,8 +27,8 @@ case class SinglePivot(
     pivotLanguage: Language,
     supportedPairs: Set[(Language, Language)]
 ) extends Pivot {
-  protected var pivotLanguageId         : Output                = _
-  protected var supportedLanguagePairIds: Seq[(Output, Output)] = _
+  protected var pivotLanguageId         : Output[Int]                     = _
+  protected var supportedLanguagePairIds: Seq[(Output[Int], Output[Int])] = _
 
   override def initialize(
       languages: Seq[(Language, Vocabulary)],
@@ -42,7 +42,10 @@ case class SinglePivot(
     }
   }
 
-  override def pivotingSequence(srcLanguage: Output, tgtLanguage: Output): Output = {
+  override def pivotingSequence(
+      srcLanguage: Output[Int],
+      tgtLanguage: Output[Int]
+  ): Output[Int] = {
     tf.cases(
       predicateFnPairs = supportedLanguagePairIds.map(lp =>
         (tf.logicalAnd(tf.equal(lp._1, srcLanguage), tf.equal(lp._2, tgtLanguage)), () => tgtLanguage(NewAxis))),

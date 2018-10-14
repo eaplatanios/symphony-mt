@@ -24,6 +24,17 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 object NoPivot extends Pivot {
-  override def initialize(languages: Seq[(Language, Vocabulary)], parameterManager: ParameterManager): Unit = ()
-  override def pivotingSequence(srcLanguage: Output, tgtLanguage: Output): Output = tgtLanguage(NewAxis)
+  override def initialize(
+      languages: Seq[(Language, Vocabulary)],
+      parameterManager: ParameterManager
+  ): Unit = {
+    ()
+  }
+
+  override def pivotingSequence(
+      srcLanguage: Output[Int],
+      tgtLanguage: Output[Int]
+  ): Output[Int] = {
+    tgtLanguage(NewAxis)
+  }
 }
