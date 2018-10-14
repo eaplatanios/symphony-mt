@@ -21,42 +21,37 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 package object models {
-  /** Contains the source language, the target language, a sentence batch, and the corresponding sentence lengths. */
-  type TFBatchWithLanguages = (Output, Output, Output, Output)
-  type TFBatchWithLanguagesT = (Tensor[DataType], Tensor[DataType], Tensor[DataType], Tensor[DataType])
-  type TFBatchWithLanguagesD = (DataType, DataType, DataType, DataType)
-  type TFBatchWithLanguagesS = (Shape, Shape, Shape, Shape)
+  case class SentencesWithLanguagePair(
+      srcLanguage: Output[Int],
+      tgtLanguage: Output[Int],
+      srcSentences: Output[String],
+      srcSentenceLengths: Output[Int])
 
-  type TFBatchWithLanguage = (Output, Output, Output)
-  type TFBatchWithLanguageT = (Tensor[DataType], Tensor[DataType], Tensor[DataType])
-  type TFBatchWithLanguageD = (DataType, DataType, DataType)
-  type TFBatchWithLanguageS = (Shape, Shape, Shape)
+  case class SentencesWithLanguage(
+      language: Output[Int],
+      sentences: Output[String],
+      sentenceLengths: Output[Int])
 
-  type TFBatch = (Output, Output)
-  type TFBatchT = (Tensor[DataType], Tensor[DataType])
-  type TFBatchD = (DataType, DataType)
-  type TFBatchS = (Shape, Shape)
+  case class SentencesWithTgtLanguage(
+      tgtLanguage: Output[Int],
+      srcSentences: Output[String],
+      srcSentenceLengths: Output[Int])
 
-  type TFLanguagePair = (Output, Output)
-  type TFLanguagePairT = (Tensor[DataType], Tensor[DataType])
-  type TFLanguagePairD = (DataType, DataType)
-  type TFLanguagePairS = (Shape, Shape)
+  case class LanguagePair(
+      srcLanguage: Output[Int],
+      tgtLanguage: Output[Int])
 
-  type TFSentencesDataset = tf.data.Dataset[TFBatchT, TFBatch, TFBatchD, TFBatchS]
+  case class Sentences(
+      sentences: Output[String],
+      lengths: Output[Int])
 
-  type TFSentencePairsDataset = tf.data.Dataset[
-      (TFLanguagePairT, (TFBatchT, TFBatchT)),
-      (TFLanguagePair, (TFBatch, TFBatch)),
-      (TFLanguagePairD, (TFBatchD, TFBatchD)),
-      (TFLanguagePairS, (TFBatchS, TFBatchS))]
+  case class SentencePairs(
+      languagesPair: LanguagePair,
+      srcSentences: Sentences,
+      tgtSentences: Sentences)
 
-  type TFInputDataset = tf.data.Dataset[
-      TFBatchWithLanguagesT, TFBatchWithLanguages,
-      TFBatchWithLanguagesD, TFBatchWithLanguagesS]
-
-  type TFTrainDataset = tf.data.Dataset[
-      (TFBatchWithLanguagesT, TFBatchT),
-      (TFBatchWithLanguages, TFBatch),
-      (TFBatchWithLanguagesD, TFBatchD),
-      (TFBatchWithLanguagesS, TFBatchS)]
+  type SentencesDataset = tf.data.Dataset[Sentences]
+  type SentencePairsDataset = tf.data.Dataset[SentencePairs]
+  type InputDataset = tf.data.Dataset[SentencesWithLanguagePair]
+  type TrainDataset = tf.data.Dataset[(SentencesWithLanguagePair, Sentences)]
 }
