@@ -160,9 +160,9 @@ class ParameterManager protected (
   def postprocessEmbeddedSequences(
       srcLanguage: Output[Int],
       tgtLanguage: Output[Int],
-      srcSequences: Output[String],
+      srcSequences: Output[Float],
       srcSequenceLengths: Output[Int]
-  )(implicit context: Output[Int]): (Output[String], Output[Int]) = {
+  )(implicit context: Output[Int]): (Output[Float], Output[Int]) = {
     (srcSequences, srcSequenceLengths)
   }
 }
