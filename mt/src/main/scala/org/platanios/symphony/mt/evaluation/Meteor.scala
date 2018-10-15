@@ -193,10 +193,10 @@ class Meteor protected (
           stateful = false,
           name = "Update")
         val reset = tf.group(Set(statistics.initializer), name = "Reset")
-        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset))
-        Metric.StreamingInstance(value, update, reset, Set(language, statistics))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(value, update, reset, Set(language.asUntyped, statistics.asUntyped))
       }
     }
   }

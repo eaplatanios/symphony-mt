@@ -73,10 +73,10 @@ class SentenceLength protected (
         val value = tf.divide(totalLength.value.toFloat, count.value.toFloat, name = "Value")
         val update = tf.divide(updateLength.toFloat, updateCount.toFloat, name = "Update")
         val reset = tf.group(Set(totalLength.initializer, count.initializer), name = "Reset")
-        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset))
-        Metric.StreamingInstance(value, update, reset, Set(totalLength, count))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(value, update, reset, Set(totalLength.asUntyped, count.asUntyped))
       }
     }
   }

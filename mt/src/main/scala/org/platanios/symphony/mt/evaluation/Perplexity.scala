@@ -91,12 +91,12 @@ class Perplexity(
         val reset = tf.group(Set(totalLoss.initializer, length.initializer))
 
         // Add the created ops to the relevant graph collections
-        variablesCollections.foreach(tf.currentGraph.addToCollection(_)(totalLoss))
-        variablesCollections.foreach(tf.currentGraph.addToCollection(_)(length))
-        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset))
-        Metric.StreamingInstance(value, update, reset, Set(totalLoss, length))
+        variablesCollections.foreach(tf.currentGraph.addToCollection(_)(totalLoss.asUntyped))
+        variablesCollections.foreach(tf.currentGraph.addToCollection(_)(length.asUntyped))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(value, update, reset, Set(totalLoss.asUntyped, length.asUntyped))
       }
     }
   }

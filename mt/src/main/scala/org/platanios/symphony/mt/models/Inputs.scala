@@ -271,10 +271,10 @@ object Inputs {
         batchSize = batchSize,
         // The first three entries are the source and target line rows, which are unknown-length vectors.
         // The last two entries are the source and target row sizes, which are scalars.
-        paddedShapes = ((Shape(), Shape()), ((Shape(-1), Shape()), (Shape(-1), Shape()))),
+        paddedShapes = ((Shape(), Shape()), (Shape(-1), Shape()), (Shape(-1), Shape())),
         // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
         // generally need to do this since later on we will be masking out calculations past the true sequence.
-        paddingValues = ((zero, zero), ((Tensor(dataConfig.endOfSequenceToken), zero), (Tensor(dataConfig.endOfSequenceToken), zero))))
+        paddingValues = ((zero, zero), (Tensor(dataConfig.endOfSequenceToken), zero), (Tensor(dataConfig.endOfSequenceToken), zero)))
     }
 
     val parallelDataset = {

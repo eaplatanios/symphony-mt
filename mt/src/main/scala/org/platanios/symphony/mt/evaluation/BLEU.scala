@@ -150,10 +150,12 @@ class BLEU protected (
         val reset = tf.group(
           Set(matches.initializer, possibleMatches.initializer, refLen.initializer, hypLen.initializer),
           name = "Reset")
-        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset))
-        Metric.StreamingInstance(value, update, reset, Set(matches, possibleMatches, refLen, hypLen))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(
+          value, update, reset,
+          Set(matches.asUntyped, possibleMatches.asUntyped, refLen.asUntyped, hypLen.asUntyped))
       }
     }
   }
@@ -226,7 +228,7 @@ object BLEU {
         tf.zeros[Float](Shape(1)),
         tf.ones[Float](tf.shape(matchesByOrder).slice(0) - 1)
       ))
-      (matchesByOrder.toFloat + ones) / (possibleMatchesByOrder.toFloat + ones)
+      tf.add(matchesByOrder.toFloat, ones) / tf.add(possibleMatchesByOrder.toFloat, ones)
     }
   }
 

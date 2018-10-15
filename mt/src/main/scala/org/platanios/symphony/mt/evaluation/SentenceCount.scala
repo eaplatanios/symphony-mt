@@ -68,10 +68,10 @@ class SentenceCount protected (
         val value = count.value.toFloat
         val update = updateCount
         val reset = count.initializer
-        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset))
-        Metric.StreamingInstance(value, update, reset, Set(count))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(value, update, reset, Set(count.asUntyped))
       }
     }
   }

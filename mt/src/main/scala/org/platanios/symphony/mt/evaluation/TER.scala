@@ -146,10 +146,10 @@ class TER protected (
         val value = 100.0f * tf.divide(totalEdits.value, totalWords.value, name = "Value")
         val update = 100.0f * tf.divide(updateTotalEdits, updateTotalWords, name = "Update")
         val reset = tf.group(Set(totalEdits.initializer, totalWords.initializer), name = "Reset")
-        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset))
-        Metric.StreamingInstance(value, update, reset, Set(totalEdits, totalWords))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(value, update, reset, Set(totalEdits.asUntyped, totalWords.asUntyped))
       }
     }
   }
