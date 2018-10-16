@@ -21,37 +21,33 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 package object models {
-  case class SentencesWithLanguagePair(
-      srcLanguage: Output[Int],
-      tgtLanguage: Output[Int],
-      srcSentences: Output[String],
-      srcSentenceLengths: Output[Int])
+  // Core Types
 
-  case class SentencesWithLanguage(
-      language: Output[Int],
-      sentences: Output[String],
-      sentenceLengths: Output[Int])
+  type LanguageID = Output[Int]
+  type LanguagePair = (LanguageID, LanguageID)
+  type SentenceLengths = Output[Int]
+  type Sentences[T] = (Output[T], SentenceLengths)
+  type SentencesWithLanguage[T] = (LanguageID, Sentences[T])
+  type SentencesWithLanguagePair[T] = (LanguageID, LanguageID, Sentences[T])
+  type SentencePairs[T] = (LanguagePair, Sentences[T], Sentences[T])
 
-  case class SentencesWithTgtLanguage(
-      tgtLanguage: Output[Int],
-      srcSentences: Output[String],
-      srcSentenceLengths: Output[Int])
+  type SentencesWithLanguageValue = (Tensor[Int], Tensor[String], Tensor[Int])
+  type SentencesWithLanguagePairValue = (Tensor[Int], Tensor[Int], Tensor[String], Tensor[Int])
 
-  case class LanguagePair(
-      srcLanguage: Output[Int],
-      tgtLanguage: Output[Int])
+  // Dataset Types
 
-  case class Sentences(
-      sentences: Output[String],
-      lengths: Output[Int])
+  type SentencesDataset = tf.data.Dataset[Sentences[String]]
+  type SentencePairsDataset = tf.data.Dataset[SentencePairs[String]]
+  type InputDataset = tf.data.Dataset[SentencesWithLanguagePair[String]]
+  type TrainDataset = tf.data.Dataset[(SentencesWithLanguagePair[String], Sentences[String])]
 
-  case class SentencePairs(
-      languagesPair: LanguagePair,
-      srcSentences: Sentences,
-      tgtSentences: Sentences)
+  // Estimators
 
-  type SentencesDataset = tf.data.Dataset[Sentences]
-  type SentencePairsDataset = tf.data.Dataset[SentencePairs]
-  type InputDataset = tf.data.Dataset[SentencesWithLanguagePair]
-  type TrainDataset = tf.data.Dataset[(SentencesWithLanguagePair, Sentences)]
+  type TranslationEstimator = tf.learn.Estimator[
+      /* In       */ SentencesWithLanguagePair[String],
+      /* TrainIn  */ (SentencesWithLanguagePair[String], Sentences[String]),
+      /* Out      */ SentencesWithLanguage[String],
+      /* TrainOut */ SentencesWithLanguage[Float],
+      /* Loss     */ Float,
+      /* EvalIn   */ (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String]))]
 }

@@ -30,7 +30,7 @@ import java.nio.charset.StandardCharsets
 object Inputs {
   def createInputDataset(
       dataConfig: DataConfig,
-      config: Model.Config,
+      modelConfig: Model.Config,
       dataset: FileParallelDataset,
       srcLanguage: Language,
       tgtLanguage: Language,
@@ -56,11 +56,7 @@ object Inputs {
             // not generally need to do this since later on we will be masking out calculations past
             // the true sequence.
             paddingValues = (Tensor(dataConfig.endOfSequenceToken), Tensor.zeros[Int](Shape())))
-          .map(d => SentencesWithLanguagePair(
-            srcLanguage = srcLanguage,
-            tgtLanguage = tgtLanguage,
-            srcSentences = d._1,
-            srcSentenceLengths = d._2))
+          .map(d => (srcLanguage, tgtLanguage, (d._1, d._2)))
     }
 
     val languageIds = languages.map(_._1).zipWithIndex.toMap
@@ -80,10 +76,10 @@ object Inputs {
 
   def createTrainDataset(
       dataConfig: DataConfig,
-      config: Model.Config,
+      modelConfig: Model.Config,
       datasets: Seq[FileParallelDataset],
       languages: Seq[(Language, Vocabulary)],
-      includeBackTranslations: Boolean = false,
+      includeIdentityTranslations: Boolean = false,
       repeat: Boolean = true,
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
@@ -95,11 +91,11 @@ object Inputs {
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))
         .filter(_.nonEmpty)
         .flatMap(d => {
-          var currentLanguagePairs = d.languagePairs(includeBackTranslations)
+          var currentLanguagePairs = d.languagePairs(includeIdentityTranslations)
           if (dataConfig.parallelPortion == 0.0f)
             currentLanguagePairs = currentLanguagePairs.filter(p => p._1 == p._2)
           val providedLanguagePairs = languagePairs match {
-            case Some(pairs) if includeBackTranslations => pairs.flatMap(p => Seq(p, (p._1, p._1), (p._2, p._2)))
+            case Some(pairs) if includeIdentityTranslations => pairs.flatMap(p => Seq(p, (p._1, p._1), (p._2, p._2)))
             case Some(pairs) => pairs
             case None => currentLanguagePairs
           }
@@ -131,7 +127,7 @@ object Inputs {
         }.reduce((d1, d2) => d1.concatenateWith(d2))
 
     val parallelDatasetCreator: (Output[Int], Output[Int], Output[String], Output[String], Output[Int], Output[Int]) => TrainDataset =
-      createSingleParallelDataset(dataConfig, config, repeat, isEval)
+      createSingleParallelDataset(dataConfig, modelConfig, repeat, isEval)
 
     filesDataset
         .shuffle(filteredDatasets.size)
@@ -162,7 +158,7 @@ object Inputs {
 
   def createEvalDatasets(
       dataConfig: DataConfig,
-      config: Model.Config,
+      modelConfig: Model.Config,
       datasets: Seq[(String, FileParallelDataset, Float)],
       languages: Seq[(Language, Vocabulary)],
       languagePairs: Option[Set[(Language, Language)]] = None
@@ -183,8 +179,8 @@ object Inputs {
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
             (datasetName, () => tf.nameScope(datasetName) {
               createTrainDataset(
-                dataConfig.copy(parallelPortion = parallelPortion), config, Seq(dataset), languages,
-                includeBackTranslations = false, repeat = false, isEval = true,
+                dataConfig.copy(parallelPortion = parallelPortion), modelConfig, Seq(dataset), languages,
+                includeIdentityTranslations = false, repeat = false, isEval = true,
                 languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
             })
         }
@@ -192,7 +188,7 @@ object Inputs {
 
   private def createSingleParallelDataset(
       dataConfig: DataConfig,
-      config: Model.Config,
+      modelConfig: Model.Config,
       repeat: Boolean,
       isEval: Boolean
   )(
@@ -250,17 +246,10 @@ object Inputs {
           })
           .prefetch(bufferSize)
           // Add sequence lengths.
-          .map(
-            d => SentencePairs(
-              languagesPair = LanguagePair(
-                srcLanguage = d._1._1,
-                tgtLanguage = d._1._2),
-              srcSentences = Sentences(
-                sentences = d._2._1,
-                lengths = tf.size(d._2._1).toInt),
-              tgtSentences = Sentences(
-                sentences = d._2._2,
-                lengths = tf.size(d._2._2).toInt)),
+          .map(d => (
+              /* Language pair */ (d._1._1, d._1._2),
+              /* Source sentences */ (d._2._1, tf.size(d._2._1).toInt),
+              /* Target sentences */ (d._2._2, tf.size(d._2._2).toInt)),
             numParallelCalls = dataConfig.numParallelCalls,
             name = "Map/AddLengths")
           .prefetch(bufferSize)
@@ -291,11 +280,11 @@ object Inputs {
             10
         }
 
-        def keyFn(element: SentencePairs): Output[Long] = {
+        def keyFn(element: SentencePairs[String]): Output[Long] = {
           // Bucket sequence  pairs based on the length of their source sequence and target sequence.
           val bucketId = tf.maximum(
-            tf.truncateDivide(element.srcSentences.lengths, bucketWidth),
-            tf.truncateDivide(element.tgtSentences.lengths, bucketWidth))
+            tf.truncateDivide(element._2._2, bucketWidth), // Source sentence lengths
+            tf.truncateDivide(element._3._2, bucketWidth)) // Target sentence lengths
           tf.minimum(dataConfig.numBuckets, bucketId).toLong
         }
 
@@ -308,16 +297,9 @@ object Inputs {
     }
 
     parallelDataset
-        .map(
-          d => (
-              SentencesWithLanguagePair(
-                srcLanguage = d.languagesPair.srcLanguage,
-                tgtLanguage = d.languagesPair.tgtLanguage,
-                srcSentences = d.srcSentences.sentences,
-                srcSentenceLengths = d.srcSentences.lengths),
-              Sentences(
-                sentences = d.tgtSentences.sentences,
-                lengths = d.tgtSentences.lengths)),
+        .map(d => (
+            (/* Source language */ d._1._1, /* Target language */ d._1._2, /* Source sentences */ d._2),
+            /* Target sentences */ d._3),
           numParallelCalls = dataConfig.numParallelCalls,
           name = "AddLanguageIDs")
         .prefetch(bufferSize)

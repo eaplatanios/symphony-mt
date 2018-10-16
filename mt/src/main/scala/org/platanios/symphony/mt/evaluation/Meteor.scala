@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.evaluation
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.{Sentences, SentencesWithTgtLanguage}
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.symphony.mt.utilities.Encoding
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -127,19 +127,19 @@ class Meteor protected (
   }
 
   override def compute(
-      values: (SentencesWithTgtLanguage, Sentences),
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Output[Float] = {
-    val tgtLanguageId = values._1.tgtLanguage
-    val srcSentences = values._1.srcSentences
-    val srcSentenceLengths = values._1.srcSentenceLengths
-    val tgtSentences = values._2.sentences
-    val tgtSentenceLengths = values._2.lengths
+    val tgtLanguageId = values._1._1
+    val hypSentences = values._1._2._1
+    val hypSentenceLengths = values._1._2._2
+    val refSentences = values._2._2._1
+    val refSentenceLengths = values._2._2._2
     tf.nameScope(name) {
       val _statistics = tf.callback(
         function = Function.tupled(statistics _),
-        input = (tgtLanguageId, srcSentences, srcSentenceLengths, tgtSentences, tgtSentenceLengths),
+        input = (tgtLanguageId, hypSentences, hypSentenceLengths, refSentences, refSentenceLengths),
         outputDataType = STRING,
         stateful = false,
         name = "Statistics")
@@ -153,15 +153,15 @@ class Meteor protected (
   }
 
   override def streaming(
-      values: (SentencesWithTgtLanguage, Sentences),
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output[Float]] = {
-    val tgtLanguageId = values._1.tgtLanguage
-    val srcSentences = values._1.srcSentences
-    val srcSentenceLengths = values._1.srcSentenceLengths
-    val tgtSentences = values._2.sentences
-    val tgtSentenceLengths = values._2.lengths
+    val tgtLanguageId = values._1._1
+    val hypSentences = values._1._2._1
+    val hypSentenceLengths = values._1._2._2
+    val refSentences = values._2._2._1
+    val refSentenceLengths = values._2._2._2
     tf.variableScope(name) {
       tf.nameScope(name) {
         // TODO: Find a better way to deal with the language.
@@ -169,7 +169,7 @@ class Meteor protected (
         val statistics = variable[String]("Statistics", Shape(1), tf.ConstantInitializer(Tensor(new MeteorStats().toString())), variablesCollections)
         val _statistics = tf.callback(
           function = Function.tupled(this.statistics _),
-          input = (tgtLanguageId, srcSentences, srcSentenceLengths, tgtSentences, tgtSentenceLengths),
+          input = (tgtLanguageId, hypSentences, hypSentenceLengths, refSentences, refSentenceLengths),
           outputDataType = STRING,
           stateful = false,
           name = "Statistics")

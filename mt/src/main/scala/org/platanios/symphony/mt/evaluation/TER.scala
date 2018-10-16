@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.evaluation
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.{Sentences, SentencesWithTgtLanguage}
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.symphony.mt.utilities.Encoding
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -101,43 +101,43 @@ class TER protected (
   }
 
   override def compute(
-      values: (SentencesWithTgtLanguage, Sentences),
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Output[Float] = {
-    val tgtLanguageId = values._1.tgtLanguage
-    val srcSentences = values._1.srcSentences
-    val srcSentenceLengths = values._1.srcSentenceLengths
-    val tgtSentences = values._2.sentences
-    val tgtSentenceLengths = values._2.lengths
+    val tgtLanguageId = values._1._1
+    val hypSentences = values._1._2._1
+    val hypSentenceLengths = values._1._2._2
+    val refSentences = values._2._2._1
+    val refSentenceLengths = values._2._2._2
     tf.nameScope(name) {
       val _counts = tf.callback(
         function = Function.tupled(counts _),
-        input = (tgtLanguageId, srcSentences, srcSentenceLengths, tgtSentences, tgtSentenceLengths),
+        input = (tgtLanguageId, hypSentences, hypSentenceLengths, refSentences, refSentenceLengths),
         outputDataType = (FLOAT32, FLOAT32),
         stateful = false,
         name = "Counts")
-      100.0f * tf.divide(_counts._1, _counts._2, name = "Value")
+      Output.constant[Float](100.0f) * tf.divide(_counts._1, _counts._2, name = "Value")
     }
   }
 
   override def streaming(
-      values: (SentencesWithTgtLanguage, Sentences),
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output[Float]] = {
-    val tgtLanguageId = values._1.tgtLanguage
-    val srcSentences = values._1.srcSentences
-    val srcSentenceLengths = values._1.srcSentenceLengths
-    val tgtSentences = values._2.sentences
-    val tgtSentenceLengths = values._2.lengths
+    val tgtLanguageId = values._1._1
+    val hypSentences = values._1._2._1
+    val hypSentenceLengths = values._1._2._2
+    val refSentences = values._2._2._1
+    val refSentenceLengths = values._2._2._2
     tf.variableScope(name) {
       tf.nameScope(name) {
         val totalEdits = variable[Float]("TotalEdits", Shape(), tf.ZerosInitializer, variablesCollections)
         val totalWords = variable[Float]("TotalWords", Shape(), tf.ZerosInitializer, variablesCollections)
         val _counts = tf.callback(
           function = Function.tupled(counts _),
-          input = (tgtLanguageId, srcSentences, srcSentenceLengths, tgtSentences, tgtSentenceLengths),
+          input = (tgtLanguageId, hypSentences, hypSentenceLengths, refSentences, refSentenceLengths),
           outputDataType = (FLOAT32, FLOAT32),
           stateful = false,
           name = "Counts")

@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.evaluation
 
-import org.platanios.symphony.mt.models.{Sentences, SentencesWithTgtLanguage}
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.metrics.Metric
 import org.platanios.tensorflow.api.ops.metrics.Metric._
@@ -43,12 +43,12 @@ class SentenceLength protected (
   protected def sanitize(name: String): String = name.replace(' ', '_')
 
   override def compute(
-      values: (SentencesWithTgtLanguage, Sentences),
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Output[Float] = {
-    val srcSentenceLengths = values._1.srcSentenceLengths.toFloat
-    val tgtSentenceLengths = values._2.lengths.toFloat
+    val srcSentenceLengths = values._2._1._2.toFloat
+    val tgtSentenceLengths = values._2._2._2.toFloat
     tf.nameScope(sanitize(name)) {
       val length = if (forHypothesis) srcSentenceLengths else tgtSentenceLengths
       tf.mean(length)
@@ -56,12 +56,12 @@ class SentenceLength protected (
   }
 
   override def streaming(
-      values: (SentencesWithTgtLanguage, Sentences),
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output[Float]] = {
-    val srcSentenceLengths = values._1.srcSentenceLengths.toFloat
-    val tgtSentenceLengths = values._2.lengths.toFloat
+    val srcSentenceLengths = values._2._1._2.toFloat
+    val tgtSentenceLengths = values._2._2._2.toFloat
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
       tf.nameScope(sanitizedName) {

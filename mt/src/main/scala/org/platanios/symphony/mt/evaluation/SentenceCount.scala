@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.evaluation
 
-import org.platanios.symphony.mt.models.{Sentences, SentencesWithTgtLanguage}
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.metrics.Metric
 import org.platanios.tensorflow.api.ops.metrics.Metric._
@@ -44,29 +44,29 @@ class SentenceCount protected (
   }
 
   override def compute(
-      values: (SentencesWithTgtLanguage, Sentences),
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Output[Float] = {
-    val tgtSentenceLengths = values._2.lengths
+    val tgtSentenceLengths = values._2._2._2.toFloat
     tf.nameScope(sanitize(name)) {
       tf.size(tgtSentenceLengths).toFloat
     }
   }
 
   override def streaming(
-      values: (SentencesWithTgtLanguage, Sentences),
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output[Float]] = {
-    val tgtSentenceLengths = values._2.lengths
+    val tgtSentenceLengths = values._2._2._2.toFloat
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
       tf.nameScope(sanitizedName) {
         val count = variable[Long]("Count", Shape(), tf.ZerosInitializer, variablesCollections)
         val updateCount = count.assignAdd(tf.size(tgtSentenceLengths))
         val value = count.value.toFloat
-        val update = updateCount
+        val update = updateCount.toFloat
         val reset = count.initializer
         valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
         updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
