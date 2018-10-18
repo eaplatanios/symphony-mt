@@ -18,29 +18,29 @@ package org.platanios.symphony.mt.models.rnn.attention
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
+import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class RNNAttention[AS, ASS](implicit evAS: WhileLoopVariable.Aux[AS, ASS]) {
-  def create[S, SS](
-      cell: tf.RNNCell[Output, Shape, S, SS],
-      memory: Output,
-      memorySequenceLengths: Output,
+abstract class RNNAttention[T: TF : IsNotQuantized, AttentionState: NestedStructure] {
+  def create[CellState: NestedStructure](
+      cell: tf.RNNCell[Output[T], CellState],
+      memory: Output[T],
+      memorySequenceLengths: Output[Int],
       numUnits: Int,
       inputSequencesLastAxisSize: Int,
-      initialState: S,
+      initialState: CellState,
       useAttentionLayer: Boolean,
       outputAttention: Boolean
   )(implicit
       stage: Stage,
       mode: Mode,
       parameterManager: ParameterManager,
-      context: Output,
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): (AttentionWrapperCell[S, SS, AS, ASS], AttentionWrapperState[S, SS, Seq[AS], Seq[ASS]])
+      context: Output[Int]
+  ): (AttentionWrapperCell[T, CellState, AttentionState],
+      AttentionWrapperState[T, CellState, Seq[AttentionState]])
 }

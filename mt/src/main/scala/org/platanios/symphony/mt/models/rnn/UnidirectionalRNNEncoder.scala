@@ -19,62 +19,82 @@ import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.models.{DeviceManager, RNNModel, Stage}
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
+import org.platanios.tensorflow.api.implicits.helpers.{NestedStructure, Zero}
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
+import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
-/**
+/** Uni-directional (i.e., left-to-right) RNN encoder.
+  *
+  * This encoder takes as input a source sequence in some language and returns a tuple containing:
+  *   - '''Output:''' Outputs (for each time step) of the RNN.
+  *   - '''State:''' Sequence of last computed RNN states in layer order containing the states for each layer
+  *     (e.g., `Seq(state0, state1, ...)`).
+  *
   * @author Emmanouil Antonios Platanios
   */
-class UnidirectionalRNNEncoder[S, SS](
-    val cell: Cell[S, SS],
+class UnidirectionalRNNEncoder[T: TF : IsNotQuantized, State](
+    val cell: Cell[T, State],
     val numUnits: Int,
     val numLayers: Int,
-    val dataType: DataType = FLOAT32,
     val residual: Boolean = false,
     val dropout: Option[Float] = None,
-    val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+    val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
 )(implicit
-    evS: WhileLoopVariable.Aux[S, SS],
-    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends RNNEncoder[S, SS]()(evS, evSDropout) {
+    override val evZeroState: Zero[State]
+) extends RNNEncoder[T, State]() {
   override def create(
-      config: RNNModel.Config[_, _],
-      srcSequences: Output,
-      srcSequenceLengths: Output
+      config: RNNModel.Config[T, _],
+      srcSequences: Output[Int],
+      srcSequenceLengths: Output[Int]
   )(implicit
       stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager,
-      context: Output
-  ): Tuple[Output, Seq[S]] = {
+      context: Output[Int]
+  ): Tuple[Output[T], Seq[State]] = {
+    implicit val evZeroState: Zero.Aux[State, _, _, _] = this.evZeroState.asAux()
+    implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = evZeroState.structure
+
     val (embeddedSequences, embeddedSequenceLengths) = embedSequences(config, srcSequences, srcSequenceLengths)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
-    val uniCell = RNNModel.multiCell(
-      cell, embeddedSequences.shape(-1), numUnits, dataType, numLayers, numResLayers, dropout, residualFn,
-      config.env.randomSeed, "MultiUniCell")(mode, env, parameterManager, deviceManager)
+
+    val uniCell = RNNModel.stackedCell[T, State](
+      cell = cell,
+      numInputs = embeddedSequences.shape(-1),
+      numUnits = numUnits,
+      numLayers = numLayers,
+      numResidualLayers = numResLayers,
+      dropout = dropout,
+      residualFn = residualFn,
+      seed = config.env.randomSeed,
+      name = "MultiUniCell")
+
     tf.dynamicRNN(
-      uniCell, embeddedSequences, null, config.timeMajor, config.env.parallelIterations, config.env.swapMemory,
-      embeddedSequenceLengths, "UnidirectionalLayers")
+      cell = uniCell,
+      input = embeddedSequences,
+      initialState = None,
+      timeMajor = config.timeMajor,
+      parallelIterations = config.env.parallelIterations,
+      swapMemory = config.env.swapMemory,
+      sequenceLengths = embeddedSequenceLengths,
+      name = "UnidirectionalLayers")
   }
 }
 
 object UnidirectionalRNNEncoder {
-  def apply[S, SS](
-      cell: Cell[S, SS],
+  def apply[T: TF : IsNotQuantized, State: Zero](
+      cell: Cell[T, State],
       numUnits: Int,
       numLayers: Int,
-      dataType: DataType = FLOAT32,
       residual: Boolean = false,
       dropout: Option[Float] = None,
-      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
-  )(implicit
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): UnidirectionalRNNEncoder[S, SS] = {
-    new UnidirectionalRNNEncoder[S, SS](
-      cell, numUnits, numLayers, dataType, residual, dropout, residualFn)(evS, evSDropout)
+      residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
+  ): UnidirectionalRNNEncoder[T, State] = {
+    new UnidirectionalRNNEncoder[T, State](
+      cell, numUnits, numLayers, residual, dropout, residualFn)
   }
 }
