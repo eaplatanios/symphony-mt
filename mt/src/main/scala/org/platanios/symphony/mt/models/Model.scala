@@ -19,6 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.evaluation
 import org.platanios.symphony.mt.evaluation._
+import org.platanios.symphony.mt.models.Model.DecodingMode
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.parameters.ParameterManager
@@ -26,13 +27,14 @@ import org.platanios.symphony.mt.models.pivoting._
 import org.platanios.symphony.mt.utilities.Encoding.tfStringToUTF8
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.config.{NoCheckpoints, TimeBasedCheckpoints}
+import org.platanios.tensorflow.api.config.TimeBasedCheckpoints
 import org.platanios.tensorflow.api.core.client.SessionConfig
+import org.platanios.tensorflow.api.core.types.TF
+import org.platanios.tensorflow.api.implicits.helpers.Zero
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
-import org.platanios.tensorflow.horovod._
 
 import java.io.PrintWriter
 
@@ -108,17 +110,11 @@ abstract class Model[S] protected (
   }
 
   protected val estimator: TranslationEstimator = {
-    if (config.env.useHorovod)
-      hvd.initialize()
-
     tf.createWith(
       nameScope = name,
       device = config.deviceManager.nextDevice(config.env, moveToNext = false)
     ) {
       var optimizer = optConfig.optimizer
-      if (config.env.useHorovod)
-        optimizer = hvd.DistributedOptimizer(optimizer)
-
       val model = optConfig.maxGradNorm match {
         case Some(norm) =>
           tf.learn.Model.supervised(
@@ -145,49 +141,41 @@ abstract class Model[S] protected (
       // Create estimator hooks.
       var hooks = Set[tf.learn.Hook]()
 
-      // Add hooks (if distributed using Horovod, hooks are only added for the first process).
-      if (!config.env.useHorovod || hvd.localRank == 0) {
-        // Add logging hooks.
-        if (logConfig.logLossSteps > 0) {
-          val dataParallelFactor = if (config.env.useHorovod) hvd.size.toFloat else 1.0f
-          hooks += TrainingLogger(
-            log = true,
-            trigger = StepHookTrigger(logConfig.logLossSteps),
-            dataParallelFactor = dataParallelFactor)
+      // Add logging hooks.
+      if (logConfig.logLossSteps > 0) {
+        hooks += TrainingLogger(
+          log = true,
+          trigger = StepHookTrigger(logConfig.logLossSteps))
+      }
+      if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
+        val languagePairs = {
+          if (config.evalLanguagePairs.nonEmpty) Some(config.evalLanguagePairs)
+          else if (config.languagePairs.nonEmpty) Some(config.languagePairs)
+          else None
         }
-        if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
-          val languagePairs = {
-            if (config.evalLanguagePairs.nonEmpty) Some(config.evalLanguagePairs)
-            else if (config.languagePairs.nonEmpty) Some(config.languagePairs)
-            else None
-          }
-          val datasets = evalDatasets.filter(_._2.nonEmpty)
-          if (datasets.nonEmpty) {
-            val evalDatasets = Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs)
-            hooks += tf.learn.Evaluator(
-              log = true, summariesDir, evalDatasets, evalMetrics, StepHookTrigger(logConfig.logEvalSteps),
-              triggerAtEnd = true, numDecimalPoints = 6, name = "Evaluation")
-          }
+        val datasets = evalDatasets.filter(_._2.nonEmpty)
+        if (datasets.nonEmpty) {
+          val evalDatasets = Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs)
+          hooks += tf.learn.Evaluator(
+            log = true, summariesDir, evalDatasets, evalMetrics, StepHookTrigger(logConfig.logEvalSteps),
+            triggerAtEnd = true, numDecimalPoints = 6, name = "Evaluation")
         }
-
-        // Add summaries/checkpoints hooks.
-        hooks ++= Set(
-          tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-          tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
-          tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
-
-        env.traceSteps.foreach(numSteps =>
-          hooks += tf.learn.TimelineHook(
-            summariesDir, showDataFlow = true, showMemory = true, trigger = StepHookTrigger(numSteps)))
-
-        // Add TensorBoard hook.
-        if (logConfig.launchTensorBoard)
-          hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
-            summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
       }
 
-      if (config.env.useHorovod)
-        hooks += hvd.BroadcastGlobalVariablesHook(0)
+      // Add summaries/checkpoints hooks.
+      hooks ++= Set(
+        tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
+        tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
+        tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
+
+      env.traceSteps.foreach(numSteps =>
+        hooks += tf.learn.TimelineHook(
+          summariesDir, showDataFlow = true, showMemory = true, trigger = StepHookTrigger(numSteps)))
+
+      // Add TensorBoard hook.
+      if (logConfig.launchTensorBoard)
+        hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
+          summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
 
       var sessionConfig = SessionConfig(
         allowSoftPlacement = Some(config.env.allowSoftPlacement),
@@ -195,22 +183,13 @@ abstract class Model[S] protected (
         gpuAllowMemoryGrowth = Some(config.env.gpuAllowMemoryGrowth))
       if (config.env.useXLA)
         sessionConfig = sessionConfig.copy(optGlobalJITLevel = Some(SessionConfig.L1GraphOptimizerGlobalJIT))
-      if (config.env.useHorovod)
-        sessionConfig = sessionConfig.copy(gpuVisibleDevices = Some(Seq(hvd.localRank)))
-
-      val checkpointConfig = {
-        if (!config.env.useHorovod || hvd.localRank == 0)
-          TimeBasedCheckpoints(600, 5, 10000)
-        else
-          NoCheckpoints
-      }
 
       // Create estimator.
       tf.learn.InMemoryEstimator(
         model, tf.learn.Configuration(
           workingDir = Some(config.env.workingDir),
           sessionConfig = Some(sessionConfig),
-          checkpointConfig = checkpointConfig,
+          checkpointConfig = TimeBasedCheckpoints(600, 5, 10000),
           randomSeed = config.env.randomSeed),
         trainHooks = hooks)
     }
@@ -373,7 +352,7 @@ abstract class Model[S] protected (
 
           // Decode to obtain the target sentences.
           val decodedTgtSentences = tf.variableScope("Decoder") {
-            trainDecoder(srcMapped, Some(tgtMapped), Some(state))
+            decoder(Model.DecodingTrainMode, srcMapped, Some(tgtMapped), Some(state))
           }
 
           (tgtLanguage, decodedTgtSentences)
@@ -414,7 +393,7 @@ abstract class Model[S] protected (
 
               // Decode to obtain the target sentences.
               val (tgtSentences, tgtSentenceLengths) = tf.variableScope("Decoder") {
-                inferDecoder(encoderInput, None, Some(state))
+                decoder(Model.DecodingInferMode, encoderInput, None, Some(state))
               }
 
               // Map from word indices in the vocabulary, back to actual words and return the result.
@@ -451,7 +430,7 @@ abstract class Model[S] protected (
 
                 // Decode to obtain the target sentences in this step of the pivoting chain.
                 val tgtSentences = tf.variableScope("Decoder") {
-                  inferDecoder(encoderInput, None, Some(state))
+                  decoder(Model.DecodingInferMode, encoderInput, None, Some(state))
                 }
 
                 (index + 1, currentTgtLanguage, tgtSentences)
@@ -540,23 +519,15 @@ abstract class Model[S] protected (
     *
     * @return Tensor with shape `[batchSize, length, 1, hiddenSize]`.
     */
-  protected def trainDecoder(
+  protected def decoder[O: TF](
+      decodingMode: DecodingMode[O],
       encoderInput: SentencesWithLanguagePair[Int],
       input: Option[Sentences[Int]],
       state: Option[S]
   )(implicit
       mode: Mode,
       context: Output[Int]
-  ): Sentences[Float]
-
-  protected def inferDecoder(
-      encoderInput: SentencesWithLanguagePair[Int],
-      input: Option[Sentences[Int]],
-      state: Option[S]
-  )(implicit
-      mode: Mode,
-      context: Output[Int]
-  ): Sentences[Int]
+  ): Sentences[O]
 
   protected def loss(
       predictedSequences: Output[Float],
@@ -574,7 +545,11 @@ abstract class Model[S] protected (
 }
 
 object Model {
-  class Config protected (
+  sealed trait DecodingMode[O]
+  case object DecodingTrainMode extends DecodingMode[Float]
+  case object DecodingInferMode extends DecodingMode[Int]
+
+  class Config protected(
       val env: Environment,
       val parameterManager: ParameterManager,
       val deviceManager: DeviceManager,

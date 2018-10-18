@@ -23,17 +23,17 @@ import org.platanios.tensorflow.api.Output
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Encoder[O] {
+trait Encoder[T, O] {
   def create(
-      config: RNNModel.Config[_, _],
-      srcSequences: Output,
-      srcSequenceLengths: Output
+      config: RNNModel.Config[T, _],
+      srcSequences: Output[Int],
+      srcSequenceLengths: Output[Int]
   )(implicit
       stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager,
-      context: Output
+      context: Output[Int]
   ): O
 }
