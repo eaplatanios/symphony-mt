@@ -51,7 +51,7 @@ trait WordEmbeddingsType {
       embeddingTables: T,
       languageIds: Seq[Output[Int]],
       languageId: Output[Int],
-      keys: Output[Long]
+      keys: Output[Int]
   )(implicit context: Output[Int]): Output[Float]
 
   def projectionToWords(

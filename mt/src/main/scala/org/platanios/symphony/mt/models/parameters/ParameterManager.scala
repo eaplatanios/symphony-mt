@@ -122,8 +122,8 @@ class ParameterManager protected (
     }
   }
 
-  def wordEmbeddings(languageId: Output[Int])(implicit context: Output[Int]): Output[Long] => Output[Float] = {
-    keys: Output[Long] => {
+  def wordEmbeddings(languageId: Output[Int])(implicit context: Output[Int]): Output[Int] => Output[Float] = {
+    keys: Output[Int] => {
       tf.variableScope("ParameterManager/WordEmbeddings") {
         val graph = currentGraph
         wordEmbeddingsType.embeddingLookup(wordEmbeddings(graph), languageIds(graph), languageId, keys)

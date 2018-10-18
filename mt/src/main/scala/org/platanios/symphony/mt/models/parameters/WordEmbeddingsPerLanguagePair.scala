@@ -74,7 +74,7 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
       embeddingTables: Seq[WordEmbeddingsPerLanguagePair.EmbeddingsPair],
       languageIds: Seq[Output[Int]],
       languageId: Output[Int],
-      keys: Output[Long]
+      keys: Output[Int]
   )(implicit context: Output[Int]): Output[Float] = {
     val languageIdPairs = languageIds
         .combinations(2)
@@ -93,10 +93,10 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
     val assertion = tf.assert(
       tf.any(tf.stack(predicates.map(_._1))),
       Seq(
-        "No word embeddings table found for the provided language pair.",
-        "Context source language: ", context(0),
-        "Context target language: ", context(1),
-        "Current language: ", languageId))
+        tf.constant[String]("No word embeddings table found for the provided language pair."),
+        tf.constant[String]("Context source language: "), context(0),
+        tf.constant[String]("Context target language: "), context(1),
+        tf.constant[String]("Current language: "), languageId))
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
       tf.identity(embeddingTables.head.embeddings1)
     }
@@ -146,10 +146,10 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
     val assertion = tf.assert(
       tf.any(tf.stack(predicates.map(_._1))),
       Seq(
-        "No projections found for the provided language pair.",
-        "Context source language: ", context(0),
-        "Context target language: ", context(1),
-        "Current language: ", languageId))
+        tf.constant[String]("No projections found for the provided language pair."),
+        tf.constant[String]("Context source language: "), context(0),
+        tf.constant[String]("Context target language: "), context(1),
+        tf.constant[String]("Current language: "), languageId))
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
       tf.identity(projectionsForSize.head.embeddings1)
     }

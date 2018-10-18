@@ -61,7 +61,7 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
       embeddingTables: Output[Float],
       languageIds: Seq[Output[Int]],
       languageId: Output[Int],
-      keys: Output[Long]
+      keys: Output[Int]
   )(implicit context: Output[Int]): Output[Float] = {
     embeddingTables.gather(keys)
   }

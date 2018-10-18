@@ -58,8 +58,9 @@ class GoogleMultilingualManager protected (
       srcSequences: Output[Float],
       srcSequenceLengths: Output[Int]
   )(implicit context: Output[Int]): (Output[Float], Output[Int]) = {
+    val batchSize = tf.shape(srcSequences).slice(0).toInt
     val tgtLanguageEmbedding = languageEmbeddings(currentGraph).gather(context(1)).reshape(Shape(1, 1, -1))
-    val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack(Seq(tf.shape(srcSequences).slice(0), 1, 1)))
+    val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack[Int](Seq(batchSize, 1, 1)))
     val processedSrcSentences = tf.concatenate(Seq(tgtLanguageEmbeddingTiled, srcSequences), 1)
     val processedSrcSentenceLengths = srcSequenceLengths + 1
     (processedSrcSentences, processedSrcSentenceLengths)

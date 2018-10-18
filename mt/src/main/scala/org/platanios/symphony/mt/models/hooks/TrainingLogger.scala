@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.models.hooks
 
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
 import org.platanios.tensorflow.api.learn.Counter
@@ -49,12 +50,12 @@ case class TrainingLogger(
     formatter: (Option[Double], Long, Float, Float, Option[Double]) => String = null,
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
-    (Output[Int], Output[Int], Output[String], Output[Int]),
-    (Output[String], Output[Int]),
-    ((Output[Int], Output[Int], Output[String], Output[Int]), (Output[String], Output[Int])),
-    (Output[Float], Output[Int]),
-    Float,
-    ((Output[Int], Output[Int], Output[String], Output[Int]), (Output[String], Output[Int]))]
+    /* In       */ SentencesWithLanguagePair[String],
+    /* TrainIn  */ (SentencesWithLanguagePair[String], Sentences[String]),
+    /* Out      */ SentencesWithLanguage[String],
+    /* TrainOut */ SentencesWithLanguage[Float],
+    /* Loss     */ Float,
+    /* EvalIn   */ (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String]))]
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 
@@ -78,10 +79,15 @@ case class TrainingLogger(
     internalTrigger.reset()
     shouldTrigger = false
     gradientsNorm = modelInstance.gradientsAndVariables.map(g => tf.globalNorm(g.map(_._1))).orNull
-    loss = modelInstance.loss.map(_.toFloat)
-        .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._2).toFloat)).orNull
-    srcWordCount = modelInstance.trainInput.map(o => tf.sum(o._1._4).toLong).orNull
-    tgtWordCount = modelInstance.trainInput.map(o => tf.sum(o._2._2).toLong + tf.size(o._2._2)).orNull
+    loss = modelInstance.loss.map(_.toFloat).flatMap(l => {
+      modelInstance.trainInput.map(o => l * /* batch size */ tf.size(o._2._2).toFloat)
+    }).orNull
+    srcWordCount = modelInstance.trainInput.map(o => {
+      /* source sentence lengths */ tf.sum(o._1._3._2).toLong
+    }).orNull
+    tgtWordCount = modelInstance.trainInput.map(o => {
+      /* target sentence lengths */ tf.sum(o._2._2).toLong + /* batch size */ tf.size(o._2._2)
+    }).orNull
     totalLoss = 0.0f
     totalSrcWordCount = 0L
     totalTgtWordCount = 0L
@@ -115,7 +121,8 @@ case class TrainingLogger(
   override protected def end(session: Session): Unit = {
     if (triggerAtEnd && lastStep.toInt != internalTrigger.lastTriggerStep().getOrElse(-1)) {
       shouldTrigger = true
-      processFetches(session.run(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
+      processFetches(session.run(fetches = Seq[Output[Any]](
+        step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
     }
   }
 
