@@ -19,8 +19,9 @@ import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types._
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.NN.ConvPaddingMode
+import org.platanios.tensorflow.api.ops.NN.{ConvPaddingMode, ValidConvPadding}
 
 import scala.language.postfixOps
 
@@ -38,12 +39,15 @@ trait Attention {
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
-  def apply(
-      q: Output,
-      k: Output,
-      v: Output,
-      bias: Option[Output]
-  )(mode: Mode, parameterManager: ParameterManager): Output
+  def apply[T: TF : IsFloat16OrFloat32OrFloat64](
+      q: Output[T],
+      k: Output[T],
+      v: Output[T],
+      bias: Option[Output[T]]
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager
+  ): Output[T]
 
   // TODO: Add support for saving weights.
   // TODO: Add support for image summaries for the weights.
@@ -59,15 +63,19 @@ object Attention {
     * @param  length      Integer scalar representing the sequence length.
     * @param  maxBackward Maximum backwards distance to attend. Negative values indicate an unlimited distance.
     * @param  maxForward  Maximum forwards distance to attend. Negative values indicate an unlimited distance.
-    * @return `FLOAT32` tensor with shape `[1, 1, length, length]`.
+    * @return Tensor with shape `[1, 1, length, length]`.
     */
-  def attentionBiasLocal(length: Output, maxBackward: Int, maxForward: Int): Output = {
+  def attentionBiasLocal(
+      length: Output[Int],
+      maxBackward: Int,
+      maxForward: Int
+  ): Output[Float] = {
     var band = tf.matrixBandPart(
-      tf.ones(FLOAT32, tf.stack(Seq(length, length))),
-      tf.constant(maxBackward, INT64),
-      tf.constant(maxForward, INT64))
-    band = tf.reshape(band, tf.stack(Seq(1, 1, length, length)))
-    tf.cast(-1e9f * (1.0f - band), FLOAT32)
+      tf.ones[Float, Int](tf.stack[Int](Seq(length, length))),
+      tf.constant[Int](maxBackward),
+      tf.constant[Int](maxForward))
+    band = tf.reshape(band, tf.stack[Int](Seq(1, 1, length, length)))
+    tf.constant[Float](-1e9f) * (1.0f - band)
   }
 
   /** Creates a bias tensor to be added to the attention logits.
@@ -75,9 +83,11 @@ object Attention {
     * This bias allows a query to attend to all positions up to and including its own.
     *
     * @param  length Integer scalar representing the sequence length.
-    * @return `FLOAT32` tensor with shape `[1, 1, length, length]`.
+    * @return Tensor with shape `[1, 1, length, length]`.
     */
-  def attentionBiasLowerTriangular(length: Output): Output = {
+  def attentionBiasLowerTriangular(
+      length: Output[Int]
+  ): Output[Float] = {
     attentionBiasLocal(length, -1, 0)
   }
 
@@ -87,21 +97,28 @@ object Attention {
     *
     * @param  querySegmentIDs  Tensor with shape `[batchSize, queryLength]`.
     * @param  memorySegmentIDs Tensor with shape `[batchSize, memoryLength]`.
-    * @return `FLOAT32` tensor with shape `[batchSize, 1, queryLength, memoryLength]`.
+    * @return Tensor with shape `[batchSize, 1, queryLength, memoryLength]`.
     */
-  def attentionBiasSameSegment(querySegmentIDs: Output, memorySegmentIDs: Output): Output = {
+  def attentionBiasSameSegment[T: TF : IsNumeric](
+      querySegmentIDs: Output[T],
+      memorySegmentIDs: Output[T]
+  ): Output[Float] = {
     tf.expandDims(tf.notEqual(
       tf.expandDims(querySegmentIDs, axis = 2),
-      tf.expandDims(memorySegmentIDs, axis = 1)).cast(FLOAT32) * -1e9f, axis = 1)
+      tf.expandDims(memorySegmentIDs, axis = 1)
+    ).toFloat * -1e9f, axis = 1)
   }
 
   /** Creates a bias tensor to be added to the attention logits.
     *
-    * @param  padding `FLOAT32` tensor with shape `[batchSize, length]`.
+    * @param  padding Tensor with shape `[batchSize, length]`.
     * @param  epsilon Bias value to the be added.
     * @return Bias tensor with shape `[batchSize, 1, 1, length]`.
     */
-  def attentionBiasIgnorePadding(padding: Output, epsilon: Float = -1e9f): Output = {
+  def attentionBiasIgnorePadding(
+      padding: Output[Float],
+      epsilon: Output[Float] = -1e9f
+  ): Output[Float] = {
     tf.expandDims(tf.expandDims(padding * epsilon, axis = 1), axis = 1)
   }
 
@@ -111,9 +128,11 @@ object Attention {
     * @return Bias tensor with shape `[batchSize, length]`, with `1.0f` in padding positions and `0.0f` in non-padding
     *         positions.
     */
-  def attentionBiasToPadding(attentionBias: Output): Output = {
+  def attentionBiasToPadding[T: TF : IsNumeric](
+      attentionBias: Output[T]
+  ): Output[Boolean] = {
     // `attentionBias` is a large negative number in padding positions and zero elsewhere.
-    tf.squeeze(tf.less(attentionBias, -1).cast(FLOAT32), axes = Seq(1, 2))
+    tf.squeeze(tf.less(attentionBias, tf.constant[Int](-1).castTo[T]), axes = Seq(1, 2))
   }
 
   /** Creates a bias tensor for self-attention, that encourages attention to close positions.
@@ -121,8 +140,10 @@ object Attention {
     * @param  length Integer scalar representing the sequence length.
     * @return Bias tensor with shape `[1, 1, length, length]`.
     */
-  def attentionBiasProximal(length: Output): Output = {
-    val r = tf.range(0, length).cast(FLOAT32)
+  def attentionBiasProximal(
+      length: Output[Int]
+  ): Output[Float] = {
+    val r = tf.range(0, length).toFloat
     val diff = tf.expandDims(r, 0) - tf.expandDims(r, 1)
     tf.expandDims(tf.expandDims(-tf.log(1 + tf.abs(diff)), axis = 0), axis = 0)
   }
@@ -131,18 +152,19 @@ object Attention {
     *
     * This bias prevents batches from attending to each other.
     *
-    * @param  conditionFn       Function defining which type of mask to build.
-    * @param  batchCoordinatesQ `INT32` tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
-    * @param  batchCoordinatesK `INT32` tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
-    * @return `FLOAT32` tensor with shape `[lengthQ, lengthK]`, containing either `0` or `-infinity` (i.e., `-1e9f`).
+    * @param  conditionFn       Function defining which type of mask to build that takes as input the difference
+    *                           between `batchCoordinatesQ` and `batchCoordinatesK` and returns the bias mask.
+    * @param  batchCoordinatesQ Tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
+    * @param  batchCoordinatesK Tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
+    * @return Tensor with shape `[lengthQ, lengthK]`, containing either `0` or `-infinity` (i.e., `-1e9f`).
     */
   def attentionBiasBatch(
-      conditionFn: Output => Output,
-      batchCoordinatesQ: Output,
-      batchCoordinatesK: Output
-  ): Output = {
-    val bcQ = tf.expandDims(tf.squeeze(batchCoordinatesQ, axes = Seq(1)).cast(FLOAT32), axis = 1)
-    val bcK = tf.expandDims(tf.squeeze(batchCoordinatesK, axes = Seq(1)).cast(FLOAT32), axis = 0)
+      conditionFn: Output[Int] => Output[Float],
+      batchCoordinatesQ: Output[Int],
+      batchCoordinatesK: Output[Int]
+  ): Output[Float] = {
+    val bcQ = tf.expandDims(tf.squeeze(batchCoordinatesQ, axes = Seq(1)), axis = 1)
+    val bcK = tf.expandDims(tf.squeeze(batchCoordinatesK, axes = Seq(1)), axis = 0)
     // Broadcast to create a `[lengthQ, lengthK]` mask.
     conditionFn(bcK - bcQ) * -1e9f
   }
@@ -151,24 +173,36 @@ object Attention {
     *
     * This bias prevents individual sequences of the same batch from attending to each other.
     *
-    * @param  batchCoordinatesQ `INT32` tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
-    * @param  batchCoordinatesK `INT32` tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
-    * @return `FLOAT32` tensor with shape `[lengthQ, lengthK]`, containing either `0` or `-infinity` (i.e., `-1e9f`).
+    * @param  batchCoordinatesQ Tensor with shape [lengthQ, 1]`, containing the coordinates of the batches.
+    * @param  batchCoordinatesK Tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
+    * @return Tensor with shape `[lengthQ, lengthK]`, containing either `0` or `-infinity` (i.e., `-1e9f`).
     */
-  def attentionBiasCoordinates(batchCoordinatesQ: Output, batchCoordinatesK: Output): Output = {
-    attentionBiasBatch(bias => tf.minimum(1.0f, tf.abs(bias)), batchCoordinatesQ, batchCoordinatesK)
+  def attentionBiasCoordinates(
+      batchCoordinatesQ: Output[Int],
+      batchCoordinatesK: Output[Int]
+  ): Output[Float] = {
+    attentionBiasBatch(
+      conditionFn = bias => tf.minimum(1.0f, tf.abs(bias.toFloat)),
+      batchCoordinatesQ = batchCoordinatesQ,
+      batchCoordinatesK = batchCoordinatesK)
   }
 
   /** Creates a bias tensor to be added to the attention logits.
     *
     * This bias prevents individual sequences of the same batch from attending to future values.
     *
-    * @param  batchCoordinatesQ `INT32` tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
-    * @param  batchCoordinatesK `INT32` tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
-    * @return `FLOAT32` tensor with shape `[lengthQ, lengthK]`, containing either `0` or `-infinity` (i.e., `-1e9f`).
+    * @param  batchCoordinatesQ Tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
+    * @param  batchCoordinatesK Tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
+    * @return Tensor with shape `[lengthQ, lengthK]`, containing either `0` or `-infinity` (i.e., `-1e9f`).
     */
-  def attentionBiasFuture(batchCoordinatesQ: Output, batchCoordinatesK: Output): Output = {
-    attentionBiasBatch(bias => tf.maximum(0.0f, tf.minimum(1.0f, tf.abs(bias))), batchCoordinatesQ, batchCoordinatesK)
+  def attentionBiasFuture(
+      batchCoordinatesQ: Output[Int],
+      batchCoordinatesK: Output[Int]
+  ): Output[Float] = {
+    attentionBiasBatch(
+      conditionFn = bias => tf.maximum(0.0f, tf.minimum(1.0f, tf.abs(bias))),
+      batchCoordinatesQ = batchCoordinatesQ,
+      batchCoordinatesK = batchCoordinatesK)
   }
 
   //endregion Attention Bias
@@ -183,7 +217,10 @@ object Attention {
     * @param  numHeads Number of heads to split in.
     * @return Tensor with shape `[batchSize, numHeads, length, depth / numHeads]`.
     */
-  def splitHeads(input: Output, numHeads: Int): Output = {
+  def splitHeads[T: TF](
+      input: Output[T],
+      numHeads: Int
+  ): Output[T] = {
     tf.transpose(Common.splitLastDimension(input, numHeads), Seq(0, 2, 1, 3))
   }
 
@@ -193,7 +230,10 @@ object Attention {
     * @param  numHeads Number of heads to split in.
     * @return Tensor with shape `[batchSize, numHeads, height, width, depth / numHeads]`.
     */
-  def splitHeads2D(input: Output, numHeads: Int): Output = {
+  def splitHeads2D[T: TF](
+      input: Output[T],
+      numHeads: Int
+  ): Output[T] = {
     tf.transpose(Common.splitLastDimension(input, numHeads), Seq(0, 3, 1, 2, 4))
   }
 
@@ -202,7 +242,7 @@ object Attention {
     * @param  input Tensor with shape `[batchSize, numHeads, length, depth / numHeads]`.
     * @return Tensor with shape `[batchSize, length, depth]`.
     */
-  def combineHeads(input: Output): Output = {
+  def combineHeads[T: TF](input: Output[T]): Output[T] = {
     Common.combineLastTwoDimensions(tf.transpose(input, Seq(0, 2, 1, 3)))
   }
 
@@ -211,7 +251,7 @@ object Attention {
     * @param  input Tensor with shape `[batchSize, numHeads, height, width, depth / numHeads]`.
     * @return Tensor with shape `[batchSize, height, width, depth]`.
     */
-  def combineHeads2D(input: Output): Output = {
+  def combineHeads2D[T: TF](input: Output[T]): Output[T] = {
     Common.combineLastTwoDimensions(tf.transpose(input, Seq(0, 2, 3, 1, 4)))
   }
 
@@ -229,24 +269,33 @@ object Attention {
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Tuple containing the queries, keys, and values tensors.
     */
-  def computeQKV(
-      queryAntecedent: Output,
-      memoryAntecedent: Output,
+  def computeQKV[T: TF : IsNotQuantized](
+      queryAntecedent: Output[T],
+      memoryAntecedent: Output[T],
       totalKeysDepth: Int,
       totalValuesDepth: Int,
       qNumFilters: Int = 1,
       kvNumFilters: Int = 1,
-      qPaddingMode: ConvPaddingMode = tf.ValidConvPadding,
-      kvPaddingMode: ConvPaddingMode = tf.ValidConvPadding
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      qPaddingMode: ConvPaddingMode = ValidConvPadding,
+      kvPaddingMode: ConvPaddingMode = ValidConvPadding
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): (Output, Output, Output) = {
+      context: Output[Int]
+  ): (Output[T], Output[T], Output[T]) = {
 
-    def compute(input: Output, depth: Int, numFilters: Int, paddingMode: ConvPaddingMode, name: String): Output = {
+    def compute(
+        input: Output[T],
+        depth: Int,
+        numFilters: Int,
+        paddingMode: ConvPaddingMode,
+        name: String
+    ): Output[T] = {
       tf.variableScope(name) {
         if (numFilters == 1) {
-          val weights = parameterManager.get("Weights", input.dataType, Shape(input.shape(-1), depth))
+          val weights = parameterManager.get[T](
+            "Weights", Shape(input.shape(-1), depth))
           tf.linear(input, weights)
         } else {
           ???
@@ -291,10 +340,10 @@ object Attention {
     *                                  if a cache is provided, but no `bias` is provided.
     */
   @throws[IllegalArgumentException]
-  def multiHeadAttention(
-      queryAntecedent: Output,
-      memoryAntecedent: Output,
-      bias: Output,
+  def multiHeadAttention[T: TF : IsFloat16OrFloat32OrFloat64](
+      queryAntecedent: Output[T],
+      memoryAntecedent: Output[T],
+      bias: Output[T],
       totalKeysDepth: Int,
       totalValuesDepth: Int,
       outputsDepth: Int,
@@ -302,20 +351,28 @@ object Attention {
       attention: Attention,
       qNumFilters: Int = 1,
       kvNumFilters: Int = 1,
-      qPaddingMode: ConvPaddingMode = tf.ValidConvPadding,
-      kvPaddingMode: ConvPaddingMode = tf.ValidConvPadding,
-      cache: Option[Cache] = None,
+      qPaddingMode: ConvPaddingMode = ValidConvPadding,
+      kvPaddingMode: ConvPaddingMode = ValidConvPadding,
+      cache: Option[Cache[T]] = None,
       name: String = "MultiHeadAttention"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
+      context: Output[Int]
+  ): Output[T] = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.variableScope(name) {
       var (q, k, v) = computeQKV(
-        queryAntecedent, memoryAntecedent, totalKeysDepth, totalValuesDepth, qNumFilters, kvNumFilters,
-        qPaddingMode, kvPaddingMode)(mode, parameterManager)
+        queryAntecedent = queryAntecedent,
+        memoryAntecedent = memoryAntecedent,
+        totalKeysDepth = totalKeysDepth,
+        totalValuesDepth = totalValuesDepth,
+        qNumFilters = qNumFilters,
+        kvNumFilters = kvNumFilters,
+        qPaddingMode = qPaddingMode,
+        kvPaddingMode = kvPaddingMode)
       cache match {
         case Some(c) =>
           require(
@@ -331,18 +388,27 @@ object Attention {
       q = splitHeads(q, numHeads)
       k = splitHeads(k, numHeads)
       v = splitHeads(v, numHeads)
-      q = q * tf.pow(tf.truncateDivide(totalKeysDepth, numHeads), -0.5f)
-      var result = attention(q, k, v, Some(bias))(mode, parameterManager)
+      q = q * tf.pow(
+        tf.constant[Int](totalKeysDepth / numHeads).toFloat,
+        tf.constant[Float](-0.5f)
+      ).castTo[T]
+      var result = attention(q, k, v, Some(bias))
       result = combineHeads(result)
-      val w = parameterManager.get("OutputTransformWeights", result.dataType, Shape(result.shape(-1), outputsDepth))
+      val w = parameterManager.get[T](
+        "OutputTransformWeights", Shape(result.shape(-1), outputsDepth))
       tf.linear(result, w)
     }
   }
 
-  class Cache protected(var k: Output, var v: Output)
+  class Cache[T] protected(
+      var k: Output[T],
+      var v: Output[T])
 
   object Cache {
-    def apply(k: Output, v: Output): Cache = {
+    def apply[T](
+        k: Output[T],
+        v: Output[T]
+    ): Cache[T] = {
       new Cache(k, v)
     }
   }

@@ -28,12 +28,14 @@ import scala.language.postfixOps
   */
 trait FeedForwardLayer {
   def apply(
-      input: Output,
+      input: Output[Float],
       paddingRemover: Option[PadRemover]
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output
+      context: Output[Int]
+  ): Output[Float]
 }
 
 class DenseReLUDenseFeedForwardLayer protected (
@@ -44,19 +46,25 @@ class DenseReLUDenseFeedForwardLayer protected (
     val name: String = "DenseReLUDense"
 ) extends FeedForwardLayer {
   override def apply(
-      input: Output,
+      input: Output[Float],
       paddingRemover: Option[PadRemover]
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
-    val inputShape = tf.shape(input)
+      context: Output[Int]
+  ): Output[Float] = {
+    val inputShape = tf.shape(input).toInt
     val processedInput = paddingRemover.map(pr => {
-      // Collapse `input` across examples, and remove padding positions.
-      tf.expandDims(pr.remove(tf.reshape(input, tf.concatenate(Seq(Tensor(-1), inputShape(2 ::)), axis = 0))), axis = 0)
+      // Collapse `input` across examples.
+      val collapsedShape = tf.concatenate[Int](Seq(Tensor(-1), inputShape(2 ::).toInt), axis = 0)
+      val collapsedInput = tf.reshape(input, collapsedShape)
+      // Remove the padding positions.
+      tf.expandDims(pr.remove(collapsedInput), axis = 0)
     }).getOrElse(input)
     val output = Common.denseReLUDense(
-      processedInput, filterSize, outputSize, reluDropoutRate, reluDropoutBroadcastAxes, name)(mode, parameterManager)
+      processedInput, filterSize, outputSize,
+      reluDropoutRate, reluDropoutBroadcastAxes, name)
     paddingRemover.map(pr => {
       // Restore `output` to the original shape of `input`, including padding.
       tf.reshape(pr.restore(tf.squeeze(output, axes = Seq(0))), inputShape)

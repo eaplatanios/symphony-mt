@@ -20,22 +20,24 @@ import org.platanios.tensorflow.api._
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait DecodeHelper[E, CacheType] {
-  def batchSize(encoderOutput: E): Output
+trait DecodeHelper[EncoderOutput, CacheType] {
+  def batchSize(encoderOutput: EncoderOutput): Output[Int]
 
   def decode(
-      encoderOutput: E,
-      decodingFn: (Output, Output, E, CacheType) => (Output, CacheType),
-      decodingLength: Output,
-      endOfSequenceID: Output
+      encoderOutput: EncoderOutput,
+      decodingFn: (Output[Int], Output[Int], EncoderOutput, CacheType) => (Output[Float], CacheType),
+      decodingLength: Output[Int],
+      endOfSequenceID: Output[Int]
   ): DecodeHelper.Result
 }
 
 object DecodeHelper {
-  case class Result(outputs: (Output, Output), scores: Option[Output] = None)
+  case class Result(
+      outputs: (Output[Int], Output[Int]),
+      scores: Option[Output[Float]] = None)
 
   /** Returns the shape of `value`, with the inner dimensions set to unknown size. */
-  def stateShapeInvariants(value: Output): Shape = {
+  def stateShapeInvariants(value: Output[_]): Shape = {
     Shape(value.shape(0)) ++ Shape.fromSeq(Seq.fill(value.rank - 2)(-1)) ++ Shape(value.shape(-1))
   }
 }
