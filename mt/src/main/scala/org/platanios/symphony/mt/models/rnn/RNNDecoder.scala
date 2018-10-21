@@ -30,10 +30,8 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSear
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class RNNDecoder[T: TF : IsNotQuantized, State]()
+abstract class RNNDecoder[T: TF : IsNotQuantized, State: NestedStructure]()
     extends Decoder[T, (Tuple[Output[T], Seq[State]], Output[Int], Output[Int])] {
-  val evStructureState: NestedStructure[State]
-
   override def create[O: TF](
       decodingMode: DecodingMode[O],
       config: RNNModel.Config[T, _],
@@ -51,7 +49,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State]()
       context: Output[Int]
   ): RNNDecoder.DecoderOutput[O]
 
-  protected def decode[O: TF, DS](
+  protected def decode[O: TF, DS: NestedStructure](
       decodingMode: DecodingMode[O],
       config: RNNModel.Config[T, _],
       srcSequenceLengths: Output[Int],
@@ -66,8 +64,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State]()
   )(implicit
       mode: Mode,
       parameterManager: ParameterManager,
-      context: Output[Int],
-      evStructureDS: NestedStructure.Aux[DS, _, _, _]
+      context: Output[Int]
   ): RNNDecoder.DecoderOutput[O] = {
     val outputWeights = parameterManager.getProjectionToWords(cell.outputShape.apply(-1), context(1)).castTo[T]
 

@@ -25,7 +25,8 @@ import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
+import org.platanios.tensorflow.api.core.types.{IsDecimal, IsReal, TF}
+import org.platanios.tensorflow.api.implicits.helpers.Zero
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -33,7 +34,7 @@ import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 sealed trait ModelArchitecture {
   val name: String
 
-  def model(
+  def model[T: TF : IsDecimal](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -57,16 +58,17 @@ sealed trait ModelArchitecture {
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
-  ): RNNModel[_, _] = {
-    val cell = cellFromString(cellString)
-    createModel[cell.StateType, cell.StateShapeType](
+  ): RNNModel[T, _] = {
+    val cell = cellFromString[T](cellString)
+    createModel[T, cell.StateType](
       name, languages, dataConfig, env, parameterManager, trainBackTranslation, languagePairs, evalLanguagePairs,
-      cell.asInstanceOf[Cell[cell.StateType, cell.StateShapeType]], numUnits, residual, dropout, attention,
+      cell.asInstanceOf[Cell[cell.DataType, cell.StateType]], numUnits, residual, dropout, attention,
       labelSmoothing, summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
-      optConfig, logConfig, evalDatasets, evalMetrics)(cell.stateWhileLoopEvidence, cell.stateDropoutEvidence)
+      optConfig, logConfig, evalDatasets, evalMetrics
+    )(TF[T], IsDecimal[T], cell.evZeroState.asInstanceOf[Zero[cell.StateType]])
   }
 
-  protected def createModel[S, SS](
+  protected def createModel[T: TF : IsDecimal, State: Zero](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -75,7 +77,7 @@ sealed trait ModelArchitecture {
       trainBackTranslation: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
-      cell: Cell[S, SS],
+      cell: Cell[T, State],
       numUnits: Int,
       residual: Boolean,
       dropout: Option[Float],
@@ -90,14 +92,11 @@ sealed trait ModelArchitecture {
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
-  )(implicit
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): RNNModel[S, SS]
+  ): RNNModel[T, State]
 
-  protected def cellFromString(cellString: String): Cell[_, _] = {
+  protected def cellFromString[T: TF : IsReal](cellString: String): Cell[T, _] = {
     val parts = cellString.split(":")
-    val activation: Output => Output = {
+    val activation: Output[T] => Output[T] = {
       if (parts.length < 2) {
         tf.tanh(_)
       } else {
@@ -116,7 +115,7 @@ sealed trait ModelArchitecture {
     parts(0) match {
       case "gru" => GRU(activation)
       case "lstm" if parts.length == 2 => BasicLSTM(activation = activation)
-      case "lstm" if parts.length == 3 => BasicLSTM(parts(2).toFloat, activation)
+      case "lstm" if parts.length == 3 => BasicLSTM(activation = activation, forgetBias = parts(2).toFloat)
       case _ => throw new IllegalArgumentException(s"'$cellString' does not represent a valid RNN cell type.")
     }
   }
@@ -154,7 +153,7 @@ case class RNN(
 ) extends ModelArchitecture {
   override val name: String = "rnn"
 
-  override protected def createModel[S, SS](
+  override protected def createModel[T: TF : IsDecimal, State: Zero](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -163,7 +162,7 @@ case class RNN(
       trainBackTranslation: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
-      cell: Cell[S, SS],
+      cell: Cell[T, State],
       numUnits: Int,
       residual: Boolean,
       dropout: Option[Float],
@@ -178,10 +177,7 @@ case class RNN(
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
-  )(implicit
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): RNNModel[S, SS] = {
+  ): RNNModel[T, State] = {
     RNNModel(
       name = name,
       languages = languages,
@@ -201,7 +197,15 @@ case class RNN(
           numLayers = numDecoderLayers,
           residual = residual,
           dropout = dropout,
-          attention = if (attention) Some(LuongRNNAttention(scaled = true)) else None,
+          attention = {
+            if (attention) {
+              Some(LuongRNNAttention(
+                scaled = true,
+                probabilityFn = (o: Output[T]) => tf.softmax(o)))
+            } else {
+              None
+            }
+          },
           outputAttention = attention),
         pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
         labelSmoothing = labelSmoothing,
@@ -229,7 +233,7 @@ case class BiRNN(
 ) extends ModelArchitecture {
   override val name: String = "bi_rnn"
 
-  override protected def createModel[S, SS](
+  override protected def createModel[T: TF : IsDecimal, State: Zero](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -238,7 +242,7 @@ case class BiRNN(
       trainBackTranslation: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
-      cell: Cell[S, SS],
+      cell: Cell[T, State],
       numUnits: Int,
       residual: Boolean,
       dropout: Option[Float],
@@ -253,10 +257,7 @@ case class BiRNN(
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
-  )(implicit
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): RNNModel[S, SS] = {
+  ): RNNModel[T, State] = {
     RNNModel(
       name = name,
       languages = languages,
@@ -276,7 +277,15 @@ case class BiRNN(
           numLayers = numDecoderLayers,
           residual = residual,
           dropout = dropout,
-          attention = if (attention) Some(LuongRNNAttention(scaled = true)) else None,
+          attention = {
+            if (attention) {
+              Some(LuongRNNAttention(
+                scaled = true,
+                probabilityFn = (o: Output[T]) => tf.softmax(o)))
+            } else {
+              None
+            }
+          },
           outputAttention = attention),
         pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
         labelSmoothing = labelSmoothing,
@@ -305,7 +314,7 @@ case class GNMT(
 ) extends ModelArchitecture {
   override val name: String = "gnmt"
 
-  override protected def createModel[S, SS](
+  override protected def createModel[T: TF : IsDecimal, State: Zero](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -314,7 +323,7 @@ case class GNMT(
       trainBackTranslation: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
-      cell: Cell[S, SS],
+      cell: Cell[T, State],
       numUnits: Int,
       residual: Boolean,
       dropout: Option[Float],
@@ -329,10 +338,7 @@ case class GNMT(
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
-  )(implicit
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): RNNModel[S, SS] = {
+  ): RNNModel[T, State] = {
     RNNModel(
       name = name,
       languages = languages,
@@ -352,7 +358,9 @@ case class GNMT(
           numUnits = numUnits,
           numLayers = numBiLayers + numUniLayers,
           numResLayers = numUniResLayers,
-          attention = BahdanauRNNAttention(normalized = true),
+          attention = BahdanauRNNAttention(
+            normalized = true,
+            probabilityFn = (o: Output[T]) => tf.softmax(o)),
           dropout = dropout,
           useNewAttention = attention),
         pivot = ModelArchitecture.pivot(parameterManager, languagePairs),

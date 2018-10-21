@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
+import org.platanios.tensorflow.api.implicits.helpers.Zero
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.cell._
 
@@ -27,7 +27,7 @@ import org.platanios.tensorflow.api.ops.rnn.cell._
   * @author Emmanouil Antonios Platanios
   */
 abstract class Cell[T: TF, State](implicit
-    val evStructureState: NestedStructure[State]
+    val evZeroState: Zero[State]
 ) {
   // The following two type aliases are used in the experiments module.
   type DataType = T

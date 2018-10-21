@@ -30,7 +30,6 @@ import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.config.TimeBasedCheckpoints
 import org.platanios.tensorflow.api.core.client.SessionConfig
 import org.platanios.tensorflow.api.core.types.TF
-import org.platanios.tensorflow.api.implicits.helpers.Zero
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
@@ -436,10 +435,16 @@ abstract class Model[S] protected (
                 (index + 1, currentTgtLanguage, tgtSentences)
               }
 
+              val srcSequences = srcMapped._3._1
+              val srcSequenceLengths = srcMapped._3._2
+
+              // Set the shape invariants for the while loop.
+              srcSequences.setShape(Shape(-1, -1))
+              srcSequenceLengths.setShape(Shape(-1))
+
               val results = tf.whileLoop(
                 predicateFn, bodyFn,
-                loopVariables = (Output[Int](0), srcLanguage, srcMapped._3),
-                shapeInvariants = Some((Shape(), Shape(), (Shape(-1, -1), Shape(-1)))))
+                loopVariables = (Output[Int](0), srcLanguage, (srcSequences, srcSequenceLengths)))
               val decodedSequences = mapFromWordIds(tgtLanguage, /* target sentences */ results._3._1)
               (tgtLanguage, (decodedSequences, /* target sentence lengths */ results._3._2))
           }

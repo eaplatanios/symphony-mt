@@ -24,32 +24,21 @@ import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
-import org.platanios.tensorflow.api.ops.rnn.attention.AttentionWrapperState
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State, AttentionState](
+class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: NestedStructure, AttentionState: NestedStructure](
     val cell: Cell[T, State],
     val numUnits: Int,
     val numLayers: Int,
-    val dataType: DataType[T],
     val residual: Boolean = false,
     val dropout: Option[Float] = None,
     val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
     val attention: Option[RNNAttention[T, AttentionState]] = None,
     val outputAttention: Boolean = true
-)(implicit
-    override val evStructureState: NestedStructure[State],
-    evStructureAttentionState: NestedStructure[AttentionState]
 ) extends RNNDecoder[T, State]() {
-  val evStructureAttentionWrapperState: NestedStructure[AttentionWrapperState[T, Seq[State], Seq[AttentionState]]] = {
-    implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = this.evStructureState.asAux()
-    implicit val evStructureAttentionState: NestedStructure.Aux[AttentionState, _, _, _] = this.evStructureAttentionState.asAux()
-    NestedStructure[AttentionWrapperState[T, Seq[State], Seq[AttentionState]]]
-  }
-
   override def create[O: TF](
       decodingMode: Model.DecodingMode[O],
       config: RNNModel.Config[T, _],
@@ -66,10 +55,6 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State, AttentionState](
       deviceManager: DeviceManager,
       context: Output[Int]
   ): RNNDecoder.DecoderOutput[O] = {
-    implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = this.evStructureState.asAux()
-    implicit val evStructureAttentionState: NestedStructure.Aux[AttentionState, _, _, _] = this.evStructureAttentionState.asAux()
-    implicit val evStructureAttentionWrapperState: NestedStructure.Aux[AttentionWrapperState[T, Seq[State], Seq[AttentionState]], _, _, _] = this.evStructureAttentionWrapperState.asAux()
-
     // Embeddings
     val tgtLanguage = context(1)
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
@@ -134,7 +119,6 @@ object UnidirectionalRNNDecoder {
       cell: Cell[T, State],
       numUnits: Int,
       numLayers: Int,
-      dataType: DataType[T],
       residual: Boolean = false,
       dropout: Option[Float] = None,
       residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
@@ -142,7 +126,7 @@ object UnidirectionalRNNDecoder {
       outputAttention: Boolean = false
   ): UnidirectionalRNNDecoder[T, State, AttentionState] = {
     new UnidirectionalRNNDecoder[T, State, AttentionState](
-      cell, numUnits, numLayers, dataType, residual, dropout,
+      cell, numUnits, numLayers, residual, dropout,
       residualFn, attention, outputAttention)
   }
 }

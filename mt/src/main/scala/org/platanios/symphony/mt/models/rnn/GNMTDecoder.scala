@@ -30,7 +30,7 @@ import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 /**
   * @author Emmanouil Antonios Platanios
   */
-class GNMTDecoder[T: TF : IsNotQuantized, State, AttentionState](
+class GNMTDecoder[T: TF : IsNotQuantized, State: NestedStructure, AttentionState: NestedStructure](
     val cell: Cell[T, State],
     val numUnits: Int,
     val numLayers: Int,
@@ -38,26 +38,9 @@ class GNMTDecoder[T: TF : IsNotQuantized, State, AttentionState](
     val attention: RNNAttention[T, AttentionState],
     val dropout: Option[Float] = None,
     val useNewAttention: Boolean = true
-)(implicit
-    override val evStructureState: NestedStructure[State],
-    evStructureAttentionState: NestedStructure[AttentionState]
 ) extends RNNDecoder[T, State]() {
-  val evStructureSeqState: NestedStructure.Aux[Seq[State], _, _, _] = {
-    NestedStructure[Seq[State]]
-  }
-
-  val evStructureAttentionWrapperState1: NestedStructure.Aux[AttentionWrapperState[T, State, Seq[AttentionState]], _, _, _] = {
-    implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = this.evStructureState.asAux()
+  implicit val evStructureHelper: NestedStructure[AttentionWrapperState[T, State, Seq[AttentionState]]] = {
     NestedStructure[AttentionWrapperState[T, State, Seq[AttentionState]]]
-  }
-
-  val evStructureAttentionWrapperState: NestedStructure[(AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State])] = {
-    implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = this.evStructureState.asAux()
-    implicit val evStructureAttentionState: NestedStructure.Aux[AttentionState, _, _, _] = this.evStructureAttentionState.asAux()
-    implicit val evStructureSeqState: NestedStructure.Aux[Seq[State], _, _, _] = this.evStructureSeqState
-    implicit val evStructureAttentionWrapperState: NestedStructure.Aux[AttentionWrapperState[T, State, Seq[AttentionState]], _, _, _] = this.evStructureAttentionWrapperState1
-    implicitly[NestedStructure.Aux[(AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State]), _, _, _]]
-    NestedStructure[(AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State])]
   }
 
   override def create[O: TF](
@@ -76,10 +59,6 @@ class GNMTDecoder[T: TF : IsNotQuantized, State, AttentionState](
       deviceManager: DeviceManager,
       context: Output[Int]
   ): RNNDecoder.DecoderOutput[O] = {
-    implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = this.evStructureState.asAux()
-    implicit val evStructureAttentionState: NestedStructure.Aux[AttentionState, _, _, _] = this.evStructureAttentionState.asAux()
-    implicit val evStructureAttentionWrapperState: NestedStructure.Aux[(AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State]), _, _, _] = this.evStructureAttentionWrapperState.asAux()
-
     // Embeddings
     val tgtLanguage = context(1)
     val embeddings = parameterManager.wordEmbeddings(tgtLanguage)
@@ -128,6 +107,7 @@ class GNMTDecoder[T: TF : IsNotQuantized, State, AttentionState](
       outputAttention = false)
     val multiCell = GNMTDecoder.StackedCell[T, State, AttentionState](
       attentionCell, cells.tail, useNewAttention)
+
     decode(
       decodingMode, config, encoderState._2, tgtSequences, tgtSequenceLengths,
       (attentionInitialState, initialState.tail), embeddings(_).castTo[T], multiCell,
@@ -170,21 +150,12 @@ object GNMTDecoder {
     *
     * @author Emmanouil Antonios Platanios
     */
-  class StackedCell[T: TF : IsNotQuantized, State, AttentionState](
+  class StackedCell[T: TF : IsNotQuantized, State: NestedStructure, AttentionState: NestedStructure](
       val attentionCell: AttentionWrapperCell[T, State, AttentionState],
       val cells: Seq[tf.RNNCell[Output[T], State]],
       val useNewAttention: Boolean = false,
       val name: String = "GNMTMultiCell"
-  )(implicit
-      evStructureState: NestedStructure[State],
-      evStructureAttentionState: NestedStructure[AttentionState]
   ) extends tf.RNNCell[Output[T], (AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State])] {
-    val evStructureAttentionWrapperState: NestedStructure[AttentionWrapperState[T, State, Seq[AttentionState]]] = {
-      implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = this.evStructureState.asAux()
-      implicit val evStructureAttentionState: NestedStructure.Aux[AttentionState, _, _, _] = this.evStructureAttentionState.asAux()
-      NestedStructure[AttentionWrapperState[T, State, Seq[AttentionState]]]
-    }
-
     override def outputShape[OS](implicit
         evStructureOutput: NestedStructure.Aux[Output[T], _, _, OS]
     ): OS = {
@@ -194,10 +165,8 @@ object GNMTDecoder {
     override def stateShape[SS](implicit
         evStructureAttentionWrapperState: NestedStructure.Aux[(AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State]), _, _, SS]
     ): SS = {
-      implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = this.evStructureState.asAux()
-      implicit val evStructureAttentionState: NestedStructure.Aux[AttentionState, _, _, _] = this.evStructureAttentionState.asAux()
-      implicit val evStructureAttentionWrapperState: NestedStructure.Aux[AttentionWrapperState[T, State, Seq[AttentionState]], _, _, _] = this.evStructureAttentionWrapperState.asAux()
-      (attentionCell.stateShape(evStructureAttentionWrapperState), cells.map(_.stateShape(evStructureState))).asInstanceOf[SS]
+      (attentionCell.stateShape(NestedStructure[AttentionWrapperState[T, State, Seq[AttentionState]]]),
+          cells.map(_.stateShape(NestedStructure[State]))).asInstanceOf[SS]
     }
 
     override def forward(
