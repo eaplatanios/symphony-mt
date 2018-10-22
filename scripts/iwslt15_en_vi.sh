@@ -6,7 +6,7 @@ java -jar target/scala-2.12/symphony-mt-0.1.0-SNAPSHOT.jar \
   --working-dir temp/experiments \
   --data-dir temp/data \
   --dataset iwslt15 \
-  --languages en:cs,en:de,en:fr,en:th,en:vi,en:zh \
+  --languages en:vi \
   --eval-languages en:cs,en:de,en:fr,en:th,en:vi,en:zh \
   --use-back-translations \
   --parallel-portion 1.00 \
@@ -14,7 +14,7 @@ java -jar target/scala-2.12/symphony-mt-0.1.0-SNAPSHOT.jar \
   --eval-metrics bleu,hyp_len,ref_len,sen_cnt \
   --tokenizer moses \
   --cleaner moses \
-  --vocabulary bpe:10000:5 \
+  --vocabulary generated:20000:5 \
   --batch-size 128 \
   --num-buckets 5 \
   --src-max-length 50 \

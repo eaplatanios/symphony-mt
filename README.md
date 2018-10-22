@@ -11,6 +11,10 @@ Mitchell.
 
 ## Running Experiments
 
+In order to reproduce our experimental results you must
+first execute `sbt assembly` on the root directory of this
+repository, after cloning it.
+
 Example experiment scripts are located in the `scripts` 
 directory. We will soon update this with the specific 
 scripts used to reproduce the experiments presented in 
