@@ -47,7 +47,7 @@ class SentenceLength protected (
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Output[Float] = {
-    val srcSentenceLengths = values._2._1._2.toFloat
+    val srcSentenceLengths = values._1._2._2.toFloat
     val tgtSentenceLengths = values._2._2._2.toFloat
     tf.nameScope(sanitize(name)) {
       val length = if (forHypothesis) srcSentenceLengths else tgtSentenceLengths
@@ -60,7 +60,7 @@ class SentenceLength protected (
       weights: Option[Output[Float]] = None,
       name: String = this.name
   ): Metric.StreamingInstance[Output[Float]] = {
-    val srcSentenceLengths = values._2._1._3._2.toFloat
+    val srcSentenceLengths = values._1._2._2.toFloat
     val tgtSentenceLengths = values._2._2._2.toFloat
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
