@@ -19,3 +19,28 @@ Example experiment scripts are located in the `scripts`
 directory. We will soon update this with the specific 
 scripts used to reproduce the experiments presented in 
 our paper.
+
+## Using Precompiled TensorFlow Distribution
+
+In order to use the precompiled TensorFlow binaries that
+TensorFlow Scala provides, you need to change line 76 in
+the `build.sbt` file, from this:
+
+```scala
+libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion
+```
+
+to this:
+
+```scala
+libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion classifier "linux-cpu-x86_64"
+```
+
+*Make sure to replace `linux-cpu-x86_64` with the string
+that corresponds to your platform.* Currently supported
+platforms are: `linux-cpu-x86_64`, `linux-gpu-x86_64`, and
+`darwin-cpu-x86_64`.
+
+For more information on how to install/configure TensorFlow
+Scala, please refer to the
+[official website](http://platanios.org/tensorflow_scala/).
