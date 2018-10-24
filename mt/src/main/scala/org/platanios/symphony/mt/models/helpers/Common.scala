@@ -325,8 +325,8 @@ object Common {
           tf.oneHot(
             indices = labels,
             depth = vocabSize,
-            onValue = Output[Float](confidence).castTo[T],
-            offValue = Output[Float](lowConfidence).castTo[T])
+            onValue = Output.constant[Float](confidence).castTo[T],
+            offValue = lowConfidence.castTo[T])
         }
       }
       tf.softmaxCrossEntropy(logits, softTargets) - normalizingConstant.castTo[T]

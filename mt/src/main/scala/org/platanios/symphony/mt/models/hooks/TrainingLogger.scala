@@ -131,8 +131,8 @@ case class TrainingLogger(
     if (average || shouldTrigger) {
       totalGradientsNorm += fetches(1).scalar.asInstanceOf[Float]
       totalLoss += fetches(2).scalar.asInstanceOf[Float]
-      totalSrcWordCount += fetches(3).scalar.asInstanceOf[Int]
-      totalTgtWordCount += fetches(4).scalar.asInstanceOf[Int]
+      totalSrcWordCount += fetches(3).scalar.asInstanceOf[Long].toInt
+      totalTgtWordCount += fetches(4).scalar.asInstanceOf[Long].toInt
       if (shouldTrigger) {
         val numSteps = (lastStep * dataParallelFactor).toInt
         val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt)

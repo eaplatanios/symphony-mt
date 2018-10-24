@@ -41,6 +41,7 @@ object Inputs {
         tgtLanguage: Output[Int],
         file: Output[String]
     ): InputDataset = {
+      val endSeqToken = Tensor.fill[String](Shape())(dataConfig.endOfSequenceToken)
       tf.data.datasetFromDynamicTextFiles(file)
           .map(o => tf.stringSplit(o.expandDims(0)).values)
           // Crop based on the maximum allowed sequence length.
@@ -55,7 +56,7 @@ object Inputs {
             // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
             // not generally need to do this since later on we will be masking out calculations past
             // the true sequence.
-            paddingValues = Some((Tensor(dataConfig.endOfSequenceToken), Tensor.zeros[Int](Shape()))))
+            paddingValues = Some((endSeqToken, Tensor.zeros[Int](Shape()))))
           .map(d => (srcLanguage, tgtLanguage, (d._1, d._2)))
     }
 
@@ -148,7 +149,6 @@ object Inputs {
                 .interleave(
                   function = d => parallelDatasetCreator(d._1, d._2, d._3, d._4, d._5, d._6),
                   cycleLength = maxNumFiles,
-                  numParallelCalls = maxNumFiles,
                   name = "FilesInterleave")
           },
           cycleLength = numParallelFiles,
@@ -231,15 +231,15 @@ object Inputs {
             if (!isEval && dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1) {
               d.map(
                 dd => (dd._1, (dd._2._1(0 :: dataConfig.srcMaxLength), dd._2._2(0 :: dataConfig.tgtMaxLength))),
-                dataConfig.numParallelCalls, name = "Map/MaxLength")
+                name = "Map/MaxLength")
             } else if (!isEval && dataConfig.srcMaxLength != -1) {
               d.map(
                 dd => (dd._1, (dd._2._1(0 :: dataConfig.srcMaxLength), dd._2._2)),
-                dataConfig.numParallelCalls, name = "Map/MaxLength")
+                name = "Map/MaxLength")
             } else if (!isEval && dataConfig.tgtMaxLength != -1) {
               d.map(
                 dd => (dd._1, (dd._2._1, dd._2._2(0 :: dataConfig.tgtMaxLength))),
-                dataConfig.numParallelCalls, name = "Map/MaxLength")
+                name = "Map/MaxLength")
             } else {
               d
             }
@@ -250,12 +250,12 @@ object Inputs {
               /* Language pair */ (d._1._1, d._1._2),
               /* Source sentences */ (d._2._1, tf.size(d._2._1).toInt),
               /* Target sentences */ (d._2._2, tf.size(d._2._2).toInt)),
-            numParallelCalls = dataConfig.numParallelCalls,
             name = "Map/AddLengths")
           .prefetch(bufferSize)
 
     val batchingFn = (dataset: SentencePairsDataset) => {
       val zero = Tensor.zeros[Int](Shape())
+      val endSeqToken = Tensor.fill[String](Shape())(dataConfig.endOfSequenceToken)
       dataset.paddedBatch(
         batchSize = batchSize,
         // The first three entries are the source and target line rows, which are unknown-length vectors.
@@ -263,7 +263,7 @@ object Inputs {
         paddedShapes = ((Shape(), Shape()), (Shape(-1), Shape()), (Shape(-1), Shape())),
         // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
         // generally need to do this since later on we will be masking out calculations past the true sequence.
-        paddingValues = Some(((zero, zero), (Tensor(dataConfig.endOfSequenceToken), zero), (Tensor(dataConfig.endOfSequenceToken), zero))))
+        paddingValues = Some(((zero, zero), (endSeqToken, zero), (endSeqToken, zero))))
     }
 
     val parallelDataset = {
@@ -300,7 +300,6 @@ object Inputs {
         .map(d => (
             (/* Source language */ d._1._1(0), /* Target language */ d._1._2(0), /* Source sentences */ d._2),
             /* Target sentences */ d._3),
-          numParallelCalls = dataConfig.numParallelCalls,
           name = "AddLanguageIDs")
         .prefetch(bufferSize)
   }

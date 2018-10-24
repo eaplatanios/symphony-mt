@@ -38,7 +38,7 @@ class ParameterManager protected (
 
   protected val languageIds                : mutable.Map[Graph, Seq[Output[Int]]]     = mutable.Map.empty
   protected val stringToIndexLookupTables  : mutable.Map[Graph, Output[Resource]]     = mutable.Map.empty
-  protected val stringToIndexLookupDefaults: mutable.Map[Graph, Output[Int]]          = mutable.Map.empty
+  protected val stringToIndexLookupDefaults: mutable.Map[Graph, Output[Long]]         = mutable.Map.empty
   protected val indexToStringLookupTables  : mutable.Map[Graph, Output[Resource]]     = mutable.Map.empty
   protected val indexToStringLookupDefaults: mutable.Map[Graph, Output[String]]       = mutable.Map.empty
   protected val wordEmbeddings             : mutable.Map[Graph, wordEmbeddingsType.T] = mutable.Map.empty
@@ -77,7 +77,7 @@ class ParameterManager protected (
 
         tf.variableScope("StringToIndexLookupTables") {
           stringToIndexLookupTables += graph -> wordEmbeddingsType.createStringToIndexLookupTable(languages)
-          stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID, name = "Default")
+          stringToIndexLookupDefaults += graph -> tf.constant(Vocabulary.UNKNOWN_TOKEN_ID.toLong, name = "Default")
         }
 
         tf.variableScope("IndexToStringLookupTables") {
@@ -104,7 +104,7 @@ class ParameterManager protected (
         ParameterManager.lookup(
           handle = handle,
           keys = keys,
-          defaultValue = stringToIndexLookupDefaults(graph))
+          defaultValue = stringToIndexLookupDefaults(graph)).toInt
       }
     }
   }
@@ -116,7 +116,7 @@ class ParameterManager protected (
         val handle = wordEmbeddingsType.lookupTable(indexToStringLookupTables(graph), languageId)
         ParameterManager.lookup(
           handle = handle,
-          keys = keys,
+          keys = keys.toLong,
           defaultValue = indexToStringLookupDefaults(graph))
       }
     }

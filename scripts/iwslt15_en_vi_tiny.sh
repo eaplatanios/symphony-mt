@@ -14,12 +14,12 @@ java -jar target/scala-2.12/symphony-mt-0.1.0-SNAPSHOT.jar \
   --eval-metrics bleu,hyp_len,ref_len,sen_cnt \
   --tokenizer moses \
   --cleaner moses \
-  --vocabulary generated:20000:5 \
+  --vocabulary bpe:5000:5 \
   --batch-size 32 \
   --num-buckets 5 \
   --src-max-length 50 \
   --tgt-max-length 50 \
-  --buffer-size 128 \
+  --buffer-size 16 \
   --model-arch bi_rnn:2:2 \
   --model-cell lstm:tanh \
   --model-type pairwise \
