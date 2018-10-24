@@ -18,66 +18,68 @@ package org.platanios.symphony.mt.models.parameters
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.Resource
 
 import scala.collection.mutable
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-class SharedWordEmbeddings protected (
-    override val embeddingsSize: Int
-) extends WordEmbeddingsType {
-  override type T = Output
+case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType {
+  override type T = Output[Float]
 
-  override def createStringToIndexLookupTable(languages: Seq[(Language, Vocabulary)]): Output = {
+  override def createStringToIndexLookupTable(
+      languages: Seq[(Language, Vocabulary)]
+  ): Output[Resource] = {
     languages.head._2.stringToIndexLookupTable(name = "SharedStringToIndexLookupTable").handle
   }
 
-  override def createIndexToStringLookupTable(languages: Seq[(Language, Vocabulary)]): Output = {
+  override def createIndexToStringLookupTable(
+      languages: Seq[(Language, Vocabulary)]
+  ): Output[Resource] = {
     languages.head._2.indexToStringLookupTable(name = "SharedIndexToStringLookupTable").handle
   }
 
-  override def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): Output = {
-    val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+  override def createWordEmbeddings(
+      languages: Seq[(Language, Vocabulary)]
+  ): Output[Float] = {
     val someLanguage = languages.head
-    tf.variable(
-      someLanguage._1.name, FLOAT32, Shape(someLanguage._2.size, embeddingsSize),
-      embeddingsInitializer).value
+    tf.variable[Float](
+      name = someLanguage._1.name,
+      shape = Shape(someLanguage._2.size, embeddingsSize),
+      initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)).value
   }
 
-  override def lookupTable(lookupTable: Output, languageId: Output): Output = {
+  override def lookupTable(
+      lookupTable: Output[Resource],
+      languageId: Output[Int]
+  ): Output[Resource] = {
     lookupTable
   }
 
   override def embeddingLookup(
-      embeddingTables: Output,
-      languageIds: Seq[Output],
-      languageId: Output,
-      keys: Output
-  )(implicit context: Output): Output = {
+      embeddingTables: Output[Float],
+      languageIds: Seq[Output[Int]],
+      languageId: Output[Int],
+      keys: Output[Int]
+  )(implicit context: Output[Int]): Output[Float] = {
     embeddingTables.gather(keys)
   }
 
   override def projectionToWords(
       languages: Seq[(Language, Vocabulary)],
-      languageIds: Seq[Output],
-      projectionsToWords: mutable.Map[Int, Output],
+      languageIds: Seq[Output[Int]],
+      projectionsToWords: mutable.Map[Int, Output[Float]],
       inputSize: Int,
-      languageId: Output
-  )(implicit context: Output): Output = {
+      languageId: Output[Int]
+  )(implicit context: Output[Int]): Output[Float] = {
     projectionsToWords
         .getOrElseUpdate(inputSize, {
           val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
           val someLanguage = languages.head
-          tf.variable(
-            s"${someLanguage._1.name}/OutWeights", FLOAT32,
+          tf.variable[Float](
+            s"${someLanguage._1.name}/OutWeights",
             Shape(inputSize, someLanguage._2.size), weightsInitializer).value
         })
-  }
-}
-
-object SharedWordEmbeddings {
-  def apply(embeddingsSize: Int): SharedWordEmbeddings = {
-    new SharedWordEmbeddings(embeddingsSize)
   }
 }

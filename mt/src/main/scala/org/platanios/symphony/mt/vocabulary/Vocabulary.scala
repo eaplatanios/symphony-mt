@@ -47,7 +47,7 @@ class Vocabulary protected (
     *
     * @return Vocabulary lookup table.
     */
-  def stringToIndexLookupTable(name: String = "StringToIndexTableFromFile"): tf.HashTable = {
+  def stringToIndexLookupTable(name: String = "StringToIndexTableFromFile"): tf.HashTable[String, Long] = {
     Vocabulary.stringToIndexTableFromFile(
       file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN_ID, name = name)
   }
@@ -56,7 +56,7 @@ class Vocabulary protected (
     *
     * @return Vocabulary lookup table.
     */
-  def indexToStringLookupTable(name: String = "IndexToStringTableFromFile"): tf.HashTable = {
+  def indexToStringLookupTable(name: String = "IndexToStringTableFromFile"): tf.HashTable[Long, String] = {
     Vocabulary.indexToStringTableFromFile(
       file.path.toAbsolutePath.toString, defaultValue = Vocabulary.UNKNOWN_TOKEN, name = name)
   }
@@ -227,11 +227,11 @@ object Vocabulary {
     *   val table = tf.stringToIndexTableFromFile("test.txt"))
     * }}}
     *
-    * @param  filename          Filename of the text file to be used for initialization. The path must be accessible
-    *                           from wherever the graph is initialized (e.g., trainer or evaluation workers).
-    * @param  vocabularySize    Number of elements in the file, if known. If not known, set to `-1` (the default value).
-    * @param  defaultValue      Default value to use if a key is missing from the table.
-    * @param  name              Name for the created table.
+    * @param  filename       Filename of the text file to be used for initialization. The path must be accessible
+    *                        from wherever the graph is initialized (e.g., trainer or evaluation workers).
+    * @param  vocabularySize Number of elements in the file, if known. If not known, set to `-1` (the default value).
+    * @param  defaultValue   Default value to use if a key is missing from the table.
+    * @param  name           Name for the created table.
     * @return Created table.
     */
   private[Vocabulary] def stringToIndexTableFromFile(
@@ -239,9 +239,9 @@ object Vocabulary {
       vocabularySize: Int = -1,
       defaultValue: Long = -1L,
       name: String = "StringToIndexTableFromFile"
-  ): tf.HashTable = {
-    tf.createWithNameScope(name) {
-      tf.createWithNameScope("HashTable") {
+  ): tf.HashTable[String, Long] = {
+    tf.nameScope(name) {
+      tf.nameScope("HashTable") {
         val sharedName = {
           if (vocabularySize != -1)
             s"hash_table_${filename}_${vocabularySize}_${tf.TextFileWholeLine}_${tf.TextFileLineNumber}"
@@ -249,7 +249,7 @@ object Vocabulary {
             s"hash_table_${filename}_${tf.TextFileWholeLine}_${tf.TextFileLineNumber}"
         }
         val initializer = tf.LookupTableTextFileInitializer(
-          filename, STRING, INT64, tf.TextFileWholeLine, tf.TextFileLineNumber, vocabularySize = vocabularySize)
+          filename, STRING, INT64, tf.TextFileWholeLine[String], tf.TextFileLineNumber, vocabularySize = vocabularySize)
         tf.HashTable(initializer, defaultValue, sharedName = sharedName, name = "Table")
       }
     }
@@ -278,11 +278,11 @@ object Vocabulary {
     *   val table = tf.indexToStringTableFromFile("test.txt"))
     * }}}
     *
-    * @param  filename          Filename of the text file to be used for initialization. The path must be accessible
-    *                           from wherever the graph is initialized (e.g., trainer or evaluation workers).
-    * @param  vocabularySize    Number of elements in the file, if known. If not known, set to `-1` (the default value).
-    * @param  defaultValue      Default value to use if a key is missing from the table.
-    * @param  name              Name for the created table.
+    * @param  filename       Filename of the text file to be used for initialization. The path must be accessible
+    *                        from wherever the graph is initialized (e.g., trainer or evaluation workers).
+    * @param  vocabularySize Number of elements in the file, if known. If not known, set to `-1` (the default value).
+    * @param  defaultValue   Default value to use if a key is missing from the table.
+    * @param  name           Name for the created table.
     * @return Created table.
     */
   private[Vocabulary] def indexToStringTableFromFile(
@@ -290,9 +290,9 @@ object Vocabulary {
       vocabularySize: Int = -1,
       defaultValue: String = UNKNOWN_TOKEN,
       name: String = "IndexToStringTableFromFile"
-  ): tf.HashTable = {
-    tf.createWithNameScope(name) {
-      tf.createWithNameScope("HashTable") {
+  ): tf.HashTable[Long, String] = {
+    tf.nameScope(name) {
+      tf.nameScope("HashTable") {
         val sharedName = {
           if (vocabularySize != -1)
             s"hash_table_${filename}_${vocabularySize}_${tf.TextFileLineNumber}_${tf.TextFileWholeLine}"
@@ -300,7 +300,7 @@ object Vocabulary {
             s"hash_table_${filename}_${tf.TextFileLineNumber}_${tf.TextFileWholeLine}"
         }
         val initializer = tf.LookupTableTextFileInitializer(
-          filename, INT64, STRING, tf.TextFileLineNumber, tf.TextFileWholeLine, vocabularySize = vocabularySize)
+          filename, INT64, STRING, tf.TextFileLineNumber, tf.TextFileWholeLine[String], vocabularySize = vocabularySize)
         tf.HashTable(initializer, defaultValue, sharedName = sharedName, name = "Table")
       }
     }

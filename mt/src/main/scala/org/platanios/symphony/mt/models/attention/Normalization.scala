@@ -18,55 +18,62 @@ package org.platanios.symphony.mt.models.attention
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.learn.Mode
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 trait Normalization {
-  def apply(
-      input: Output,
+  def apply[T: TF : IsNotQuantized](
+      input: Output[T],
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output
+      context: Output[Int]
+  ): Output[T]
 }
 
 /** Applies no normalization to the input tensor. */
 case object NoNormalization extends Normalization {
-  override def apply(
-      input: Output,
+  override def apply[T: TF : IsNotQuantized](
+      input: Output[T],
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
-      name: String = "NoNormalization"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      name: String = "Normalization"
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
+      context: Output[Int]
+  ): Output[T] = {
     input
   }
 }
 
 case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable) extends Normalization {
-  override def apply(
-      input: Output,
+  override def apply[T: TF : IsNotQuantized](
+      input: Output[T],
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
-      name: String = "LayerNormalization"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      name: String = "Normalization"
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
+      context: Output[Int]
+  ): Output[T] = {
     val numFilters = depth.getOrElse(input.shape(-1))
     tf.variableScope(name, reuse) {
-      val scale = parameterManager.get("Scale", input.dataType, Shape(numFilters), tf.OnesInitializer)
-      val bias = parameterManager.get("Bias", input.dataType, Shape(numFilters), tf.ZerosInitializer)
+      val scale = parameterManager.get[T]("Scale", Shape(numFilters), tf.OnesInitializer)
+      val bias = parameterManager.get[T]("Bias", Shape(numFilters), tf.ZerosInitializer)
       val mean = tf.mean(input, axes = -1, keepDims = true)
       val variance = tf.mean(tf.square(input - mean), axes = -1, keepDims = true)
-      val normalizedInput = (input - mean) * tf.rsqrt(variance + epsilon)
+      val normalizedInput = (input - mean) * tf.rsqrt(variance + tf.constant[Float](epsilon).castTo[T])
       normalizedInput * scale + bias
     }
   }
@@ -74,29 +81,35 @@ case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVaria
 
 // TODO: !!!
 case object BatchNormalization extends Normalization {
-  override def apply(
-      input: Output,
+  override def apply[T: TF : IsNotQuantized](
+      input: Output[T],
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
-      name: String = "BatchNormalization"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      name: String = "Normalization"
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
+      context: Output[Int]
+  ): Output[T] = {
     ???
   }
 }
 
 case object NoamNormalization extends Normalization {
-  override def apply(
-      input: Output,
+  override def apply[T: TF : IsNotQuantized](
+      input: Output[T],
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
-      name: String = "NoamNormalization"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      name: String = "Normalization"
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = tf.createWithNameScope(name) {
-    tf.l2Normalize(input, input.rank - 1, epsilon) * tf.sqrt(tf.constant(input.shape(-1), FLOAT32))
+      context: Output[Int]
+  ): Output[T] = {
+    tf.nameScope(name) {
+      tf.l2Normalize(input, input.rank - 1, epsilon) * tf.sqrt(tf.constant[Float](input.shape(-1))).castTo[T]
+    }
   }
 }

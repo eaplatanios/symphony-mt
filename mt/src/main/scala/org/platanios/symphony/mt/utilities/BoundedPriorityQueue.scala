@@ -34,11 +34,21 @@ import scala.collection.generic.Growable
 private[utilities] class BoundedPriorityQueue[A](maxSize: Int)(implicit ord: Ordering[A])
     extends Iterable[A] with Growable[A] with Serializable {
 
-  private val underlying = if (maxSize < 1) new JPriorityQueue[A](ord) else new JPriorityQueue[A](maxSize, ord)
+  private val underlying = {
+    if (maxSize < 1) {
+      new JPriorityQueue[A](ord)
+    } else {
+      new JPriorityQueue[A](maxSize, ord)
+    }
+  }
 
-  override def iterator: Iterator[A] = underlying.iterator.asScala
+  override def iterator: Iterator[A] = {
+    underlying.iterator.asScala
+  }
 
-  override def size: Int = underlying.size
+  override def size: Int = {
+    underlying.size
+  }
 
   override def ++=(xs: TraversableOnce[A]): this.type = {
     xs.foreach(this += _)

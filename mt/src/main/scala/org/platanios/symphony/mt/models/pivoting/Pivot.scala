@@ -24,6 +24,13 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 trait Pivot {
-  def initialize(languages: Seq[(Language, Vocabulary)], parameterManager: ParameterManager): Unit
-  def pivotingSequence(srcLanguage: Output, tgtLanguage: Output): Output
+  def initialize(
+      languages: Seq[(Language, Vocabulary)],
+      parameterManager: ParameterManager
+  ): Unit
+
+  def pivotingSequence(
+      srcLanguage: Output[Int],
+      tgtLanguage: Output[Int]
+  ): Output[Int]
 }

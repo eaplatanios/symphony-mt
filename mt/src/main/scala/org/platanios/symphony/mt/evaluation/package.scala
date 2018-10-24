@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt
 
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.metrics.Metric
 
@@ -27,5 +28,5 @@ import org.slf4j.LoggerFactory
 package object evaluation {
   private[mt] val logger = Logger(LoggerFactory.getLogger("Evaluation"))
 
-  trait MTMetric extends Metric[((Output, Output, Output), (Output, Output)), Output]
+  trait MTMetric extends Metric[(SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])), Output[Float]]
 }

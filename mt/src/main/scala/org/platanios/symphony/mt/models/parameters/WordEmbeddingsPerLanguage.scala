@@ -18,128 +18,96 @@ package org.platanios.symphony.mt.models.parameters
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.Resource
 
 import scala.collection.mutable
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-class WordEmbeddingsPerLanguage protected (
-    override val embeddingsSize: Int,
-    val mergedEmbeddings: Boolean,
-    val mergedProjections: Boolean
-) extends WordEmbeddingsType {
-  override type T = Seq[Output]
+case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddingsType {
+  override type T = Seq[Output[Float]]
 
-  override def createStringToIndexLookupTable(languages: Seq[(Language, Vocabulary)]): Output = {
+  override def createStringToIndexLookupTable(
+      languages: Seq[(Language, Vocabulary)]
+  ): Output[Resource] = {
     val tables = languages.map(l => l._2.stringToIndexLookupTable(name = l._1.name))
     tf.stack(tables.map(_.handle))
   }
 
-  override def createIndexToStringLookupTable(languages: Seq[(Language, Vocabulary)]): Output = {
+  override def createIndexToStringLookupTable(
+      languages: Seq[(Language, Vocabulary)]
+  ): Output[Resource] = {
     val tables = languages.map(l => l._2.indexToStringLookupTable(name = l._1.name))
     tf.stack(tables.map(_.handle))
   }
 
-  override def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): T = {
+  override def createWordEmbeddings(
+      languages: Seq[(Language, Vocabulary)]
+  ): T = {
     val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-    if (!mergedEmbeddings) {
-      languages.map(l =>
-        tf.variable(l._1.name, FLOAT32, Shape(l._2.size, embeddingsSize), embeddingsInitializer).value)
-    } else {
-      val vocabSizes = languages.map(_._2.size)
-      val merged = tf.variable(
-        "Embeddings", FLOAT32, Shape(vocabSizes.sum, embeddingsSize), embeddingsInitializer).value
-      val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
-      val offsets = tf.concatenate(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
-      Seq(merged, offsets)
-    }
+    languages.map(l => {
+      tf.variable[Float](l._1.name, Shape(l._2.size, embeddingsSize), embeddingsInitializer).value
+    })
   }
 
-  override def lookupTable(lookupTable: Output, languageId: Output): Output = {
+  override def lookupTable(
+      lookupTable: Output[Resource],
+      languageId: Output[Int]
+  ): Output[Resource] = {
     lookupTable.gather(languageId)
   }
 
   override def embeddingLookup(
-      embeddingTables: T,
-      languageIds: Seq[Output],
-      languageId: Output,
-      keys: Output
-  )(implicit context: Output): Output = {
-    if (!mergedEmbeddings) {
-      val predicates = embeddingTables.zip(languageIds).map {
-        case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
-      }
-      val assertion = tf.assert(
-        tf.any(tf.stack(predicates.map(_._1))),
-        Seq(
-          "No word embeddings table found for the provided language.",
-          "Current language: ", languageId))
-      val default = () => tf.createWith(controlDependencies = Set(assertion)) {
-        tf.identity(embeddingTables.head)
-      }
-      tf.cases(predicates, default).gather(keys)
-    } else {
-      val merged = embeddingTables(0)
-      val offsets = embeddingTables(1)
-      merged.gather(keys + offsets.gather(languageId))
+      embeddingTables: Seq[Output[Float]],
+      languageIds: Seq[Output[Int]],
+      languageId: Output[Int],
+      keys: Output[Int]
+  )(implicit context: Output[Int]): Output[Float] = {
+    val predicates = embeddingTables.zip(languageIds).map {
+      case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
     }
+    val assertion = tf.assert(
+      tf.any(tf.stack(predicates.map(_._1))),
+      Seq[Output[Any]](
+        tf.constant[String]("No word embeddings table found for the provided language."),
+        tf.constant[String]("Current language: "),
+        languageId))
+    val default = () => tf.createWith(controlDependencies = Set(assertion)) {
+      tf.identity(embeddingTables.head)
+    }
+    tf.cases(predicates, default).gather(keys)
   }
 
   override def projectionToWords(
       languages: Seq[(Language, Vocabulary)],
-      languageIds: Seq[Output],
-      projectionsToWords: mutable.Map[Int, T],
+      languageIds: Seq[Output[Int]],
+      projectionsToWords: mutable.Map[Int, Seq[Output[Float]]],
       inputSize: Int,
-      languageId: Output
-  )(implicit context: Output): Output = {
-    if (!mergedProjections) {
-      val projectionsForSize = projectionsToWords
-          .getOrElseUpdate(inputSize, {
-            val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-            languages.map(l => tf.variable(
-              s"${l._1.name}/OutWeights", FLOAT32, Shape(inputSize, l._2.size), weightsInitializer).value)
+      languageId: Output[Int]
+  )(implicit context: Output[Int]): Output[Float] = {
+    val projectionsForSize = projectionsToWords
+        .getOrElseUpdate(inputSize, {
+          languages.map(l => {
+            tf.variable[Float](
+              name = s"${l._1.name}/OutWeights",
+              shape = Shape(inputSize, l._2.size),
+              initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
+            ).value
           })
-      val predicates = projectionsForSize.zip(languageIds).map {
-        case (projections, langId) => (tf.equal(languageId, langId), () => projections)
-      }
-      val assertion = tf.assert(
-        tf.any(tf.stack(predicates.map(_._1))),
-        Seq(
-          "No projections found for the provided language.",
-          "Current language: ", languageId))
-      val default = () => tf.createWith(controlDependencies = Set(assertion)) {
-        tf.identity(projectionsForSize.head)
-      }
-      tf.cases(predicates, default)
-    } else {
-      val projectionsForSize = projectionsToWords
-          .getOrElseUpdate(inputSize, {
-            val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-            val vocabSizes = languages.map(_._2.size)
-            val merged = tf.variable(
-              "ProjectionWeights", FLOAT32, Shape(inputSize, vocabSizes.sum), weightsInitializer).value
-            val sizes = tf.createWithNameScope("VocabularySizes")(tf.stack(vocabSizes.map(tf.constant(_))))
-            val offsets = tf.concatenate(Seq(tf.zeros(sizes.dataType, Shape(1)), tf.cumsum(sizes)(0 :: -1)))
-            Seq(merged, offsets, sizes)
-          })
-      val merged = projectionsForSize(0)
-      val offsets = projectionsForSize(1)
-      val sizes = projectionsForSize(2)
-      tf.slice(
-        merged,
-        tf.stack(Seq(0, offsets.gather(languageId))),
-        tf.stack(Seq(inputSize, sizes.gather(languageId))))
+        })
+    val predicates = projectionsForSize.zip(languageIds).map {
+      case (projections, langId) => (tf.equal(languageId, langId), () => projections)
     }
-  }
-}
-
-object WordEmbeddingsPerLanguage {
-  def apply(
-      embeddingsSize: Int,
-      mergedEmbeddings: Boolean = false,
-      mergedProjections: Boolean = false
-  ): WordEmbeddingsPerLanguage = {
-    new WordEmbeddingsPerLanguage(embeddingsSize, mergedEmbeddings, mergedProjections)
+    val assertion = tf.assert(
+      tf.any(tf.stack(predicates.map(_._1))),
+      Seq[Output[Any]](
+        tf.constant[String]("No projections found for the provided language."),
+        tf.constant[String]("Current language: "),
+        languageId))
+    val default = () => tf.createWith(controlDependencies = Set(assertion)) {
+      tf.identity(projectionsForSize.head)
+    }
+    tf.cases(predicates, default)
   }
 }

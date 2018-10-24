@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models.attention
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsHalfOrFloatOrDouble, TF}
 import org.platanios.tensorflow.api.learn.Mode
 
 /** Dot-product attention.
@@ -43,20 +44,25 @@ class DotProductAttention protected (
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
-  override def apply(
-      q: Output,
-      k: Output,
-      v: Output,
-      bias: Option[Output]
-  )(mode: Mode, parameterManager: ParameterManager): Output = tf.createWithNameScope(name) {
-    // `logits` shape: [batchSize, numHeads, queryLength, memoryLength]
-    var logits = tf.matmul(q, k, transposeB = true)
-    bias.foreach(logits += _)
-    var weights = tf.softmax(logits, name = "AttentionWeights")
-    // Apply dropout to the attention links for each of the heads.
-    if (mode.isTraining)
-      weights = Common.dropoutWithBroadcastAxes(weights, 1.0f - dropoutRate, broadcastAxes = dropoutBroadcastAxes)
-    tf.matmul(weights, v)
+  override def apply[T: TF : IsHalfOrFloatOrDouble](
+      q: Output[T],
+      k: Output[T],
+      v: Output[T],
+      bias: Option[Output[T]]
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager
+  ): Output[T] = {
+    tf.nameScope(name) {
+      // `logits` shape: [batchSize, numHeads, queryLength, memoryLength]
+      var logits = tf.matmul(q, k, transposeB = true)
+      bias.foreach(logits += _)
+      var weights = tf.softmax(logits, name = "AttentionWeights")
+      // Apply dropout to the attention links for each of the heads.
+      if (mode.isTraining)
+        weights = Common.dropoutWithBroadcastAxes(weights, 1.0f - dropoutRate, broadcastAxes = dropoutBroadcastAxes)
+      tf.matmul(weights, v)
+    }
   }
 }
 

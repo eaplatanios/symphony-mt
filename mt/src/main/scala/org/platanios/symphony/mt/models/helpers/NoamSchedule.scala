@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.helpers
 
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsIntOrLong, TF}
 
 /** Noam scheduling method, similar to that proposed in:
   * [Attention is All You Need (Section 5.3)](https://arxiv.org/pdf/1706.03762.pdf).
@@ -38,7 +39,7 @@ class NoamSchedule protected (
     val warmUpSteps: Int,
     val hiddenSize: Int,
     val name: String = "NoamSchedule"
-) extends tf.train.Schedule {
+) extends tf.train.Schedule[Float] {
   /** Applies the scheduling method to `value`, the current iteration in the optimization loop is `step` and returns the
     * result.
     *
@@ -49,13 +50,16 @@ class NoamSchedule protected (
     *                                  empty.
     */
   @throws[IllegalArgumentException]
-  override def apply(value: Output, step: Option[tf.Variable]): Output = {
+  override def apply[I: TF : IsIntOrLong](
+      value: Output[Float],
+      step: Option[Variable[I]]
+  ): Output[Float] = {
     if (step.isEmpty)
       throw new IllegalArgumentException("A step needs to be provided for the Noam scheduling method.")
-    tf.createWithNameScope(name, Set(value.op, step.get.op)) {
-      val stepValue = tf.cast(step.get.value, value.dataType)
-      val warmUpStepsValue = tf.constant(warmUpSteps, value.dataType)
-      val hiddenSizeValue = tf.constant(hiddenSize, value.dataType)
+    tf.nameScope(name) {
+      val stepValue = step.get.value.toFloat
+      val warmUpStepsValue = tf.constant[Int](warmUpSteps).toFloat
+      val hiddenSizeValue = tf.constant[Int](hiddenSize).toFloat
       value * 5000.0f * (hiddenSizeValue ** -0.5f) *
           tf.minimum((stepValue + 1) * (warmUpStepsValue ** -1.5f), (stepValue + 1) ** -0.5f)
     }

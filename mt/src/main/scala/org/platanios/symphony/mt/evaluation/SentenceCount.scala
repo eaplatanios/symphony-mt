@@ -15,8 +15,8 @@
 
 package org.platanios.symphony.mt.evaluation
 
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.Op
 import org.platanios.tensorflow.api.ops.metrics.Metric
 import org.platanios.tensorflow.api.ops.metrics.Metric._
 
@@ -32,10 +32,10 @@ import org.platanios.tensorflow.api.ops.metrics.Metric._
   * @author Emmanouil Antonios Platanios
   */
 class SentenceCount protected (
-    val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
-    val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
-    val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
-    val resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
+    val variablesCollections: Set[Graph.Key[Variable[Any]]] = Set(METRIC_VARIABLES),
+    val valuesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_VALUES),
+    val updatesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_UPDATES),
+    val resetsCollections: Set[Graph.Key[UntypedOp]] = Set(METRIC_RESETS),
     override val name: String = "SentenceCount"
 ) extends MTMetric {
   // TODO: Move to the TF metric class.
@@ -44,39 +44,34 @@ class SentenceCount protected (
   }
 
   override def compute(
-      values: ((Output, Output, Output), (Output, Output)),
-      weights: Option[Output] = None,
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
+      weights: Option[Output[Float]] = None,
       name: String = this.name
-  ): Output = {
-    val (_, (_, refLen)) = values
-    var ops = Set(refLen.op)
-    weights.foreach(ops += _.op)
-    val sanitizedName = sanitize(name)
-    tf.createWithNameScope(sanitizedName, ops) {
-      tf.size(refLen)
+  ): Output[Float] = {
+    val tgtSentenceLengths = values._2._2._2.toFloat
+    tf.nameScope(sanitize(name)) {
+      tf.size(tgtSentenceLengths).toFloat
     }
   }
 
   override def streaming(
-      values: ((Output, Output, Output), (Output, Output)),
-      weights: Option[Output] = None,
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
+      weights: Option[Output[Float]] = None,
       name: String = this.name
-  ): Metric.StreamingInstance[Output] = {
-    val (_, (_, refLen)) = values
-    var ops = Set(refLen.op)
-    weights.foreach(ops += _.op)
+  ): Metric.StreamingInstance[Output[Float]] = {
+    val tgtSentenceLengths = values._2._2._2.toFloat
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
-      tf.createWithNameScope(sanitizedName, ops) {
-        val count = variable("Count", INT64, Shape(), tf.ZerosInitializer, variablesCollections)
-        val updateCount = count.assignAdd(tf.size(refLen, INT64))
-        val value = count.value
-        val update = updateCount
+      tf.nameScope(sanitizedName) {
+        val count = variable[Long]("Count", Shape(), tf.ZerosInitializer, variablesCollections)
+        val updateCount = count.assignAdd(tf.size(tgtSentenceLengths))
+        val value = count.value.toFloat
+        val update = updateCount.toFloat
         val reset = count.initializer
-        valuesCollections.foreach(tf.currentGraph.addToCollection(value, _))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(update, _))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(reset, _))
-        Metric.StreamingInstance(value, update, reset, Set(count))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(value, update, reset, Set(count.asUntyped))
       }
     }
   }
@@ -84,10 +79,10 @@ class SentenceCount protected (
 
 object SentenceCount {
   def apply(
-      variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
-      valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
-      updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
-      resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
+      variablesCollections: Set[Graph.Key[Variable[Any]]] = Set(METRIC_VARIABLES),
+      valuesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_VALUES),
+      updatesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_UPDATES),
+      resetsCollections: Set[Graph.Key[UntypedOp]] = Set(METRIC_RESETS),
       name: String = "SentenceCount"
   ): SentenceCount = {
     new SentenceCount(variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)

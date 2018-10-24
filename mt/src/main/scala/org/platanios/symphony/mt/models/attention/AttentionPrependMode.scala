@@ -25,12 +25,12 @@ import org.platanios.tensorflow.api._
 trait AttentionPrependMode {
   /** Creates a bias tensor to be added to the attention logits.
     *
-    * @param  padding `FLOAT32` tensor with shape `[batchSize, length]`, with ones in positions corresponding to
+    * @param  padding Tensor with shape `[batchSize, length]`, with ones in positions corresponding to
     *                 padding and zeros otherwise. In each row of this tensor, a single padding position separates the
     *                 input part from the target part.
-    * @return `FLOAT32` tensor with shape `[batchSize, 1, length, length]`.
+    * @return Tensor with shape `[batchSize, 1, length, length]`.
     */
-  def apply(padding: Output): Output
+  def apply(padding: Output[Float]): Output[Float]
 }
 
 /** Creates a bias tensor to be added to the attention logits, that allows for full connectivity in the "inputs" part of
@@ -38,12 +38,12 @@ trait AttentionPrependMode {
 case object AttentionPrependInputsFullAttention extends AttentionPrependMode {
   /** Creates a bias tensor to be added to the attention logits.
     *
-    * @param  padding `FLOAT32` tensor with shape `[batchSize, length]`, with ones in positions corresponding to
+    * @param  padding Tensor with shape `[batchSize, length]`, with ones in positions corresponding to
     *                 padding and zeros otherwise. In each row of this tensor, a single padding position separates the
     *                 input part from the target part.
-    * @return `FLOAT32` tensor with shape `[batchSize, 1, length, length]`.
+    * @return Tensor with shape `[batchSize, 1, length, length]`.
     */
-  override def apply(padding: Output): Output = {
+  override def apply(padding: Output[Float]): Output[Float] = {
     // Everything past the first padding position is part of the target. This tensor has zeros for the source portion
     // and the separator, and ones for the target portion.
     val inTarget = tf.cumsum(padding, axis = 1, exclusive = true)
@@ -53,7 +53,7 @@ case object AttentionPrependInputsFullAttention extends AttentionPrependMode {
     val illegalConnections = tf.greater(
       tf.expandDims(targetPositions, axis = 1),
       tf.expandDims(targetPositions, axis = 2))
-    tf.expandDims(tf.cast(illegalConnections * -1e9f, FLOAT32), axis = 1)
+    tf.expandDims(illegalConnections.toFloat * -1e9f, axis = 1)
   }
 }
 
@@ -62,12 +62,12 @@ case object AttentionPrependInputsFullAttention extends AttentionPrependMode {
 case object AttentionPrependInputsMaskedAttention extends AttentionPrependMode {
   /** Creates a bias tensor to be added to the attention logits.
     *
-    * @param  padding `FLOAT32` tensor with shape `[batchSize, length]`, with ones in positions corresponding to
+    * @param  padding Tensor with shape `[batchSize, length]`, with ones in positions corresponding to
     *                 padding and zeros otherwise. In each row of this tensor, a single padding position separates the
     *                 input part from the target part.
-    * @return `FLOAT32` tensor with shape `[1, 1, length, length]`.
+    * @return Tensor with shape `[1, 1, length, length]`.
     */
-  override def apply(padding: Output): Output = {
-    Attention.attentionBiasLowerTriangular(tf.shape(padding)(1))
+  override def apply(padding: Output[Float]): Output[Float] = {
+    Attention.attentionBiasLowerTriangular(tf.shape(padding).slice(1).toInt)
   }
 }

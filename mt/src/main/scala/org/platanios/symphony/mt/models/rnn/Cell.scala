@@ -18,109 +18,103 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell._
-import org.platanios.tensorflow.api.types.DataType
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Cell[S, SS] {
-  type StateType = S
-  type StateShapeType = SS
+abstract class Cell[T: TF, State, StateShape](implicit
+    val evOutputStructureState: OutputStructure[State],
+    val evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+    val evZeroState: Zero.Aux[State, StateShape]
+) {
+  // The following two type aliases are used in the experiments module.
+  type DataType = T
+  type StateType = State
+  type StateShapeType = StateShape
 
   def create(
       name: String,
       numInputs: Int,
-      numUnits: Int,
-      dataType: DataType
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      numUnits: Int
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): RNNCell[Output, Shape, S, SS]
-
-  // The following two evidence variables are used in the experiments package.
-  private[mt] val stateWhileLoopEvidence: WhileLoopVariable.Aux[StateType, StateShapeType]
-  private[mt] val stateDropoutEvidence  : ops.rnn.cell.DropoutWrapper.Supported[StateType]
+      context: Output[Int]
+  ): RNNCell[Output[T], State, Shape, StateShape]
 }
 
-case class GRU(activation: Output => Output = tf.tanh(_)) extends Cell[Output, Shape] {
+case class GRU[T: TF : IsNotQuantized](
+    activation: Output[T] => Output[T]
+) extends Cell[T, Output[T], Shape] {
   override def create(
       name: String,
       numInputs: Int,
-      numUnits: Int,
-      dataType: DataType
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      numUnits: Int
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): RNNCell[Output, Shape, Output, Shape] = {
-    val gateKernel = parameterManager.get("Gate/Weights", dataType, Shape(numInputs + numUnits, 2 * numUnits))
-    val gateBias = parameterManager.get("Gate/Bias", dataType, Shape(2 * numUnits), tf.ZerosInitializer)
-    val candidateKernel = parameterManager.get("Candidate/Weights", dataType, Shape(numInputs + numUnits, numUnits))
-    val candidateBias = parameterManager.get("Candidate/Bias", dataType, Shape(numUnits), tf.ZerosInitializer)
+      context: Output[Int]
+  ): RNNCell[Output[T], Output[T], Shape, Shape] = {
+    val gateKernel = parameterManager.get[T]("Gate/Weights", Shape(numInputs + numUnits, 2 * numUnits))
+    val gateBias = parameterManager.get[T]("Gate/Bias", Shape(2 * numUnits), tf.ZerosInitializer)
+    val candidateKernel = parameterManager.get[T]("Candidate/Weights", Shape(numInputs + numUnits, numUnits))
+    val candidateBias = parameterManager.get[T]("Candidate/Bias", Shape(numUnits), tf.ZerosInitializer)
     GRUCell(gateKernel, gateBias, candidateKernel, candidateBias, activation, name)
   }
-
-  override private[mt] val stateWhileLoopEvidence: WhileLoopVariable.Aux[Output, Shape] = {
-    WhileLoopVariable.outputWhileLoopVariable
-  }
-
-  override private[mt] val stateDropoutEvidence: ops.rnn.cell.DropoutWrapper.Supported[Output] = {
-    ops.rnn.cell.DropoutWrapper.Supported.outputSupported
-  }
 }
 
-case class BasicLSTM(forgetBias: Float = 1.0f, activation: Output => Output = tf.tanh(_))
-    extends Cell[LSTMState, (Shape, Shape)] {
+case class BasicLSTM[T: TF : IsNotQuantized](
+    activation: Output[T] => Output[T],
+    forgetBias: Float = 1.0f
+) extends Cell[T, LSTMState[T], (Shape, Shape)] {
   override def create(
       name: String,
       numInputs: Int,
-      numUnits: Int,
-      dataType: DataType
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      numUnits: Int
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): BasicLSTMCell = {
-    val kernel = parameterManager.get("Weights", dataType, Shape(numInputs + numUnits, 4 * numUnits))
-    val bias = parameterManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
+      context: Output[Int]
+  ): BasicLSTMCell[T] = {
+    val kernel = parameterManager.get[T]("Weights", Shape(numInputs + numUnits, 4 * numUnits))
+    val bias = parameterManager.get[T]("Bias", Shape(4 * numUnits), tf.ZerosInitializer)
     BasicLSTMCell(kernel, bias, activation, forgetBias, name)
-  }
-
-  override private[mt] val stateWhileLoopEvidence: WhileLoopVariable.Aux[LSTMState, (Shape, Shape)] = {
-    LSTMState.lstmStateWhileLoopVariable
-  }
-
-  override private[mt] val stateDropoutEvidence: ops.rnn.cell.DropoutWrapper.Supported[LSTMState] = {
-    ops.rnn.cell.DropoutWrapper.Supported.lstmStateSupported
   }
 }
 
-case class LSTM(
+case class LSTM[T: TF : IsNotQuantized](
+    activation: Output[T] => Output[T],
     forgetBias: Float = 1.0f,
     usePeepholes: Boolean = false,
     cellClip: Float = -1,
     projectionSize: Int = -1,
-    projectionClip: Float = -1,
-    activation: Output => Output = tf.tanh(_)
-) extends Cell[LSTMState, (Shape, Shape)] {
+    projectionClip: Float = -1
+) extends Cell[T, LSTMState[T], (Shape, Shape)] {
   override def create(
       name: String,
       numInputs: Int,
-      numUnits: Int,
-      dataType: DataType
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+      numUnits: Int
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): LSTMCell = {
+      context: Output[Int]
+  ): LSTMCell[T] = {
     val hiddenDepth = if (projectionSize != -1) projectionSize else numUnits
-    val kernel = parameterManager.get("Weights", dataType, Shape(numInputs + hiddenDepth, 4 * numUnits))
-    val bias = parameterManager.get("Bias", dataType, Shape(4 * numUnits), tf.ZerosInitializer)
+    val kernel = parameterManager.get[T]("Weights", Shape(numInputs + hiddenDepth, 4 * numUnits))
+    val bias = parameterManager.get[T]("Bias", Shape(4 * numUnits), tf.ZerosInitializer)
     val (wfDiag, wiDiag, woDiag) = {
       if (usePeepholes) {
-        val wfDiag = parameterManager.get("Peepholes/ForgetKernelDiag", dataType, Shape(numUnits))
-        val wiDiag = parameterManager.get("Peepholes/InputKernelDiag", dataType, Shape(numUnits))
-        val woDiag = parameterManager.get("Peepholes/OutputKernelDiag", dataType, Shape(numUnits))
+        val wfDiag = parameterManager.get[T]("Peepholes/ForgetKernelDiag", Shape(numUnits))
+        val wiDiag = parameterManager.get[T]("Peepholes/InputKernelDiag", Shape(numUnits))
+        val woDiag = parameterManager.get[T]("Peepholes/OutputKernelDiag", Shape(numUnits))
         (wfDiag, wiDiag, woDiag)
       } else {
         (null, null, null)
@@ -128,19 +122,12 @@ case class LSTM(
     }
     val projectionKernel = {
       if (projectionSize != -1)
-        parameterManager.get("Projection/Weights", dataType, Shape(numUnits, projectionSize))
+        parameterManager.get[T]("Projection/Weights", Shape(numUnits, projectionSize))
       else
         null
     }
     LSTMCell(
-      kernel, bias, cellClip, wfDiag, wiDiag, woDiag, projectionKernel, projectionClip, activation, forgetBias, name)
-  }
-
-  override private[mt] val stateWhileLoopEvidence: WhileLoopVariable.Aux[LSTMState, (Shape, Shape)] = {
-    LSTMState.lstmStateWhileLoopVariable
-  }
-
-  override private[mt] val stateDropoutEvidence: ops.rnn.cell.DropoutWrapper.Supported[LSTMState] = {
-    ops.rnn.cell.DropoutWrapper.Supported.lstmStateSupported
+      kernel, bias, activation, cellClip, wfDiag, wiDiag, woDiag,
+      projectionKernel, projectionClip, forgetBias, name)
   }
 }

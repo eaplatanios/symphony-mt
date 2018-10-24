@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models.parameters
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.Resource
 
 import scala.collection.mutable
 
@@ -29,24 +30,35 @@ trait WordEmbeddingsType {
 
   val embeddingsSize: Int
 
-  def createStringToIndexLookupTable(languages: Seq[(Language, Vocabulary)]): Output
-  def createIndexToStringLookupTable(languages: Seq[(Language, Vocabulary)]): Output
-  def createWordEmbeddings(languages: Seq[(Language, Vocabulary)]): T
+  def createStringToIndexLookupTable(
+      languages: Seq[(Language, Vocabulary)]
+  ): Output[Resource]
 
-  def lookupTable(lookupTable: Output, languageId: Output): Output
+  def createIndexToStringLookupTable(
+      languages: Seq[(Language, Vocabulary)]
+  ): Output[Resource]
+
+  def createWordEmbeddings(
+      languages: Seq[(Language, Vocabulary)]
+  ): T
+
+  def lookupTable(
+      lookupTable: Output[Resource],
+      languageId: Output[Int]
+  ): Output[Resource]
 
   def embeddingLookup(
       embeddingTables: T,
-      languageIds: Seq[Output],
-      languageId: Output,
-      keys: Output
-  )(implicit context: Output): Output
+      languageIds: Seq[Output[Int]],
+      languageId: Output[Int],
+      keys: Output[Int]
+  )(implicit context: Output[Int]): Output[Float]
 
   def projectionToWords(
       languages: Seq[(Language, Vocabulary)],
-      languageIds: Seq[Output],
+      languageIds: Seq[Output[Int]],
       projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
-      languageId: Output
-  )(implicit context: Output): Output
+      languageId: Output[Int]
+  )(implicit context: Output[Int]): Output[Float]
 }

@@ -28,8 +28,8 @@ class GoogleMultilingualManager protected (
     override val wordEmbeddingsType: WordEmbeddingsType,
     override val variableInitializer: tf.VariableInitializer = null
 ) extends ParameterManager(wordEmbeddingsType, variableInitializer) {
-  protected val languageEmbeddings: mutable.Map[Graph, Output]                      = mutable.Map.empty
-  protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output]] = mutable.Map.empty
+  protected val languageEmbeddings: mutable.Map[Graph, Output[Float]]                    = mutable.Map.empty
+  protected val parameters        : mutable.Map[Graph, mutable.Map[String, Output[Any]]] = mutable.Map.empty
 
   override protected def removeGraph(graph: Graph): Unit = {
     super.removeGraph(graph)
@@ -44,8 +44,8 @@ class GoogleMultilingualManager protected (
       if (!languageEmbeddings.contains(graph)) {
         languageEmbeddings += graph -> {
           val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-          tf.variable(
-            "LanguageEmbeddings", FLOAT32, Shape(languages.length, wordEmbeddingsType.embeddingsSize),
+          tf.variable[Float](
+            "LanguageEmbeddings", Shape(languages.length, wordEmbeddingsType.embeddingsSize),
             initializer = embeddingsInitializer).value
         }
       }
@@ -53,13 +53,14 @@ class GoogleMultilingualManager protected (
   }
 
   override def postprocessEmbeddedSequences(
-      srcLanguage: Output,
-      tgtLanguage: Output,
-      srcSequences: Output,
-      srcSequenceLengths: Output
-  )(implicit context: Output): (Output, Output) = {
+      srcLanguage: Output[Int],
+      tgtLanguage: Output[Int],
+      srcSequences: Output[Float],
+      srcSequenceLengths: Output[Int]
+  )(implicit context: Output[Int]): (Output[Float], Output[Int]) = {
+    val batchSize = tf.shape(srcSequences).slice(0).toInt
     val tgtLanguageEmbedding = languageEmbeddings(currentGraph).gather(context(1)).reshape(Shape(1, 1, -1))
-    val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack(Seq(tf.shape(srcSequences)(0), 1, 1)))
+    val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack[Int](Seq(batchSize, 1, 1)))
     val processedSrcSentences = tf.concatenate(Seq(tgtLanguageEmbeddingTiled, srcSequences), 1)
     val processedSrcSentenceLengths = srcSequenceLengths + 1
     (processedSrcSentences, processedSrcSentenceLengths)

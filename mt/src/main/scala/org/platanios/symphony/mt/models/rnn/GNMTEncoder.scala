@@ -19,65 +19,101 @@ import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.models.{DeviceManager, RNNModel, Stage}
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
+import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-class GNMTEncoder[S, SS](
-    val cell: Cell[S, SS],
+class GNMTEncoder[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
+    val cell: Cell[T, State, StateShape],
     val numUnits: Int,
     val numBiLayers: Int,
     val numUniLayers: Int,
     val numUniResLayers: Int,
-    val dataType: DataType = FLOAT32,
     val dropout: Option[Float] = None,
-    val residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+    val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
 )(implicit
-    evS: WhileLoopVariable.Aux[S, SS],
-    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends RNNEncoder[S, SS]()(evS, evSDropout) {
+    evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+    evZeroState: Zero.Aux[State, StateShape]
+) extends RNNEncoder[T, State]() {
   override def create(
-      config: RNNModel.Config[_, _],
-      srcSequences: Output,
-      srcSequenceLengths: Output
+      config: RNNModel.Config[T, _],
+      srcSequences: Output[Int],
+      srcSequenceLengths: Output[Int]
   )(implicit
       stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager,
-      context: Output
-  ): Tuple[Output, Seq[S]] = {
+      context: Output[Int]
+  ): Tuple[Output[T], Seq[State]] = {
     val (embeddedSequences, embeddedSequenceLengths) = embedSequences(config, srcSequences, srcSequenceLengths)
 
     // Bidirectional RNN layers
     val biTuple = {
       if (numBiLayers > 0) {
-        val biCellFw = RNNModel.multiCell(
-          cell, embeddedSequences.shape(-1), numUnits, dataType, numBiLayers, 0, dropout, residualFn,
-          config.env.randomSeed, "MultiBiCellFw")(mode, env, parameterManager, deviceManager)
-        val biCellBw = RNNModel.multiCell(
-          cell, embeddedSequences.shape(-1), numUnits, dataType, numBiLayers, 0, dropout, residualFn,
-          config.env.randomSeed, "MultiBiCellBw")(mode, env, parameterManager, deviceManager)
+        val biCellFw = RNNModel.stackedCell[T, State, StateShape](
+          cell = cell,
+          numInputs = embeddedSequences.shape(-1),
+          numUnits = numUnits,
+          numLayers = numBiLayers,
+          numResidualLayers = 0,
+          dropout = dropout,
+          residualFn = residualFn,
+          seed = config.env.randomSeed,
+          name = "MultiBiCellFw")
+        val biCellBw = RNNModel.stackedCell[T, State, StateShape](
+          cell = cell,
+          numInputs = embeddedSequences.shape(-1),
+          numUnits = numUnits,
+          numLayers = numBiLayers,
+          numResidualLayers = 0,
+          dropout = dropout,
+          residualFn = residualFn,
+          seed = config.env.randomSeed,
+          name = "MultiBiCellBw")
         val unmergedBiTuple = tf.bidirectionalDynamicRNN(
-          biCellFw, biCellBw, embeddedSequences, null, null, config.timeMajor, config.env.parallelIterations,
-          config.env.swapMemory, embeddedSequenceLengths, "BidirectionalLayers")
+          cellFw = biCellFw,
+          cellBw = biCellBw,
+          input = embeddedSequences,
+          initialStateFw = None,
+          initialStateBw = None,
+          timeMajor = config.timeMajor,
+          parallelIterations = config.env.parallelIterations,
+          swapMemory = config.env.swapMemory,
+          sequenceLengths = embeddedSequenceLengths,
+          name = "BidirectionalLayers")
         Tuple(tf.concatenate(Seq(unmergedBiTuple._1.output, unmergedBiTuple._2.output), -1), unmergedBiTuple._2.state)
       } else {
-        Tuple(embeddedSequences, Seq.empty[S])
+        Tuple(embeddedSequences, Seq.empty[State])
       }
     }
 
     // Unidirectional RNN layers
-    val uniCell = RNNModel.multiCell(
-      cell, biTuple.output.shape(-1), numUnits, dataType, numUniLayers, numUniResLayers, dropout, residualFn,
-      config.env.randomSeed, "MultiUniCell")(mode, env, parameterManager, deviceManager)
+    val uniCell = RNNModel.stackedCell[T, State, StateShape](
+      cell = cell,
+      numInputs = biTuple.output.shape(-1),
+      numUnits = numUnits,
+      numLayers = numUniLayers,
+      numResidualLayers = numUniResLayers,
+      dropout = dropout,
+      residualFn = residualFn,
+      seed = config.env.randomSeed,
+      name = "MultiUniCell")
     val uniTuple = tf.dynamicRNN(
-      uniCell, biTuple.output, null, config.timeMajor, config.env.parallelIterations, config.env.swapMemory,
-      embeddedSequenceLengths, "UnidirectionalLayers")
+      cell = uniCell,
+      input = biTuple.output,
+      initialState = None,
+      timeMajor = config.timeMajor,
+      parallelIterations = config.env.parallelIterations,
+      swapMemory = config.env.swapMemory,
+      sequenceLengths = embeddedSequenceLengths,
+      name = "UnidirectionalLayers")
 
     // Pass all of the encoder's state except for the first bi-directional layer's state, to the decoder.
     Tuple(uniTuple.output, biTuple.state ++ uniTuple.state)
@@ -85,20 +121,19 @@ class GNMTEncoder[S, SS](
 }
 
 object GNMTEncoder {
-  def apply[S, SS](
-      cell: Cell[S, SS],
+  def apply[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
+      cell: Cell[T, State, StateShape],
       numUnits: Int,
       numBiLayers: Int,
       numUniLayers: Int,
       numUniResLayers: Int,
-      dataType: DataType = FLOAT32,
       dropout: Option[Float] = None,
-      residualFn: Option[(Output, Output) => Output] = Some((input: Output, output: Output) => input + output)
+      residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
   )(implicit
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-  ): GNMTEncoder[S, SS] = {
-    new GNMTEncoder[S, SS](
-      cell, numUnits, numBiLayers, numUniLayers, numUniResLayers, dataType, dropout, residualFn)(evS, evSDropout)
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evZeroState: Zero.Aux[State, StateShape]
+  ): GNMTEncoder[T, State, StateShape] = {
+    new GNMTEncoder[T, State, StateShape](
+      cell, numUnits, numBiLayers, numUniLayers, numUniResLayers, dropout, residualFn)
   }
 }

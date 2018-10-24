@@ -18,8 +18,8 @@ import sbtrelease.Vcs
 
 import scala.sys.process.Process
 
-scalaVersion in ThisBuild := "2.12.6"
-crossScalaVersions in ThisBuild := Seq("2.11.12", "2.12.6")
+scalaVersion in ThisBuild := "2.12.7"
+crossScalaVersions in ThisBuild := Seq("2.11.12", "2.12.7")
 
 organization in ThisBuild := "org.platanios"
 
@@ -30,7 +30,7 @@ organization in ThisBuild := "org.platanios"
 // every 24 hours.
 resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
 
-val tensorFlowForScalaVersion = "0.3.0-SNAPSHOT"
+val tensorFlowForScalaVersion = "0.4.0-SNAPSHOT"
 
 autoCompilerPlugins in ThisBuild := true
 
@@ -43,14 +43,23 @@ scalacOptions in ThisBuild ++= Seq(
   "-language:implicitConversions",
   "-unchecked",
   "-Yno-adapted-args",
+  // "-Ystatistics:typer",
   "-Xfuture")
+
+val scalacProfilingEnabled: SettingKey[Boolean] =
+  settingKey[Boolean]("Flag specifying whether to enable profiling for the Scala compiler.")
+
+scalacProfilingEnabled in ThisBuild := false
 
 lazy val loggingSettings = Seq(
   libraryDependencies ++= Seq(
     "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.0",
     "ch.qos.logback"             %  "logback-classic" % "1.2.3"))
 
-lazy val commonSettings = loggingSettings
+lazy val commonSettings = loggingSettings ++ Seq(
+  // Plugin that prints better implicit resolution errors.
+  addCompilerPlugin("io.tryp"  % "splain" % "0.3.3" cross CrossVersion.patch)
+)
 
 lazy val testSettings = Seq(
   libraryDependencies ++= Seq(
@@ -65,7 +74,7 @@ lazy val testSettings = Seq(
 
 lazy val tensorFlowSettings = Seq(
   libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "darwin-cpu-x86_64",
-  libraryDependencies += "org.platanios" %% "tensorflow-horovod" % tensorFlowForScalaVersion)
+)
 
 lazy val all = (project in file("."))
     .aggregate(mt, experiments, docs)
@@ -94,6 +103,25 @@ lazy val mt = (project in file("./mt"))
       libraryDependencies ++= Seq(
         "com.github.pathikrit" %% "better-files" % "3.4.0",
         "org.apache.commons" % "commons-compress" % "1.16.1"),
+        // Scalac Profiling Settings
+      libraryDependencies ++= {
+        if (scalacProfilingEnabled.value)
+          Seq(compilerPlugin("ch.epfl.scala" %% "scalac-profiling" % "1.0.0"))
+        else
+          Seq.empty
+      },
+      scalacOptions ++= {
+        if (scalacProfilingEnabled.value) {
+          Seq(
+            "-Ystatistics:typer",
+            // Scala profiler plugin options
+            "-P:scalac-profiling:no-profiledb",
+            "-P:scalac-profiling:show-profiles",
+            "-P:scalac-profiling:show-concrete-implicit-tparams")
+        } else {
+          Seq.empty
+        }
+      },
       unmanagedResourceDirectories in Compile += baseDirectory.value / "lib",
       unmanagedResourceDirectories in Test += baseDirectory.value / "lib",
       unmanagedJars in Compile ++= Seq(
@@ -209,12 +237,15 @@ lazy val publishSettings = Seq(
     setReleaseVersion,
     commitReleaseVersion,
     tagRelease,
-    publishArtifacts,
+    releaseStepCommandAndRemaining("+publishSigned"),
     setNextVersion,
     commitNextVersion,
     releaseStepCommand("sonatypeReleaseAll"),
     pushChanges
   ),
+  // The following 2 lines are needed to get around this: https://github.com/sbt/sbt/issues/4275
+  publishConfiguration := publishConfiguration.value.withOverwrite(true),
+  publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(true),
   // For Travis CI - see http://www.cakesolutions.net/teamblogs/publishing-artefacts-to-oss-sonatype-nexus-using-sbt-and-travis-ci
   credentials ++= (for {
     username <- Option(System.getenv().get("SONATYPE_USERNAME"))

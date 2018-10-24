@@ -18,53 +18,54 @@ package org.platanios.symphony.mt.models.rnn.attention
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsDecimal, TF}
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
 import org.platanios.tensorflow.api.ops.variables.OnesInitializer
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-case class LuongRNNAttention(
+case class LuongRNNAttention[T: TF : IsDecimal](
     scaled: Boolean = false,
-    probabilityFn: (Output) => Output = tf.softmax(_, name = "Probability"),
-    scoreMask: Float = Float.NegativeInfinity
-) extends RNNAttention[Output, Shape] {
-  override def create[S, SS](
-      cell: tf.RNNCell[Output, Shape, S, SS],
-      memory: Output,
-      memorySequenceLengths: Output,
+    probabilityFn: Output[T] => Output[T], // TODO: Softmax should be the default.
+    scoreMask: Float = Float.NegativeInfinity.toFloat
+) extends RNNAttention[T, Output[T], Shape] {
+  override def create[CellState: OutputStructure, CellStateShape](
+      cell: tf.RNNCell[Output[T], CellState, Shape, CellStateShape],
+      memory: Output[T],
+      memorySequenceLengths: Output[Int],
       numUnits: Int,
       inputSequencesLastAxisSize: Int,
-      initialState: S,
+      initialState: CellState,
       useAttentionLayer: Boolean,
       outputAttention: Boolean
   )(implicit
       stage: Stage,
       mode: Mode,
       parameterManager: ParameterManager,
-      context: Output,
-      evS: WhileLoopVariable.Aux[S, SS],
-      evSDropout: tf.DropoutWrapper.Supported[S]
-  ): (AttentionWrapperCell[S, SS, Output, Shape], AttentionWrapperState[S, SS, Seq[Output], Seq[Shape]]) = {
-    val memoryWeights = parameterManager.get("MemoryWeights", memory.dataType, Shape(memory.shape(-1), numUnits))
+      context: Output[Int],
+      evOutputToShapeCellState: OutputToShape.Aux[CellState, CellStateShape]
+  ): (AttentionWrapperCell[T, CellState, Output[T], CellStateShape, Shape],
+      AttentionWrapperState[T, CellState, Seq[Output[T]]]) = {
+    val memoryWeights = parameterManager.get[T]("MemoryWeights", Shape(memory.shape(-1), numUnits))
     val scale = {
       if (scaled)
-        parameterManager.get("LuongFactor", memory.dataType, Shape.scalar(), OnesInitializer)
+        parameterManager.get[T]("LuongFactor", Shape(), OnesInitializer)
       else
         null
     }
     val attention = tf.LuongAttention(
-      memory, memoryWeights, memorySequenceLengths, scale, probabilityFn, scoreMask, "Attention")
+      memory, memoryWeights, probabilityFn, memorySequenceLengths, scale, scoreMask, "Attention")
     val attentionWeights = {
       if (useAttentionLayer)
-        Seq(parameterManager.get("AttentionWeights", attention.dataType, Shape(numUnits + memory.shape(-1), numUnits)))
+        Seq(parameterManager.get[T]("AttentionWeights", Shape(numUnits + memory.shape(-1), numUnits)))
       else
         null
     }
     val attentionCell = tf.AttentionWrapperCell(
       cell, Seq(attention), attentionWeights, outputAttention = outputAttention)
-    (attentionCell, attentionCell.initialState(initialState, memory.dataType))
+    (attentionCell, attentionCell.initialState(initialState))
   }
 }

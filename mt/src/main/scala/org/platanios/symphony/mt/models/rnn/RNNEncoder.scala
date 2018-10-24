@@ -19,44 +19,42 @@ import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.control_flow.WhileLoopVariable
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class RNNEncoder[S, SS]()(implicit
-    evS: WhileLoopVariable.Aux[S, SS],
-    evSDropout: ops.rnn.cell.DropoutWrapper.Supported[S]
-) extends Encoder[Tuple[Output, Seq[S]]] {
+abstract class RNNEncoder[T: TF : IsNotQuantized, State]()
+    extends Encoder[T, Tuple[Output[T], Seq[State]]] {
   override def create(
-      config: RNNModel.Config[_, _],
-      srcSequences: Output,
-      srcSequenceLengths: Output
+      config: RNNModel.Config[T, _],
+      srcSequences: Output[Int],
+      srcSequenceLengths: Output[Int]
   )(implicit
       stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager,
-      context: Output
-  ): Tuple[Output, Seq[S]]
+      context: Output[Int]
+  ): Tuple[Output[T], Seq[State]]
 
   def embedSequences(
-      config: RNNModel.Config[_, _],
-      srcSequences: Output,
-      srcSequenceLengths: Output
+      config: RNNModel.Config[T, _],
+      srcSequences: Output[Int],
+      srcSequenceLengths: Output[Int]
   )(implicit
       parameterManager: ParameterManager,
-      context: Output
-  ): (Output, Output) = {
+      context: Output[Int]
+  ): (Output[T], Output[Int]) = {
     val embeddedSrcSequences = parameterManager.wordEmbeddings(context(0))(context)(srcSequences)
     val (embeddedSequences, embeddedSequenceLengths) = parameterManager.postprocessEmbeddedSequences(
       context(0), context(1), embeddedSrcSequences, srcSequenceLengths)
     if (config.timeMajor)
-      (embeddedSequences.transpose(Seq(1, 0, 2)), embeddedSequenceLengths)
+      (embeddedSequences.transpose(Seq(1, 0, 2)).castTo[T], embeddedSequenceLengths)
     else
-      (embeddedSequences, embeddedSequenceLengths)
+      (embeddedSequences.castTo[T], embeddedSequenceLengths)
   }
 }

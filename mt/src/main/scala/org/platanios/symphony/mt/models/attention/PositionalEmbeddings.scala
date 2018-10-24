@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.attention
 
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -23,8 +24,15 @@ import org.platanios.tensorflow.api._
 trait PositionalEmbeddings {
   // TODO: !!! Add name to positional embeddings.
 
-  def get(length: Output, depth: Output): Output
-  def addTo(input: Output, positions: Option[Output] = None): Output
+  def get(
+      length: Output[Int],
+      depth: Output[Int]
+  ): Output[Float]
+
+  def addTo[T: TF : IsNotQuantized](
+      input: Output[T],
+      positions: Option[Output[Int]] = None
+  ): Output[T]
 }
 
 object PositionalEmbeddings {
@@ -48,18 +56,18 @@ object PositionalEmbeddings {
     * @return Positional embeddings tensor with shape `[1, length, depth]`.
     */
   def positionalEmbeddings1D(
-      length: Output,
-      depth: Output,
+      length: Output[Int],
+      depth: Output[Int],
       minScale: Float = 1.0f,
       maxScale: Float = 1.0e4f
-  ): Output = {
-    val zero = tf.constant(0, dataType = depth.dataType)
-    val one = tf.constant(1, dataType = depth.dataType)
-    val two = tf.constant(2, dataType = depth.dataType)
-    val positions = tf.range(zero, length, dataType = FLOAT32)
+  ): Output[Float] = {
+    val zero = tf.constant[Int](0)
+    val one = tf.constant[Int](1)
+    val two = tf.constant[Int](2)
+    val positions = tf.range(zero, length).toFloat
     val numScales = tf.truncateDivide(depth, two)
-    val logScaleIncrement = math.log(maxScale / minScale).toFloat / (numScales - one)
-    val invScales = minScale * tf.exp(-tf.range(zero, numScales, dataType = FLOAT32) * logScaleIncrement)
+    val logScaleIncrement = math.log(maxScale / minScale).toFloat / (numScales - one).toFloat
+    val invScales = minScale * tf.exp(-tf.range(zero, numScales).toFloat * logScaleIncrement)
     val scaledPositions = tf.expandDims(positions, axis = one) * tf.expandDims(invScales, axis = zero)
     var embedding = tf.concatenate(Seq(tf.sin(scaledPositions), tf.cos(scaledPositions)), axis = one)
     val padding = tf.stack(Seq(tf.stack(Seq(zero, zero)), tf.stack(Seq(zero, tf.mod(depth, two)))))
@@ -89,12 +97,16 @@ object PositionalEmbeddings {
     * @param  maxScale Maximum scale.
     * @return Input tensor with the positional embeddings added to it.
     */
-  def addPositionalEmbeddings1D(input: Output, minScale: Float = 1.0f, maxScale: Float = 1.0e4f): Output = {
-    val inputShape = tf.shape(input)
+  def addPositionalEmbeddings1D[T: TF : IsNotQuantized](
+      input: Output[T],
+      minScale: Float = 1.0f,
+      maxScale: Float = 1.0e4f
+  ): Output[T] = {
+    val inputShape = tf.shape(input).toInt
     val length = inputShape(1)
     val depth = inputShape(2)
     val embedding = positionalEmbeddings1D(length, depth, minScale, maxScale)
-    input + embedding
+    input + embedding.castTo[T]
   }
 
   /** Adds a bunch of sinusoids of different frequencies and phases to `input`, using the provided positions.
@@ -105,28 +117,28 @@ object PositionalEmbeddings {
     * @param  maxScale  Maximum scale.
     * @return Input tensor with the positional embeddings added to it.
     */
-  def addPositionalEmbeddings1DGivenPositions(
-      input: Output,
-      positions: Output,
+  def addPositionalEmbeddings1DGivenPositions[T: TF : IsNotQuantized](
+      input: Output[T],
+      positions: Output[Int],
       minScale: Float = 1.0f,
       maxScale: Float = 1.0e4f
-  ): Output = {
-    val inputShape = tf.shape(input)
-    val depth = inputShape(2)
-    val zero = tf.constant(0, dataType = depth.dataType)
-    val one = tf.constant(1, dataType = depth.dataType)
-    val two = tf.constant(2, dataType = depth.dataType)
-    val numScales = tf.truncateDivide(depth, two)
-    val logScaleIncrement = math.log(maxScale / minScale).toFloat / (numScales - one)
-    val invScales = minScale * tf.exp(-tf.range(zero, numScales, dataType = FLOAT32) * logScaleIncrement)
-    val scaledPositions = tf.expandDims(positions, axis = two) *
+  ): Output[T] = {
+    val inputShape = tf.shape(input).toInt
+    val depth = inputShape(2).toInt
+    val zero = tf.constant[Int](0)
+    val one = tf.constant[Int](1)
+    val two = tf.constant[Int](2)
+    val numScales = tf.truncateDivide(depth, two).toInt
+    val logScaleIncrement = math.log(maxScale / minScale).toFloat / (numScales - one).toFloat
+    val invScales = minScale * tf.exp(-tf.range(zero, numScales).toFloat * logScaleIncrement)
+    val scaledPositions = tf.expandDims(positions.toFloat, axis = two) *
         tf.expandDims(tf.expandDims(invScales, axis = zero), axis = zero)
     val embedding = tf.concatenate(Seq(tf.sin(scaledPositions), tf.cos(scaledPositions)), axis = two)
     val padding = tf.stack(Seq(
       tf.stack(Seq(zero, zero)),
       tf.stack(Seq(zero, zero)),
-      tf.stack(Seq(zero, tf.mod(depth, two)))))
-    input + tf.pad(embedding, padding)
+      tf.stack(Seq(zero, tf.mod(depth, two).toInt))))
+    input + tf.pad(embedding, padding).castTo[T]
   }
 
   /** Adds a bunch of sinusoids of different frequencies and phases to `input`.
@@ -152,21 +164,25 @@ object PositionalEmbeddings {
     * @param  maxScale Maximum scale.
     * @return Input tensor with the positional embeddings added to it.
     */
-  def addPositionalEmbeddingsND(input: Output, minScale: Float = 1.0f, maxScale: Float = 1.0e4f): Output = {
+  def addPositionalEmbeddingsND[T: TF : IsNotQuantized](
+      input: Output[T],
+      minScale: Float = 1.0f,
+      maxScale: Float = 1.0e4f
+  ): Output[T] = {
     val rank = input.rank - 2
-    val inputShape = tf.shape(input)
+    val inputShape = tf.shape(input).toInt
     val depth = inputShape(-1)
-    val zero = tf.constant(0, dataType = depth.dataType)
-    val one = tf.constant(1, dataType = depth.dataType)
-    val two = tf.constant(2, dataType = depth.dataType)
-    val minusTwo = tf.constant(2, dataType = depth.dataType)
-    val numScales = tf.truncateDivide(depth, two * rank)
-    val logScaleIncrement = math.log(maxScale / minScale).toFloat / (numScales - one)
-    val invScales = minScale * tf.exp(-tf.range(zero, numScales, dataType = FLOAT32) * logScaleIncrement)
+    val zero = tf.constant[Int](0)
+    val one = tf.constant[Int](1)
+    val two = tf.constant[Int](2)
+    val minusTwo = tf.constant[Int](-2)
+    val numScales = tf.truncateDivide(depth, two * rank).toInt
+    val logScaleIncrement = math.log(maxScale / minScale).toFloat / (numScales - one).toFloat
+    val invScales = minScale * tf.exp(-tf.range(zero, numScales).toFloat * logScaleIncrement)
     var result = input
     (0 until rank).foreach(axis => {
       val length = inputShape(axis + 1)
-      val positions = tf.range(zero, length, dataType = FLOAT32)
+      val positions = tf.range(zero, length).toFloat
       val scaledPositions = tf.expandDims(positions, axis = one) * tf.expandDims(invScales, axis = zero)
       var embedding = tf.concatenate(Seq(tf.sin(scaledPositions), tf.cos(scaledPositions)), axis = one)
       val prePadding = 2 * rank * numScales
@@ -177,7 +193,7 @@ object PositionalEmbeddings {
       )))
       (0 until axis + 1).foreach(_ => embedding = tf.expandDims(embedding, axis = zero))
       (0 until rank - 1 - axis).foreach(_ => embedding = tf.expandDims(embedding, axis = minusTwo))
-      result += embedding
+      result += embedding.castTo[T]
     })
     result
   }
@@ -187,11 +203,17 @@ class FixedSinusoidPositionalEmbeddings protected (
     val minScale: Float = 1.0f,
     val maxScale: Float = 1.0e4f
 ) extends PositionalEmbeddings {
-  override def get(length: Output, depth: Output): Output = {
+  override def get(
+      length: Output[Int],
+      depth: Output[Int]
+  ): Output[Float] = {
     PositionalEmbeddings.positionalEmbeddings1D(length, depth, minScale, maxScale)
   }
 
-  override def addTo(input: Output, positions: Option[Output] = None): Output = {
+  override def addTo[T: TF : IsNotQuantized](
+      input: Output[T],
+      positions: Option[Output[Int]] = None
+  ): Output[T] = {
     positions match {
       case Some(p) => PositionalEmbeddings.addPositionalEmbeddings1DGivenPositions(input, p, minScale, maxScale)
       case None => PositionalEmbeddings.addPositionalEmbeddings1D(input, minScale, maxScale)

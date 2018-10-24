@@ -15,8 +15,9 @@
 
 package org.platanios.symphony.mt.models.hooks
 
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.client.{Executable, Fetchable}
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToTensor}
 import org.platanios.tensorflow.api.learn.Counter
 import org.platanios.tensorflow.api.learn.hooks._
 
@@ -49,29 +50,28 @@ case class TrainingLogger(
     formatter: (Option[Double], Long, Float, Float, Option[Double]) => String = null,
     summaryTag: String = "Perplexity"
 ) extends ModelDependentHook[
-    (Tensor[DataType], Tensor[DataType], Tensor[DataType], Tensor[DataType]), (Output, Output, Output, Output),
-    (DataType, DataType, DataType, DataType), (Shape, Shape, Shape, Shape), (Output, Output),
-    ((Tensor[DataType], Tensor[DataType], Tensor[DataType], Tensor[DataType]), (Tensor[DataType], Tensor[DataType])),
-    ((Output, Output, Output, Output), (Output, Output)),
-    ((DataType, DataType, DataType, DataType), (DataType, DataType)),
-    ((Shape, Shape, Shape, Shape), (Shape, Shape)),
-    ((Output, Output, Output, Output), (Output, Output))]
+    /* In       */ SentencesWithLanguagePair[String],
+    /* TrainIn  */ (SentencesWithLanguagePair[String], Sentences[String]),
+    /* Out      */ SentencesWithLanguage[String],
+    /* TrainOut */ SentencesWithLanguage[Float],
+    /* Loss     */ Float,
+    /* EvalIn   */ (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String]))]
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 
-  private[this] var step         : Variable = _
-  private[this] var gradientsNorm: Output   = _
-  private[this] var loss         : Output   = _
-  private[this] var srcWordCount : Output   = _
-  private[this] var tgtWordCount : Output   = _
+  private var step         : Variable[Long] = _
+  private var gradientsNorm: Output[Float]  = _
+  private var loss         : Output[Float]  = _
+  private var srcWordCount : Output[Long]   = _
+  private var tgtWordCount : Output[Long]   = _
 
-  private[this] val internalTrigger   : HookTrigger = trigger.copy()
-  private[this] var lastStep          : Long        = 0L
-  private[this] var shouldTrigger     : Boolean     = false
-  private[this] var totalGradientsNorm: Float       = 0.0f
-  private[this] var totalLoss         : Float       = 0.0f
-  private[this] var totalSrcWordCount : Long        = 0L
-  private[this] var totalTgtWordCount : Long        = 0L
+  private val internalTrigger   : HookTrigger = trigger.copy()
+  private var lastStep          : Long        = 0L
+  private var shouldTrigger     : Boolean     = false
+  private var totalGradientsNorm: Float       = 0.0f
+  private var totalLoss         : Float       = 0.0f
+  private var totalSrcWordCount : Long        = 0L
+  private var totalTgtWordCount : Long        = 0L
 
   override protected def begin(): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
@@ -79,48 +79,54 @@ case class TrainingLogger(
     internalTrigger.reset()
     shouldTrigger = false
     gradientsNorm = modelInstance.gradientsAndVariables.map(g => tf.globalNorm(g.map(_._1))).orNull
-    loss = modelInstance.loss.map(_.cast(FLOAT32))
-        .flatMap(l => modelInstance.trainInput.map(o => l * tf.size(o._2._2))).orNull
-    srcWordCount = modelInstance.trainInput.map(o => tf.sum(o._1._4)).orNull
-    tgtWordCount = modelInstance.trainInput.map(o => tf.sum(o._2._2) + tf.size(o._2._2)).orNull
+    loss = modelInstance.loss.map(_.toFloat).flatMap(l => {
+      modelInstance.trainInput.map(o => l * /* batch size */ tf.size(o._2._2).toFloat)
+    }).orNull
+    srcWordCount = modelInstance.trainInput.map(o => {
+      /* source sentence lengths */ tf.sum(o._1._3._2).toLong
+    }).orNull
+    tgtWordCount = modelInstance.trainInput.map(o => {
+      /* target sentence lengths */ tf.sum(o._2._2).toLong + /* batch size */ tf.size(o._2._2)
+    }).orNull
     totalLoss = 0.0f
     totalSrcWordCount = 0L
     totalTgtWordCount = 0L
   }
 
   override protected def afterSessionCreation(session: Session): Unit = {
-    lastStep = session.run(fetches = step.value).scalar.asInstanceOf[Long]
+    lastStep = session.run(fetches = step.value).scalar
   }
 
-  override protected def beforeSessionRun[F, E, R](runContext: Hook.SessionRunContext[F, E, R])(implicit
-      executableEv: Executable[E],
-      fetchableEv: Fetchable.Aux[F, R]
-  ): Option[Hook.SessionRunArgs[Seq[Output], Traversable[Op], Seq[Tensor[DataType]]]] = {
+  override protected def beforeSessionRun[C: OutputStructure, CV](
+      runContext: Hook.SessionRunContext[C, CV]
+  )(implicit
+      evOutputToTensorC: OutputToTensor.Aux[C, CV]
+  ): Option[Hook.SessionRunArgs[Seq[Output[Any]], Seq[Tensor[Any]]]] = {
     shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt + 1)
     if (average || shouldTrigger)
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
+      Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
     else
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value)))
+      Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](step.value)))
   }
 
-  override protected def afterSessionRun[F, E, R](
-      runContext: Hook.SessionRunContext[F, E, R],
-      runResult: Hook.SessionRunResult[Seq[Output], Seq[Tensor[DataType]]]
+  override protected def afterSessionRun[C: OutputStructure, CV](
+      runContext: Hook.SessionRunContext[C, CV],
+      runResult: Hook.SessionRunResult[Seq[Tensor[Any]]]
   )(implicit
-      executableEv: Executable[E],
-      fetchableEv: Fetchable.Aux[F, R]
+      evOutputToTensorC: OutputToTensor.Aux[C, CV]
   ): Unit = {
-    processFetches(runResult.values)
+    processFetches(runResult.result)
   }
 
   override protected def end(session: Session): Unit = {
     if (triggerAtEnd && lastStep.toInt != internalTrigger.lastTriggerStep().getOrElse(-1)) {
       shouldTrigger = true
-      processFetches(session.run(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
+      processFetches(session.run(fetches = Seq[Output[Any]](
+        step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
     }
   }
 
-  private[this] def processFetches(fetches: Seq[Tensor[DataType]]): Unit = {
+  private def processFetches(fetches: Seq[Tensor[Any]]): Unit = {
     lastStep = fetches.head.scalar.asInstanceOf[Long]
     if (average || shouldTrigger) {
       totalGradientsNorm += fetches(1).scalar.asInstanceOf[Float]

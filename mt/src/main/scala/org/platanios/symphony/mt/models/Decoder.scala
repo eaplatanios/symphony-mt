@@ -16,28 +16,41 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.models.Model.DecodingMode
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.models.rnn.RNNDecoder
+import org.platanios.tensorflow.api.core.types.TF
+import org.platanios.tensorflow.api.implicits.helpers.OutputStructure
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
+import org.platanios.tensorflow.api.ops.seq2seq.decoders.BeamSearchDecoder
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Decoder[O] {
-  def create(
-      config: RNNModel.Config[_, _],
-      encoderState: O,
+trait Decoder[T, EncoderState] {
+  def create[O: TF](
+      decodingMode: DecodingMode[O],
+      config: RNNModel.Config[T, _],
+      encoderState: EncoderState,
       beginOfSequenceToken: String,
       endOfSequenceToken: String,
-      tgtSequences: Output = null,
-      tgtSequenceLengths: Output = null
+      tgtSequences: Output[Int] = null,
+      tgtSequenceLengths: Output[Int] = null
   )(implicit
       stage: Stage,
       mode: Mode,
       env: Environment,
       parameterManager: ParameterManager,
       deviceManager: DeviceManager,
-      context: Output
-  ): RNNDecoder.Output
+      context: Output[Int],
+  ): RNNDecoder.DecoderOutput[O]
+}
+
+object Decoder {
+  def tileForBeamSearch[S: OutputStructure](value: S, beamWidth: Int): S = {
+    OutputStructure[S].map(
+      value,
+      converter = BeamSearchDecoder.TileBatchConverter(beamWidth))
+  }
 }

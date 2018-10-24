@@ -15,8 +15,8 @@
 
 package org.platanios.symphony.mt.evaluation
 
+import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.Op
 import org.platanios.tensorflow.api.ops.metrics.Metric
 import org.platanios.tensorflow.api.ops.metrics.Metric._
 
@@ -33,53 +33,50 @@ import org.platanios.tensorflow.api.ops.metrics.Metric._
   */
 class SentenceLength protected (
     val forHypothesis: Boolean,
-    val variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
-    val valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
-    val updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
-    val resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
+    val variablesCollections: Set[Graph.Key[Variable[Any]]] = Set(METRIC_VARIABLES),
+    val valuesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_VALUES),
+    val updatesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_UPDATES),
+    val resetsCollections: Set[Graph.Key[UntypedOp]] = Set(METRIC_RESETS),
     override val name: String = "SentenceLength"
 ) extends MTMetric {
   // TODO: Move to the TF metric class.
   protected def sanitize(name: String): String = name.replace(' ', '_')
 
   override def compute(
-      values: ((Output, Output, Output), (Output, Output)),
-      weights: Option[Output] = None,
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
+      weights: Option[Output[Float]] = None,
       name: String = this.name
-  ): Output = {
-    val ((_, _, hypLen), (_, refLen)) = values
-    val len = if (forHypothesis) hypLen else refLen
-    var ops = Set(len.op)
-    weights.foreach(ops += _.op)
-    val sanitizedName = sanitize(name)
-    tf.createWithNameScope(sanitizedName, ops) {
-      tf.mean(len)
+  ): Output[Float] = {
+    val srcSentenceLengths = values._2._1._2.toFloat
+    val tgtSentenceLengths = values._2._2._2.toFloat
+    tf.nameScope(sanitize(name)) {
+      val length = if (forHypothesis) srcSentenceLengths else tgtSentenceLengths
+      tf.mean(length)
     }
   }
 
   override def streaming(
-      values: ((Output, Output, Output), (Output, Output)),
-      weights: Option[Output] = None,
+      values: (SentencesWithLanguage[String], (SentencesWithLanguagePair[String], Sentences[String])),
+      weights: Option[Output[Float]] = None,
       name: String = this.name
-  ): Metric.StreamingInstance[Output] = {
-    val ((_, _, hypLen), (_, refLen)) = values
-    val len = if (forHypothesis) hypLen else refLen
-    var ops = Set(len.op)
-    weights.foreach(ops += _.op)
+  ): Metric.StreamingInstance[Output[Float]] = {
+    val srcSentenceLengths = values._2._1._2.toFloat
+    val tgtSentenceLengths = values._2._2._2.toFloat
     val sanitizedName = sanitize(name)
     tf.variableScope(sanitizedName) {
-      tf.createWithNameScope(sanitizedName, ops) {
-        val length = variable("Length", INT64, Shape(), tf.ZerosInitializer, variablesCollections)
-        val count = variable("Count", INT64, Shape(), tf.ZerosInitializer, variablesCollections)
-        val updateLength = length.assignAdd(tf.sum(len).toInt64)
-        val updateCount = count.assignAdd(tf.size(len, INT64))
-        val value = tf.divide(length.value.cast(FLOAT32), count.value, name = "Value")
-        val update = tf.divide(updateLength.cast(FLOAT32), updateCount.cast(FLOAT32), name = "Update")
-        val reset = tf.group(Set(length.initializer, count.initializer), name = "Reset")
-        valuesCollections.foreach(tf.currentGraph.addToCollection(value, _))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(update, _))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(reset, _))
-        Metric.StreamingInstance(value, update, reset, Set(length, count))
+      tf.nameScope(sanitizedName) {
+        val totalLength = variable[Long]("Length", Shape(), tf.ZerosInitializer, variablesCollections)
+        val count = variable[Long]("Count", Shape(), tf.ZerosInitializer, variablesCollections)
+        val length = if (forHypothesis) srcSentenceLengths else tgtSentenceLengths
+        val updateLength = totalLength.assignAdd(tf.sum(length).toLong)
+        val updateCount = count.assignAdd(tf.size(length))
+        val value = tf.divide(totalLength.value.toFloat, count.value.toFloat, name = "Value")
+        val update = tf.divide(updateLength.toFloat, updateCount.toFloat, name = "Update")
+        val reset = tf.group(Set(totalLength.initializer, count.initializer), name = "Reset")
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(value, update, reset, Set(totalLength.asUntyped, count.asUntyped))
       }
     }
   }
@@ -88,10 +85,10 @@ class SentenceLength protected (
 object SentenceLength {
   def apply(
       forHypothesis: Boolean,
-      variablesCollections: Set[Graph.Key[Variable]] = Set(METRIC_VARIABLES),
-      valuesCollections: Set[Graph.Key[Output]] = Set(METRIC_VALUES),
-      updatesCollections: Set[Graph.Key[Output]] = Set(METRIC_UPDATES),
-      resetsCollections: Set[Graph.Key[Op]] = Set(METRIC_RESETS),
+      variablesCollections: Set[Graph.Key[Variable[Any]]] = Set(METRIC_VARIABLES),
+      valuesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_VALUES),
+      updatesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_UPDATES),
+      resetsCollections: Set[Graph.Key[UntypedOp]] = Set(METRIC_RESETS),
       name: String = "SentenceLength"
   ): SentenceLength = {
     new SentenceLength(

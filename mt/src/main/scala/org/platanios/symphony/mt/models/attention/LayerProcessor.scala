@@ -19,6 +19,7 @@ import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsHalfOrFloatOrDouble, TF}
 import org.platanios.tensorflow.api.learn.Mode
 
 /**
@@ -26,26 +27,30 @@ import org.platanios.tensorflow.api.learn.Mode
   */
 trait LayerProcessor {
   @throws[IllegalArgumentException]
-  def apply(
-      value: Output,
-      previousValue: Option[Output],
+  def apply[T: TF : IsHalfOrFloatOrDouble](
+      value: Output[T],
+      previousValue: Option[Output[T]],
       name: String = "LayerProcessor"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output
+      context: Output[Int]
+  ): Output[T]
 }
 
 case object AddResidualConnection extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply(
-      value: Output,
-      previousValue: Option[Output],
+  override def apply[T: TF : IsHalfOrFloatOrDouble](
+      value: Output[T],
+      previousValue: Option[Output[T]],
       name: String = "AddResidualConnection"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
+      context: Output[Int]
+  ): Output[T] = {
     previousValue match {
       case Some(v) => value + v
       case None => throw new IllegalArgumentException(
@@ -56,15 +61,17 @@ case object AddResidualConnection extends LayerProcessor {
 
 case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply(
-      value: Output,
-      previousValue: Option[Output],
+  override def apply[T: TF : IsHalfOrFloatOrDouble](
+      value: Output[T],
+      previousValue: Option[Output[T]],
       name: String = "Normalize"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
-    normalization(value, epsilon = epsilon, name = name)(mode, parameterManager)
+      context: Output[Int]
+  ): Output[T] = {
+    normalization(value, epsilon = epsilon, name = name)
   }
 }
 
@@ -74,14 +81,16 @@ case class Dropout(
     broadcastAxes: Set[Int] = Set.empty
 ) extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply(
-      value: Output,
-      previousValue: Option[Output],
-      name: String = "Normalize"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  override def apply[T: TF : IsHalfOrFloatOrDouble](
+      value: Output[T],
+      previousValue: Option[Output[T]],
+      name: String = "Dropout"
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
+      context: Output[Int]
+  ): Output[T] = {
     if (mode.isTraining)
       Common.dropoutWithBroadcastAxes(value, 1.0f - dropoutRate, scaleOutput, broadcastAxes)
     else
@@ -92,43 +101,47 @@ case class Dropout(
 object LayerProcessor {
   /** Applies a sequence of functions to the input of a layer.
     *
-    * @param  input             Layer input.
-    * @param  processors        Layer processors to apply.
-    * @param  mode              Current learning mode (e.g., training or evaluation).
+    * @param  input            Layer input.
+    * @param  processors       Layer processors to apply.
+    * @param  mode             Current learning mode (e.g., training or evaluation).
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Processed layer input.
     */
-  def layerPreprocess(
-      input: Output,
+  def layerPreprocess[T: TF : IsHalfOrFloatOrDouble](
+      input: Output[T],
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
+      context: Output[Int]
+  ): Output[T] = {
     processors.foldLeft(input) {
-      case (value, processor) => processor(value, None)(mode, parameterManager)
+      case (value, processor) => processor(value, None)
     }
   }
 
   /** Applies a sequence of functions to the output of a layer, potentially depending on its input.
     *
-    * @param  input             Layer input.
-    * @param  output            Layer output.
-    * @param  processors        Layer processors to apply.
-    * @param  mode              Current learning mode (e.g., training or evaluation).
+    * @param  input            Layer input.
+    * @param  output           Layer output.
+    * @param  processors       Layer processors to apply.
+    * @param  mode             Current learning mode (e.g., training or evaluation).
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Processed layer output.
     */
-  def layerPostprocess(
-      input: Output,
-      output: Output,
+  def layerPostprocess[T: TF : IsHalfOrFloatOrDouble](
+      input: Output[T],
+      output: Output[T],
       processors: Seq[LayerProcessor]
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = {
+      context: Output[Int]
+  ): Output[T] = {
     processors.foldLeft(output) {
-      case (value, processor) => processor(value, Some(input))(mode, parameterManager)
+      case (value, processor) => processor(value, Some(input))
     }
   }
 }

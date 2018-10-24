@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models.helpers
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types._
 import org.platanios.tensorflow.api.learn.Mode
 
 import scala.language.postfixOps
@@ -39,8 +40,11 @@ object Common {
     * @param  n     Size at which to split the last dimension.
     * @return Tensor with shape `[..., n, m / n]`.
     */
-  def splitLastDimension(input: Output, n: Int): Output = {
-    val inputShape = tf.shape(input)
+  def splitLastDimension[T: TF](
+      input: Output[T],
+      n: Int
+  ): Output[T] = {
+    val inputShape = tf.shape(input).toInt
     val result = tf.reshape(input, tf.concatenate(Seq(
       inputShape(0 :: -1),
       tf.constant(n, shape = Shape(1)),
@@ -55,7 +59,9 @@ object Common {
     * @param  input Tensor with shape `[..., a, b]`.
     * @return Tensor with shape `[..., a * b]`.
     */
-  def combineLastTwoDimensions(input: Output): Output = {
+  def combineLastTwoDimensions[T: TF](
+      input: Output[T]
+  ): Output[T] = {
     val inputShape = tf.shape(input)
     val result = tf.reshape(input, tf.concatenate(Seq(
       inputShape(0 :: -2),
@@ -73,8 +79,15 @@ object Common {
     * @param  input Tensor with shape `[a, b, ...]`.
     * @return Tensor with shape `[a * b, ...]`.
     */
-  def combineFirstTwoDimensions(input: Output): Output = {
-    val result = tf.reshape(input, tf.concatenate(Seq(tf.constant(-1, shape = Shape(1)), tf.shape(input)(2 ::))))
+  def combineFirstTwoDimensions[T: TF](
+      input: Output[T]
+  ): Output[T] = {
+    val resultShape = tf.concatenate(Seq(
+      tf.constant[Int](Tensor(-1)),
+      tf.shape(input).slice(2 ::).toInt))
+    val result = tf.reshape(input, resultShape)
+
+    // Set static shape information, if known.
     if (input.rank != -1) {
       val firstDimSize = if (input.shape(0) != -1 && input.shape(1) != -1) input.shape(0) * input.shape(1) else -1
       val resultShape = Shape(firstDimSize) ++ input.shape(2 ::)
@@ -89,35 +102,32 @@ object Common {
     * @param  paddingValue Optional padding value to use.
     * @return Resulting tensor with the same shape as `input`.
     */
-  def shift2DRight(input: Output, paddingValue: Option[Output] = None): Output = {
+  def shift2DRight[T: TF](
+      input: Output[T],
+      paddingValue: Option[Output[T]] = None
+  ): Output[T] = {
     // TODO: Make more generic.
     input.rank match {
       case 2 =>
         paddingValue.map(pv => {
-          tf.concatenate(Seq(pv, input), axis = 1)(::, 0 :: -1)
+          tf.concatenate(Seq(pv, input), axis = 1).slice(::, 0 :: -1)
         }).getOrElse {
-          tf.pad(input, tf.stack(Seq(
-            tf.stack(Seq(0, 0)),
-            tf.stack(Seq(1, 0)))))(::, 0 :: -1)
+          val paddings = Tensor(Tensor(0, 0), Tensor(1, 0))
+          tf.pad(input, paddings).slice(::, 0 :: -1)
         }
       case 3 =>
         paddingValue.map(pv => {
-          tf.concatenate(Seq(pv, input), axis = 1)(::, 0 :: -1, ::)
+          tf.concatenate(Seq(pv, input), axis = 1).slice(::, 0 :: -1, ::)
         }).getOrElse {
-          tf.pad(input, tf.stack(Seq(
-            tf.stack(Seq(0, 0)),
-            tf.stack(Seq(1, 0)),
-            tf.stack(Seq(0, 0)))))(::, 0 :: -1, ::)
+          val paddings = Tensor(Tensor(0, 0), Tensor(1, 0), Tensor(0, 0))
+          tf.pad(input, paddings).slice(::, 0 :: -1, ::)
         }
       case 4 =>
         paddingValue.map(pv => {
-          tf.concatenate(Seq(pv, input), axis = 1)(::, 0 :: -1, ::, ::)
+          tf.concatenate(Seq(pv, input), axis = 1).slice(::, 0 :: -1, ::, ::)
         }).getOrElse {
-          tf.pad(input, tf.stack(Seq(
-            tf.stack(Seq(0, 0)),
-            tf.stack(Seq(1, 0)),
-            tf.stack(Seq(0, 0)),
-            tf.stack(Seq(0, 0)))))(::, 0 :: -1, ::, ::)
+          val paddings = Tensor(Tensor(0, 0), Tensor(1, 0), Tensor(0, 0), Tensor(0, 0))
+          tf.pad(input, paddings).slice(::, 0 :: -1, ::, ::)
         }
     }
   }
@@ -130,11 +140,16 @@ object Common {
     * @param  axis                   Axis along which to pad.
     * @return Tuple containing the padded `x` and `y` tensors.
     */
-  def padToSameLength(x: Output, y: Output, finalLengthDivisibleBy: Int = 1, axis: Int = 1): (Output, Output) = {
+  def padToSameLength[T1: TF, T2: TF](
+      x: Output[T1],
+      y: Output[T2],
+      finalLengthDivisibleBy: Int = 1,
+      axis: Int = 1
+  ): (Output[T1], Output[T2]) = {
     require(axis == 1 || axis == 2, "The axis can only be set to 1 or 2.")
-    tf.createWithNameScope("PadToSameLength") {
-      val xLength = tf.shape(x)(axis)
-      val yLength = tf.shape(y)(axis)
+    tf.nameScope("PadToSameLength") {
+      val xLength = tf.shape(x).slice(axis).toInt
+      val yLength = tf.shape(y).slice(axis).toInt
       var maxLength = tf.maximum(xLength, yLength)
       if (finalLengthDivisibleBy > 1) {
         // Find the nearest larger-or-equal integer divisible by the provided number.
@@ -143,16 +158,16 @@ object Common {
         maxLength = tf.multiply(maxLength, finalLengthDivisibleBy)
       }
 
-      def padding(lengthDiff: Output, arg: Output): Output = {
+      def padding[P: TF](lengthDiff: Output[Int], arg: Output[P]): Output[Int] = {
         val paddings = {
           if (axis == 1) {
             Seq(
-              tf.stack(Seq(tf.stack(Seq(0, 0)), tf.stack(Seq(0, lengthDiff)))),
-              tf.zeros(INT32, tf.stack(Seq(tf.rank(arg) - 2, 2))))
+              tf.stack[Int](Seq(tf.stack[Int](Seq(0, 0)), tf.stack[Int](Seq(0, lengthDiff)))),
+              tf.zeros[Int, Int](tf.stack[Int](Seq(tf.rank(arg) - 2, 2))))
           } else {
             Seq(
-              tf.stack(Seq(tf.stack(Seq(0, 0)), tf.stack(Seq(0, 0)), tf.stack(Seq(0, lengthDiff)))),
-              tf.zeros(INT32, tf.stack(Seq(tf.rank(arg) - 3, 2))))
+              tf.stack[Int](Seq(tf.stack[Int](Seq(0, 0)), tf.stack[Int](Seq(0, 0)), tf.stack[Int](Seq(0, lengthDiff)))),
+              tf.zeros[Int, Int](tf.stack[Int](Seq(tf.rank(arg) - 3, 2))))
           }
         }
         tf.concatenate(paddings, axis = 0)
@@ -175,8 +190,11 @@ object Common {
     * @param  labels Labels tensor.
     * @return Tuple containing the padded `logits` and `labels` tensors.
     */
-  def padToSameLengthWithZeros(logits: Output, labels: Output): (Output, Output) = {
-    tf.createWithNameScope("PadWithZeros") {
+  def padToSameLengthWithZeros[T1: TF, T2: TF](
+      logits: Output[T1],
+      labels: Output[T2]
+  ): (Output[T1], Output[T2]) = {
+    tf.nameScope("PadWithZeros") {
       var processed = padToSameLength(logits, labels)
       var processedLogits = processed._1
       var processedLabels = processed._2
@@ -192,59 +210,73 @@ object Common {
 
   //region Weight Functions
 
-  /** Assigns weight `1.0f` to all labels.
+  /** Assigns weight `1` to all labels.
     *
     * @param  labels Target labels.
-    * @return  `FLOAT32` tensor containing weights for the provided labels.
+    * @return Tensor containing weights for the provided labels.
     */
-  def weightsAll(labels: Output): Output = {
-    tf.onesLike(labels, FLOAT32)
+  def weightsAll[T: TF : IsNumeric](
+      labels: Output[T]
+  ): Output[T] = {
+    tf.onesLike(labels)
   }
 
-  /** Assigns weight `1.0f` to all labels except for those equal to `0` (i.e., padding).
+  /** Assigns weight `1` to all labels except for those equal to `0` (i.e., padding).
     *
     * @param  labels Target labels.
-    * @return  `FLOAT32` tensor containing weights for the provided labels.
+    * @return Tensor containing weights for the provided labels.
     */
-  def weightsNonZero(labels: Output): Output = {
-    tf.notEqual(labels, 0).cast(FLOAT32)
+  def weightsNonZero[T: TF : IsNumeric](
+      labels: Output[T]
+  ): Output[T] = {
+    val zero = tf.zeros[T](Shape())
+    tf.notEqual(labels, zero).castTo[T]
   }
 
-  /** Assign weight `1.0f` to only the "targets" portion of the labels. Weight `1.0f` is assigned to all nonzero labels
+  /** Assign weight `1` to only the "targets" portion of the labels. Weight `1` is assigned to all nonzero labels
     * past the first zero.
     *
     * @param  labels Target labels.
-    * @return  `FLOAT32` tensor containing weights for the provided labels.
+    * @return Tensor containing weights for the provided labels.
     */
-  def weightsPrependInputsToTargets(labels: Output): Output = {
-    val pastFirstZero = tf.cumsum(tf.equal(labels, 0).cast(FLOAT32), axis = 1)
-    tf.notEqual(pastFirstZero * labels.cast(FLOAT32), 0).cast(FLOAT32)
+  def weightsPrependInputsToTargets[T: TF : IsNotQuantized](
+      labels: Output[T]
+  ): Output[T] = {
+    val zero = tf.zeros[T](Shape())
+    val pastFirstZero = tf.cumsum(tf.equal(labels, zero).castTo[T], axis = 1)
+    tf.notEqual(pastFirstZero * labels, zero).castTo[T]
   }
 
   /** Assigns weight `1.0f` to only the "target" part of the concatenated labels.
     *
     * The labels look like:
-    *   source English I love you . EOS target French Je t'aime . EOS
-    *   source English the cat EOS target French le chat EOS
-    *   source English ...
+    * source English I love you . EOS target French Je t'aime . EOS
+    * source English the cat EOS target French le chat EOS
+    * source English ...
     *
     * We want to assign weight `1.0f` to all words in the target text (including the EOS symbol), but not to the source
     * text or the boilerplate. In the above example, the target words that get positive weight are:
-    *   Je t'aime . EOS le chat EOS
+    * Je t'aime . EOS le chat EOS
     *
     * @param  labels Target labels.
-    * @return  `FLOAT32` tensor containing weights for the provided labels.
+    * @return `FLOAT32` tensor containing weights for the provided labels.
     */
-  def weightsConcatenated(labels: Output): Output = {
-    val eosMask = tf.equal(labels, 1).cast(INT32) // TODO: Standardize EOS symbol.
+  def weightsConcatenated[T: TF: IsNumeric](
+      labels: Output[T]
+  ): Output[T] = {
+    val one = tf.ones[T](Shape())
+    val eosMask = tf.equal(labels, one).toInt // TODO: [GLOBAL_CONTEXT] Standardize EOS symbol.
     val sentenceNum = tf.cumsum(eosMask, axis = 1, exclusive = true)
     val sentenceNumPlusOne = sentenceNum + 1
     val inTarget = tf.equal(tf.mod(sentenceNum, 2), 1)
     // The first two tokens of each sentence are boilerplate.
-    val shifted = tf.pad(sentenceNumPlusOne, tf.stack(
-      Seq(tf.stack(Seq(0, 0)), tf.stack(Seq(2, 0)), tf.stack(Seq(0, 0)), tf.stack(Seq(0, 0)))))(::, 0 :: -2, ::, ::)
-    val nonBoilerplate = tf.equal(sentenceNumPlusOne, shifted)
-    tf.logicalAnd(nonBoilerplate, inTarget).cast(FLOAT32)
+    val shifted = tf.pad(sentenceNumPlusOne, Tensor[Int](
+      Tensor[Int](0, 0),
+      Tensor[Int](2, 0),
+      Tensor[Int](0, 0),
+      Tensor[Int](0, 0)))
+    val nonBoilerplate = tf.equal(sentenceNumPlusOne, shifted.slice(::, 0 :: -2, ::, ::))
+    tf.logicalAnd(nonBoilerplate, inTarget).castTo[T]
   }
 
   //endregion Weight Functions
@@ -260,15 +292,15 @@ object Common {
     * @param  gaussian       If `true`, a Gaussian distribution will be used for label smoothing.
     * @return Cross entropy scores.
     */
-  def smoothingCrossEntropy(
-      logits: Output,
-      labels: Output,
+  def smoothingCrossEntropy[T: TF : IsDecimal, I: TF : IsIntOrLong](
+      logits: Output[T],
+      labels: Output[I],
       labelSmoothing: Float = 0.0f,
       gaussian: Boolean = false
-  ): Output = {
-    tf.createWithNameScope("SmoothingCrossEntropy") {
-      val vocabSize = tf.shape(logits)(-1)
-      val vocabSizeMinusOne = (vocabSize - 1).cast(FLOAT32)
+  ): Output[T] = {
+    tf.nameScope("SmoothingCrossEntropy") {
+      val vocabSize = tf.shape(logits).slice(-1).toInt
+      val vocabSizeMinusOne = (vocabSize - 1).toFloat
       // Low confidence is given to all non-true labels, uniformly.
       val confidence = 1.0f - labelSmoothing
       val lowConfidence = (1.0f - confidence) / vocabSizeMinusOne
@@ -290,10 +322,14 @@ object Common {
           //      # logits: [batch_size, ?, ?, ?, vocab_size]
           //      soft_targets = tf.transpose(soft_targets, perm=[1, 2, 3, 4, 0])
         } else {
-          tf.oneHot(tf.cast(labels, INT64), vocabSize, confidence, lowConfidence)
+          tf.oneHot(
+            indices = labels,
+            depth = vocabSize,
+            onValue = Output[Float](confidence).castTo[T],
+            offValue = Output[Float](lowConfidence).castTo[T])
         }
       }
-      tf.softmaxCrossEntropy(logits, softTargets) - normalizingConstant
+      tf.softmaxCrossEntropy(logits, softTargets) - normalizingConstant.castTo[T]
     }
   }
 
@@ -309,27 +345,28 @@ object Common {
     * @param  gaussian       If `true`, a Gaussian distribution will be used for label smoothing.
     * @return Tuple containing the cross-entropy tensor and the weights tensor.
     */
-  def paddedCrossEntropy(
-      logits: Output,
-      labels: Output,
-      labelLengths: Output,
+  def paddedCrossEntropy[T: TF : IsDecimal, I: TF : IsIntOrLong](
+      logits: Output[T],
+      labels: Output[I],
+      labelLengths: Output[Int],
       labelSmoothing: Float = 0.0f,
       sum: Boolean = true,
       gaussian: Boolean = false,
       timeMajor: Boolean = false
-  ): (Output, Output) = {
+  ): (Output[T], Output[T]) = {
     // TODO: Factored padded cross-entropy.
-    tf.createWithNameScope("PaddedCrossEntropy") {
-      val maxLength = tf.shape(labels)(1)
+    tf.nameScope("PaddedCrossEntropy") {
+      val maxLength = tf.shape(labels).slice(1).toInt
       // val (processedLogits, processedLabels) = padToSameLengthWithZeros(logits, labels)
       val transposedLabels = if (timeMajor) labels.transpose() else labels
       val crossEntropy = smoothingCrossEntropy(logits, transposedLabels, labelSmoothing, gaussian)
-      val weights = tf.sequenceMask(labelLengths, maxLength, logits.dataType)
+      val weights = tf.sequenceMask(labelLengths, maxLength).castTo[T]
       val transposedWeights = if (timeMajor) weights.transpose() else weights
-      if (!sum)
+      if (!sum) {
         (crossEntropy * transposedWeights, transposedWeights)
-      else
+      } else {
         (tf.sum(crossEntropy * transposedWeights), tf.sum(transposedWeights))
+      }
     }
   }
 
@@ -350,21 +387,20 @@ object Common {
     * @param  broadcastAxes   Specifies along which axes the dropout is broadcast.
     * @return Created op output that has the same shape as `input`.
     */
-  def dropoutWithBroadcastAxes(
-      input: Output,
+  def dropoutWithBroadcastAxes[T: TF : IsHalfOrFloatOrDouble](
+      input: Output[T],
       keepProbability: Float,
       scaleOutput: Boolean = true,
       broadcastAxes: Set[Int] = Set.empty
-  ): Output = {
-    val one = tf.constant(1, dataType = INT32)
+  ): Output[T] = {
     val noiseShape = {
       if (broadcastAxes.isEmpty) {
-        tf.shape(input)
+        tf.shape(input).toInt
       } else {
-        val inputShape = tf.shape(input)
+        val inputShape = tf.shape(input).toInt
         tf.stack((0 until input.rank).map(i => {
           if (broadcastAxes.contains(i))
-            one
+            tf.constant[Int](1)
           else
             inputShape(i)
         }))
@@ -383,27 +419,31 @@ object Common {
     * @param  reluDropoutBroadcastAxes Specifies along which axes of the attention weights the dropout is broadcast.
     * @param  name                     Name for this alayer that also specifies a variable scope.
     * @param  mode                     Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager        Parameter manager to use, if parameters are required.
+    * @param  parameterManager         Parameter manager to use, if parameters are required.
     * @return Output of the last fully connected layer.
     */
-  def denseReLUDense(
-      input: Output,
+  def denseReLUDense[T: TF : IsHalfOrFloatOrDouble](
+      input: Output[T],
       filterSize: Int,
       outputSize: Int,
       reluDropoutRate: Float = 0.0f,
       reluDropoutBroadcastAxes: Set[Int] = Set.empty,
       name: String = "DenseReLUDense"
-  )(mode: Mode, parameterManager: ParameterManager)(implicit
+  )(implicit
+      mode: Mode,
+      parameterManager: ParameterManager,
       stage: Stage,
-      context: Output
-  ): Output = tf.variableScope(name) {
-    val weights1 = parameterManager.get("Dense1/Weights", input.dataType, Shape(input.shape(-1), filterSize))
-    val bias1 = parameterManager.get("Dense1/Bias", input.dataType, Shape(filterSize))
-    var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")
-    if (mode.isTraining)
-      hidden = dropoutWithBroadcastAxes(hidden, 1.0f - reluDropoutRate, scaleOutput = true, reluDropoutBroadcastAxes)
-    val weights2 = parameterManager.get("Dense2/Weights", input.dataType, Shape(filterSize, outputSize))
-    val bias2 = parameterManager.get("Dense2/Bias", input.dataType, Shape(outputSize))
-    tf.linear(hidden, weights2, bias2, "Dense2")
+      context: Output[Int]
+  ): Output[T] = {
+    tf.variableScope(name) {
+      val weights1 = parameterManager.get[T]("Dense1/Weights", Shape(input.shape(-1), filterSize))
+      val bias1 = parameterManager.get[T]("Dense1/Bias", Shape(filterSize))
+      var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")
+      if (mode.isTraining)
+        hidden = dropoutWithBroadcastAxes(hidden, 1.0f - reluDropoutRate, scaleOutput = true, reluDropoutBroadcastAxes)
+      val weights2 = parameterManager.get[T]("Dense2/Weights", Shape(filterSize, outputSize))
+      val bias2 = parameterManager.get[T]("Dense2/Bias", Shape(outputSize))
+      tf.linear(hidden, weights2, bias2, "Dense2")
+    }
   }
 }

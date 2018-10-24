@@ -16,7 +16,9 @@
 package org.platanios.symphony.mt.evaluation
 
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.core.types.{IsDecimal, TF}
 import org.platanios.tensorflow.api.ops.metrics.Metric
+import org.platanios.tensorflow.api.ops.metrics.Metric._
 
 /** Perplexity metric, implemented as in the [TensorFlow NMT package](https://github.com/tensorflow/nmt).
   *
@@ -29,57 +31,72 @@ import org.platanios.tensorflow.api.ops.metrics.Metric
   * @author Emmanouil Antonios Platanios
   */
 class Perplexity(
-    val variablesCollections: Set[Graph.Key[Variable]] = Set(Metric.METRIC_VARIABLES),
-    val valuesCollections: Set[Graph.Key[Output]] = Set(Metric.METRIC_VALUES),
-    val updatesCollections: Set[Graph.Key[Output]] = Set(Metric.METRIC_UPDATES),
-    val resetsCollections: Set[Graph.Key[Op]] = Set(Metric.METRIC_RESETS),
+    val variablesCollections: Set[Graph.Key[Variable[Any]]] = Set(METRIC_VARIABLES),
+    val valuesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_VALUES),
+    val updatesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_UPDATES),
+    val resetsCollections: Set[Graph.Key[UntypedOp]] = Set(METRIC_RESETS),
     override val name: String = "Perplexity"
-) extends Metric[((Output, Output), (Output, Output)), Output] {
+) extends Metric[((Output[Float], Output[Int]), (Output[Float], Output[Int])), Output[Float]] {
   override def compute(
-      values: ((Output, Output), (Output, Output)),
-      weights: Option[Output] = None,
+      values: ((Output[Float], Output[Int]), (Output[Float], Output[Int])),
+      weights: Option[Output[Float]] = None,
       name: String = name
-  ): Output = {
-    tf.createWithNameScope(name) {
-      val mask = tf.sequenceMask(values._1._2, tf.shape(values._1._1)(1), dataType = values._1._1.dataType)
-      val loss = tf.sum(tf.sequenceLoss(
-        values._1._1, values._2._1, mask, averageAcrossTimeSteps = false, averageAcrossBatch = false))
-      val length = tf.sum(values._1._2).cast(values._1._1.dataType)
+  ): Output[Float] = {
+    tf.nameScope(name) {
+      val mask = tf.sequenceMask(
+        lengths = values._1._2,
+        maxLength = tf.shape(values._1._1).slice(1).toInt)
+      val loss = tf.sum(tf.sequenceLoss[Float, Float](
+        logits = values._1._1,
+        labels = values._2._1,
+        lossFn = tf.softmaxCrossEntropy[Float](_, _)(TF[Float], IsDecimal[Float]),
+        weights = mask.toFloat,
+        averageAcrossTimeSteps = false,
+        averageAcrossBatch = false))
+      val length = tf.sum(values._1._2)
       tf.exp(Metric.safeScalarDiv(loss, length))
     }
   }
 
   override def streaming(
-      values: ((Output, Output), (Output, Output)),
-      weights: Option[Output] = None,
+      values: ((Output[Float], Output[Int]), (Output[Float], Output[Int])),
+      weights: Option[Output[Float]] = None,
       name: String = name
-  ): Metric.StreamingInstance[Output] = {
+  ): Metric.StreamingInstance[Output[Float]] = {
     tf.variableScope(name) {
-      tf.createWithNameScope(name) {
+      tf.nameScope(name) {
         // Create accumulator variables
-        val loss = tf.variable("Loss", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)
-        val length = tf.variable("Length", values._1._1.dataType, Shape.scalar(), tf.ZerosInitializer)
+        val totalLoss = tf.variable[Float]("Loss", Shape.scalar(), tf.ZerosInitializer)
+        val length = tf.variable[Long]("Length", Shape.scalar(), tf.ZerosInitializer)
 
         // Create update ops
-        val mask  = tf.sequenceMask(values._1._2, tf.shape(values._1._1)(1), dataType = values._1._1.dataType)
-        val updateLoss = loss.assignAdd(tf.sum(tf.sequenceLoss(
-          values._1._1, values._2._1, mask, averageAcrossTimeSteps = false, averageAcrossBatch = false)))
-        val updateLength = length.assignAdd(tf.sum(values._1._2).cast(values._1._1.dataType))
+        val mask = tf.sequenceMask(
+          lengths = values._1._2,
+          maxLength = tf.shape(values._1._1).slice(1).toInt)
+        val loss = tf.sum(tf.sequenceLoss[Float, Float](
+          logits = values._1._1,
+          labels = values._2._1,
+          lossFn = tf.softmaxCrossEntropy[Float](_, _)(TF[Float], IsDecimal[Float]),
+          weights = mask.toFloat,
+          averageAcrossTimeSteps = false,
+          averageAcrossBatch = false))
+        val updateLoss = totalLoss.assignAdd(loss)
+        val updateLength = length.assignAdd(tf.sum(values._1._2).toLong)
 
         // Create value ops
-        val value = tf.exp(Metric.safeScalarDiv(loss.value, length.value), name = "Value")
-        val update = tf.exp(Metric.safeScalarDiv(updateLoss, updateLength), name = "Update")
+        val value = tf.exp(Metric.safeScalarDiv(totalLoss.value, length.value.toFloat), name = "Value")
+        val update = tf.exp(Metric.safeScalarDiv(updateLoss, updateLength.toFloat), name = "Update")
 
         // Create reset op
-        val reset = tf.group(Set(loss.initializer, length.initializer))
+        val reset = tf.group(Set(totalLoss.initializer, length.initializer))
 
         // Add the created ops to the relevant graph collections
-        variablesCollections.foreach(tf.currentGraph.addToCollection(loss, _))
-        variablesCollections.foreach(tf.currentGraph.addToCollection(length, _))
-        valuesCollections.foreach(tf.currentGraph.addToCollection(value, _))
-        updatesCollections.foreach(tf.currentGraph.addToCollection(update, _))
-        resetsCollections.foreach(tf.currentGraph.addToCollection(reset, _))
-        Metric.StreamingInstance(value, update, reset, Set(loss, length))
+        variablesCollections.foreach(tf.currentGraph.addToCollection(_)(totalLoss.asUntyped))
+        variablesCollections.foreach(tf.currentGraph.addToCollection(_)(length.asUntyped))
+        valuesCollections.foreach(tf.currentGraph.addToCollection(_)(value.asUntyped))
+        updatesCollections.foreach(tf.currentGraph.addToCollection(_)(update.asUntyped))
+        resetsCollections.foreach(tf.currentGraph.addToCollection(_)(reset.asUntyped))
+        Metric.StreamingInstance(value, update, reset, Set(totalLoss.asUntyped, length.asUntyped))
       }
     }
   }
@@ -96,10 +113,10 @@ object Perplexity {
     * @return New mean metric.
     */
   def apply(
-      variablesCollections: Set[Graph.Key[Variable]] = Set(Metric.METRIC_VARIABLES),
-      valuesCollections: Set[Graph.Key[Output]] = Set(Metric.METRIC_VALUES),
-      updatesCollections: Set[Graph.Key[Output]] = Set(Metric.METRIC_UPDATES),
-      resetsCollections: Set[Graph.Key[Op]] = Set(Metric.METRIC_RESETS),
+      variablesCollections: Set[Graph.Key[Variable[Any]]] = Set(METRIC_VARIABLES),
+      valuesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_VALUES),
+      updatesCollections: Set[Graph.Key[Output[Any]]] = Set(METRIC_UPDATES),
+      resetsCollections: Set[Graph.Key[UntypedOp]] = Set(METRIC_RESETS),
       name: String = "Perplexity"
   ): Perplexity = {
     new Perplexity(variablesCollections, valuesCollections, updatesCollections, resetsCollections, name)

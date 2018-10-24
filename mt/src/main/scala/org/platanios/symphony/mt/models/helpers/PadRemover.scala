@@ -31,13 +31,18 @@ import scala.language.postfixOps
   *
   * @author Emmanouil Antonios Platanios
   */
-case class PadRemover(padMask: Output, name: String = "PadRemover") {
+case class PadRemover(
+    padMask: Output[Float],
+    name: String = "PadRemover"
+) {
   /** `nonPadIndices` contains coordinates of zero rows (as `padMask` may be `FLOAT32`, checking zero equality is done
     * with `|x| < epsilon`, with `epsilon = 1e-9` as standard. Here padMask contains only positive values and so the
     * absolute value is not needed. */
-  val (nonPadIndices, originAxisSize) = tf.createWithNameScope(s"$name/Initialization") {
-    val flattenedPadMask = padMask.reshape(Shape(-1))
-    (tf.where(flattenedPadMask < 1e-9f).cast(INT32), tf.shape(flattenedPadMask)(0 :: 1))
+  val (nonPadIndices, originAxisSize) = {
+    tf.nameScope(s"$name/Initialization") {
+      val flattenedPadMask = padMask.reshape(Shape(-1))
+      (tf.where(flattenedPadMask < 1e-9f).toLong, tf.shape(flattenedPadMask).slice(0 :: 1))
+    }
   }
 
   /** Removes padding from the provided `value`.
@@ -45,11 +50,15 @@ case class PadRemover(padMask: Output, name: String = "PadRemover") {
     * @param  value Tensor with shape `[originAxisSize, ...]`.
     * @return Tensor with shape `[originAxisSizeCompressed, ...]`, where `originAxisSizeCompressed <= originAxisSize`.
     */
-  def remove(value: Output): Output = tf.createWithNameScope(s"$name/Remove") {
-    val valueShape = value.shape
-    val result = tf.gatherND(value, nonPadIndices)
-    result.setShape(Shape(-1) ++ valueShape(1 ::))
-    result
+  def remove(
+      value: Output[Float]
+  ): Output[Float] = {
+    tf.nameScope(s"$name/Remove") {
+      val valueShape = value.shape
+      val result = tf.gatherND(value, nonPadIndices)
+      result.setShape(Shape(-1) ++ valueShape(1 ::))
+      result
+    }
   }
 
   /** Adds padding back to the provided `value`.
@@ -58,7 +67,11 @@ case class PadRemover(padMask: Output, name: String = "PadRemover") {
     *               `originAxisSizeCompressed <= originAxisSize`.
     * @return Tensor with shape `[originAxisSize, ...]`.
     */
-  def restore(value: Output): Output = tf.createWithNameScope(s"$name/Add") {
-    tf.scatterND(nonPadIndices, value, tf.concatenate(Seq(originAxisSize, tf.shape(value)(1 ::))))
+  def restore(
+      value: Output[Float]
+  ): Output[Float] = {
+    tf.nameScope(s"$name/Add") {
+      tf.scatterND(nonPadIndices, value, tf.concatenate(Seq(originAxisSize, tf.shape(value).slice(1 ::))))
+    }
   }
 }
