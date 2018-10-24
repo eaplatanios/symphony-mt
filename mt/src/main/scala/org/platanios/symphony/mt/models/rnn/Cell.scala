@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.Zero
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.cell._
 
@@ -27,6 +27,8 @@ import org.platanios.tensorflow.api.ops.rnn.cell._
   * @author Emmanouil Antonios Platanios
   */
 abstract class Cell[T: TF, State, StateShape](implicit
+    val evOutputStructureState: OutputStructure[State],
+    val evOutputToShapeState: OutputToShape.Aux[State, StateShape],
     val evZeroState: Zero.Aux[State, StateShape]
 ) {
   // The following two type aliases are used in the experiments module.

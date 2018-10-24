@@ -26,7 +26,7 @@ import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, Luo
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsDecimal, IsReal, TF}
-import org.platanios.tensorflow.api.implicits.helpers.Zero
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -60,15 +60,19 @@ sealed trait ModelArchitecture {
       evalMetrics: Seq[MTMetric]
   ): RNNModel[T, _] = {
     val cell = cellFromString[T](cellString)
-    createModel[T, cell.StateType](
+    createModel[T, cell.StateType, cell.StateShapeType](
       name, languages, dataConfig, env, parameterManager, trainBackTranslation, languagePairs, evalLanguagePairs,
-      cell.asInstanceOf[Cell[cell.DataType, cell.StateType]], numUnits, residual, dropout, attention,
-      labelSmoothing, summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
+      cell.asInstanceOf[Cell[cell.DataType, cell.StateType, cell.StateShapeType]], numUnits, residual, dropout,
+      attention, labelSmoothing, summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
       optConfig, logConfig, evalDatasets, evalMetrics
-    )(TF[T], IsDecimal[T], cell.evZeroState.asInstanceOf[Zero[cell.StateType]])
+    )(
+      TF[T], IsDecimal[T],
+      cell.evOutputStructureState.asInstanceOf[OutputStructure[cell.StateType]],
+      cell.evOutputToShapeState.asInstanceOf[OutputToShape.Aux[cell.StateType, cell.StateShapeType]],
+      cell.evZeroState.asInstanceOf[Zero.Aux[cell.StateType, cell.StateShapeType]])
   }
 
-  protected def createModel[T: TF : IsDecimal, State: Zero](
+  protected def createModel[T: TF : IsDecimal, State: OutputStructure, StateShape](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -77,7 +81,7 @@ sealed trait ModelArchitecture {
       trainBackTranslation: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
-      cell: Cell[T, State],
+      cell: Cell[T, State, StateShape],
       numUnits: Int,
       residual: Boolean,
       dropout: Option[Float],
@@ -92,9 +96,12 @@ sealed trait ModelArchitecture {
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
+  )(implicit
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evZeroState: Zero.Aux[State, StateShape]
   ): RNNModel[T, State]
 
-  protected def cellFromString[T: TF : IsReal](cellString: String): Cell[T, _] = {
+  protected def cellFromString[T: TF : IsReal](cellString: String): Cell[T, _, _] = {
     val parts = cellString.split(":")
     val activation: Output[T] => Output[T] = {
       if (parts.length < 2) {
@@ -153,7 +160,7 @@ case class RNN(
 ) extends ModelArchitecture {
   override val name: String = "rnn"
 
-  override protected def createModel[T: TF : IsDecimal, State: Zero](
+  override protected def createModel[T: TF : IsDecimal, State: OutputStructure, StateShape](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -162,7 +169,7 @@ case class RNN(
       trainBackTranslation: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
-      cell: Cell[T, State],
+      cell: Cell[T, State, StateShape],
       numUnits: Int,
       residual: Boolean,
       dropout: Option[Float],
@@ -177,6 +184,9 @@ case class RNN(
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
+  )(implicit
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evZeroState: Zero.Aux[State, StateShape]
   ): RNNModel[T, State] = {
     RNNModel(
       name = name,
@@ -233,7 +243,7 @@ case class BiRNN(
 ) extends ModelArchitecture {
   override val name: String = "bi_rnn"
 
-  override protected def createModel[T: TF : IsDecimal, State: Zero](
+  override protected def createModel[T: TF : IsDecimal, State: OutputStructure, StateShape](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -242,7 +252,7 @@ case class BiRNN(
       trainBackTranslation: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
-      cell: Cell[T, State],
+      cell: Cell[T, State, StateShape],
       numUnits: Int,
       residual: Boolean,
       dropout: Option[Float],
@@ -257,6 +267,9 @@ case class BiRNN(
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
+  )(implicit
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evZeroState: Zero.Aux[State, StateShape]
   ): RNNModel[T, State] = {
     RNNModel(
       name = name,
@@ -314,7 +327,7 @@ case class GNMT(
 ) extends ModelArchitecture {
   override val name: String = "gnmt"
 
-  override protected def createModel[T: TF : IsDecimal, State: Zero](
+  override protected def createModel[T: TF : IsDecimal, State: OutputStructure, StateShape](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -323,7 +336,7 @@ case class GNMT(
       trainBackTranslation: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
-      cell: Cell[T, State],
+      cell: Cell[T, State, StateShape],
       numUnits: Int,
       residual: Boolean,
       dropout: Option[Float],
@@ -338,6 +351,9 @@ case class GNMT(
       logConfig: Model.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
+  )(implicit
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evZeroState: Zero.Aux[State, StateShape]
   ): RNNModel[T, State] = {
     RNNModel(
       name = name,
