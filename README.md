@@ -44,3 +44,16 @@ platforms are: `linux-cpu-x86_64`, `linux-gpu-x86_64`, and
 For more information on how to install/configure TensorFlow
 Scala, please refer to the
 [official website](http://platanios.org/tensorflow_scala/).
+
+## TODOs
+
+- [ ] Add support for bridges between the encoder and
+      the decoder (inspired from OpenNMT).
+- [ ] Add support for merging the bidirectional encoder
+      states using either summation or concatenation.
+- [ ] Add support for residual connections in the simple
+      encoders and decoders.
+- [ ] Add support for other attention models, as in
+      [here](https://arxiv.org/pdf/1508.04025.pdf).
+- [ ] Add support for scheduled sampling, presented in
+      [this paper](http://papers.nips.cc/paper/5956-scheduled-sampling-for-sequence-prediction-with-recurrent-neural-networks.pdf).
