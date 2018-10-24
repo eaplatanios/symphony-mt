@@ -21,7 +21,7 @@ import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
@@ -30,7 +30,7 @@ import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSear
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class RNNDecoder[T: TF : IsNotQuantized, State: NestedStructure]()
+abstract class RNNDecoder[T: TF : IsNotQuantized, State: OutputStructure]()
     extends Decoder[T, (Tuple[Output[T], Seq[State]], Output[Int], Output[Int])] {
   override def create[O: TF](
       decodingMode: DecodingMode[O],
@@ -49,22 +49,23 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State: NestedStructure]()
       context: Output[Int]
   ): RNNDecoder.DecoderOutput[O]
 
-  protected def decode[O: TF, DS: NestedStructure](
+  protected def decode[O: TF, DecState: OutputStructure, DecStateShape](
       decodingMode: DecodingMode[O],
       config: RNNModel.Config[T, _],
       srcSequenceLengths: Output[Int],
       tgtSequences: Output[Int],
       tgtSequenceLengths: Output[Int],
-      initialState: DS,
+      initialState: DecState,
       embeddings: Output[Int] => Output[T],
-      cell: tf.RNNCell[Output[T], DS],
+      cell: tf.RNNCell[Output[T], DecState, Shape, DecStateShape],
       tgtMaxLength: Output[Int],
       beginOfSequenceToken: String,
       endOfSequenceToken: String
   )(implicit
       mode: Mode,
       parameterManager: ParameterManager,
-      context: Output[Int]
+      context: Output[Int],
+      evOutputToShapeDecState: OutputToShape.Aux[DecState, DecStateShape]
   ): RNNDecoder.DecoderOutput[O] = {
     val outputWeights = parameterManager.getProjectionToWords(cell.outputShape.apply(-1), context(1)).castTo[T]
 
@@ -75,7 +76,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State: NestedStructure]()
         val embeddedSequences = embeddings(transposedSequences)
 
         // Decoder RNN
-        val helper = BasicDecoder.TrainingHelper[Output[T], DS](
+        val helper = BasicDecoder.TrainingHelper[Output[T], DecState, Shape](
           input = embeddedSequences,
           sequenceLengths = tgtSequenceLengths,
           timeMajor = config.timeMajor)
@@ -105,7 +106,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State: NestedStructure]()
             parallelIterations = config.env.parallelIterations, swapMemory = config.env.swapMemory)
           RNNDecoder.DecoderOutput(tuple._1.predictedIDs(---, 0), tuple._3(---, 0).toInt)
         } else {
-          val decHelper = BasicDecoder.GreedyEmbeddingHelper[T, DS](
+          val decHelper = BasicDecoder.GreedyEmbeddingHelper[T, DecState](
             embeddingFn = embeddingFn,
             beginTokens = tf.fill(INT32, batchSize)(tgtBosID),
             endToken = tgtEosID)

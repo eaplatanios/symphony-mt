@@ -26,12 +26,13 @@ import org.platanios.tensorflow.api.ops.rnn.cell._
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Cell[T: TF, State](implicit
-    val evZeroState: Zero[State]
+abstract class Cell[T: TF, State, StateShape](implicit
+    val evZeroState: Zero.Aux[State, StateShape]
 ) {
   // The following two type aliases are used in the experiments module.
   type DataType = T
   type StateType = State
+  type StateShapeType = StateShape
 
   def create(
       name: String,
@@ -42,12 +43,12 @@ abstract class Cell[T: TF, State](implicit
       parameterManager: ParameterManager,
       stage: Stage,
       context: Output[Int]
-  ): RNNCell[Output[T], State]
+  ): RNNCell[Output[T], State, Shape, StateShape]
 }
 
 case class GRU[T: TF : IsNotQuantized](
     activation: Output[T] => Output[T]
-) extends Cell[T, Output[T]] {
+) extends Cell[T, Output[T], Shape] {
   override def create(
       name: String,
       numInputs: Int,
@@ -57,7 +58,7 @@ case class GRU[T: TF : IsNotQuantized](
       parameterManager: ParameterManager,
       stage: Stage,
       context: Output[Int]
-  ): RNNCell[Output[T], Output[T]] = {
+  ): RNNCell[Output[T], Output[T], Shape, Shape] = {
     val gateKernel = parameterManager.get[T]("Gate/Weights", Shape(numInputs + numUnits, 2 * numUnits))
     val gateBias = parameterManager.get[T]("Gate/Bias", Shape(2 * numUnits), tf.ZerosInitializer)
     val candidateKernel = parameterManager.get[T]("Candidate/Weights", Shape(numInputs + numUnits, numUnits))
@@ -69,7 +70,7 @@ case class GRU[T: TF : IsNotQuantized](
 case class BasicLSTM[T: TF : IsNotQuantized](
     activation: Output[T] => Output[T],
     forgetBias: Float = 1.0f
-) extends Cell[T, LSTMState[T]] {
+) extends Cell[T, LSTMState[T], (Shape, Shape)] {
   override def create(
       name: String,
       numInputs: Int,
@@ -93,7 +94,7 @@ case class LSTM[T: TF : IsNotQuantized](
     cellClip: Float = -1,
     projectionSize: Int = -1,
     projectionClip: Float = -1
-) extends Cell[T, LSTMState[T]] {
+) extends Cell[T, LSTMState[T], (Shape, Shape)] {
   override def create(
       name: String,
       numInputs: Int,

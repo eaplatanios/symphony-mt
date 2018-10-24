@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsFloat16OrFloat32OrFloat64, TF}
+import org.platanios.tensorflow.api.core.types.{IsHalfOrFloatOrDouble, TF}
 import org.platanios.tensorflow.api.learn.Mode
 
 /**
@@ -27,7 +27,7 @@ import org.platanios.tensorflow.api.learn.Mode
   */
 trait LayerProcessor {
   @throws[IllegalArgumentException]
-  def apply[T: TF : IsFloat16OrFloat32OrFloat64](
+  def apply[T: TF : IsHalfOrFloatOrDouble](
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "LayerProcessor"
@@ -41,7 +41,7 @@ trait LayerProcessor {
 
 case object AddResidualConnection extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply[T: TF : IsFloat16OrFloat32OrFloat64](
+  override def apply[T: TF : IsHalfOrFloatOrDouble](
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "AddResidualConnection"
@@ -61,7 +61,7 @@ case object AddResidualConnection extends LayerProcessor {
 
 case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply[T: TF : IsFloat16OrFloat32OrFloat64](
+  override def apply[T: TF : IsHalfOrFloatOrDouble](
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "Normalize"
@@ -81,7 +81,7 @@ case class Dropout(
     broadcastAxes: Set[Int] = Set.empty
 ) extends LayerProcessor {
   @throws[IllegalArgumentException]
-  override def apply[T: TF : IsFloat16OrFloat32OrFloat64](
+  override def apply[T: TF : IsHalfOrFloatOrDouble](
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "Dropout"
@@ -107,7 +107,7 @@ object LayerProcessor {
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Processed layer input.
     */
-  def layerPreprocess[T: TF : IsFloat16OrFloat32OrFloat64](
+  def layerPreprocess[T: TF : IsHalfOrFloatOrDouble](
       input: Output[T],
       processors: Seq[LayerProcessor]
   )(implicit
@@ -130,7 +130,7 @@ object LayerProcessor {
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Processed layer output.
     */
-  def layerPostprocess[T: TF : IsFloat16OrFloat32OrFloat64](
+  def layerPostprocess[T: TF : IsHalfOrFloatOrDouble](
       input: Output[T],
       output: Output[T],
       processors: Seq[LayerProcessor]

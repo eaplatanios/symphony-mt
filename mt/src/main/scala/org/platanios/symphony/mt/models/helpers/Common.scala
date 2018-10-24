@@ -292,7 +292,7 @@ object Common {
     * @param  gaussian       If `true`, a Gaussian distribution will be used for label smoothing.
     * @return Cross entropy scores.
     */
-  def smoothingCrossEntropy[T: TF : IsDecimal, I: TF : IsInt32OrInt64](
+  def smoothingCrossEntropy[T: TF : IsDecimal, I: TF : IsIntOrLong](
       logits: Output[T],
       labels: Output[I],
       labelSmoothing: Float = 0.0f,
@@ -345,7 +345,7 @@ object Common {
     * @param  gaussian       If `true`, a Gaussian distribution will be used for label smoothing.
     * @return Tuple containing the cross-entropy tensor and the weights tensor.
     */
-  def paddedCrossEntropy[T: TF : IsDecimal, I: TF : IsInt32OrInt64](
+  def paddedCrossEntropy[T: TF : IsDecimal, I: TF : IsIntOrLong](
       logits: Output[T],
       labels: Output[I],
       labelLengths: Output[Int],
@@ -387,7 +387,7 @@ object Common {
     * @param  broadcastAxes   Specifies along which axes the dropout is broadcast.
     * @return Created op output that has the same shape as `input`.
     */
-  def dropoutWithBroadcastAxes[T: TF : IsFloat16OrFloat32OrFloat64](
+  def dropoutWithBroadcastAxes[T: TF : IsHalfOrFloatOrDouble](
       input: Output[T],
       keepProbability: Float,
       scaleOutput: Boolean = true,
@@ -422,7 +422,7 @@ object Common {
     * @param  parameterManager         Parameter manager to use, if parameters are required.
     * @return Output of the last fully connected layer.
     */
-  def denseReLUDense[T: TF : IsFloat16OrFloat32OrFloat64](
+  def denseReLUDense[T: TF : IsHalfOrFloatOrDouble](
       input: Output[T],
       filterSize: Int,
       outputSize: Int,

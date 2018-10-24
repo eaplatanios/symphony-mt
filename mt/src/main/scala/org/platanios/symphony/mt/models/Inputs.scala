@@ -55,7 +55,7 @@ object Inputs {
             // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
             // not generally need to do this since later on we will be masking out calculations past
             // the true sequence.
-            paddingValues = (Tensor(dataConfig.endOfSequenceToken), Tensor.zeros[Int](Shape())))
+            paddingValues = Some((Tensor(dataConfig.endOfSequenceToken), Tensor.zeros[Int](Shape()))))
           .map(d => (srcLanguage, tgtLanguage, (d._1, d._2)))
     }
 
@@ -263,7 +263,7 @@ object Inputs {
         paddedShapes = ((Shape(), Shape()), (Shape(-1), Shape()), (Shape(-1), Shape())),
         // We pad the source and target sequences with 'endSequenceToken' tokens. Though notice that we do not
         // generally need to do this since later on we will be masking out calculations past the true sequence.
-        paddingValues = ((zero, zero), (Tensor(dataConfig.endOfSequenceToken), zero), (Tensor(dataConfig.endOfSequenceToken), zero)))
+        paddingValues = Some(((zero, zero), (Tensor(dataConfig.endOfSequenceToken), zero), (Tensor(dataConfig.endOfSequenceToken), zero))))
     }
 
     val parallelDataset = {
@@ -298,7 +298,7 @@ object Inputs {
 
     parallelDataset
         .map(d => (
-            (/* Source language */ d._1._1, /* Target language */ d._1._2, /* Source sentences */ d._2),
+            (/* Source language */ d._1._1(0), /* Target language */ d._1._2(0), /* Source sentences */ d._2),
             /* Target sentences */ d._3),
           numParallelCalls = dataConfig.numParallelCalls,
           name = "AddLanguageIDs")

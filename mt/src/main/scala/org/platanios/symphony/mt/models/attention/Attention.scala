@@ -39,7 +39,7 @@ trait Attention {
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
-  def apply[T: TF : IsFloat16OrFloat32OrFloat64](
+  def apply[T: TF : IsHalfOrFloatOrDouble](
       q: Output[T],
       k: Output[T],
       v: Output[T],
@@ -340,7 +340,7 @@ object Attention {
     *                                  if a cache is provided, but no `bias` is provided.
     */
   @throws[IllegalArgumentException]
-  def multiHeadAttention[T: TF : IsFloat16OrFloat32OrFloat64](
+  def multiHeadAttention[T: TF : IsHalfOrFloatOrDouble](
       queryAntecedent: Output[T],
       memoryAntecedent: Output[T],
       bias: Output[T],

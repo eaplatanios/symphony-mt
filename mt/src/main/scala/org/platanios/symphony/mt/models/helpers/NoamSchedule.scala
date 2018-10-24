@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.helpers
 
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsInt32OrInt64, TF}
+import org.platanios.tensorflow.api.core.types.{IsIntOrLong, TF}
 
 /** Noam scheduling method, similar to that proposed in:
   * [Attention is All You Need (Section 5.3)](https://arxiv.org/pdf/1706.03762.pdf).
@@ -50,7 +50,7 @@ class NoamSchedule protected (
     *                                  empty.
     */
   @throws[IllegalArgumentException]
-  override def apply[I: TF : IsInt32OrInt64](
+  override def apply[I: TF : IsIntOrLong](
       value: Output[Float],
       step: Option[Variable[I]]
   ): Output[Float] = {

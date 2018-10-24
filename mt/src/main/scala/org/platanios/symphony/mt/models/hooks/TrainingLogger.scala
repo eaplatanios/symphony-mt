@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.hooks
 
 import org.platanios.symphony.mt.models.{Sentences, SentencesWithLanguage, SentencesWithLanguagePair}
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToTensor}
 import org.platanios.tensorflow.api.learn.Counter
 import org.platanios.tensorflow.api.learn.hooks._
 
@@ -97,23 +97,23 @@ case class TrainingLogger(
     lastStep = session.run(fetches = step.value).scalar
   }
 
-  override protected def beforeSessionRun[C, CV](
+  override protected def beforeSessionRun[C: OutputStructure, CV](
       runContext: Hook.SessionRunContext[C, CV]
   )(implicit
-      evStructureC: NestedStructure.Aux[C, CV, _, _]
+      evOutputToTensorC: OutputToTensor.Aux[C, CV]
   ): Option[Hook.SessionRunArgs[Seq[Output[Any]], Seq[Tensor[Any]]]] = {
     shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt + 1)
     if (average || shouldTrigger)
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
+      Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
     else
-      Some(Hook.SessionRunArgs(fetches = Seq(step.value)))
+      Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](step.value)))
   }
 
-  override protected def afterSessionRun[C, CV](
+  override protected def afterSessionRun[C: OutputStructure, CV](
       runContext: Hook.SessionRunContext[C, CV],
       runResult: Hook.SessionRunResult[Seq[Tensor[Any]]]
   )(implicit
-      evStructureC: NestedStructure.Aux[C, CV, _, _]
+      evOutputToTensorC: OutputToTensor.Aux[C, CV]
   ): Unit = {
     processFetches(runResult.result)
   }

@@ -20,7 +20,6 @@ import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.Zero
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
@@ -29,8 +28,6 @@ import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
   */
 abstract class RNNEncoder[T: TF : IsNotQuantized, State]()
     extends Encoder[T, Tuple[Output[T], Seq[State]]] {
-  val evZeroState: Zero[State]
-
   override def create(
       config: RNNModel.Config[T, _],
       srcSequences: Output[Int],

@@ -444,7 +444,7 @@ abstract class Model[S] protected (
 
               val results = tf.whileLoop(
                 predicateFn, bodyFn,
-                loopVariables = (Output[Int](0), srcLanguage, (srcSequences, srcSequenceLengths)))
+                loopVariables = (Output.constant[Int](0), srcLanguage, (srcSequences, srcSequenceLengths)))
               val decodedSequences = mapFromWordIds(tgtLanguage, /* target sentences */ results._3._1)
               (tgtLanguage, (decodedSequences, /* target sentence lengths */ results._3._2))
           }
@@ -475,7 +475,7 @@ abstract class Model[S] protected (
           // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
           // word used as input, rather than the previous predicted word.
           val tgtEosId = parameterManager
-              .stringToIndexLookup(tgtLanguage)(Output[String](dataConfig.endOfSequenceToken)).toInt
+              .stringToIndexLookup(tgtLanguage)(Output.constant[String](dataConfig.endOfSequenceToken)).toInt
           tgtSequences = tf.concatenate(Seq(
             tgtSequences,
             tf.fill(tf.stack[Int](Seq(tf.shape(tgtSequences).slice(0).toInt, 1)))(tgtEosId)

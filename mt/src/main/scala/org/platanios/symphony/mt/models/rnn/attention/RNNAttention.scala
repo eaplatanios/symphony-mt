@@ -19,16 +19,16 @@ import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class RNNAttention[T: TF : IsNotQuantized, AttentionState: NestedStructure] {
-  def create[CellState: NestedStructure](
-      cell: tf.RNNCell[Output[T], CellState],
+abstract class RNNAttention[T: TF : IsNotQuantized, AttentionState, AttentionStateShape] {
+  def create[CellState: OutputStructure, CellStateShape](
+      cell: tf.RNNCell[Output[T], CellState, Shape, CellStateShape],
       memory: Output[T],
       memorySequenceLengths: Output[Int],
       numUnits: Int,
@@ -40,7 +40,8 @@ abstract class RNNAttention[T: TF : IsNotQuantized, AttentionState: NestedStruct
       stage: Stage,
       mode: Mode,
       parameterManager: ParameterManager,
-      context: Output[Int]
-  ): (AttentionWrapperCell[T, CellState, AttentionState],
+      context: Output[Int],
+      evOutputToShapeCellState: OutputToShape.Aux[CellState, CellStateShape]
+  ): (AttentionWrapperCell[T, CellState, AttentionState, CellStateShape, AttentionStateShape],
       AttentionWrapperState[T, CellState, Seq[AttentionState]])
 }

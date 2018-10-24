@@ -24,14 +24,14 @@ import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.{NestedStructure, Zero}
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-class RNNModel[T: TF : IsNotQuantized, State](
+class RNNModel[T: TF : IsNotQuantized, State : OutputStructure](
     override val name: String = "RNNModel",
     override val languages: Seq[(Language, Vocabulary)],
     override val dataConfig: DataConfig,
@@ -47,8 +47,6 @@ class RNNModel[T: TF : IsNotQuantized, State](
       SentenceLength(forHypothesis = true, name = "HypLen"),
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences"))
-)(implicit
-    evS: NestedStructure.Aux[State, _, _, _]
 ) extends Model[(Tuple[Output[T], Seq[State]], Output[Int], Output[Int])](
   name, languages, dataConfig, config, optConfig, logConfig
 )(
@@ -120,7 +118,7 @@ class RNNModel[T: TF : IsNotQuantized, State](
 }
 
 object RNNModel {
-  def apply[T: TF : IsNotQuantized, State](
+  def apply[T: TF : IsNotQuantized, State: OutputStructure](
       name: String = "RNNModel",
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -136,8 +134,6 @@ object RNNModel {
         SentenceLength(forHypothesis = true, name = "HypLen"),
         SentenceLength(forHypothesis = false, name = "RefLen"),
         SentenceCount(name = "#Sentences"))
-  )(implicit
-      evS: NestedStructure.Aux[State, _, _, _]
   ): RNNModel[T, State] = {
     new RNNModel[T, State](
       name, languages, dataConfig, config, optConfig, logConfig)(evalDatasets, evalMetrics)
@@ -194,8 +190,8 @@ object RNNModel {
     }
   }
 
-  private[models] def cell[T: TF : IsNotQuantized, State: NestedStructure](
-      cell: Cell[T, State],
+  private[models] def cell[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
+      cell: Cell[T, State, StateShape],
       numInputs: Int,
       numUnits: Int,
       dropout: Option[Float] = None,
@@ -207,8 +203,9 @@ object RNNModel {
       mode: Mode,
       parameterManager: ParameterManager,
       stage: Stage,
-      context: Output[Int]
-  ): tf.RNNCell[Output[T], State] = {
+      context: Output[Int],
+      evOutputToShape: OutputToShape.Aux[State, StateShape]
+  ): tf.RNNCell[Output[T], State, Shape, StateShape] = {
     tf.variableScope(name) {
       tf.createWith(device = device) {
         // Create the main RNN cell.
@@ -231,8 +228,8 @@ object RNNModel {
     }
   }
 
-  private[models] def cells[T: TF : IsNotQuantized, State: NestedStructure](
-      cell: Cell[T, State],
+  private[models] def cells[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
+      cell: Cell[T, State, StateShape],
       numInputs: Int,
       numUnits: Int,
       numLayers: Int,
@@ -247,12 +244,13 @@ object RNNModel {
       parameterManager: ParameterManager,
       deviceManager: DeviceManager,
       stage: Stage,
-      context: Output[Int]
-  ): Seq[tf.RNNCell[Output[T], State]] = {
+      context: Output[Int],
+      evOutputToShape: OutputToShape.Aux[State, StateShape]
+  ): Seq[tf.RNNCell[Output[T], State, Shape, StateShape]] = {
     tf.variableScope(name) {
-      (0 until numLayers).foldLeft(Seq.empty[tf.RNNCell[Output[T], State]])((cells, i) => {
-        val cellNumInputs = if (i == 0) numInputs else cells(i - 1).outputShape.apply(-1)
-        cells :+ this.cell[T, State](
+      (0 until numLayers).foldLeft(Seq.empty[tf.RNNCell[Output[T], State, Shape, StateShape]])((cells, i) => {
+        val cellNumInputs = if (i == 0) numInputs else cells(i - 1).outputShape(-1)
+        cells :+ this.cell[T, State, StateShape](
           cell, cellNumInputs, numUnits, dropout,
           if (i >= numLayers - numResidualLayers) residualFn else None,
           deviceManager.nextDevice(env), seed, s"Cell$i")
@@ -260,8 +258,8 @@ object RNNModel {
     }
   }
 
-  private[models] def stackedCell[T: TF : IsNotQuantized, State: NestedStructure](
-      cell: Cell[T, State],
+  private[models] def stackedCell[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
+      cell: Cell[T, State, StateShape],
       numInputs: Int,
       numUnits: Int,
       numLayers: Int,
@@ -276,9 +274,10 @@ object RNNModel {
       parameterManager: ParameterManager,
       deviceManager: DeviceManager,
       stage: Stage,
-      context: Output[Int]
-  ): tf.RNNCell[Output[T], Seq[State]] = {
-    tf.StackedCell(cells[T, State](
+      context: Output[Int],
+      evOutputToShape: OutputToShape.Aux[State, StateShape]
+  ): tf.RNNCell[Output[T], Seq[State], Shape, Seq[StateShape]] = {
+    tf.StackedCell(cells[T, State, StateShape](
       cell, numInputs, numUnits, numLayers, numResidualLayers, dropout,
       residualFn, seed, name), name)
   }

@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsDecimal, TF}
-import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
 import org.platanios.tensorflow.api.ops.variables.{ConstantInitializer, ZerosInitializer}
@@ -31,9 +31,9 @@ case class BahdanauRNNAttention[T: TF : IsDecimal](
     normalized: Boolean = false,
     probabilityFn: Output[T] => Output[T], // TODO: Softmax should be the default.
     scoreMask: Float = Float.NegativeInfinity.toFloat
-) extends RNNAttention[T, Output[T]] {
-  override def create[CellState: NestedStructure](
-      cell: tf.RNNCell[Output[T], CellState],
+) extends RNNAttention[T, Output[T], Shape] {
+  override def create[CellState: OutputStructure, CellStateShape](
+      cell: tf.RNNCell[Output[T], CellState, Shape, CellStateShape],
       memory: Output[T],
       memorySequenceLengths: Output[Int],
       numUnits: Int,
@@ -46,7 +46,8 @@ case class BahdanauRNNAttention[T: TF : IsDecimal](
       mode: Mode,
       parameterManager: ParameterManager,
       context: Output[Int],
-  ): (AttentionWrapperCell[T, CellState, Output[T]],
+      evOutputToShapeCellState: OutputToShape.Aux[CellState, CellStateShape]
+  ): (AttentionWrapperCell[T, CellState, Output[T], CellStateShape, Shape],
       AttentionWrapperState[T, CellState, Seq[Output[T]]]) = {
     tf.variableScope("BahdanauAttention") {
       val memoryWeights = parameterManager.get[T]("MemoryWeights", Shape(numUnits, numUnits))

@@ -21,7 +21,7 @@ import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
@@ -29,15 +29,18 @@ import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 /**
   * @author Emmanouil Antonios Platanios
   */
-class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: NestedStructure, AttentionState: NestedStructure](
-    val cell: Cell[T, State],
+class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: OutputStructure, AttentionState: OutputStructure, StateShape, AttentionStateShape](
+    val cell: Cell[T, State, StateShape],
     val numUnits: Int,
     val numLayers: Int,
     val residual: Boolean = false,
     val dropout: Option[Float] = None,
     val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
-    val attention: Option[RNNAttention[T, AttentionState]] = None,
+    val attention: Option[RNNAttention[T, AttentionState, AttentionStateShape]] = None,
     val outputAttention: Boolean = true
+)(implicit
+    evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+    evOutputToShapeAttentionState: OutputToShape.Aux[AttentionState, AttentionStateShape]
 ) extends RNNDecoder[T, State]() {
   override def create[O: TF](
       decodingMode: Model.DecodingMode[O],
@@ -63,7 +66,7 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: NestedStructure, A
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = attention match {
       case None =>
-        RNNModel.stackedCell[T, State](
+        RNNModel.stackedCell[T, State, StateShape](
           cell = cell,
           numInputs = numUnits,
           numUnits = numUnits,
@@ -74,7 +77,7 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: NestedStructure, A
           seed = config.env.randomSeed,
           name = "MultiUniCell")
       case Some(_) =>
-        RNNModel.stackedCell[T, State](
+        RNNModel.stackedCell[T, State, StateShape](
           cell, 2 * numUnits, numUnits, numLayers, numResLayers, dropout,
           residualFn, config.env.randomSeed, "MultiUniCell")
     }
@@ -115,17 +118,20 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: NestedStructure, A
 }
 
 object UnidirectionalRNNDecoder {
-  def apply[T: TF : IsNotQuantized, State: NestedStructure, AttentionState: NestedStructure](
-      cell: Cell[T, State],
+  def apply[T: TF : IsNotQuantized, State: OutputStructure, AttentionState: OutputStructure, StateShape, AttentionStateShape](
+      cell: Cell[T, State, StateShape],
       numUnits: Int,
       numLayers: Int,
       residual: Boolean = false,
       dropout: Option[Float] = None,
       residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
-      attention: Option[RNNAttention[T, AttentionState]] = None,
+      attention: Option[RNNAttention[T, AttentionState, AttentionStateShape]] = None,
       outputAttention: Boolean = false
-  ): UnidirectionalRNNDecoder[T, State, AttentionState] = {
-    new UnidirectionalRNNDecoder[T, State, AttentionState](
+  )(implicit
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evOutputToShapeAttentionState: OutputToShape.Aux[AttentionState, AttentionStateShape]
+  ): UnidirectionalRNNDecoder[T, State, AttentionState, StateShape, AttentionStateShape] = {
+    new UnidirectionalRNNDecoder[T, State, AttentionState, StateShape, AttentionStateShape](
       cell, numUnits, numLayers, residual, dropout,
       residualFn, attention, outputAttention)
   }

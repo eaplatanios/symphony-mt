@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.models.attention
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsFloat16OrFloat32OrFloat64, TF}
+import org.platanios.tensorflow.api.core.types.{IsHalfOrFloatOrDouble, TF}
 import org.platanios.tensorflow.api.learn.Mode
 
 /** Dot-product attention.
@@ -44,7 +44,7 @@ class DotProductAttention protected (
     * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
-  override def apply[T: TF : IsFloat16OrFloat32OrFloat64](
+  override def apply[T: TF : IsHalfOrFloatOrDouble](
       q: Output[T],
       k: Output[T],
       v: Output[T],

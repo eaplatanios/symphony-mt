@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.models.Model.DecodingMode
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.models.rnn.RNNDecoder
 import org.platanios.tensorflow.api.core.types.TF
-import org.platanios.tensorflow.api.implicits.helpers.NestedStructure
+import org.platanios.tensorflow.api.implicits.helpers.OutputStructure
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.seq2seq.decoders.BeamSearchDecoder
@@ -48,10 +48,9 @@ trait Decoder[T, EncoderState] {
 }
 
 object Decoder {
-  def tileForBeamSearch[S: NestedStructure](value: S, beamWidth: Int): S = {
-    NestedStructure[S].map(
+  def tileForBeamSearch[S: OutputStructure](value: S, beamWidth: Int): S = {
+    OutputStructure[S].map(
       value,
-      shape = None,
       converter = BeamSearchDecoder.TileBatchConverter(beamWidth))
   }
 }

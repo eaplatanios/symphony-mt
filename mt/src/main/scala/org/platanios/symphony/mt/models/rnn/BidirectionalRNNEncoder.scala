@@ -20,7 +20,7 @@ import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.models.{DeviceManager, RNNModel, Stage}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.{NestedStructure, Zero}
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
@@ -34,15 +34,16 @@ import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
   *
   * @author Emmanouil Antonios Platanios
   */
-class BidirectionalRNNEncoder[T: TF : IsNotQuantized, State](
-    val cell: Cell[T, State],
+class BidirectionalRNNEncoder[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
+    val cell: Cell[T, State, StateShape],
     val numUnits: Int,
     val numLayers: Int,
     val residual: Boolean = false,
     val dropout: Option[Float] = None,
     val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
 )(implicit
-    override val evZeroState: Zero[State]
+    evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+    evZeroState: Zero.Aux[State, StateShape]
 ) extends RNNEncoder[T, State]() {
   override def create(
       config: RNNModel.Config[T, _],
@@ -56,14 +57,11 @@ class BidirectionalRNNEncoder[T: TF : IsNotQuantized, State](
       deviceManager: DeviceManager,
       context: Output[Int]
   ): Tuple[Output[T], Seq[State]] = {
-    implicit val evZeroState: Zero.Aux[State, _, _, _] = this.evZeroState.asAux()
-    implicit val evStructureState: NestedStructure.Aux[State, _, _, _] = evZeroState.structure
-
     val (embeddedSequences, embeddedSequenceLengths) = embedSequences(config, srcSequences, srcSequenceLengths)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
 
     // Build the forward RNN cell.
-    val biCellFw = RNNModel.stackedCell[T, State](
+    val biCellFw = RNNModel.stackedCell[T, State, StateShape](
       cell = cell,
       numInputs = embeddedSequences.shape(-1),
       numUnits = numUnits,
@@ -75,7 +73,7 @@ class BidirectionalRNNEncoder[T: TF : IsNotQuantized, State](
       name = "MultiBiCellFw")
 
     // Build the backward RNN cell.
-    val biCellBw = RNNModel.stackedCell[T, State](
+    val biCellBw = RNNModel.stackedCell[T, State, StateShape](
       cell = cell,
       numInputs = embeddedSequences.shape(-1),
       numUnits = numUnits,
@@ -108,15 +106,18 @@ class BidirectionalRNNEncoder[T: TF : IsNotQuantized, State](
 }
 
 object BidirectionalRNNEncoder {
-  def apply[T: TF : IsNotQuantized, State: Zero](
-      cell: Cell[T, State],
+  def apply[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
+      cell: Cell[T, State, StateShape],
       numUnits: Int,
       numLayers: Int,
       residual: Boolean = false,
       dropout: Option[Float] = None,
       residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
-  ): BidirectionalRNNEncoder[T, State] = {
-    new BidirectionalRNNEncoder[T, State](
+  )(implicit
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evZeroState: Zero.Aux[State, StateShape]
+  ): BidirectionalRNNEncoder[T, State, StateShape] = {
+    new BidirectionalRNNEncoder[T, State, StateShape](
       cell, numUnits, numLayers, residual, dropout, residualFn)
   }
 }
