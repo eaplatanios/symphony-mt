@@ -8,7 +8,7 @@ java -jar target/scala-2.12/symphony-mt-0.1.0-SNAPSHOT.jar \
   --dataset iwslt15 \
   --languages en:vi \
   --eval-languages en:vi \
-  --use-back-translations \
+  --only-forward \
   --parallel-portion 1.00 \
   --eval-datasets dev2010:1.00,tst2013:1.00 \
   --eval-metrics bleu,hyp_len,ref_len,sen_cnt \
@@ -24,7 +24,7 @@ java -jar target/scala-2.12/symphony-mt-0.1.0-SNAPSHOT.jar \
   --model-cell lstm:tanh \
   --model-type pairwise \
   --word-embed-size 512 \
-  --lang-embed-size 512 \
+  --lang-embed-size 8 \
   --residual \
   --attention \
   --dropout 0.2 \
