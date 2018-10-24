@@ -148,7 +148,7 @@ object Inputs {
                 .interleave(
                   function = d => parallelDatasetCreator(d._1, d._2, d._3, d._4, d._5, d._6),
                   cycleLength = maxNumFiles,
-                  numParallelCalls = bufferSize.toInt,
+                  numParallelCalls = maxNumFiles,
                   name = "FilesInterleave")
           },
           cycleLength = numParallelFiles,
