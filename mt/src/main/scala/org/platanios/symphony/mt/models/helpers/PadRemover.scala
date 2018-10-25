@@ -41,7 +41,7 @@ case class PadRemover(
   val (nonPadIndices, originAxisSize) = {
     tf.nameScope(s"$name/Initialization") {
       val flattenedPadMask = padMask.reshape(Shape(-1))
-      (tf.where(flattenedPadMask < 1e-9f).toLong, tf.shape(flattenedPadMask).slice(0 :: 1))
+      (tf.where(flattenedPadMask < 1e-9f).toInt, tf.shape(flattenedPadMask).slice(0 :: 1))
     }
   }
 
