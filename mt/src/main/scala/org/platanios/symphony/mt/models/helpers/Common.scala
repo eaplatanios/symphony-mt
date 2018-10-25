@@ -18,7 +18,6 @@ package org.platanios.symphony.mt.models.helpers
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types._
 import org.platanios.tensorflow.api.learn.Mode
 
 import scala.language.postfixOps
