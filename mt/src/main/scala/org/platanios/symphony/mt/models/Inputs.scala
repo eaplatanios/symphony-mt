@@ -152,7 +152,7 @@ object Inputs {
                   name = "FilesInterleave")
           },
           cycleLength = numParallelFiles,
-          numParallelCalls = numParallelFiles,
+          numParallelCalls = maxNumFiles,
           name = "LanguagePairsInterleave")
   }
 
