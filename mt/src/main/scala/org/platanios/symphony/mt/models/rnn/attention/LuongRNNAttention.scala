@@ -21,7 +21,7 @@ import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsDecimal, TF}
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
+import org.platanios.tensorflow.api.ops.rnn.attention.{Attention, AttentionWrapperCell, AttentionWrapperState}
 import org.platanios.tensorflow.api.ops.variables.OnesInitializer
 
 /**
@@ -48,7 +48,7 @@ case class LuongRNNAttention[T: TF : IsDecimal](
       context: Output[Int],
       evOutputToShapeCellState: OutputToShape.Aux[CellState, CellStateShape]
   ): (AttentionWrapperCell[T, CellState, Output[T], CellStateShape, Shape],
-      AttentionWrapperState[T, CellState, Seq[Output[T]]]) = {
+      AttentionWrapperState[T, CellState, Output[T]]) = {
     val memoryWeights = parameterManager.get[T]("MemoryWeights", Shape(memory.shape(-1), numUnits))
     val scale = {
       if (scaled)
@@ -57,7 +57,7 @@ case class LuongRNNAttention[T: TF : IsDecimal](
         null
     }
     val attention = tf.LuongAttention(
-      memory, memoryWeights, probabilityFn, memorySequenceLengths, scale, scoreMask, "Attention")
+      tf.shape(memory).slice(1), memoryWeights, probabilityFn, scale, scoreMask, "Attention")
     val attentionWeights = {
       if (useAttentionLayer)
         Seq(parameterManager.get[T]("AttentionWeights", Shape(numUnits + memory.shape(-1), numUnits)))
@@ -65,7 +65,8 @@ case class LuongRNNAttention[T: TF : IsDecimal](
         null
     }
     val attentionCell = tf.AttentionWrapperCell(
-      cell, Seq(attention), attentionWeights, outputAttention = outputAttention)
+      cell, Seq(Attention.Memory(memory, Some(memorySequenceLengths)) -> attention),
+      attentionWeights, outputAttention = outputAttention)
     (attentionCell, attentionCell.initialState(initialState))
   }
 }

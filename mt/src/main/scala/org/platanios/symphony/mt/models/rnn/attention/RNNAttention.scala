@@ -43,5 +43,5 @@ abstract class RNNAttention[T: TF : IsNotQuantized, AttentionState, AttentionSta
       context: Output[Int],
       evOutputToShapeCellState: OutputToShape.Aux[CellState, CellStateShape]
   ): (AttentionWrapperCell[T, CellState, AttentionState, CellStateShape, AttentionStateShape],
-      AttentionWrapperState[T, CellState, Seq[AttentionState]])
+      AttentionWrapperState[T, CellState, AttentionState])
 }

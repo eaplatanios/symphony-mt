@@ -21,7 +21,7 @@ import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsDecimal, TF}
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
+import org.platanios.tensorflow.api.ops.rnn.attention.{Attention, AttentionWrapperCell, AttentionWrapperState}
 import org.platanios.tensorflow.api.ops.variables.{ConstantInitializer, ZerosInitializer}
 
 /**
@@ -48,7 +48,7 @@ case class BahdanauRNNAttention[T: TF : IsDecimal](
       context: Output[Int],
       evOutputToShapeCellState: OutputToShape.Aux[CellState, CellStateShape]
   ): (AttentionWrapperCell[T, CellState, Output[T], CellStateShape, Shape],
-      AttentionWrapperState[T, CellState, Seq[Output[T]]]) = {
+      AttentionWrapperState[T, CellState, Output[T]]) = {
     tf.variableScope("BahdanauAttention") {
       val memoryWeights = parameterManager.get[T]("MemoryWeights", Shape(numUnits, numUnits))
       val queryWeights = parameterManager.get[T]("QueryWeights", Shape(numUnits, numUnits))
@@ -62,8 +62,8 @@ case class BahdanauRNNAttention[T: TF : IsDecimal](
         }
       }
       val attention = tf.BahdanauAttention(
-        memory, memoryWeights, queryWeights, scoreWeights, probabilityFn,
-        memorySequenceLengths, normFactor, normBias, scoreMask, "Attention")
+        tf.shape(memory).slice(1), memoryWeights, queryWeights, scoreWeights, probabilityFn,
+        normFactor, normBias, scoreMask, "Attention")
       val attentionWeights = {
         if (useAttentionLayer)
           Seq(tf.variable[T]("AttentionWeights", Shape(numUnits + memory.shape(-1), numUnits), null).value)
@@ -71,7 +71,8 @@ case class BahdanauRNNAttention[T: TF : IsDecimal](
           null
       }
       val attentionCell = tf.AttentionWrapperCell(
-        cell, Seq(attention), attentionWeights, outputAttention = outputAttention)
+        cell, Seq(Attention.Memory(memory, Some(memorySequenceLengths)) -> attention),
+        attentionWeights, outputAttention = outputAttention)
       (attentionCell, attentionCell.initialState(initialState))
     }
   }
