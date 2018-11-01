@@ -21,7 +21,7 @@ import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
-import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
@@ -83,22 +83,9 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: OutputStructure, A
     }
 
     // Use attention, if necessary, and create the decoder RNN.
-    var initialState = encoderState._1.state
-    var memory = encoderState._1.output
-    var memorySequenceLengths = encoderState._2
-
-    // Transpose the memory tensor, if necessary.
-    if (config.timeMajor) {
-      memory = encoderState._1.output.transpose(Tensor(1, 0, 2))
-    }
-
-    // If using beam search we need to tile the initial state and the memory-related tensors.
-    if (config.beamWidth > 1 && !mode.isTraining) {
-      // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
-      initialState = Decoder.tileForBeamSearch(initialState, config.beamWidth)
-      memory = Decoder.tileForBeamSearch(memory, config.beamWidth)
-      memorySequenceLengths = Decoder.tileForBeamSearch(memorySequenceLengths, config.beamWidth)
-    }
+    val initialState = encoderState._1.state
+    val memory = if (config.timeMajor) encoderState._1.output.transpose(Tensor(1, 0, 2)) else encoderState._1.output
+    val memorySequenceLengths = encoderState._2
 
     attention match {
       case None =>

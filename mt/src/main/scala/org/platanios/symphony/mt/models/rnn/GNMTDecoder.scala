@@ -24,7 +24,7 @@ import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
-import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}
+import org.platanios.tensorflow.api.ops.rnn.attention.{Attention, AttentionWrapperCell, AttentionWrapperState}
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 
 /**
@@ -90,15 +90,9 @@ class GNMTDecoder[T: TF : IsNotQuantized, State: OutputStructure, AttentionState
     })
 
     // Attention
-    var initialState = encoderState._1.state
-    var memory = if (config.timeMajor) encoderState._1.output.transpose(Tensor(1, 0, 2)) else encoderState._1.output
-    var memorySequenceLengths = encoderState._2
-    if (config.beamWidth > 1 && !mode.isTraining) {
-      // TODO: Find a way to remove the need for this tiling that is external to the beam search decoder.
-      initialState = Decoder.tileForBeamSearch(initialState, config.beamWidth)
-      memory = Decoder.tileForBeamSearch(memory, config.beamWidth)
-      memorySequenceLengths = Decoder.tileForBeamSearch(memorySequenceLengths, config.beamWidth)
-    }
+    val initialState = encoderState._1.state
+    val memory = if (config.timeMajor) encoderState._1.output.transpose(Tensor(1, 0, 2)) else encoderState._1.output
+    val memorySequenceLengths = encoderState._2
     val (attentionCell, attentionInitialState) = attention.create[State, StateShape](
       cells.head, memory, memorySequenceLengths, numUnits,
       numUnits, initialState.head,
@@ -160,18 +154,18 @@ object GNMTDecoder {
   )(implicit
       evOutputToShapeState: OutputToShape.Aux[State, StateShape],
       evOutputToShapeAttentionState: OutputToShape.Aux[AttentionState, AttentionStateShape]
-  ) extends tf.RNNCell[Output[T], (AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State]), Shape, ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[AttentionStateShape]), Seq[StateShape])] {
+  ) extends tf.RNNCell[Output[T], (AttentionWrapperState[T, State, AttentionState], Seq[State]), Shape, ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]]), Seq[StateShape])] {
     override def outputShape: Shape = {
       cells.last.outputShape
     }
 
-    override def stateShape: ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[AttentionStateShape]), Seq[StateShape]) = {
+    override def stateShape: ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]]), Seq[StateShape]) = {
       (attentionCell.stateShape, cells.map(_.stateShape))
     }
 
     override def forward(
-        input: Tuple[Output[T], (AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State])]
-    ): Tuple[Output[T], (AttentionWrapperState[T, State, Seq[AttentionState]], Seq[State])] = {
+        input: Tuple[Output[T], (AttentionWrapperState[T, State, AttentionState], Seq[State])]
+    ): Tuple[Output[T], (AttentionWrapperState[T, State, AttentionState], Seq[State])] = {
       val minusOne = tf.constant(-1)
       val nextAttentionTuple = attentionCell(Tuple(input.output, input.state._1))
       var currentInput = nextAttentionTuple.output

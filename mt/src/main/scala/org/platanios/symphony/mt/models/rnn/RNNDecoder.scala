@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.Model.DecodingMode
 import org.platanios.symphony.mt.models._
+import org.platanios.symphony.mt.models.helpers.decoders.{BasicDecoder, BeamSearchDecoder, GooglePenalty}
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
@@ -25,7 +26,6 @@ import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputTo
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
-import org.platanios.tensorflow.api.ops.seq2seq.decoders.{BasicDecoder, BeamSearchDecoder, GooglePenalty}
 
 /**
   * @author Emmanouil Antonios Platanios

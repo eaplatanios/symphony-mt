@@ -52,8 +52,6 @@ class RNNModel[T: TF : IsNotQuantized, State : OutputStructure](
 )(
   evalDatasets, evalMetrics
 ) {
-  // TODO: Make this use the parameters manager.
-
   override protected def encoder(input: SentencesWithLanguagePair[Int])(implicit
       mode: Mode,
       context: Output[Int]

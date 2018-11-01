@@ -29,7 +29,6 @@ import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.config.TimeBasedCheckpoints
 import org.platanios.tensorflow.api.core.client.SessionConfig
-import org.platanios.tensorflow.api.core.types.TF
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
