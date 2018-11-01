@@ -1,7 +1,3 @@
-**NOTE:** Currently fixing a bug and things are broken.
-Please give it a couple of days and things will be
-working again. :)
-
 # Symphony Machine Translation
 
 We plan to soon publish a documentation website with 
