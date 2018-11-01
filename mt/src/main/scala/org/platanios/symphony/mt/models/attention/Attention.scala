@@ -19,7 +19,6 @@ import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types._
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.NN.{ConvPaddingMode, ValidConvPadding}
 
