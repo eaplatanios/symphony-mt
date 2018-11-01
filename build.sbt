@@ -30,7 +30,7 @@ organization in ThisBuild := "org.platanios"
 // every 24 hours.
 resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
 
-val tensorFlowForScalaVersion = "0.4.0-SNAPSHOT"
+val tensorFlowScalaVersion = "0.4.0-SNAPSHOT"
 
 autoCompilerPlugins in ThisBuild := true
 
@@ -43,7 +43,6 @@ scalacOptions in ThisBuild ++= Seq(
   "-language:implicitConversions",
   "-unchecked",
   "-Yno-adapted-args",
-  // "-Ystatistics:typer",
   "-Xfuture")
 
 val scalacProfilingEnabled: SettingKey[Boolean] =
@@ -58,7 +57,7 @@ lazy val loggingSettings = Seq(
 
 lazy val commonSettings = loggingSettings ++ Seq(
   // Plugin that prints better implicit resolution errors.
-  addCompilerPlugin("io.tryp"  % "splain" % "0.3.3" cross CrossVersion.patch)
+  // addCompilerPlugin("io.tryp"  % "splain" % "0.3.3" cross CrossVersion.patch)
 )
 
 lazy val testSettings = Seq(
@@ -73,7 +72,7 @@ lazy val testSettings = Seq(
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF"))
 
 lazy val tensorFlowSettings = Seq(
-  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion, // classifier "darwin-cpu-x86_64",
+  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowScalaVersion, // classifier "darwin-cpu-x86_64",
 )
 
 lazy val all = (project in file("."))
@@ -141,44 +140,58 @@ lazy val experiments = (project in file("./experiments"))
         "com.github.scopt" %% "scopt" % "3.7.0",
         "com.hierynomus" % "sshj" % "0.24.0",
         "com.jcraft" % "jzlib" % "1.1.3",
-        "io.circe" %% "circe-core" % "0.9.1",
-        "io.circe" %% "circe-generic" % "0.9.1",
-        "io.circe" %% "circe-parser" % "0.9.1"))
+        "io.circe" %% "circe-core" % "0.10.0",
+        "io.circe" %% "circe-generic" % "0.10.0",
+        "io.circe" %% "circe-parser" % "0.10.0"))
 
 val MT = config("mt")
 val Experiments = config("experiments")
 
 lazy val docs = (project in file("docs"))
-    .dependsOn(mt)
-    .enablePlugins(SiteScaladocPlugin, ParadoxPlugin, ParadoxMaterialThemePlugin, GhpagesPlugin)
+    .dependsOn(mt, experiments)
+    .enablePlugins(SiteScaladocPlugin, ParadoxSitePlugin, ParadoxMaterialThemePlugin, GhpagesPlugin)
     .settings(moduleName := "symphony-docs", name := "Symphony Documentation")
+    .settings(ParadoxMaterialThemePlugin.paradoxMaterialThemeSettings(Paradox))
     .settings(
-      SiteScaladocPlugin.scaladocSettings(MT, mappings in (Compile, packageDoc) in mt, "api/mt"),
-      SiteScaladocPlugin.scaladocSettings(Experiments, mappings in (Compile, packageDoc) in experiments, "api/experiments"),
       ghpagesNoJekyll := true,
-      siteSubdirName in SiteScaladoc := "api/latest",
-      siteSourceDirectory := (target in (Compile, paradox)).value,
-      makeSite := makeSite.dependsOn(paradox in Compile).value,
-      paradoxMaterialTheme := ParadoxMaterialTheme(),
-      paradoxProperties += ("material.theme.version" -> (version in paradoxMaterialTheme).value),
-      paradoxProperties ++= paradoxMaterialTheme.value.paradoxProperties,
-      mappings in makeSite ++= (mappings in (Compile, paradoxMaterialTheme)).value,
-      mappings in makeSite ++= Seq(
-        file("LICENSE") -> "LICENSE"),
-      // file("src/assets/favicon.ico") -> "favicon.ico"),
+      sourceDirectory in Paradox := sourceDirectory.value / "main" / "paradox",
+      paradoxProperties in Paradox ++= Map(
+        "scaladoc.base_url" -> "http://platanios.org/symphony-mt/api/",
+        "scaladoc.org.platanios.symphony.mt.base_url" -> "http://platanios.org/symphony-mt/api/mt/",
+        "github.base_url" -> "https://github.com/eaplatanios/tensorflow_scala",
+        "snip.github_link" -> "false"),
+      paradoxNavigationDepth in Paradox := 3,
+      makeSite := makeSite.dependsOn(paradox in Paradox).value,
+      mappings in makeSite in Paradox ++= Seq(
+        file("LICENSE") -> "LICENSE",
+        file("assets/favicon.ico") -> "favicon.ico"),
       scmInfo := Some(ScmInfo(
         url("https://github.com/eaplatanios/symphony-mt"),
         "git@github.com:eaplatanios/symphony-mt.git")),
       git.remoteRepo := scmInfo.value.get.connection,
-      paradoxMaterialTheme in Compile ~= {
-        _.withColor("red", "red")
+      paradoxMaterialTheme in Paradox ~= {
+        _.withColor("white", "red")
+            // .withFavicon("favicon.ico")
+            .withLogo("assets/images/logo.png")
+            // .withGoogleAnalytics("UA-107934279-1")
             .withRepository(uri("https://github.com/eaplatanios/symphony-mt"))
             .withSocial(
               uri("https://github.com/eaplatanios"),
               uri("https://twitter.com/eaplatanios"))
             .withLanguage(java.util.Locale.ENGLISH)
-            .withFont("Roboto", "Source Code Pro")
-      })
+            .withCustomStylesheet("assets/custom.css")
+      },
+      siteSubdirName in SiteScaladoc := "api",
+      SiteScaladocPlugin.scaladocSettings(MT, mappings in (Compile, packageDoc) in mt, "api/mt"),
+      SiteScaladocPlugin.scaladocSettings(Experiments, mappings in (Compile, packageDoc) in experiments, "api/experiments"),
+      scalacOptions in (SiteScaladoc, packageDoc) ++= Seq(
+        //"-Xfatal-warnings",
+        "-doc-source-url", scmInfo.value.get.browseUrl + "/tree/master€{FILE_PATH}.scala",
+        "-sourcepath", baseDirectory.in(LocalRootProject).value.getAbsolutePath,
+        // "=diagrams",
+        "-groups",
+        "-implicits-show-all"
+      ))
 
 lazy val noPublishSettings = Seq(
   publish := Unit,

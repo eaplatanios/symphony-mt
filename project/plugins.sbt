@@ -18,10 +18,11 @@ logLevel := Level.Warn
 // addSbtPlugin("ch.epfl.lamp" % "sbt-dotty" % "latest.integration")
 
 // Plugins used for the documentation website.
-addSbtPlugin("com.lightbend.paradox" % "sbt-paradox" % "0.3.6")
-addSbtPlugin("io.github.jonas" % "sbt-paradox-material-theme" % "0.4.0")
+addSbtPlugin("com.lightbend.paradox" % "sbt-paradox" % "0.4.3")
+addSbtPlugin("io.github.jonas" % "sbt-paradox-material-theme" % "0.5.1")
 addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.3.2")
 addSbtPlugin("com.typesafe.sbt" % "sbt-ghpages" % "0.6.2")
+addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "latest.release")
 
 // Packaging and publishing related plugins
 addSbtPlugin("com.eed3si9n"      % "sbt-assembly" % "latest.integration")
