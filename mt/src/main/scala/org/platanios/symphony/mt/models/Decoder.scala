@@ -15,11 +15,11 @@
 
 package org.platanios.symphony.mt.models
 
+import org.platanios.tensorflow.api.TF
 import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.Model.DecodingMode
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.models.rnn.RNNDecoder
-import org.platanios.tensorflow.api.core.types.TF
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output
 

@@ -18,7 +18,6 @@ package org.platanios.symphony.mt.models.rnn.attention
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.attention.{AttentionWrapperCell, AttentionWrapperState}

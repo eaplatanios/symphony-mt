@@ -23,7 +23,6 @@ import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot}
 import org.platanios.symphony.mt.models.rnn.{Cell, RNNDecoder, RNNEncoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple

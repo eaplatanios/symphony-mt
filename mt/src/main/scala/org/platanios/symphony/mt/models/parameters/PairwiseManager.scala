@@ -17,7 +17,6 @@ package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.TF
 
 /**
   * @author Emmanouil Antonios Platanios

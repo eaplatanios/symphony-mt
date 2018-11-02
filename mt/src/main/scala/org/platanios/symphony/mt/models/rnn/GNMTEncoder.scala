@@ -19,7 +19,6 @@ import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.models.{DeviceManager, RNNModel, Stage}
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output

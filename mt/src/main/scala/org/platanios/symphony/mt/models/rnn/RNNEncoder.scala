@@ -19,7 +19,6 @@ import org.platanios.symphony.mt.Environment
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.rnn.cell.Tuple
 

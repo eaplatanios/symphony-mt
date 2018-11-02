@@ -18,7 +18,6 @@ package org.platanios.symphony.mt.models.attention
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsHalfOrFloatOrDouble, TF}
 import org.platanios.tensorflow.api.learn.Mode
 
 /** Dot-product attention.

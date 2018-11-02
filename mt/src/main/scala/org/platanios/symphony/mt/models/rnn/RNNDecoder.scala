@@ -21,7 +21,6 @@ import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.helpers.decoders.{BasicDecoder, BeamSearchDecoder, GooglePenalty}
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.Output

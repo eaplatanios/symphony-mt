@@ -19,7 +19,6 @@ import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.models.Stage
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.TF
 
 import scala.collection.mutable
 

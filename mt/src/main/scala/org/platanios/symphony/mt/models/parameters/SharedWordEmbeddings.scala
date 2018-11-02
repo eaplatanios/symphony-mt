@@ -18,7 +18,6 @@ package org.platanios.symphony.mt.models.parameters
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.Resource
 
 import scala.collection.mutable
 

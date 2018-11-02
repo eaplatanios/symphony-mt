@@ -16,12 +16,11 @@
 package org.platanios.symphony.mt.models.attention
 
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.core.types.{IsNotQuantized, TF}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait PositionalEmbeddings {
+trait PositionEmbeddings {
   // TODO: !!! Add name to positional embeddings.
 
   def get(
@@ -35,7 +34,7 @@ trait PositionalEmbeddings {
   ): Output[T]
 }
 
-object PositionalEmbeddings {
+object PositionEmbeddings {
   /** Creates a bunch of sinusoids of different frequencies and phases, to be used as positional embeddings.
     *
     * This allows attention models to learn and use absolute and relative positions. Positional embeddings should be
@@ -199,15 +198,15 @@ object PositionalEmbeddings {
   }
 }
 
-class FixedSinusoidPositionalEmbeddings protected (
+class FixedSinusoidPositionEmbeddings protected (
     val minScale: Float = 1.0f,
     val maxScale: Float = 1.0e4f
-) extends PositionalEmbeddings {
+) extends PositionEmbeddings {
   override def get(
       length: Output[Int],
       depth: Output[Int]
   ): Output[Float] = {
-    PositionalEmbeddings.positionalEmbeddings1D(length, depth, minScale, maxScale)
+    PositionEmbeddings.positionalEmbeddings1D(length, depth, minScale, maxScale)
   }
 
   override def addTo[T: TF : IsNotQuantized](
@@ -215,14 +214,14 @@ class FixedSinusoidPositionalEmbeddings protected (
       positions: Option[Output[Int]] = None
   ): Output[T] = {
     positions match {
-      case Some(p) => PositionalEmbeddings.addPositionalEmbeddings1DGivenPositions(input, p, minScale, maxScale)
-      case None => PositionalEmbeddings.addPositionalEmbeddings1D(input, minScale, maxScale)
+      case Some(p) => PositionEmbeddings.addPositionalEmbeddings1DGivenPositions(input, p, minScale, maxScale)
+      case None => PositionEmbeddings.addPositionalEmbeddings1D(input, minScale, maxScale)
     }
   }
 }
 
-object FixedSinusoidPositionalEmbeddings {
-  def apply(minScale: Float = 1.0f, maxScale: Float = 1.0e4f): FixedSinusoidPositionalEmbeddings = {
-    new FixedSinusoidPositionalEmbeddings(minScale, maxScale)
+object FixedSinusoidPositionEmbeddings {
+  def apply(minScale: Float = 1.0f, maxScale: Float = 1.0e4f): FixedSinusoidPositionEmbeddings = {
+    new FixedSinusoidPositionEmbeddings(minScale, maxScale)
   }
 }

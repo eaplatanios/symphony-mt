@@ -20,8 +20,7 @@ import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.exception.InvalidDataTypeException
-import org.platanios.tensorflow.api.core.types.{Resource, TF}
-import org.platanios.tensorflow.api.ops.{FunctionGraph, Op}
+import org.platanios.tensorflow.api.ops.FunctionGraph
 
 import scala.collection.mutable
 
