@@ -1,0 +1,160 @@
+/* Copyright 2017-18, Emmanouil Antonios Platanios. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
+
+package org.platanios.symphony.mt.models.rnn
+
+import org.platanios.symphony.mt.models._
+import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
+import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.tf.RNNTuple
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
+import org.platanios.tensorflow.api.ops.Output
+import org.platanios.tensorflow.api.ops.rnn.attention.{Attention, AttentionWrapperCell, AttentionWrapperState}
+
+/**
+  * @author Emmanouil Antonios Platanios
+  */
+class GNMTDecoder[T: TF : IsNotQuantized, State: OutputStructure, AttentionState: OutputStructure, StateShape, AttentionStateShape](
+    val cell: Cell[T, State, StateShape],
+    val numUnits: Int,
+    val numLayers: Int,
+    val numResLayers: Int,
+    val attention: RNNAttention[T, AttentionState, AttentionStateShape],
+    val residual: Boolean = false,
+    val dropout: Option[Float] = None,
+    val useNewAttention: Boolean = true
+)(implicit
+    evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+    evOutputToShapeAttentionState: OutputToShape.Aux[AttentionState, AttentionStateShape]
+) extends RNNDecoder[T, State, (AttentionWrapperState[T, State, AttentionState], Seq[State]), ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]]), Seq[StateShape])] {
+  override def embeddings(
+      ids: Output[Int]
+  )(implicit context: Context): Output[T] = {
+    val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
+    embeddingsTable(ids).castTo[T]
+  }
+
+  override protected def cellAndInitialState(
+      encodedSequences: EncodedSequences[T, State],
+      tgtSequences: Option[Sequences[Int]]
+  )(implicit context: Context): (GNMTDecoder.StackedCell[T, State, AttentionState, StateShape, AttentionStateShape], (AttentionWrapperState[T, State, AttentionState], Seq[State])) = {
+    // RNN cells
+    val cells = (0 until numLayers).foldLeft(Seq.empty[tf.RNNCell[Output[T], State, Shape, StateShape]])((cells, i) => {
+      val cellNumInputs = if (i == 0) 2 * numUnits else cells(i - 1).outputShape.apply(-1) + numUnits
+      cells :+ Utilities.cell[T, State, StateShape](
+        cell = cell,
+        numInputs = cellNumInputs,
+        numUnits = numUnits,
+        dropout = dropout,
+        residualFn = {
+          if (i >= numLayers - numResLayers) {
+            Some((i: Output[T], o: Output[T]) => {
+              // This residual function can handle inputs and outputs of different sizes (due to attention).
+              val oLastDim = tf.shape(o).slice(-1)
+              val iLastDim = tf.shape(i).slice(-1)
+              val actualInput = tf.split(i, tf.stack(Seq(oLastDim, iLastDim - oLastDim)), axis = -1).head
+              actualInput.shape.assertIsCompatibleWith(o.shape)
+              actualInput + o
+            })
+          } else {
+            None
+          }
+        },
+        device = context.nextDevice(),
+        seed = context.env.randomSeed,
+        name = s"Cell$i")
+    })
+
+    // Attention
+    val initialState = encodedSequences.rnnTuple.state
+    val memory = Sequences(
+      sequences = {
+        if (context.modelConfig.timeMajor)
+          encodedSequences.rnnTuple.output.transpose(Tensor(1, 0, 2))
+        else
+          encodedSequences.rnnTuple.output
+      },
+      lengths = encodedSequences.lengths)
+    val attentionCell = attention.createCell[State, StateShape](
+      cells.head, memory, numUnits, numUnits, useAttentionLayer = false, outputAttention = false)
+    val attentionInitialState = attentionCell.initialState(initialState.head)
+    val multiCell = new GNMTDecoder.StackedCell[T, State, AttentionState, StateShape, AttentionStateShape](
+      attentionCell, cells.tail, useNewAttention)
+
+    (multiCell, (attentionInitialState, initialState.tail))
+  }
+}
+
+object GNMTDecoder {
+  /** GNMT RNN cell that is composed by applying an attention cell and then a sequence of RNN cells in order, all being
+    * fed the same attention as input.
+    *
+    * This means that the output of each RNN is fed to the next one as input, while the states remain separate.
+    * Furthermore, the attention layer is used first as the bottom layer and then the same attention is fed to all upper
+    * layers. That is either the previous attention, or the new attention generated by the bottom layer (if
+    * `useNewAttention` is set to `true`).
+    *
+    * Note that this class does no variable management at all. Variable sharing should be handled based on the RNN cells
+    * the caller provides to this class. The learn API provides a layer version of this class that also does some
+    * management of the variables involved.
+    *
+    * @param  attentionCell   Attention cell to use.
+    * @param  cells           Cells being stacked together.
+    * @param  useNewAttention Boolean value specifying whether to use the attention generated from the current step
+    *                         bottom layer's output as input to all upper layers, or the previous attention (i.e., same
+    *                         as the one that's input to the bottom layer).
+    * @param  name            Name prefix used for all new ops.
+    *
+    * @author Emmanouil Antonios Platanios
+    */
+  class StackedCell[T: TF : IsNotQuantized, State: OutputStructure, AttentionState: OutputStructure, StateShape, AttentionStateShape](
+      val attentionCell: AttentionWrapperCell[T, State, AttentionState, StateShape, AttentionStateShape],
+      val cells: Seq[tf.RNNCell[Output[T], State, Shape, StateShape]],
+      val useNewAttention: Boolean = false,
+      val name: String = "GNMTStackedCell"
+  )(implicit
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evOutputToShapeAttentionState: OutputToShape.Aux[AttentionState, AttentionStateShape]
+  ) extends tf.RNNCell[Output[T], (AttentionWrapperState[T, State, AttentionState], Seq[State]), Shape, ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]]), Seq[StateShape])] {
+    override def outputShape: Shape = {
+      cells.last.outputShape
+    }
+
+    override def stateShape: ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]]), Seq[StateShape]) = {
+      (attentionCell.stateShape, cells.map(_.stateShape))
+    }
+
+    override def forward(
+        input: RNNTuple[Output[T], (AttentionWrapperState[T, State, AttentionState], Seq[State])]
+    ): RNNTuple[Output[T], (AttentionWrapperState[T, State, AttentionState], Seq[State])] = {
+      val minusOne = tf.constant(-1)
+      val nextAttentionTuple = attentionCell(RNNTuple(input.output, input.state._1))
+      var currentInput = nextAttentionTuple.output
+      val state = cells.zip(input.state._2).map {
+        case (cell, s) =>
+          val concatenatedInput = {
+            if (useNewAttention)
+              tf.concatenate(Seq(currentInput, nextAttentionTuple.state.attention), axis = minusOne)
+            else
+              tf.concatenate(Seq(currentInput, input.state._1.attention), axis = minusOne)
+          }
+          val nextTuple = cell(RNNTuple(concatenatedInput, s))
+          currentInput = nextTuple.output
+          nextTuple.state
+      }
+      RNNTuple(currentInput, (nextAttentionTuple.state, state))
+    }
+  }
+}
