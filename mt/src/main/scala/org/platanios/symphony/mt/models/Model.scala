@@ -151,7 +151,7 @@ class Model[Code](
         }
         val datasets = evalDatasets.filter(_._2.nonEmpty)
         if (datasets.nonEmpty) {
-          val evalDatasets = Inputs.createEvalDatasets(dataConfig, modelConfig, datasets, languages, languagePairs)
+          val evalDatasets = Inputs.createEvalDatasets(dataConfig, datasets, languages, languagePairs)
           hooks += tf.learn.Evaluator(
             log = true, summariesDir, evalDatasets, evalMetrics, StepHookTrigger(modelConfig.logConfig.logEvalSteps),
             triggerAtEnd = true, numDecimalPoints = 6, name = "Evaluation")
@@ -199,7 +199,6 @@ class Model[Code](
     estimator.train(
       data = Inputs.createTrainDataset(
         dataConfig = dataConfig,
-        modelConfig = modelConfig,
         datasets = datasets,
         languages = languages,
         includeIdentityTranslations = modelConfig.trainIdentityTranslations,
@@ -220,7 +219,6 @@ class Model[Code](
   ): Iterator[(SentencesWithLanguagePairValue, SentencesWithLanguageValue)] = {
     val inputDataset = Inputs.createInputDataset(
       dataConfig = dataConfig,
-      modelConfig = modelConfig,
       dataset = dataset,
       srcLanguage = srcLanguage,
       tgtLanguage = tgtLanguage,
@@ -279,7 +277,6 @@ class Model[Code](
     val languagePairs = if (modelConfig.languagePairs.nonEmpty) Some(modelConfig.languagePairs) else None
     val evalDatasets = Inputs.createEvalDatasets(
       dataConfig = dataConfig,
-      modelConfig = modelConfig,
       datasets = datasets.filter(_._2.nonEmpty),
       languages = languages,
       languagePairs = languagePairs)

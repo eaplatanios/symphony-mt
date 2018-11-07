@@ -30,7 +30,6 @@ import java.nio.charset.StandardCharsets
 object Inputs {
   def createInputDataset(
       dataConfig: DataConfig,
-      modelConfig: Model.Config,
       dataset: FileParallelDataset,
       srcLanguage: Language,
       tgtLanguage: Language,
@@ -77,7 +76,6 @@ object Inputs {
 
   def createTrainDataset(
       dataConfig: DataConfig,
-      modelConfig: Model.Config,
       datasets: Seq[FileParallelDataset],
       languages: Seq[(Language, Vocabulary)],
       includeIdentityTranslations: Boolean = false,
@@ -86,8 +84,6 @@ object Inputs {
       languagePairs: Option[Set[(Language, Language)]] = None
   ): () => TrainDataset = () => {
     val languageIds = languages.map(_._1).zipWithIndex.toMap
-    val bufferSize = if (dataConfig.bufferSize == -1L) 1024L else dataConfig.bufferSize
-
     val filteredDatasets = datasets
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))
         .filter(_.nonEmpty)
@@ -128,7 +124,7 @@ object Inputs {
         }.reduce((d1, d2) => d1.concatenateWith(d2))
 
     val parallelDatasetCreator: (Output[Int], Output[Int], Output[String], Output[String], Output[Int], Output[Int]) => TrainDataset =
-      createSingleParallelDataset(dataConfig, modelConfig, repeat, isEval)
+      createSingleParallelDataset(dataConfig, repeat, isEval)
 
     filesDataset
         .shuffle(filteredDatasets.size)
@@ -158,7 +154,6 @@ object Inputs {
 
   def createEvalDatasets(
       dataConfig: DataConfig,
-      modelConfig: Model.Config,
       datasets: Seq[(String, FileParallelDataset, Float)],
       languages: Seq[(Language, Vocabulary)],
       languagePairs: Option[Set[(Language, Language)]] = None
@@ -179,7 +174,7 @@ object Inputs {
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
             (datasetName, () => tf.nameScope(datasetName) {
               createTrainDataset(
-                dataConfig.copy(parallelPortion = parallelPortion), modelConfig, Seq(dataset), languages,
+                dataConfig.copy(parallelPortion = parallelPortion), Seq(dataset), languages,
                 includeIdentityTranslations = false, repeat = false, isEval = true,
                 languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
             })
@@ -188,7 +183,6 @@ object Inputs {
 
   private def createSingleParallelDataset(
       dataConfig: DataConfig,
-      modelConfig: Model.Config,
       repeat: Boolean,
       isEval: Boolean
   )(
