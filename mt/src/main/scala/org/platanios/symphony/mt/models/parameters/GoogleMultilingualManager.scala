@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.models.{Context, Sequences}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -53,17 +54,14 @@ class GoogleMultilingualManager protected (
   }
 
   override def postprocessEmbeddedSequences(
-      srcLanguage: Output[Int],
-      tgtLanguage: Output[Int],
-      srcSequences: Output[Float],
-      srcSequenceLengths: Output[Int]
-  )(implicit context: Output[Int]): (Output[Float], Output[Int]) = {
-    val batchSize = tf.shape(srcSequences).slice(0).toInt
-    val tgtLanguageEmbedding = languageEmbeddings(currentGraph).gather(context(1)).reshape(Shape(1, 1, -1))
+      sequences: Sequences[Float]
+  )(implicit context: Context): Sequences[Float] = {
+    val batchSize = tf.shape(sequences.sequences).slice(0).toInt
+    val tgtLanguageEmbedding = languageEmbeddings(currentGraph).gather(context.tgtLanguageID).reshape(Shape(1, 1, -1))
     val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack[Int](Seq(batchSize, 1, 1)))
-    val processedSrcSentences = tf.concatenate(Seq(tgtLanguageEmbeddingTiled, srcSequences), 1)
-    val processedSrcSentenceLengths = srcSequenceLengths + 1
-    (processedSrcSentences, processedSrcSentenceLengths)
+    val processedSrcSentences = tf.concatenate(Seq(tgtLanguageEmbeddingTiled, sequences.sequences), 1)
+    val processedSrcSentenceLengths = sequences.lengths + 1
+    Sequences(processedSrcSentences, processedSrcSentenceLengths)
   }
 }
 

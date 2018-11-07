@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.models.Context
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -74,7 +75,7 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
       languageIds: Seq[Output[Int]],
       languageId: Output[Int],
       keys: Output[Int]
-  )(implicit context: Output[Int]): Output[Float] = {
+  )(implicit context: Context): Output[Float] = {
     val languageIdPairs = languageIds
         .combinations(2)
         .map(c => (c(0), c(1)))
@@ -83,8 +84,8 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
     val predicates = embeddingTables.zip(languageIdPairs).flatMap {
       case (embeddings, (srcLangId, tgtLangId)) =>
         val pairPredicate = tf.logicalAnd(
-          tf.equal(context(0), srcLangId),
-          tf.equal(context(1), tgtLangId))
+          tf.equal(context.srcLanguageID, srcLangId),
+          tf.equal(context.tgtLanguageID, tgtLangId))
         Seq(
           (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => embeddings.embeddings1),
           (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => embeddings.embeddings2))
@@ -93,8 +94,8 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
       tf.any(tf.stack(predicates.map(_._1))),
       Seq(
         tf.constant[String]("No word embeddings table found for the provided language pair."),
-        tf.constant[String]("Context source language: "), context(0),
-        tf.constant[String]("Context target language: "), context(1),
+        tf.constant[String]("Context source language: "), context.srcLanguageID,
+        tf.constant[String]("Context target language: "), context.tgtLanguageID,
         tf.constant[String]("Current language: "), languageId))
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
       tf.identity(embeddingTables.head.embeddings1)
@@ -108,7 +109,7 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
       projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
       languageId: Output[Int]
-  )(implicit context: Output[Int]): Output[Float] = {
+  )(implicit context: Context): Output[Float] = {
     val projectionsForSize = projectionsToWords
         .getOrElseUpdate(inputSize, {
           val languagePairs = languages
@@ -136,8 +137,8 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
     val predicates = projectionsForSize.zip(languageIdPairs).flatMap {
       case (projections, (srcLangId, tgtLangId)) =>
         val pairPredicate = tf.logicalAnd(
-          tf.equal(context(0), srcLangId),
-          tf.equal(context(1), tgtLangId))
+          tf.equal(context.srcLanguageID, srcLangId),
+          tf.equal(context.tgtLanguageID, tgtLangId))
         Seq(
           (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => projections.embeddings1),
           (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => projections.embeddings2))
@@ -146,8 +147,8 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
       tf.any(tf.stack(predicates.map(_._1))),
       Seq(
         tf.constant[String]("No projections found for the provided language pair."),
-        tf.constant[String]("Context source language: "), context(0),
-        tf.constant[String]("Context target language: "), context(1),
+        tf.constant[String]("Context source language: "), context.srcLanguageID,
+        tf.constant[String]("Context target language: "), context.tgtLanguageID,
         tf.constant[String]("Current language: "), languageId))
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
       tf.identity(projectionsForSize.head.embeddings1)

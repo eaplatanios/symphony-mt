@@ -15,9 +15,9 @@
 
 package org.platanios.symphony.mt.models.parameters
 
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.exception.InvalidDataTypeException
 import org.platanios.tensorflow.api.ops.FunctionGraph
@@ -31,9 +31,7 @@ class ParameterManager protected (
     val wordEmbeddingsType: WordEmbeddingsType,
     val variableInitializer: tf.VariableInitializer = null
 ) {
-  protected var environment  : Environment                 = _
-  protected var deviceManager: Option[DeviceManager]       = None
-  protected var languages    : Seq[(Language, Vocabulary)] = _
+  protected var languages: Seq[(Language, Vocabulary)] = _
 
   protected val languageIds                : mutable.Map[Graph, Seq[Output[Int]]]     = mutable.Map.empty
   protected val stringToIndexLookupTables  : mutable.Map[Graph, Output[Resource]]     = mutable.Map.empty
@@ -43,9 +41,6 @@ class ParameterManager protected (
   protected val wordEmbeddings             : mutable.Map[Graph, wordEmbeddingsType.T] = mutable.Map.empty
 
   protected val projectionsToWords: mutable.Map[Graph, mutable.Map[Int, wordEmbeddingsType.T]] = mutable.Map.empty
-
-  def setEnvironment(environment: Environment): Unit = this.environment = environment
-  def setDeviceManager(deviceManager: DeviceManager): Unit = this.deviceManager = Some(deviceManager)
 
   protected def currentGraph: Graph = {
     var graph = tf.currentGraph
@@ -121,7 +116,9 @@ class ParameterManager protected (
     }
   }
 
-  def wordEmbeddings(languageId: Output[Int])(implicit context: Output[Int]): Output[Int] => Output[Float] = {
+  def wordEmbeddings(
+      languageId: Output[Int]
+  )(implicit context: Context): Output[Int] => Output[Float] = {
     keys: Output[Int] => {
       tf.variableScope("ParameterManager/WordEmbeddings") {
         val graph = currentGraph
@@ -135,7 +132,7 @@ class ParameterManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit stage: Stage, context: Output[Int]): Output[P] = {
+  )(implicit context: Context): Output[P] = {
     tf.variableScope("ParameterManager") {
       tf.variable[P](name, shape, initializer = variableInitializer, reuse = variableReuse).value
     }
@@ -144,7 +141,7 @@ class ParameterManager protected (
   def getProjectionToWords(
       inputSize: Int,
       languageId: Output[Int]
-  )(implicit context: Output[Int]): Output[Float] = {
+  )(implicit context: Context): Output[Float] = {
     tf.variableScope("ParameterManager/ProjectionToWords") {
       val graph = currentGraph
       wordEmbeddingsType.projectionToWords(
@@ -157,12 +154,9 @@ class ParameterManager protected (
   }
 
   def postprocessEmbeddedSequences(
-      srcLanguage: Output[Int],
-      tgtLanguage: Output[Int],
-      srcSequences: Output[Float],
-      srcSequenceLengths: Output[Int]
-  )(implicit context: Output[Int]): (Output[Float], Output[Int]) = {
-    (srcSequences, srcSequenceLengths)
+      sequences: Sequences[Float]
+  )(implicit context: Context): Sequences[Float] = {
+    sequences
   }
 }
 

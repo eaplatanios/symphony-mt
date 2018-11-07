@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.{Decoding, Encoding, Stage}
+import org.platanios.symphony.mt.models.{Context, Decoding, Encoding, Stage}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -60,7 +60,7 @@ class LanguageEmbeddingsManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit stage: Stage, context: Output[Int]): Output[P] = {
+  )(implicit context: Context): Output[P] = {
     tf.variableScope("ParameterManager") {
       val graph = currentGraph
       val variableScopeName = tf.currentVariableScope.name
@@ -68,9 +68,9 @@ class LanguageEmbeddingsManager protected (
 
       def create(): Output[P] = {
         tf.variableScope(name) {
-          val language = stage match {
-            case Encoding => context(0)
-            case Decoding => context(1)
+          val language = context.stage match {
+            case Encoding => context.srcLanguageID
+            case Decoding => context.tgtLanguageID
           }
           val embedding = languageEmbeddings(graph).gather(language).reshape(Shape(1, -1))
           var inputSize = languageEmbeddingsSize
