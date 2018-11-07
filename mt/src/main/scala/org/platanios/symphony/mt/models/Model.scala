@@ -19,7 +19,6 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.evaluation
 import org.platanios.symphony.mt.evaluation._
-import org.platanios.symphony.mt.models.Model.DecodingMode
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.hooks.TrainingLogger
 import org.platanios.symphony.mt.models.parameters.ParameterManager
@@ -32,7 +31,6 @@ import org.platanios.tensorflow.api.core.client.SessionConfig
 import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
-import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 
 import java.io.PrintWriter
 
@@ -45,13 +43,16 @@ import scala.io.Source
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class Model[S] protected (
+class Model[Code](
     val name: String,
     val languages: Seq[(Language, Vocabulary)],
+    val encoder: Transformation.Encoder[Code],
+    val decoder: Transformation.Decoder[Code],
+    val env: Environment,
+    val parameterManager: ParameterManager,
     val dataConfig: DataConfig,
-    val config: Model.Config,
-    val optConfig: Model.OptConfig,
-    val logConfig: Model.LogConfig = Model.LogConfig()
+    val modelConfig: ModelConfig,
+    val deviceManager: DeviceManager = RoundRobinDeviceManager
 )(
     val evalDatasets: Seq[(String, FileParallelDataset, Float)] = Seq.empty,
     val evalMetrics: Seq[MTMetric] = Seq(
@@ -63,11 +64,10 @@ abstract class Model[S] protected (
       SentenceCount(name = "#Sentences"))
 ) {
   protected val languageIds: Map[Language, Int] = {
-    val file = config.env.workingDir.resolve("languages.index").toFile
+    val file = env.workingDir.resolve("languages.index").toFile
     if (file.exists()) {
-      val indices = Source.fromFile(file).getLines().map(line => {
-        val lineParts = line.split(',')
-        (Language.fromName(lineParts(0)), lineParts(1).toInt)
+      val indices = Source.fromFile(file).getLines().zipWithIndex.map(line => {
+        (Language.fromName(line._1), line._2)
       }).toMap
       if (!languages.forall(l => indices.contains(l._1)))
         throw new IllegalStateException(
@@ -75,22 +75,21 @@ abstract class Model[S] protected (
               s"all of the provided languages (${languages.map(_._1.name).mkString(", ")}).")
       indices
     } else {
-      val indices = languages.map(_._1).zipWithIndex.toMap
       val writer = new PrintWriter(file)
-      indices.foreach(i => writer.write(s"${i._1.name},${i._2}\n"))
+      val indices = languages.map(l => {
+        val language = l._1
+        writer.write(s"${language.name}\n")
+        language
+      }).zipWithIndex.toMap
       writer.close()
       indices
     }
   }
 
-  protected implicit val env             : Environment      = config.env
-  protected implicit val parameterManager: ParameterManager = config.parameterManager
-  protected implicit val deviceManager   : DeviceManager    = config.deviceManager
-
   /** Each input consists of a tuple containing:
     *   - The source language ID.
     *   - The target language ID.
-    *   - A tensor containing a padded batch of sentences consisting of word IDs, in the source language.
+    *   - A tensor containing a padded batch of sentences consisting of token IDs, in the source language.
     *   - A tensor containing the sentence lengths for the aforementioned padded batch.
     */
   protected val input: Input[SentencesWithLanguagePair[String]] = {
@@ -110,10 +109,9 @@ abstract class Model[S] protected (
   protected val estimator: TranslationEstimator = {
     tf.createWith(
       nameScope = name,
-      device = config.deviceManager.nextDevice(config.env, moveToNext = false)
+      device = deviceManager.nextDevice(env, moveToNext = false)
     ) {
-      var optimizer = optConfig.optimizer
-      val model = optConfig.maxGradNorm match {
+      val model = modelConfig.optConfig.maxGradNorm match {
         case Some(norm) =>
           tf.learn.Model.supervised(
             input = input,
@@ -121,9 +119,9 @@ abstract class Model[S] protected (
             layer = inferLayer,
             trainLayer = trainLayer,
             loss = lossLayer,
-            optimizer = optimizer,
+            optimizer = modelConfig.optConfig.optimizer,
             clipGradients = tf.learn.ClipGradientsByGlobalNorm(norm),
-            colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
+            colocateGradientsWithOps = modelConfig.optConfig.colocateGradientsWithOps)
         case None =>
           tf.learn.Model.supervised(
             input = input,
@@ -131,31 +129,31 @@ abstract class Model[S] protected (
             layer = inferLayer,
             trainLayer = trainLayer,
             loss = lossLayer,
-            optimizer = optimizer,
-            colocateGradientsWithOps = optConfig.colocateGradientsWithOps)
+            optimizer = modelConfig.optConfig.optimizer,
+            colocateGradientsWithOps = modelConfig.optConfig.colocateGradientsWithOps)
       }
-      val summariesDir = config.env.workingDir.resolve("summaries")
+      val summariesDir = env.workingDir.resolve("summaries")
 
       // Create estimator hooks.
       var hooks = Set[tf.learn.Hook]()
 
       // Add logging hooks.
-      if (logConfig.logLossSteps > 0) {
+      if (modelConfig.logConfig.logLossSteps > 0) {
         hooks += TrainingLogger(
           log = true,
-          trigger = StepHookTrigger(logConfig.logLossSteps))
+          trigger = StepHookTrigger(modelConfig.logConfig.logLossSteps))
       }
-      if (logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
+      if (modelConfig.logConfig.logEvalSteps > 0 && evalMetrics.nonEmpty) {
         val languagePairs = {
-          if (config.evalLanguagePairs.nonEmpty) Some(config.evalLanguagePairs)
-          else if (config.languagePairs.nonEmpty) Some(config.languagePairs)
+          if (modelConfig.evalLanguagePairs.nonEmpty) Some(modelConfig.evalLanguagePairs)
+          else if (modelConfig.languagePairs.nonEmpty) Some(modelConfig.languagePairs)
           else None
         }
         val datasets = evalDatasets.filter(_._2.nonEmpty)
         if (datasets.nonEmpty) {
-          val evalDatasets = Inputs.createEvalDatasets(dataConfig, config, datasets, languages, languagePairs)
+          val evalDatasets = Inputs.createEvalDatasets(dataConfig, modelConfig, datasets, languages, languagePairs)
           hooks += tf.learn.Evaluator(
-            log = true, summariesDir, evalDatasets, evalMetrics, StepHookTrigger(logConfig.logEvalSteps),
+            log = true, summariesDir, evalDatasets, evalMetrics, StepHookTrigger(modelConfig.logConfig.logEvalSteps),
             triggerAtEnd = true, numDecimalPoints = 6, name = "Evaluation")
         }
       }
@@ -163,45 +161,48 @@ abstract class Model[S] protected (
       // Add summaries/checkpoints hooks.
       hooks ++= Set(
         tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-        tf.learn.SummarySaver(summariesDir, StepHookTrigger(config.summarySteps)),
-        tf.learn.CheckpointSaver(config.env.workingDir, StepHookTrigger(config.checkpointSteps)))
+        tf.learn.SummarySaver(summariesDir, StepHookTrigger(modelConfig.summarySteps)),
+        tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(modelConfig.checkpointSteps)))
 
       env.traceSteps.foreach(numSteps =>
         hooks += tf.learn.TimelineHook(
           summariesDir, showDataFlow = true, showMemory = true, trigger = StepHookTrigger(numSteps)))
 
       // Add TensorBoard hook.
-      if (logConfig.launchTensorBoard)
+      if (modelConfig.logConfig.launchTensorBoard) {
         hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
-          summariesDir, host = logConfig.tensorBoardConfig._1, port = logConfig.tensorBoardConfig._2))
+          summariesDir,
+          host = modelConfig.logConfig.tensorBoardConfig._1,
+          port = modelConfig.logConfig.tensorBoardConfig._2))
+      }
 
       var sessionConfig = SessionConfig(
-        allowSoftPlacement = Some(config.env.allowSoftPlacement),
-        logDevicePlacement = Some(config.env.logDevicePlacement),
-        gpuAllowMemoryGrowth = Some(config.env.gpuAllowMemoryGrowth))
-      if (config.env.useXLA)
+        allowSoftPlacement = Some(env.allowSoftPlacement),
+        logDevicePlacement = Some(env.logDevicePlacement),
+        gpuAllowMemoryGrowth = Some(env.gpuAllowMemoryGrowth))
+      if (env.useXLA)
         sessionConfig = sessionConfig.copy(optGlobalJITLevel = Some(SessionConfig.L1GraphOptimizerGlobalJIT))
 
       // Create estimator.
       tf.learn.InMemoryEstimator(
         model, tf.learn.Configuration(
-          workingDir = Some(config.env.workingDir),
+          workingDir = Some(env.workingDir),
           sessionConfig = Some(sessionConfig),
           checkpointConfig = TimeBasedCheckpoints(600, 5, 10000),
-          randomSeed = config.env.randomSeed),
+          randomSeed = env.randomSeed),
         trainHooks = hooks)
     }
   }
 
   def train(datasets: Seq[FileParallelDataset], stopCriteria: StopCriteria): Unit = {
-    val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
+    val languagePairs = if (modelConfig.languagePairs.nonEmpty) Some(modelConfig.languagePairs) else None
     estimator.train(
       data = Inputs.createTrainDataset(
         dataConfig = dataConfig,
-        modelConfig = config,
+        modelConfig = modelConfig,
         datasets = datasets,
         languages = languages,
-        includeIdentityTranslations = config.trainIdentityTranslations,
+        includeIdentityTranslations = modelConfig.trainIdentityTranslations,
         repeat = true,
         isEval = false,
         languagePairs = languagePairs),
@@ -219,7 +220,7 @@ abstract class Model[S] protected (
   ): Iterator[(SentencesWithLanguagePairValue, SentencesWithLanguageValue)] = {
     val inputDataset = Inputs.createInputDataset(
       dataConfig = dataConfig,
-      modelConfig = config,
+      modelConfig = modelConfig,
       dataset = dataset,
       srcLanguage = srcLanguage,
       tgtLanguage = tgtLanguage,
@@ -275,10 +276,10 @@ abstract class Model[S] protected (
       saveSummaries: Boolean = true
   ): Seq[(String, Seq[(String, Tensor[Float])])] = {
     // Create the evaluation datasets that may only consider a subset of the language pairs.
-    val languagePairs = if (config.languagePairs.nonEmpty) Some(config.languagePairs) else None
+    val languagePairs = if (modelConfig.languagePairs.nonEmpty) Some(modelConfig.languagePairs) else None
     val evalDatasets = Inputs.createEvalDatasets(
       dataConfig = dataConfig,
-      modelConfig = config,
+      modelConfig = modelConfig,
       datasets = datasets.filter(_._2.nonEmpty),
       languages = languages,
       languagePairs = languagePairs)
@@ -325,35 +326,55 @@ abstract class Model[S] protected (
       override def forwardWithoutContext(
           input: (SentencesWithLanguagePair[String], Sentences[String])
       )(implicit mode: Mode): SentencesWithLanguage[Float] = {
-        tf.createWith(device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
+        tf.createWith(device = deviceManager.nextDevice(env, moveToNext = false)) {
           parameterManager.initialize(languages)
-          parameterManager.setEnvironment(config.env)
-          parameterManager.setDeviceManager(config.deviceManager)
 
-          val srcLanguage = input._1._1
-          val tgtLanguage = input._1._2
+          val srcLanguageID = input._1._1
+          val tgtLanguageID = input._1._2
 
-          implicit val context: Output[Int] = {
-            tf.stack(Seq(srcLanguage, tgtLanguage))
-          }
-
-          // Map words to word indices in the vocabulary.
-          val srcSentencesMapped = mapToWordIds(srcLanguage, /* source sentences */ input._1._3._1)
-          val tgtSentencesMapped = mapToWordIds(tgtLanguage, /* target sentences */ input._2._1)
-          val srcMapped = (srcLanguage, tgtLanguage, (srcSentencesMapped, /* source sentence lengths */ input._1._3._2))
-          val tgtMapped = (tgtSentencesMapped, /* target sentence lengths */ input._2._2)
+          // Map tokens to token indices in the vocabulary.
+          val mappedSrcSequences = Sequences(
+            sequences = parameterManager.stringToIndexLookup(srcLanguageID)(input._1._3._1),
+            lengths = input._1._3._2)
+          val mappedTgtSequences = Sequences(
+            sequences = parameterManager.stringToIndexLookup(tgtLanguageID)(input._2._1),
+            lengths = input._2._2)
 
           // Encode the source sentences.
-          val state = tf.variableScope("Encoder") {
-            encoder(srcMapped)
+          val encoderOutput = tf.variableScope("Encoder") {
+            implicit val context: Context = Context(
+              env = env,
+              parameterManager = parameterManager,
+              deviceManager = deviceManager,
+              dataConfig = dataConfig,
+              modelConfig = modelConfig,
+              stage = Encoding,
+              mode = mode,
+              srcLanguageID = srcLanguageID,
+              tgtLanguageID = tgtLanguageID,
+              tgtSequences = Some(mappedTgtSequences))
+
+            encoder(mappedSrcSequences)
           }
 
           // Decode to obtain the target sentences.
-          val decodedTgtSentences = tf.variableScope("Decoder") {
-            decoder(Model.DecodingTrainMode, srcMapped, Some(tgtMapped), Some(state))
+          val decoderOutput = tf.variableScope("Decoder") {
+            implicit val context: Context = Context(
+              env = env,
+              parameterManager = parameterManager,
+              deviceManager = deviceManager,
+              dataConfig = dataConfig,
+              modelConfig = modelConfig,
+              stage = Decoding,
+              mode = mode,
+              srcLanguageID = srcLanguageID,
+              tgtLanguageID = tgtLanguageID,
+              tgtSequences = Some(mappedTgtSequences))
+
+            decoder.applyTrain(encoderOutput)
           }
 
-          (tgtLanguage, decodedTgtSentences)
+          (tgtLanguageID, (decoderOutput.sequences, decoderOutput.lengths))
         }
       }
     }
@@ -366,42 +387,63 @@ abstract class Model[S] protected (
       override def forwardWithoutContext(
           input: SentencesWithLanguagePair[String]
       )(implicit mode: Mode): SentencesWithLanguage[String] = {
-        tf.createWith(device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
+        tf.createWith(device = deviceManager.nextDevice(env, moveToNext = false)) {
           parameterManager.initialize(languages)
-          parameterManager.setEnvironment(config.env)
-          parameterManager.setDeviceManager(config.deviceManager)
 
-          val srcLanguage = input._1
-          val tgtLanguage = input._2
+          val srcLanguageID = input._1
+          val tgtLanguageID = input._2
 
-          implicit val context: Output[Int] = tf.stack(Seq(srcLanguage, tgtLanguage))
-
-          // Map words to word to indices in the vocabulary.
-          val srcSentencesMapped = mapToWordIds(srcLanguage, /* source sentences */ input._3._1)
-          val srcMapped = (srcLanguage, tgtLanguage, (srcSentencesMapped, /* source sentence lengths */ input._3._2))
+          // Map tokens to token indices in the vocabulary.
+          val mappedSrcSequences = Sequences(
+            sequences = parameterManager.stringToIndexLookup(srcLanguageID)(input._3._1),
+            lengths = input._3._2)
 
           // Perform inference based on the current pivoting strategy for multi-lingual translations.
-          config.pivot match {
+          modelConfig.pivot match {
             case NoPivot =>
               // Encode the source sentences.
-              val encoderInput = srcMapped
-              val state = tf.variableScope("Encoder") {
-                encoder(encoderInput)
+              val encoderOutput = tf.variableScope("Encoder") {
+                implicit val context: Context = Context(
+                  env = env,
+                  parameterManager = parameterManager,
+                  deviceManager = deviceManager,
+                  dataConfig = dataConfig,
+                  modelConfig = modelConfig,
+                  stage = Encoding,
+                  mode = mode,
+                  srcLanguageID = srcLanguageID,
+                  tgtLanguageID = tgtLanguageID,
+                  tgtSequences = None)
+
+                encoder(mappedSrcSequences)
               }
 
               // Decode to obtain the target sentences.
-              val (tgtSentences, tgtSentenceLengths) = tf.variableScope("Decoder") {
-                decoder(Model.DecodingInferMode, encoderInput, None, Some(state))
+              val decoderOutput = tf.variableScope("Decoder") {
+                implicit val context: Context = Context(
+                  env = env,
+                  parameterManager = parameterManager,
+                  deviceManager = deviceManager,
+                  dataConfig = dataConfig,
+                  modelConfig = modelConfig,
+                  stage = Decoding,
+                  mode = mode,
+                  srcLanguageID = srcLanguageID,
+                  tgtLanguageID = tgtLanguageID,
+                  tgtSequences = None)
+
+                decoder.applyInfer(encoderOutput)
               }
 
-              // Map from word indices in the vocabulary, back to actual words and return the result.
-              val decodedSequences = mapFromWordIds(tgtLanguage, tgtSentences)
-              (tgtLanguage, (decodedSequences, tgtSentenceLengths))
+              // Map from token indices in the vocabulary, back to actual tokens and return the result.
+              val decodedSequences = decoderOutput.copy(
+                sequences = parameterManager.indexToStringLookup(tgtLanguageID)(decoderOutput.sequences))
+              (tgtLanguageID, (decodedSequences.sequences, decodedSequences.lengths))
             case _ =>
-              config.pivot.initialize(languages, parameterManager)
+              modelConfig.pivot.initialize(languages, parameterManager)
 
               // Construct a pivoting sequence over languages and loop over it using a while loop.
-              val pivotingSequence = config.pivot.pivotingSequence(srcLanguage, tgtLanguage)
+              val pivotingSequence = modelConfig.pivot.pivotingSequence(srcLanguageID, tgtLanguageID)
 
               type LoopVariables = (Output[Int], Output[Int], Sentences[Int])
 
@@ -416,36 +458,54 @@ abstract class Model[S] protected (
                 val currentSrcLanguage = loopVariables._2
                 val currentTgtLanguage = tf.gather(pivotingSequence, index)
 
-                implicit val context: Output[Int] = {
-                  tf.stack(Seq(currentSrcLanguage, currentTgtLanguage))
-                }
-
                 // Encode the source sentences in this step of the pivoting chain.
-                val encoderInput = (currentSrcLanguage, currentTgtLanguage, /* source sentences */ loopVariables._3)
-                val state = tf.variableScope("Encoder") {
-                  encoder(encoderInput)
+                val encoderOutput = tf.variableScope("Encoder") {
+                  implicit val context: Context = Context(
+                    env = env,
+                    parameterManager = parameterManager,
+                    deviceManager = deviceManager,
+                    dataConfig = dataConfig,
+                    modelConfig = modelConfig,
+                    stage = Encoding,
+                    mode = mode,
+                    srcLanguageID = currentSrcLanguage,
+                    tgtLanguageID = currentTgtLanguage,
+                    tgtSequences = None)
+
+                  val srcSequences = Sequences(
+                    sequences = loopVariables._3._1,
+                    lengths = loopVariables._3._2)
+                  encoder(srcSequences)
                 }
 
                 // Decode to obtain the target sentences in this step of the pivoting chain.
-                val tgtSentences = tf.variableScope("Decoder") {
-                  decoder(Model.DecodingInferMode, encoderInput, None, Some(state))
+                val decoderOutput = tf.variableScope("Decoder") {
+                  implicit val context: Context = Context(
+                    env = env,
+                    parameterManager = parameterManager,
+                    deviceManager = deviceManager,
+                    dataConfig = dataConfig,
+                    modelConfig = modelConfig,
+                    stage = Decoding,
+                    mode = mode,
+                    srcLanguageID = currentSrcLanguage,
+                    tgtLanguageID = currentTgtLanguage,
+                    tgtSequences = None)
+
+                  decoder.applyInfer(encoderOutput)
                 }
 
-                (index + 1, currentTgtLanguage, tgtSentences)
+                (index + 1, currentTgtLanguage, (decoderOutput.sequences, decoderOutput.lengths))
               }
-
-              val srcSequences = srcMapped._3._1
-              val srcSequenceLengths = srcMapped._3._2
-
-              // Set the shape invariants for the while loop.
-              srcSequences.setShape(Shape(-1, -1))
-              srcSequenceLengths.setShape(Shape(-1))
 
               val results = tf.whileLoop(
                 predicateFn, bodyFn,
-                loopVariables = (Output.constant[Int](0), srcLanguage, (srcSequences, srcSequenceLengths)))
-              val decodedSequences = mapFromWordIds(tgtLanguage, /* target sentences */ results._3._1)
-              (tgtLanguage, (decodedSequences, /* target sentence lengths */ results._3._2))
+                loopVariables = (Output.constant[Int](0), srcLanguageID, (mappedSrcSequences.sequences, mappedSrcSequences.lengths)),
+                shapeInvariants = Some((Shape(), Shape(), (Shape(-1, -1), Shape(-1)))))
+
+              // Map from token indices in the vocabulary, back to actual tokens and return the result.
+              val decodedSequences = parameterManager.indexToStringLookup(tgtLanguageID)(results._3._1)
+              (tgtLanguageID, (decodedSequences, /* target sentence lengths */ results._3._2))
           }
         }
       }
@@ -459,20 +519,19 @@ abstract class Model[S] protected (
       override def forwardWithoutContext(
           input: (SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String]))
       )(implicit mode: Mode): Output[Float] = {
-        tf.createWith(nameScope = "Loss", device = config.deviceManager.nextDevice(config.env, moveToNext = false)) {
+        tf.createWith(nameScope = "Loss", device = deviceManager.nextDevice(env, moveToNext = false)) {
           parameterManager.initialize(languages)
-          parameterManager.setEnvironment(config.env)
-          parameterManager.setDeviceManager(config.deviceManager)
 
           val tgtLanguage = input._1._1
 
-          var tgtSequences = tf.nameScope("TrainInputsToWordIDs") {
-            mapToWordIds(tgtLanguage, /* reference target sentences */ input._2._2._1)
+          var tgtSequences = tf.nameScope("TrainInputsToTokenIDs") {
+            // Map the reference tokens to token indices in the vocabulary.
+            parameterManager.stringToIndexLookup(tgtLanguage)(input._2._2._1)
           }
 
           // TODO: Handle this shift more efficiently.
           // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
-          // word used as input, rather than the previous predicted word.
+          // token used as input, rather than the previous predicted token.
           val tgtEosId = parameterManager
               .stringToIndexLookup(tgtLanguage)(Output.constant[String](dataConfig.endOfSequenceToken)).toInt
           tgtSequences = tf.concatenate(Seq(
@@ -488,51 +547,6 @@ abstract class Model[S] protected (
     }
   }
 
-  protected def mapToWordIds(
-      language: Output[Int],
-      wordSequence: Output[String]
-  ): Output[Int] = {
-    parameterManager.stringToIndexLookup(language)(wordSequence)
-  }
-
-  protected def mapFromWordIds(
-      language: Output[Int],
-      wordIDSequence: Output[Int]
-  ): Output[String] = {
-    parameterManager.indexToStringLookup(language)(wordIDSequence)
-  }
-
-  /**
-    *
-    * @param  input Tuple containing four tensors:
-    *                 - `INT32` tensor containing the source language ID.
-    *                 - `INT32` tensor containing the target language ID.
-    *                 - `INT32` tensor with shape `[batchSize, inputLength]`, containing the sentence word IDs.
-    *                 - `INT32` tensor with shape `[batchSize]`, containing the sentence lengths.
-    * @param  mode  Current learning mode (e.g., training or evaluation).
-    * @return   Tuple containing two tensors:
-    *           - Encoder output, with shape `[batchSize, inputLength, hiddenSize]`.
-    *           - Encoder-decoder attention bias and mask weights, with shape `[batchSize, inputLength]`.
-    */
-  protected def encoder(input: SentencesWithLanguagePair[Int])(implicit
-      mode: Mode,
-      context: Output[Int]
-  ): S
-
-  /**
-    *
-    * @return Tensor with shape `[batchSize, length, 1, hiddenSize]`.
-    */
-  protected def decoder[O: TF](
-      decodingMode: DecodingMode[O],
-      encoderInput: SentencesWithLanguagePair[Int],
-      input: Option[Sentences[Int]],
-      state: Option[S]
-  )(implicit
-      mode: Mode,
-      context: Output[Int]
-  ): Sentences[O]
-
   protected def loss(
       predictedSequences: Output[Float],
       tgtSequences: Output[Int],
@@ -542,59 +556,8 @@ abstract class Model[S] protected (
       logits = predictedSequences,
       labels = tgtSequences,
       labelLengths = tgtSequenceLengths,
-      labelSmoothing = config.labelSmoothing,
-      timeMajor = config.timeMajor)
+      labelSmoothing = modelConfig.labelSmoothing,
+      timeMajor = modelConfig.timeMajor)
     lossSum / tf.size(tgtSequenceLengths).toFloat
   }
-}
-
-object Model {
-  sealed trait DecodingMode[O]
-  case object DecodingTrainMode extends DecodingMode[Float]
-  case object DecodingInferMode extends DecodingMode[Int]
-
-  class Config protected(
-      val env: Environment,
-      val parameterManager: ParameterManager,
-      val deviceManager: DeviceManager,
-      val pivot: Pivot,
-      val labelSmoothing: Float,
-      val timeMajor: Boolean,
-      val summarySteps: Int,
-      val checkpointSteps: Int,
-      val trainIdentityTranslations: Boolean,
-      // The following is to allow training in one direction only (for a language pair).
-      val languagePairs: Set[(Language, Language)],
-      val evalLanguagePairs: Set[(Language, Language)])
-
-  object Config {
-    def apply(
-        env: Environment,
-        parameterManager: ParameterManager,
-        deviceManager: DeviceManager = RoundRobinDeviceManager,
-        pivot: Pivot = NoPivot,
-        labelSmoothing: Float = 0.0f,
-        timeMajor: Boolean = false,
-        summarySteps: Int = 100,
-        checkpointSteps: Int = 1000,
-        trainBackTranslation: Boolean = false,
-        languagePairs: Set[(Language, Language)] = Set.empty,
-        evalLanguagePairs: Set[(Language, Language)] = Set.empty
-    ): Config = {
-      new Config(
-        env, parameterManager, deviceManager, pivot, labelSmoothing, timeMajor, summarySteps, checkpointSteps,
-        trainBackTranslation, languagePairs, evalLanguagePairs)
-    }
-  }
-
-  case class OptConfig(
-      maxGradNorm: Option[Float] = None,
-      optimizer: Optimizer = GradientDescent(1.0f, learningRateSummaryTag = "LearningRate"),
-      colocateGradientsWithOps: Boolean = true)
-
-  case class LogConfig(
-      logLossSteps: Int = 100,
-      logEvalSteps: Int = 1000,
-      launchTensorBoard: Boolean = false,
-      tensorBoardConfig: (String, Int) = ("localhost", 6006))
 }

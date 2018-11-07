@@ -21,6 +21,10 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 package object models {
+  case class Sequences[T](
+      sequences: Output[T],
+      lengths: Output[Int])
+
   // Core Types
 
   type LanguageID = Output[Int]
