@@ -15,32 +15,28 @@
 
 package org.platanios.symphony.mt.models
 
-import org.platanios.tensorflow.api.TF
 import org.platanios.symphony.mt.Environment
-import org.platanios.symphony.mt.models.Model.DecodingMode
+import org.platanios.symphony.mt.data.DataConfig
 import org.platanios.symphony.mt.models.parameters.ParameterManager
-import org.platanios.symphony.mt.models.rnn.RNNDecoder
+import org.platanios.tensorflow.api.Output
 import org.platanios.tensorflow.api.learn.Mode
-import org.platanios.tensorflow.api.ops.Output
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait Decoder[T, EncoderState] {
-  def create[O: TF](
-      decodingMode: DecodingMode[O],
-      config: RNNModel.Config[T, _],
-      encoderState: EncoderState,
-      beginOfSequenceToken: String,
-      endOfSequenceToken: String,
-      tgtSequences: Output[Int] = null,
-      tgtSequenceLengths: Output[Int] = null
-  )(implicit
-      stage: Stage,
-      mode: Mode,
-      env: Environment,
-      parameterManager: ParameterManager,
-      deviceManager: DeviceManager,
-      context: Output[Int],
-  ): RNNDecoder.DecoderOutput[O]
+case class Context(
+    env: Environment,
+    parameterManager: ParameterManager,
+    deviceManager: DeviceManager,
+    dataConfig: DataConfig,
+    modelConfig: ModelConfig,
+    stage: Stage,
+    mode: Mode,
+    srcLanguageID: Output[Int],
+    tgtLanguageID: Output[Int],
+    tgtSequences: Option[Sequences[Int]]
+) {
+  def nextDevice(moveToNext: Boolean = true): String = {
+    deviceManager.nextDevice(env, moveToNext)
+  }
 }
