@@ -8,7 +8,7 @@ java -jar target/scala-2.12/symphony-mt-0.1.0-SNAPSHOT.jar \
   --dataset iwslt15 \
   --languages en:cs,en:de,en:fr,en:th,en:vi,en:zh \
   --eval-languages en:cs,en:de,en:fr,en:th,en:vi,en:zh \
-  --use-back-translations \
+  --use-identity-translations \
   --parallel-portion 1.00 \
   --eval-datasets dev2010:1.00,tst2013:1.00 \
   --eval-metrics bleu,hyp_len,ref_len,sen_cnt \

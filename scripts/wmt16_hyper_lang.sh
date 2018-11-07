@@ -8,7 +8,7 @@ java -jar target/scala-2.12/symphony-mt-0.1.0-SNAPSHOT.jar \
   --data-dir temp/data \
   --dataset wmt16 \
   --languages cs:en,fi:en,de:en,ro:en,ru:en,tr:en \
-  --use-back-translations \
+  --use-identity-translations \
   --parallel-portion 1.00 \
   --eval-datasets newsdev2016:1.00,newstest2016:1.00 \
   --eval-metrics bleu,meteor,hyp_len,ref_len,sen_cnt \
