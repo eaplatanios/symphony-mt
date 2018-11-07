@@ -47,7 +47,7 @@ case class ExperimentConfig(
     providedLanguages: String = "",
     providedEvalLanguages: String = "",
     trainBothDirections: Boolean = true,
-    trainBackTranslation: Boolean = false,
+    trainUseIdentityTranslations: Boolean = false,
     modelArchitecture: ModelArchitecture = BiRNN(),
     modelCell: String = "lstm:tanh",
     modelType: ModelType = Pairwise,
@@ -64,8 +64,8 @@ case class ExperimentConfig(
     summarySteps: Int = 100,
     checkpointSteps: Int = 1000,
     optString: String = "gd:1.0",
-    optConfig: Model.OptConfig = Model.OptConfig(),
-    logConfig: Model.LogConfig = Model.LogConfig(),
+    optConfig: ModelConfig.OptConfig = ModelConfig.OptConfig(),
+    logConfig: ModelConfig.LogConfig = ModelConfig.LogConfig(),
     evalDatasetTags: Seq[(String, Float)] = Seq.empty,
     evalMetrics: Seq[String] = Seq("bleu", "meteor", "hyp_len", "ref_len", "sen_cnt")
 ) {
@@ -127,7 +127,7 @@ case class ExperimentConfig(
       case ExperimentConfig.Translate => Seq.empty
     }
 
-    val trainBackTranslation = if (!trainBothDirections) false else this.trainBackTranslation
+    val trainUseIdentityTranslations = if (!trainBothDirections) false else this.trainUseIdentityTranslations
     val effectiveLanguagePairs = {
       if (trainBothDirections)
         languagePairs.flatMap(p => Set(p, (p._2, p._1)))
@@ -137,7 +137,7 @@ case class ExperimentConfig(
 
     // TODO: [EXPERIMENTS] Allow using different data types.
     val model = modelArchitecture.model[Float](
-      "Model", languages, dataConfig, env, parameterManager, trainBackTranslation, effectiveLanguagePairs,
+      "Model", languages, dataConfig, env, parameterManager, trainUseIdentityTranslations, effectiveLanguagePairs,
       if (evalLanguagePairs.isEmpty) effectiveLanguagePairs else evalLanguagePairs,
       modelCell, wordEmbeddingsSize, residual, dropout, attention, labelSmoothing,
       summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
@@ -194,7 +194,7 @@ case class ExperimentConfig(
         } ++ Seq(
           "Dropout" -> dropout.map(_.toString).getOrElse("Not Used"),
           "Label Smoothing" -> labelSmoothing.toString,
-          "Back-translation" -> trainBackTranslation.toString,
+          "Identity Translations" -> trainUseIdentityTranslations.toString,
           "Beam Width" -> beamWidth.toString,
           "Length Penalty Weight" -> lengthPenaltyWeight.toString,
           "Decoding Max Length Factor" -> decoderMaxLengthFactor.toString,
@@ -257,7 +257,7 @@ case class ExperimentConfig(
     val stringBuilder = new StringBuilder(s"$dataset")
     stringBuilder.append(s".${providedLanguages.replace(',', '.')}")
     stringBuilder.append(s".tw:$trainBothDirections")
-    stringBuilder.append(s".ae:$trainBackTranslation")
+    stringBuilder.append(s".ae:$trainUseIdentityTranslations")
     stringBuilder.append(s".$modelArchitecture")
     stringBuilder.append(s".$modelCell")
     stringBuilder.append(s".$modelType")
@@ -453,9 +453,9 @@ object ExperimentConfig {
         .text("If used, the model will be trained and evaluated only on " +
             "forward translation for the provided language pairs.")
 
-    opt[Unit]("use-back-translations")
-        .action((_, c) => c.copy(trainBackTranslation = true))
-        .text("If used, back-translation data will be used while training " +
+    opt[Unit]("use-identity-translations")
+        .action((_, c) => c.copy(trainUseIdentityTranslations = true))
+        .text("If used, \"identity\" translation data will be used while training " +
             "(i.e., translating back and forth from a single language.")
 
     opt[Float]("parallel-portion").valueName("<number>")

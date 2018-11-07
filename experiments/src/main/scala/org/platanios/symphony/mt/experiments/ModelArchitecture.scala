@@ -18,9 +18,10 @@ package org.platanios.symphony.mt.experiments
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
 import org.platanios.symphony.mt.evaluation.MTMetric
+import org.platanios.symphony.mt.models.helpers.decoders.GoogleLengthPenalty
 import org.platanios.symphony.mt.models.parameters.{PairwiseManager, ParameterManager}
 import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot, SinglePivot}
-import org.platanios.symphony.mt.models.{Model, RNNModel}
+import org.platanios.symphony.mt.models.{Model, ModelConfig}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -40,7 +41,7 @@ sealed trait ModelArchitecture {
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
-      trainBackTranslation: Boolean,
+      trainIdentityTranslations: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
       cellString: String,
@@ -53,17 +54,17 @@ sealed trait ModelArchitecture {
       checkpointSteps: Int,
       beamWidth: Int,
       lengthPenaltyWeight: Float,
-      decoderMaxLengthFactor: Float,
-      optConfig: Model.OptConfig,
-      logConfig: Model.LogConfig,
+      maxDecodingLengthFactor: Float,
+      optConfig: ModelConfig.OptConfig,
+      logConfig: ModelConfig.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
-  ): RNNModel[T, _] = {
+  ): Model[_] = {
     val cell = cellFromString[T](cellString)
     createModel[T, cell.StateType, cell.StateShapeType](
-      name, languages, dataConfig, env, parameterManager, trainBackTranslation, languagePairs, evalLanguagePairs,
+      name, languages, dataConfig, env, parameterManager, trainIdentityTranslations, languagePairs, evalLanguagePairs,
       cell.asInstanceOf[Cell[cell.DataType, cell.StateType, cell.StateShapeType]], numUnits, residual, dropout,
-      attention, labelSmoothing, summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, decoderMaxLengthFactor,
+      attention, labelSmoothing, summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, maxDecodingLengthFactor,
       optConfig, logConfig, evalDatasets, evalMetrics
     )(
       TF[T], IsDecimal[T],
@@ -78,7 +79,7 @@ sealed trait ModelArchitecture {
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
-      trainBackTranslation: Boolean,
+      trainIdentityTranslations: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
       cell: Cell[T, State, StateShape],
@@ -91,15 +92,15 @@ sealed trait ModelArchitecture {
       checkpointSteps: Int,
       beamWidth: Int,
       lengthPenaltyWeight: Float,
-      decoderMaxLengthFactor: Float,
-      optConfig: Model.OptConfig,
-      logConfig: Model.LogConfig,
+      maxDecodingLengthFactor: Float,
+      optConfig: ModelConfig.OptConfig,
+      logConfig: ModelConfig.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   )(implicit
       evOutputToShapeState: OutputToShape.Aux[State, StateShape],
       evZeroState: Zero.Aux[State, StateShape]
-  ): RNNModel[T, State]
+  ): Model[_]
 
   protected def cellFromString[T: TF : IsReal](cellString: String): Cell[T, _, _] = {
     val parts = cellString.split(":")
@@ -166,7 +167,7 @@ case class RNN(
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
-      trainBackTranslation: Boolean,
+      trainIdentityTranslations: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
       cell: Cell[T, State, StateShape],
@@ -179,56 +180,59 @@ case class RNN(
       checkpointSteps: Int,
       beamWidth: Int,
       lengthPenaltyWeight: Float,
-      decoderMaxLengthFactor: Float,
-      optConfig: Model.OptConfig,
-      logConfig: Model.LogConfig,
+      maxDecodingLengthFactor: Float,
+      optConfig: ModelConfig.OptConfig,
+      logConfig: ModelConfig.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   )(implicit
       evOutputToShapeState: OutputToShape.Aux[State, StateShape],
       evZeroState: Zero.Aux[State, StateShape]
-  ): RNNModel[T, State] = {
-    RNNModel(
+  ): Model[_] = {
+    new Model(
       name = name,
       languages = languages,
-      dataConfig = dataConfig,
-      config = RNNModel.Config(
-        env,
-        parameterManager,
-        UnidirectionalRNNEncoder(
-          cell = cell,
-          numUnits = numUnits,
-          numLayers = numEncoderLayers,
-          residual = residual,
-          dropout = dropout),
-        UnidirectionalRNNDecoder(
+      encoder = new UnidirectionalRNNEncoder(
+        cell = cell,
+        numUnits = numUnits,
+        numLayers = numEncoderLayers,
+        residual = residual,
+        dropout = dropout),
+      decoder = if (attention) {
+        new UnidirectionalRNNDecoderWithAttention(
           cell = cell,
           numUnits = numUnits,
           numLayers = numDecoderLayers,
           residual = residual,
           dropout = dropout,
-          attention = {
-            if (attention) {
-              Some(LuongRNNAttention(
-                scaled = true,
-                probabilityFn = (o: Output[T]) => tf.softmax(o)))
-            } else {
-              None
-            }
-          },
-          outputAttention = attention),
+          attention = new LuongRNNAttention(
+            scaled = true,
+            probabilityFn = (o: Output[T]) => tf.softmax(o)),
+          outputAttention = attention)
+      } else {
+        new UnidirectionalRNNDecoder(
+          cell = cell,
+          numUnits = numUnits,
+          numLayers = numDecoderLayers,
+          residual = residual,
+          dropout = dropout)
+      },
+      env = env,
+      parameterManager = parameterManager,
+      dataConfig = dataConfig,
+      modelConfig = ModelConfig(
         pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
+        optConfig = optConfig,
+        logConfig = logConfig,
+        beamWidth = beamWidth,
+        lengthPenalty = GoogleLengthPenalty(lengthPenaltyWeight),
+        maxDecodingLengthFactor = maxDecodingLengthFactor,
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
-        trainBackTranslation = trainBackTranslation,
+        trainIdentityTranslations = trainIdentityTranslations,
         languagePairs = languagePairs,
-        evalLanguagePairs = evalLanguagePairs,
-        beamWidth = beamWidth,
-        lengthPenaltyWeight = lengthPenaltyWeight,
-        decoderMaxLengthFactor = decoderMaxLengthFactor),
-      optConfig = optConfig,
-      logConfig = logConfig
+        evalLanguagePairs = evalLanguagePairs)
     )(
       evalDatasets = evalDatasets,
       evalMetrics = evalMetrics)
@@ -249,7 +253,7 @@ case class BiRNN(
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
-      trainBackTranslation: Boolean,
+      trainIdentityTranslations: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
       cell: Cell[T, State, StateShape],
@@ -262,56 +266,59 @@ case class BiRNN(
       checkpointSteps: Int,
       beamWidth: Int,
       lengthPenaltyWeight: Float,
-      decoderMaxLengthFactor: Float,
-      optConfig: Model.OptConfig,
-      logConfig: Model.LogConfig,
+      maxDecodingLengthFactor: Float,
+      optConfig: ModelConfig.OptConfig,
+      logConfig: ModelConfig.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   )(implicit
       evOutputToShapeState: OutputToShape.Aux[State, StateShape],
       evZeroState: Zero.Aux[State, StateShape]
-  ): RNNModel[T, State] = {
-    RNNModel(
+  ): Model[_] = {
+    new Model(
       name = name,
       languages = languages,
-      dataConfig = dataConfig,
-      config = RNNModel.Config(
-        env,
-        parameterManager,
-        BidirectionalRNNEncoder(
-          cell = cell,
-          numUnits = numUnits,
-          numLayers = numEncoderLayers,
-          residual = residual,
-          dropout = dropout),
-        UnidirectionalRNNDecoder(
+      encoder = new BidirectionalRNNEncoder(
+        cell = cell,
+        numUnits = numUnits,
+        numLayers = numEncoderLayers,
+        residual = residual,
+        dropout = dropout),
+      decoder = if (attention) {
+        new UnidirectionalRNNDecoderWithAttention(
           cell = cell,
           numUnits = numUnits,
           numLayers = numDecoderLayers,
           residual = residual,
           dropout = dropout,
-          attention = {
-            if (attention) {
-              Some(LuongRNNAttention(
-                scaled = true,
-                probabilityFn = (o: Output[T]) => tf.softmax(o)))
-            } else {
-              None
-            }
-          },
-          outputAttention = attention),
+          attention = new LuongRNNAttention(
+            scaled = true,
+            probabilityFn = (o: Output[T]) => tf.softmax(o)),
+          outputAttention = attention)
+      } else {
+        new UnidirectionalRNNDecoder(
+          cell = cell,
+          numUnits = numUnits,
+          numLayers = numDecoderLayers,
+          residual = residual,
+          dropout = dropout)
+      },
+      env = env,
+      parameterManager = parameterManager,
+      dataConfig = dataConfig,
+      modelConfig = ModelConfig(
         pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
+        optConfig = optConfig,
+        logConfig = logConfig,
+        beamWidth = beamWidth,
+        lengthPenalty = GoogleLengthPenalty(lengthPenaltyWeight),
+        maxDecodingLengthFactor = maxDecodingLengthFactor,
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
-        trainBackTranslation = trainBackTranslation,
+        trainIdentityTranslations = trainIdentityTranslations,
         languagePairs = languagePairs,
-        evalLanguagePairs = evalLanguagePairs,
-        beamWidth = beamWidth,
-        lengthPenaltyWeight = lengthPenaltyWeight,
-        decoderMaxLengthFactor = decoderMaxLengthFactor),
-      optConfig = optConfig,
-      logConfig = logConfig
+        evalLanguagePairs = evalLanguagePairs)
     )(
       evalDatasets = evalDatasets,
       evalMetrics = evalMetrics)
@@ -333,7 +340,7 @@ case class GNMT(
       dataConfig: DataConfig,
       env: Environment,
       parameterManager: ParameterManager,
-      trainBackTranslation: Boolean,
+      trainIdentityTranslations: Boolean,
       languagePairs: Set[(Language, Language)],
       evalLanguagePairs: Set[(Language, Language)],
       cell: Cell[T, State, StateShape],
@@ -346,51 +353,51 @@ case class GNMT(
       checkpointSteps: Int,
       beamWidth: Int,
       lengthPenaltyWeight: Float,
-      decoderMaxLengthFactor: Float,
-      optConfig: Model.OptConfig,
-      logConfig: Model.LogConfig,
+      maxDecodingLengthFactor: Float,
+      optConfig: ModelConfig.OptConfig,
+      logConfig: ModelConfig.LogConfig,
       evalDatasets: Seq[(String, FileParallelDataset, Float)],
       evalMetrics: Seq[MTMetric]
   )(implicit
       evOutputToShapeState: OutputToShape.Aux[State, StateShape],
       evZeroState: Zero.Aux[State, StateShape]
-  ): RNNModel[T, State] = {
-    RNNModel(
+  ): Model[_] = {
+    new Model(
       name = name,
       languages = languages,
+      encoder = new GNMTEncoder(
+        cell = cell,
+        numUnits = numUnits,
+        numBiLayers = numBiLayers,
+        numUniLayers = numUniLayers,
+        numUniResLayers = numUniResLayers,
+        dropout = dropout),
+      decoder = new GNMTDecoder(
+        cell = cell,
+        numUnits = numUnits,
+        numLayers = numBiLayers + numUniLayers,
+        numResLayers = numUniResLayers,
+        attention = new BahdanauRNNAttention(
+          normalized = true,
+          probabilityFn = (o: Output[T]) => tf.softmax(o)),
+        dropout = dropout,
+        useNewAttention = attention),
+      env = env,
+      parameterManager = parameterManager,
       dataConfig = dataConfig,
-      config = RNNModel.Config(
-        env,
-        parameterManager,
-        GNMTEncoder(
-          cell = cell,
-          numUnits = numUnits,
-          numBiLayers = numBiLayers,
-          numUniLayers = numUniLayers,
-          numUniResLayers = numUniResLayers,
-          dropout = dropout),
-        GNMTDecoder(
-          cell = cell,
-          numUnits = numUnits,
-          numLayers = numBiLayers + numUniLayers,
-          numResLayers = numUniResLayers,
-          attention = BahdanauRNNAttention(
-            normalized = true,
-            probabilityFn = (o: Output[T]) => tf.softmax(o)),
-          dropout = dropout,
-          useNewAttention = attention),
+      modelConfig = ModelConfig(
         pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
+        optConfig = optConfig,
+        logConfig = logConfig,
+        beamWidth = beamWidth,
+        lengthPenalty = GoogleLengthPenalty(lengthPenaltyWeight),
+        maxDecodingLengthFactor = maxDecodingLengthFactor,
         labelSmoothing = labelSmoothing,
         summarySteps = summarySteps,
         checkpointSteps = checkpointSteps,
-        trainBackTranslation = trainBackTranslation,
+        trainIdentityTranslations = trainIdentityTranslations,
         languagePairs = languagePairs,
-        evalLanguagePairs = evalLanguagePairs,
-        beamWidth = beamWidth,
-        lengthPenaltyWeight = lengthPenaltyWeight,
-        decoderMaxLengthFactor = decoderMaxLengthFactor),
-      optConfig = optConfig,
-      logConfig = logConfig
+        evalLanguagePairs = evalLanguagePairs)
     )(
       evalDatasets = evalDatasets,
       evalMetrics = evalMetrics)
