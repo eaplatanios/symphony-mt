@@ -50,7 +50,7 @@ class BasicTransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
   override def apply(sequences: Sequences[Int])(implicit context: Context): EncodedSequences[T] = {
     // `embeddedSequences.sequences` has shape [BatchSize, MaxLength, WordEmbeddingSize]
     // `embeddedSequence.lengths` has shape [BatchSize]
-    val embeddedSequences = maybeTransposeInputSequences(embedSequences(sequences))
+    val embeddedSequences = maybeTransposeInputSequences(embedSrcSequences(sequences))
     val embeddedSequencesMaxLength = tf.shape(embeddedSequences.sequences).slice(1)
 
     // Perform some pre-processing to the token embeddings sequence.

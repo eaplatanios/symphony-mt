@@ -15,12 +15,12 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{Context, Decoding, Sequences}
+import org.platanios.symphony.mt.models.{Context, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
 import org.platanios.symphony.mt.models.helpers.decoders.{BasicDecoder, BeamSearchDecoder}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
-import org.platanios.tensorflow.api.tf.{RNNCell, RNNTuple}
+import org.platanios.tensorflow.api.tf.RNNCell
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -152,7 +152,10 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
 
   protected def embeddings(
       ids: Output[Int]
-  )(implicit context: Context): Output[T]
+  )(implicit context: Context): Output[T] = {
+    val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
+    embeddingsTable(ids).castTo[T]
+  }
 
   protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],

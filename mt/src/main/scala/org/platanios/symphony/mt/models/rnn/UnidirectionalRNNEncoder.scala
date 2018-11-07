@@ -44,7 +44,7 @@ class UnidirectionalRNNEncoder[T: TF : IsNotQuantized, State: OutputStructure, S
   override def apply(
       sequences: Sequences[Int]
   )(implicit context: Context): EncodedSequences[T, State] = {
-    val embeddedSequences = maybeTransposeInputSequences(embedSequences(sequences))
+    val embeddedSequences = maybeTransposeInputSequences(embedSrcSequences(sequences))
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = stackedCell[T, State, StateShape](
       cell = cell,

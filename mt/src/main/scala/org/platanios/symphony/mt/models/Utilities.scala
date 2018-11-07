@@ -19,7 +19,7 @@ package org.platanios.symphony.mt.models
   * @author Emmanouil Antonios Platanios
   */
 object Utilities {
-  def embedSequences(sequences: Sequences[Int])(implicit context: Context): Sequences[Float] = {
+  def embedSrcSequences(sequences: Sequences[Int])(implicit context: Context): Sequences[Float] = {
     val wordEmbeddings = context.parameterManager.wordEmbeddings(context.srcLanguageID)
     val embeddedSequences = sequences.copy(sequences = wordEmbeddings(sequences.sequences))
     context.parameterManager.postprocessEmbeddedSequences(embeddedSequences)

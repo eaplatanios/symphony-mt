@@ -40,7 +40,7 @@ class GNMTEncoder[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
   override def apply(
       sequences: Sequences[Int]
   )(implicit context: Context): EncodedSequences[T, State] = {
-    val embeddedSequences = maybeTransposeInputSequences(embedSequences(sequences))
+    val embeddedSequences = maybeTransposeInputSequences(embedSrcSequences(sequences))
 
     // Bidirectional RNN layers
     val biTuple = {
