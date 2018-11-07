@@ -26,7 +26,7 @@ trait LengthPenalty {
 }
 
 /** No length penalty. */
-case object NoPenalty extends LengthPenalty {
+case object NoLengthPenalty extends LengthPenalty {
   override def apply[T: TF : IsNotQuantized](
       scores: Output[T],
       sequenceLengths: Output[Int]
@@ -40,7 +40,7 @@ case object NoPenalty extends LengthPenalty {
   *
   * @param  alpha Length penalty weight (disabled if set to `0.0f`).
   */
-case class ExponentialPenalty(alpha: Float) extends LengthPenalty {
+case class ExponentialLengthPenalty(alpha: Float) extends LengthPenalty {
   override def apply[T: TF : IsNotQuantized](
       scores: Output[T],
       sequenceLengths: Output[Int]
@@ -62,7 +62,7 @@ case class ExponentialPenalty(alpha: Float) extends LengthPenalty {
   *
   * @param  alpha Length penalty weight (disabled if set to `0.0f`).
   */
-case class GooglePenalty(alpha: Float) extends LengthPenalty {
+case class GoogleLengthPenalty(alpha: Float) extends LengthPenalty {
   override def apply[T: TF : IsNotQuantized](
       scores: Output[T],
       sequenceLengths: Output[Int]

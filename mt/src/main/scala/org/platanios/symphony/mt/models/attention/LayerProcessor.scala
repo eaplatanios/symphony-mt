@@ -15,11 +15,9 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.Stage
+import org.platanios.symphony.mt.models.Context
 import org.platanios.symphony.mt.models.helpers.Common
-import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.Mode
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -30,12 +28,7 @@ trait LayerProcessor {
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "LayerProcessor"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T]
+  )(implicit context: Context): Output[T]
 }
 
 case object AddResidualConnection extends LayerProcessor {
@@ -44,12 +37,7 @@ case object AddResidualConnection extends LayerProcessor {
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "AddResidualConnection"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     previousValue match {
       case Some(v) => value + v
       case None => throw new IllegalArgumentException(
@@ -64,12 +52,7 @@ case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) exte
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "Normalize"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     normalization(value, epsilon = epsilon, name = name)
   }
 }
@@ -84,13 +67,8 @@ case class Dropout(
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "Dropout"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
-    if (mode.isTraining)
+  )(implicit context: Context): Output[T] = {
+    if (context.mode.isTraining)
       Common.dropoutWithBroadcastAxes(value, 1.0f - dropoutRate, scaleOutput, broadcastAxes)
     else
       value
@@ -100,21 +78,14 @@ case class Dropout(
 object LayerProcessor {
   /** Applies a sequence of functions to the input of a layer.
     *
-    * @param  input            Layer input.
-    * @param  processors       Layer processors to apply.
-    * @param  mode             Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager Parameter manager to use, if parameters are required.
+    * @param  input      Layer input.
+    * @param  processors Layer processors to apply.
     * @return Processed layer input.
     */
   def layerPreprocess[T: TF : IsHalfOrFloatOrDouble](
       input: Output[T],
       processors: Seq[LayerProcessor]
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     processors.foldLeft(input) {
       case (value, processor) => processor(value, None)
     }
@@ -122,23 +93,16 @@ object LayerProcessor {
 
   /** Applies a sequence of functions to the output of a layer, potentially depending on its input.
     *
-    * @param  input            Layer input.
-    * @param  output           Layer output.
-    * @param  processors       Layer processors to apply.
-    * @param  mode             Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager Parameter manager to use, if parameters are required.
+    * @param  input      Layer input.
+    * @param  output     Layer output.
+    * @param  processors Layer processors to apply.
     * @return Processed layer output.
     */
   def layerPostprocess[T: TF : IsHalfOrFloatOrDouble](
       input: Output[T],
       output: Output[T],
       processors: Seq[LayerProcessor]
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     processors.foldLeft(output) {
       case (value, processor) => processor(value, Some(input))
     }

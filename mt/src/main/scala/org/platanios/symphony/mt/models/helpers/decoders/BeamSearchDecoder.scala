@@ -56,7 +56,7 @@ class BeamSearchDecoder[T: TF, State: OutputStructure, StateShape](
     val beginTokens: Output[Int],
     val endToken: Output[Int],
     val beamWidth: Int,
-    val lengthPenalty: LengthPenalty = NoPenalty,
+    val lengthPenalty: LengthPenalty = NoLengthPenalty,
     val outputLayer: Output[T] => Output[T] = (o: Output[T]) => o,
     val reorderTensorArrays: Boolean = true,
     override val name: String = "BeamSearchRNNDecoder"
@@ -336,7 +336,7 @@ object BeamSearchDecoder {
       beginTokens: Output[Int],
       endToken: Output[Int],
       beamWidth: Int,
-      lengthPenalty: LengthPenalty = NoPenalty,
+      lengthPenalty: LengthPenalty = NoLengthPenalty,
       outputLayer: Output[T] => Output[T] = (o: Output[T]) => o,
       reorderTensorArrays: Boolean = true,
       name: String = "BeamSearchRNNDecoder"

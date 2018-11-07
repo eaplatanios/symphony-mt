@@ -15,10 +15,8 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.Stage
-import org.platanios.symphony.mt.models.parameters.ParameterManager
+import org.platanios.symphony.mt.models.Context
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.Mode
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -29,12 +27,7 @@ trait Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T]
+  )(implicit context: Context): Output[T]
 }
 
 /** Applies no normalization to the input tensor. */
@@ -44,12 +37,7 @@ case object NoNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     input
   }
 }
@@ -60,16 +48,11 @@ case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVaria
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     val numFilters = depth.getOrElse(input.shape(-1))
     tf.variableScope(name, reuse) {
-      val scale = parameterManager.get[T]("Scale", Shape(numFilters), tf.OnesInitializer)
-      val bias = parameterManager.get[T]("Bias", Shape(numFilters), tf.ZerosInitializer)
+      val scale = context.parameterManager.get[T]("Scale", Shape(numFilters), tf.OnesInitializer)
+      val bias = context.parameterManager.get[T]("Bias", Shape(numFilters), tf.ZerosInitializer)
       val mean = tf.mean(input, axes = -1, keepDims = true)
       val variance = tf.mean(tf.square(input - mean), axes = -1, keepDims = true)
       val normalizedInput = (input - mean) * tf.rsqrt(variance + tf.constant[Float](epsilon).castTo[T])
@@ -85,12 +68,7 @@ case object BatchNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     ???
   }
 }
@@ -101,12 +79,7 @@ case object NoamNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     tf.nameScope(name) {
       tf.l2Normalize(input, input.rank - 1, epsilon) * tf.sqrt(tf.constant[Float](input.shape(-1))).castTo[T]
     }

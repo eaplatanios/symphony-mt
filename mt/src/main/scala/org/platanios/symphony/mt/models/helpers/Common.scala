@@ -15,10 +15,8 @@
 
 package org.platanios.symphony.mt.models.helpers
 
-import org.platanios.symphony.mt.models.Stage
-import org.platanios.symphony.mt.models.parameters.ParameterManager
+import org.platanios.symphony.mt.models.Context
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.Mode
 
 import scala.language.postfixOps
 
@@ -260,7 +258,7 @@ object Common {
     * @param  labels Target labels.
     * @return `FLOAT32` tensor containing weights for the provided labels.
     */
-  def weightsConcatenated[T: TF: IsNumeric](
+  def weightsConcatenated[T: TF : IsNumeric](
       labels: Output[T]
   ): Output[T] = {
     val one = tf.ones[T](Shape())
@@ -417,8 +415,6 @@ object Common {
     * @param  reluDropoutRate          Dropout rate for the output of the ReLU activation.
     * @param  reluDropoutBroadcastAxes Specifies along which axes of the attention weights the dropout is broadcast.
     * @param  name                     Name for this alayer that also specifies a variable scope.
-    * @param  mode                     Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager         Parameter manager to use, if parameters are required.
     * @return Output of the last fully connected layer.
     */
   def denseReLUDense[T: TF : IsHalfOrFloatOrDouble](
@@ -428,20 +424,15 @@ object Common {
       reluDropoutRate: Float = 0.0f,
       reluDropoutBroadcastAxes: Set[Int] = Set.empty,
       name: String = "DenseReLUDense"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     tf.variableScope(name) {
-      val weights1 = parameterManager.get[T]("Dense1/Weights", Shape(input.shape(-1), filterSize))
-      val bias1 = parameterManager.get[T]("Dense1/Bias", Shape(filterSize))
+      val weights1 = context.parameterManager.get[T]("Dense1/Weights", Shape(input.shape(-1), filterSize))
+      val bias1 = context.parameterManager.get[T]("Dense1/Bias", Shape(filterSize))
       var hidden = tf.relu(tf.linear(input, weights1, bias1, "Dense1"), name = "Dense1/ReLU")
-      if (mode.isTraining)
+      if (context.mode.isTraining)
         hidden = dropoutWithBroadcastAxes(hidden, 1.0f - reluDropoutRate, scaleOutput = true, reluDropoutBroadcastAxes)
-      val weights2 = parameterManager.get[T]("Dense2/Weights", Shape(filterSize, outputSize))
-      val bias2 = parameterManager.get[T]("Dense2/Bias", Shape(outputSize))
+      val weights2 = context.parameterManager.get[T]("Dense2/Weights", Shape(filterSize, outputSize))
+      val bias2 = context.parameterManager.get[T]("Dense2/Bias", Shape(outputSize))
       tf.linear(hidden, weights2, bias2, "Dense2")
     }
   }

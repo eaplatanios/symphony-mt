@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.models.attention
 
+import org.platanios.symphony.mt.models.Context
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
@@ -35,12 +36,10 @@ class DotProductAttention protected (
 ) extends Attention {
   /** Computes the attention for the provided queries, keys, and values.
     *
-    * @param  q                 Queries tensor with shape `[batchSize, ..., length, depth]`.
-    * @param  k                 Keys tensor with shape `[batchSize, ..., length, depth]`.
-    * @param  v                 Values tensor with shape `[batchSize, ..., length, depth]`.
-    * @param  bias              Optional attention bias.
-    * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager Parameter manager to use, if parameters are required.
+    * @param  q    Queries tensor with shape `[batchSize, ..., length, depth]`.
+    * @param  k    Keys tensor with shape `[batchSize, ..., length, depth]`.
+    * @param  v    Values tensor with shape `[batchSize, ..., length, depth]`.
+    * @param  bias Optional attention bias.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
   override def apply[T: TF : IsHalfOrFloatOrDouble](
@@ -48,17 +47,14 @@ class DotProductAttention protected (
       k: Output[T],
       v: Output[T],
       bias: Option[Output[T]]
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     tf.nameScope(name) {
       // `logits` shape: [batchSize, numHeads, queryLength, memoryLength]
       var logits = tf.matmul(q, k, transposeB = true)
       bias.foreach(logits += _)
       var weights = tf.softmax(logits, name = "AttentionWeights")
       // Apply dropout to the attention links for each of the heads.
-      if (mode.isTraining)
+      if (context.mode.isTraining)
         weights = Common.dropoutWithBroadcastAxes(weights, 1.0f - dropoutRate, broadcastAxes = dropoutBroadcastAxes)
       tf.matmul(weights, v)
     }

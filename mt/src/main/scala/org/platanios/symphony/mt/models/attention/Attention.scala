@@ -15,11 +15,9 @@
 
 package org.platanios.symphony.mt.models.attention
 
-import org.platanios.symphony.mt.models.Stage
+import org.platanios.symphony.mt.models.Context
 import org.platanios.symphony.mt.models.helpers.Common
-import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.Mode
 import org.platanios.tensorflow.api.ops.NN.{ConvPaddingMode, ValidConvPadding}
 
 import scala.language.postfixOps
@@ -30,12 +28,10 @@ import scala.language.postfixOps
 trait Attention {
   /** Computes the attention for the provided queries, keys, and values.
     *
-    * @param  q                 Queries tensor with shape `[batchSize, ..., length, depth]`.
-    * @param  k                 Keys tensor with shape `[batchSize, ..., length, depth]`.
-    * @param  v                 Values tensor with shape `[batchSize, ..., length, depth]`.
-    * @param  bias              Optional attention bias.
-    * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager Parameter manager to use, if parameters are required.
+    * @param  q    Queries tensor with shape `[batchSize, ..., length, depth]`.
+    * @param  k    Keys tensor with shape `[batchSize, ..., length, depth]`.
+    * @param  v    Values tensor with shape `[batchSize, ..., length, depth]`.
+    * @param  bias Optional attention bias.
     * @return Attention tensor with shape `[batchSize, ..., length, depth]`.
     */
   def apply[T: TF : IsHalfOrFloatOrDouble](
@@ -43,10 +39,7 @@ trait Attention {
       k: Output[T],
       v: Output[T],
       bias: Option[Output[T]]
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager
-  ): Output[T]
+  )(implicit context: Context): Output[T]
 
   // TODO: Add support for saving weights.
   // TODO: Add support for image summaries for the weights.
@@ -264,8 +257,6 @@ object Attention {
     * @param  kvNumFilters      Integer specifying how wide we want the keys and values to be.
     * @param  qPaddingMode      Convolution padding mode for the case when `qNumFilters > 1`.
     * @param  kvPaddingMode     Convolution padding mode for the case when `kvNumFilters > 1`.
-    * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Tuple containing the queries, keys, and values tensors.
     */
   def computeQKV[T: TF : IsNotQuantized](
@@ -277,12 +268,7 @@ object Attention {
       kvNumFilters: Int = 1,
       qPaddingMode: ConvPaddingMode = ValidConvPadding,
       kvPaddingMode: ConvPaddingMode = ValidConvPadding
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): (Output[T], Output[T], Output[T]) = {
+  )(implicit context: Context): (Output[T], Output[T], Output[T]) = {
 
     def compute(
         input: Output[T],
@@ -293,7 +279,7 @@ object Attention {
     ): Output[T] = {
       tf.variableScope(name) {
         if (numFilters == 1) {
-          val weights = parameterManager.get[T](
+          val weights = context.parameterManager.get[T](
             "Weights", Shape(input.shape(-1), depth))
           tf.linear(input, weights)
         } else {
@@ -330,8 +316,6 @@ object Attention {
     * @param  cache             Optional cache containing the result of previous attentions, used for fast decoding.
     *                           For the initial call, the values for these keys should be
     * @param  name              Name for the multi-head attention component that also specifies a variable scope.
-    * @param  mode              Current learning mode (e.g., training or evaluation).
-    * @param  parameterManager Parameter manager to use, if parameters are required.
     * @return Result of the attention transformation, with shape `[batchSize, queryLength, outputDepth]`, unless a cache
     *         is provided, in which case only the last memory position is calculated and the output shape is
     *         `[batchSize, 1, outputDepth]`.
@@ -354,12 +338,7 @@ object Attention {
       kvPaddingMode: ConvPaddingMode = ValidConvPadding,
       cache: Option[Cache[T]] = None,
       name: String = "MultiHeadAttention"
-  )(implicit
-      mode: Mode,
-      parameterManager: ParameterManager,
-      stage: Stage,
-      context: Output[Int]
-  ): Output[T] = {
+  )(implicit context: Context): Output[T] = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.variableScope(name) {
@@ -393,7 +372,7 @@ object Attention {
       ).castTo[T]
       var result = attention(q, k, v, Some(bias))
       result = combineHeads(result)
-      val w = parameterManager.get[T](
+      val w = context.parameterManager.get[T](
         "OutputTransformWeights", Shape(result.shape(-1), outputsDepth))
       tf.linear(result, w)
     }
