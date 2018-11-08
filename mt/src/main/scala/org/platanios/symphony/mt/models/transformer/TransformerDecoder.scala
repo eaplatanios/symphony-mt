@@ -82,6 +82,20 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       wordEmbeddingsSize, context.tgtLanguageID).castTo[T]
     val outputLayer = this.outputLayer(outputWeights)(_)
 
+    // Pre-compute the encoder-decoder attention keys and values.
+    val encoderDecoderAttentionCache = (0 until numLayers).map(layer => {
+      tf.variableScope(s"Decoder/Layer$layer/EncoderDecoderAttention/Cache") {
+        val encoderOutput = encodedSequences.states
+        val encoderDecoderAttentionKeys = Attention.computeAttentionComponent(
+          encoderOutput, attentionKeysDepth, name = "K").toFloat
+        val encoderDecoderAttentionValues = Attention.computeAttentionComponent(
+          encoderOutput, attentionValuesDepth, name = "V").toFloat
+        MultiHeadAttentionCache(
+          keys = Attention.splitHeads(encoderDecoderAttentionKeys, attentionNumHeads),
+          values = Attention.splitHeads(encoderDecoderAttentionValues, attentionNumHeads))
+      }
+    })
+
     // Finally, apply the decoding model.
     val (decodedSequences, _) = decode(
       encoderOutput = encodedSequences.states.toFloat,
@@ -89,7 +103,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       decoderSelfAttentionBias = decoderSelfAttentionBias,
       decoderSelfAttentionCache = None,
       encoderDecoderAttentionBias = encoderDecoderAttentionBias,
-      encoderDecoderAttentionCache = None)
+      encoderDecoderAttentionCache = Some(encoderDecoderAttentionCache))
     val outputSequences = outputLayer(decodedSequences)
     Sequences(outputSequences.toFloat, encodedSequences.lengths)
   }
@@ -186,14 +200,12 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     // Initialize the cache and the decoder RNN state.
     val embeddings = (ids: Output[Int]) => this.embeddings(ids)
     val batchSize = tf.shape(encodedSequences.lengths).slice(0)
-    val decoderSelfAttentionCache = (0 until numLayers).map(layer => {
-      tf.variableScope(s"Decoder/Layer$layer/DecoderSelfAttention/Cache") {
-        MultiHeadAttentionCache(
-          keys = Attention.splitHeads(
-            tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionKeysDepth))), attentionNumHeads),
-          values = Attention.splitHeads(
-            tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionValuesDepth))), attentionNumHeads))
-      }
+    val decoderSelfAttentionCache = (0 until numLayers).map(_ => {
+      MultiHeadAttentionCache(
+        keys = Attention.splitHeads(
+          tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionKeysDepth))), attentionNumHeads),
+        values = Attention.splitHeads(
+          tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionValuesDepth))), attentionNumHeads))
     })
     val initialState = (
         encodedSequences,

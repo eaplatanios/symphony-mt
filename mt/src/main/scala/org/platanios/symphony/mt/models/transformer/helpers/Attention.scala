@@ -386,7 +386,6 @@ object Attention {
               (q, k, v)
           }
       }
-      val updatedCache = cache.map(_ => MultiHeadAttentionCache(k, v))
       val scaledQ = q * tf.pow(
         tf.constant[Int](totalKeysDepth / numHeads).toFloat,
         tf.constant[Float](-0.5f)
@@ -395,7 +394,7 @@ object Attention {
       result = combineHeads(result)
       val w = context.parameterManager.get[T](
         "OutputTransformWeights", Shape(result.shape(-1), outputsDepth))
-      (tf.linear(result, w), updatedCache)
+      (tf.linear(result, w), Some(MultiHeadAttentionCache(k, v)))
     }
   }
 
