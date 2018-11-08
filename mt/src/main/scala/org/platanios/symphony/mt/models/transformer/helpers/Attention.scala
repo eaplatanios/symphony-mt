@@ -378,7 +378,7 @@ object Attention {
               k = tf.concatenate(Seq(c.keys, k), axis = 2)
               v = tf.concatenate(Seq(c.values, v), axis = 2)
               (q, k, v)
-            case Some(m) =>
+            case Some(_) =>
               var q = computeAttentionComponent(queryAntecedent, totalKeysDepth, qNumFilters, qPaddingMode, "Q")
               val k = c.keys
               val v = c.values
