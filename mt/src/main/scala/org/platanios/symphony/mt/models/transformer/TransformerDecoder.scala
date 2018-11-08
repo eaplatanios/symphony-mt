@@ -123,17 +123,16 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       ): RNNTuple[Output[T], (EncodedSequences[T], Output[T], Seq[MultiHeadAttentionCache[Float]])] = {
         val step = tf.shape(input.state._2).slice(1)
         val currentStepPositionEmbeddings = positionEmbeddings(0).gather(step).expandDims(0).expandDims(1)
-        val concatenatedOutput = tf.concatenate(
-          Seq(input.state._2, input.output.expandDims(1) + currentStepPositionEmbeddings),
-          axis = 1)
-        val decoderInput = concatenatedOutput
+        val currentStepInput = input.output.expandDims(1) + currentStepPositionEmbeddings
+        val concatenatedOutput = tf.concatenate(Seq(input.state._2, currentStepInput), axis = 1)
+        val decoderInput = currentStepInput
         val selfAttentionBias = tf.slice(
           decoderSelfAttentionBias(0, 0, ::, ::).gather(step),
           Seq(zero),
           Seq(step + one)).expandDims(1)
         val (output, updatedMultiHeadAttentionCache) = decode(
           input.state._1, decoderInput, selfAttentionBias, Some(input.state._3))
-        val currentStepOutput = output.gather(step, axis = 1)
+        val currentStepOutput = output(::, 0, ::)
         RNNTuple(currentStepOutput, (input.state._1, concatenatedOutput, updatedMultiHeadAttentionCache))
       }
     }
