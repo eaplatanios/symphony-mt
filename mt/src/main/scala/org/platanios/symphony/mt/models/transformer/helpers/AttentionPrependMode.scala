@@ -68,6 +68,6 @@ case object AttentionPrependInputsMaskedAttention extends AttentionPrependMode {
     * @return Tensor with shape `[1, 1, length, length]`.
     */
   override def apply(padding: Output[Float]): Output[Float] = {
-    Attention.attentionBiasLowerTriangular(tf.shape(padding).slice(1).toInt)
+    Attention.attentionBiasLowerTriangular(tf.shape(padding).slice(1))
   }
 }

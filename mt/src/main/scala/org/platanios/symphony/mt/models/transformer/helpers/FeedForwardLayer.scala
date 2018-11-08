@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.transformer.helpers
 
 import org.platanios.symphony.mt.models.{Context, Stage}
-import org.platanios.symphony.mt.models.helpers.{Common, PadRemover}
+import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Mode

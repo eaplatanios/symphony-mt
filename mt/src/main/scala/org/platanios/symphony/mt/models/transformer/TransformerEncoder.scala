@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.models.Transformation.Encoder
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.models.Utilities._
 import org.platanios.symphony.mt.models.transformer.helpers._
-import org.platanios.symphony.mt.models.helpers.{Common, PadRemover}
+import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 
 /** Transformer encoder.
