@@ -193,7 +193,7 @@ object Inputs {
       srcLength: Output[Int],
       tgtLength: Output[Int]
   ): TrainDataset = {
-    val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evaluateBatchSize
+    val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evalBatchSize
     val bufferSize = if (dataConfig.bufferSize == -1L) 64L * batchSize else dataConfig.bufferSize
 
     val srcLanguageDataset = tf.data.datasetFromOutputs(srcLanguage).repeat()

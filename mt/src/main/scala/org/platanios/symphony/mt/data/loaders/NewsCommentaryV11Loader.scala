@@ -39,13 +39,13 @@ class NewsCommentaryV11Loader(
   override def name: String = "News Commentary v11"
 
   override def dataConfig: DataConfig = {
-    config.copy(workingDir =
-        config.workingDir
+    config.copy(dataDir =
+        config.dataDir
             .resolve("news-commentary-v11")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("news-commentary-v11").resolve("downloads")
+  override def downloadsDir: Path = config.dataDir.resolve("news-commentary-v11").resolve("downloads")
 
   private[this] def reversed: Boolean = {
     NewsCommentaryV11Loader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))

@@ -111,7 +111,7 @@ class Model[Code](
       nameScope = name,
       device = deviceManager.nextDevice(env, moveToNext = false)
     ) {
-      val model = modelConfig.optConfig.maxGradNorm match {
+      val model = modelConfig.trainingConfig.optConfig.maxGradNorm match {
         case Some(norm) =>
           tf.learn.Model.supervised(
             input = input,
@@ -119,9 +119,9 @@ class Model[Code](
             layer = inferLayer,
             trainLayer = trainLayer,
             loss = lossLayer,
-            optimizer = modelConfig.optConfig.optimizer,
+            optimizer = modelConfig.trainingConfig.optConfig.optimizer,
             clipGradients = tf.learn.ClipGradientsByGlobalNorm(norm),
-            colocateGradientsWithOps = modelConfig.optConfig.colocateGradientsWithOps)
+            colocateGradientsWithOps = modelConfig.trainingConfig.optConfig.colocateGradientsWithOps)
         case None =>
           tf.learn.Model.supervised(
             input = input,
@@ -129,8 +129,8 @@ class Model[Code](
             layer = inferLayer,
             trainLayer = trainLayer,
             loss = lossLayer,
-            optimizer = modelConfig.optConfig.optimizer,
-            colocateGradientsWithOps = modelConfig.optConfig.colocateGradientsWithOps)
+            optimizer = modelConfig.trainingConfig.optConfig.optimizer,
+            colocateGradientsWithOps = modelConfig.trainingConfig.optConfig.colocateGradientsWithOps)
       }
       val summariesDir = env.workingDir.resolve("summaries")
 
@@ -161,8 +161,8 @@ class Model[Code](
       // Add summaries/checkpoints hooks.
       hooks ++= Set(
         tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-        tf.learn.SummarySaver(summariesDir, StepHookTrigger(modelConfig.summarySteps)),
-        tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(modelConfig.checkpointSteps)))
+        tf.learn.SummarySaver(summariesDir, StepHookTrigger(modelConfig.trainingConfig.summarySteps)),
+        tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(modelConfig.trainingConfig.checkpointSteps)))
 
       env.traceSteps.foreach(numSteps =>
         hooks += tf.learn.TimelineHook(
@@ -194,22 +194,18 @@ class Model[Code](
     }
   }
 
-  def train(datasets: Seq[FileParallelDataset], stopCriteria: StopCriteria): Unit = {
+  def train(datasets: Seq[FileParallelDataset], stopCriteria: Option[StopCriteria] = None): Unit = {
     val languagePairs = if (modelConfig.languagePairs.nonEmpty) Some(modelConfig.languagePairs) else None
     estimator.train(
       data = Inputs.createTrainDataset(
         dataConfig = dataConfig,
         datasets = datasets,
         languages = languages,
-        includeIdentityTranslations = modelConfig.trainIdentityTranslations,
+        includeIdentityTranslations = modelConfig.trainingConfig.useIdentityTranslations,
         repeat = true,
         isEval = false,
         languagePairs = languagePairs),
-      stopCriteria = stopCriteria)
-  }
-
-  def train(dataset: FileParallelDataset, stopCriteria: StopCriteria): Unit = {
-    train(Seq(dataset), stopCriteria)
+      stopCriteria = stopCriteria.getOrElse(StopCriteria(Some(modelConfig.trainingConfig.numSteps))))
   }
 
   def translate(
@@ -396,7 +392,7 @@ class Model[Code](
             lengths = input._3._2)
 
           // Perform inference based on the current pivoting strategy for multi-lingual translations.
-          modelConfig.pivot match {
+          modelConfig.inferenceConfig.pivot match {
             case NoPivot =>
               // Encode the source sentences.
               val encoderOutput = tf.variableScope("Encoder") {
@@ -437,10 +433,10 @@ class Model[Code](
                 sequences = parameterManager.indexToStringLookup(tgtLanguageID)(decoderOutput.sequences))
               (tgtLanguageID, (decodedSequences.sequences, decodedSequences.lengths))
             case _ =>
-              modelConfig.pivot.initialize(languages, parameterManager)
+              modelConfig.inferenceConfig.pivot.initialize(languages, parameterManager)
 
               // Construct a pivoting sequence over languages and loop over it using a while loop.
-              val pivotingSequence = modelConfig.pivot.pivotingSequence(srcLanguageID, tgtLanguageID)
+              val pivotingSequence = modelConfig.inferenceConfig.pivot.pivotingSequence(srcLanguageID, tgtLanguageID)
 
               type LoopVariables = (Output[Int], Output[Int], Sentences[Int])
 
@@ -553,7 +549,7 @@ class Model[Code](
       logits = predictedSequences,
       labels = tgtSequences,
       labelLengths = tgtSequenceLengths,
-      labelSmoothing = modelConfig.labelSmoothing,
+      labelSmoothing = modelConfig.trainingConfig.labelSmoothing,
       timeMajor = modelConfig.timeMajor)
     lossSum / tf.size(tgtSequenceLengths).toFloat
   }

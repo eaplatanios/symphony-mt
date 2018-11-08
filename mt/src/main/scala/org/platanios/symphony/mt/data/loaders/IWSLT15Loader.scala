@@ -39,13 +39,13 @@ class IWSLT15Loader(
   override def name: String = "IWSLT-15"
 
   override def dataConfig: DataConfig = {
-    config.copy(workingDir =
-        config.workingDir
+    config.copy(dataDir =
+        config.dataDir
             .resolve("iwslt-15")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("iwslt-15").resolve("downloads")
+  override def downloadsDir: Path = config.dataDir.resolve("iwslt-15").resolve("downloads")
 
   private[this] def directoryName: String = s"$src-$tgt"
 

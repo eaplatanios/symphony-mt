@@ -25,7 +25,7 @@ import java.nio.file.{Path, Paths}
   */
 case class DataConfig(
     // Loader
-    workingDir: Path = Paths.get("data"),
+    dataDir: Path = Paths.get("data"),
     loaderBufferSize: Int = 8192,
     tokenizer: Tokenizer = MosesTokenizer(),
     cleaner: Cleaner = MosesCleaner(),
@@ -35,7 +35,7 @@ case class DataConfig(
     parallelPortion: Float = 1.0f,
     trainBatchSize: Long = 128,
     inferBatchSize: Long = 32,
-    evaluateBatchSize: Long = 32,
+    evalBatchSize: Long = 32,
     numBuckets: Int = 5,
     srcMaxLength: Int = 50,
     tgtMaxLength: Int = 50,

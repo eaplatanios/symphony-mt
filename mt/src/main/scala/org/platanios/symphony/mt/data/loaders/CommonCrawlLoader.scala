@@ -39,13 +39,13 @@ class CommonCrawlLoader(
   override def name: String = "CommonCrawl"
 
   override def dataConfig: DataConfig = {
-    config.copy(workingDir =
-        config.workingDir
+    config.copy(dataDir =
+        config.dataDir
             .resolve("commoncrawl")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("commoncrawl").resolve("downloads")
+  override def downloadsDir: Path = config.dataDir.resolve("commoncrawl").resolve("downloads")
 
   private[this] def reversed: Boolean = {
     CommonCrawlLoader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))

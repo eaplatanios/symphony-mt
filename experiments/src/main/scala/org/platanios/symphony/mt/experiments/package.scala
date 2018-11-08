@@ -15,19 +15,28 @@
 
 package org.platanios.symphony.mt
 
-import org.platanios.symphony.mt.data.{FileParallelDataset, ParallelDatasetLoader}
-import org.platanios.symphony.mt.vocabulary.Vocabulary
-
-import better.files.File
+import org.platanios.symphony.mt.models.rnn.Cell
+import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 package object experiments {
-  def loadDatasets(
-      loaders: Seq[ParallelDatasetLoader],
-      workingDir: Option[File] = None
-  ): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    ParallelDatasetLoader.load(loaders, workingDir)
+  implicit def cellToEvOutputStructureState[T](
+      cell: Cell[T, _, _]
+  ): OutputStructure[cell.StateType] = {
+    cell.evOutputStructureState.asInstanceOf[OutputStructure[cell.StateType]]
+  }
+
+  implicit def cellToEvOutputToShapeState[T](
+      cell: Cell[T, _, _]
+  ): OutputToShape.Aux[cell.StateType, cell.StateShapeType] = {
+    cell.evOutputToShapeState.asInstanceOf[OutputToShape.Aux[cell.StateType, cell.StateShapeType]]
+  }
+
+  implicit def cellToEvZeroState[T](
+      cell: Cell[T, _, _]
+  ): Zero.Aux[cell.StateType, cell.StateShapeType] = {
+    cell.evZeroState.asInstanceOf[Zero.Aux[cell.StateType, cell.StateShapeType]]
   }
 }

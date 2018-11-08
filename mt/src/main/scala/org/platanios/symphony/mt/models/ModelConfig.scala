@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.ModelConfig.{LogConfig, OptConfig}
+import org.platanios.symphony.mt.models.ModelConfig.{InferenceConfig, LogConfig, TrainingConfig}
 import org.platanios.symphony.mt.models.helpers.decoders.{LengthPenalty, NoLengthPenalty}
 import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot}
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
@@ -26,28 +26,32 @@ import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Op
   */
 case class ModelConfig(
     pivot: Pivot = NoPivot,
-    // Optimizer Configuration
-    optConfig: OptConfig,
-    // Logging Configuration
+    trainingConfig: TrainingConfig,
+    inferenceConfig: InferenceConfig,
     logConfig: LogConfig,
-    // Decoder Configuration
-    beamWidth: Int,
-    lengthPenalty: LengthPenalty = NoLengthPenalty,
-    maxDecodingLengthFactor: Float = 2.0f,
-    // Other Options
-    labelSmoothing: Float = 0.0f,
     timeMajor: Boolean = false,
-    summarySteps: Int = 100,
-    checkpointSteps: Int = 1000,
-    trainIdentityTranslations: Boolean = false,
     // The following is to allow training in one direction only (for a language pair).
     languagePairs: Set[(Language, Language)] = Set.empty,
     evalLanguagePairs: Set[(Language, Language)] = Set.empty)
 
 object ModelConfig {
+  case class TrainingConfig(
+      useIdentityTranslations: Boolean,
+      labelSmoothing: Float,
+      numSteps: Int,
+      summarySteps: Int,
+      checkpointSteps: Int,
+      optConfig: OptConfig)
+
+  case class InferenceConfig(
+      pivot: Pivot = NoPivot,
+      beamWidth: Int,
+      lengthPenalty: LengthPenalty = NoLengthPenalty,
+      maxDecodingLengthFactor: Float = 2.0f)
+
   case class OptConfig(
-      maxGradNorm: Option[Float] = None,
       optimizer: Optimizer = GradientDescent(1.0f, learningRateSummaryTag = "LearningRate"),
+      maxGradNorm: Option[Float] = None,
       colocateGradientsWithOps: Boolean = true)
 
   case class LogConfig(

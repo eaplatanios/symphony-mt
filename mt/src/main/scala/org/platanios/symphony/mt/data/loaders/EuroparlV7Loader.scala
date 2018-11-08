@@ -39,13 +39,13 @@ class EuroparlV7Loader(
   override def name: String = "Europarl v7"
 
   override def dataConfig: DataConfig = {
-    config.copy(workingDir =
-        config.workingDir
+    config.copy(dataDir =
+        config.dataDir
             .resolve("europarl-v7")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("europarl-v7").resolve("downloads")
+  override def downloadsDir: Path = config.dataDir.resolve("europarl-v7").resolve("downloads")
 
   private[this] def reversed: Boolean = {
     EuroparlV7Loader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))

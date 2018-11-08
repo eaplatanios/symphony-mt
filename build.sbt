@@ -140,9 +140,7 @@ lazy val experiments = (project in file("./experiments"))
         "com.github.scopt" %% "scopt" % "3.7.0",
         "com.hierynomus" % "sshj" % "0.24.0",
         "com.jcraft" % "jzlib" % "1.1.3",
-        "io.circe" %% "circe-core" % "0.10.0",
-        "io.circe" %% "circe-generic" % "0.10.0",
-        "io.circe" %% "circe-parser" % "0.10.0"))
+        "com.typesafe" % "config" % "1.3.2"))
 
 val MT = config("mt")
 val Experiments = config("experiments")

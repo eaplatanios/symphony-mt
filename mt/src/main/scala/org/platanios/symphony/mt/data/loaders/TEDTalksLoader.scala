@@ -40,13 +40,13 @@ class TEDTalksLoader(
   override def name: String = "TED-Talks"
 
   override def dataConfig: DataConfig = {
-    config.copy(workingDir =
-        config.workingDir
+    config.copy(dataDir =
+        config.dataDir
             .resolve("ted-talks")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("ted-talks").resolve("downloads")
+  override def downloadsDir: Path = config.dataDir.resolve("ted-talks").resolve("downloads")
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(s"${TEDTalksLoader.url}/${TEDTalksLoader.filename}.tar.gz")

@@ -94,7 +94,8 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       if (!context.mode.isTraining && context.dataConfig.tgtMaxLength != -1)
         tf.constant(context.dataConfig.tgtMaxLength)
       else
-        tf.round(tf.max(encodedSequences.lengths).toFloat * context.modelConfig.maxDecodingLengthFactor).toInt
+        tf.round(tf.max(encodedSequences.lengths).toFloat *
+            context.modelConfig.inferenceConfig.maxDecodingLengthFactor).toInt
     }
 
     val positionEmbeddings = this.positionEmbeddings.get(maxDecodingLength + 1, wordEmbeddingsSize).castTo[T]
@@ -161,10 +162,10 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 
     // Create the decoder RNN.
     val output = {
-      if (context.modelConfig.beamWidth > 1) {
+      if (context.modelConfig.inferenceConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
           cell, initialState, embeddings, tf.fill[Int, Int](batchSize.expandDims(0))(tgtBosID),
-          tgtEosID, context.modelConfig.beamWidth, context.modelConfig.lengthPenalty,
+          tgtEosID, context.modelConfig.inferenceConfig.beamWidth, context.modelConfig.inferenceConfig.lengthPenalty,
           outputLayer(outputWeights))
         val tuple = decoder.decode(
           outputTimeMajor = context.modelConfig.timeMajor,

@@ -83,7 +83,8 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
       if (!context.mode.isTraining && context.dataConfig.tgtMaxLength != -1)
         tf.constant(context.dataConfig.tgtMaxLength)
       else
-        tf.round(tf.max(encodedSequences.lengths).toFloat * context.modelConfig.maxDecodingLengthFactor).toInt
+        tf.round(tf.max(encodedSequences.lengths).toFloat *
+            context.modelConfig.inferenceConfig.maxDecodingLengthFactor).toInt
     }
 
     // Create some constants that will be used during decoding.
@@ -99,10 +100,10 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     val outputWeights = context.parameterManager.getProjectionToWords(
       cell.outputShape.apply(-1), context.tgtLanguageID).castTo[T]
     val output = {
-      if (context.modelConfig.beamWidth > 1) {
+      if (context.modelConfig.inferenceConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
           cell, initialState, embeddings, tf.fill[Int, Int](batchSize)(tgtBosID),
-          tgtEosID, context.modelConfig.beamWidth, context.modelConfig.lengthPenalty,
+          tgtEosID, context.modelConfig.inferenceConfig.beamWidth, context.modelConfig.inferenceConfig.lengthPenalty,
           outputLayer(outputWeights))
         val tuple = decoder.decode(
           outputTimeMajor = context.modelConfig.timeMajor,

@@ -41,7 +41,7 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
 
   def dataConfig: DataConfig
 
-  def downloadsDir: Path = dataConfig.workingDir
+  def downloadsDir: Path = dataConfig.dataDir
 
   protected def src: String = srcLanguage.abbreviation
   protected def tgt: String = tgtLanguage.abbreviation
@@ -191,7 +191,7 @@ object ParallelDatasetLoader {
       vocabularies.getOrElseUpdate(loader.srcLanguage, mutable.ListBuffer.empty).append(loader.vocabularies._1: _*)
       vocabularies.getOrElseUpdate(loader.tgtLanguage, mutable.ListBuffer.empty).append(loader.vocabularies._2: _*)
     })
-    val vocabDir = workingDir.getOrElse(File(loaders.head.dataConfig.workingDir)) / "vocabularies"
+    val vocabDir = workingDir.getOrElse(File(loaders.head.dataConfig.dataDir)) / "vocabularies"
 
     // Collect all tokenized files per language.
     val tokenizedFiles = vocabularies.keys.toSeq.map(language => language -> {

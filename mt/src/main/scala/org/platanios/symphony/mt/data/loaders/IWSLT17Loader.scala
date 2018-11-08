@@ -39,13 +39,13 @@ class IWSLT17Loader(
   override def name: String = "IWSLT-17"
 
   override def dataConfig: DataConfig = {
-    config.copy(workingDir =
-        config.workingDir
+    config.copy(dataDir =
+        config.dataDir
             .resolve("iwslt-17")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("iwslt-17").resolve("downloads")
+  override def downloadsDir: Path = config.dataDir.resolve("iwslt-17").resolve("downloads")
 
   /** Sequence of files to download as part of this dataset. */
   override def filesToDownload: Seq[String] = Seq(

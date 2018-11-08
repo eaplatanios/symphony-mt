@@ -39,13 +39,13 @@ class WMT16Loader(
   override def name: String = "WMT-16"
 
   override def dataConfig: DataConfig = {
-    config.copy(workingDir =
-        config.workingDir
+    config.copy(dataDir =
+        config.dataDir
             .resolve("wmt-16")
             .resolve(s"${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"))
   }
 
-  override def downloadsDir: Path = config.workingDir.resolve("wmt-16").resolve("downloads")
+  override def downloadsDir: Path = config.dataDir.resolve("wmt-16").resolve("downloads")
 
   private[this] def reversed: Boolean = {
     WMT16Loader.supportedLanguagePairs.contains((tgtLanguage, srcLanguage))
@@ -53,28 +53,28 @@ class WMT16Loader(
 
   protected def commonCrawlDataset: Option[CommonCrawlLoader] = {
     if (CommonCrawlLoader.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(CommonCrawlLoader(srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir)))
+      Some(CommonCrawlLoader(srcLanguage, tgtLanguage, dataConfig.copy(dataDir = config.dataDir)))
     else
       None
   }
 
   protected def europarlV7Dataset: Option[EuroparlV7Loader] = {
     if (EuroparlV7Loader.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV7Loader(srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir)))
+      Some(EuroparlV7Loader(srcLanguage, tgtLanguage, dataConfig.copy(dataDir = config.dataDir)))
     else
       None
   }
 
   protected def europarlV8Dataset: Option[EuroparlV8Loader] = {
     if (EuroparlV8Loader.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(EuroparlV8Loader(srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir)))
+      Some(EuroparlV8Loader(srcLanguage, tgtLanguage, dataConfig.copy(dataDir = config.dataDir)))
     else
       None
   }
 
   protected def newsCommentaryV11Dataset: Option[NewsCommentaryV11Loader] = {
     if (NewsCommentaryV11Loader.isLanguagePairSupported(srcLanguage, tgtLanguage))
-      Some(NewsCommentaryV11Loader(srcLanguage, tgtLanguage, dataConfig.copy(workingDir = config.workingDir)))
+      Some(NewsCommentaryV11Loader(srcLanguage, tgtLanguage, dataConfig.copy(dataDir = config.dataDir)))
     else
       None
   }
