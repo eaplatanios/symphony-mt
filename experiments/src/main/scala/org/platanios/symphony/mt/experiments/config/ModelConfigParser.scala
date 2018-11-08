@@ -294,8 +294,13 @@ object ModelConfigParser {
           numLayers = decoderConfig.getInt("num-layers"),
           attentionKeysDepth = decoderConfig.getInt("attention-keys-depth"),
           attentionValuesDepth = decoderConfig.getInt("attention-values-depth"),
-          attentionNumHeads = decoderConfig.getInt("attention-num-heads")
-        ).asInstanceOf[Decoder[Any]]
+          attentionNumHeads = decoderConfig.getInt("attention-num-heads"),
+          useEncoderDecoderAttentionCache = {
+            if (decoderConfig.hasPath("use-encoder-decoder-attention-cache"))
+              decoderConfig.getBoolean("use-encoder-decoder-attention-cache")
+            else
+              true
+          }).asInstanceOf[Decoder[Any]]
       case _ => throw new IllegalArgumentException(s"'$decoderType' does not represent a valid decoder type.")
     }
   }
