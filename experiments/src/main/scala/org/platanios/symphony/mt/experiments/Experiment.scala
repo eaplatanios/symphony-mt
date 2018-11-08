@@ -30,7 +30,7 @@ import ch.qos.logback.core.FileAppender
 import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.{Logger, LoggerFactory}
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -271,8 +271,11 @@ object Experiment {
     logger(s"╚═${"═" * firstColumnWidth}═╧${"═" * (secondColumnWidth + 2)}╝")
   }
 
+  @throws[IllegalArgumentException]
   def main(args: Array[String]): Unit = {
     val configFile = Paths.get(args(0))
+    if (!Files.exists(configFile))
+      throw new IllegalArgumentException(s"The provided configuration file ($configFile) does not exist.")
     val experiment = new Experiment(configFile)
     experiment.initialize()
     // experiment.logSummary()
