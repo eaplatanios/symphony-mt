@@ -38,11 +38,11 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val layerPostprocessors: Seq[LayerProcessor] = Seq(
       Dropout(0.9f, broadcastAxes = Set(1)),
       AddResidualConnection),
-    val attentionKeysDepth: Int = 512,
-    val attentionValuesDepth: Int = 512,
+    val attentionKeysDepth: Int = 128,
+    val attentionValuesDepth: Int = 128,
     val attentionNumHeads: Int = 8,
     val selfAttention: Attention = DotProductAttention(0.1f, Set.empty, "DotProductAttention"),
-    val feedForwardLayer: FeedForwardLayer = DenseReLUDenseFeedForwardLayer(2048, 512, 0.0f, Set.empty, "FeedForward")
+    val feedForwardLayer: FeedForwardLayer = DenseReLUDenseFeedForwardLayer(256, 128, 0.1f, Set.empty, "FeedForward")
 ) extends Decoder[EncodedSequences[T]] {
   override def applyTrain(
       encodedSequences: EncodedSequences[T]
@@ -72,6 +72,10 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     if (context.mode.isTraining)
       decoderInputSequences = tf.dropout(decoderInputSequences, 1.0f - postPositionEmbeddingsDropout)
 
+    val encodedSequencesMaxLength = tf.shape(encodedSequences.states).slice(1)
+    val inputPadding = tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding").toFloat
+    val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding)
+
     // Obtain the output projection layer weights.
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
     val outputWeights = context.parameterManager.getProjectionToWords(
@@ -79,7 +83,8 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val outputLayer = this.outputLayer(outputWeights)(_)
 
     // Finally, apply the decoding model.
-    val (decodedSequences, _) = decode(encodedSequences, decoderInputSequences, decoderSelfAttentionBias)
+    val (decodedSequences, _) = decode(
+      encodedSequences, decoderInputSequences, decoderSelfAttentionBias, encoderDecoderAttentionBias)
     val outputSequences = outputLayer(decodedSequences)
     Sequences(outputSequences.toFloat, encodedSequences.lengths)
   }
@@ -102,6 +107,10 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     var decoderSelfAttentionBias = Attention.attentionBiasLowerTriangular(maxDecodingLength)
     if (useSelfAttentionProximityBias)
       decoderSelfAttentionBias += Attention.attentionBiasProximal(maxDecodingLength)
+
+    val encodedSequencesMaxLength = tf.shape(encodedSequences.states).slice(1)
+    val inputPadding = tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding").toFloat
+    val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding)
 
     // Create the decoder RNN cell.
     val zero = tf.constant[Int](0)
@@ -130,9 +139,9 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
         val selfAttentionBias = tf.slice(
           decoderSelfAttentionBias(0, 0, ::, ::).gather(step),
           Seq(zero),
-          Seq(step + one)).expandDims(1)
+          Seq(step + one))
         val (output, updatedMultiHeadAttentionCache) = decode(
-          input.state._1, decoderInput, selfAttentionBias, Some(input.state._3))
+          input.state._1, decoderInput, selfAttentionBias, encoderDecoderAttentionBias, Some(input.state._3))
         val currentStepOutput = output(::, 0, ::)
         RNNTuple(currentStepOutput, (input.state._1, concatenatedOutput, updatedMultiHeadAttentionCache))
       }
@@ -216,13 +225,10 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       encodedSequences: EncodedSequences[T],
       decoderInputSequences: Output[T],
       decoderSelfAttentionBias: Output[Float],
+      encoderDecoderAttentionBias: Output[Float],
       multiHeadAttentionCache: Option[Seq[MultiHeadAttentionCache[Float]]] = None
   )(implicit context: Context): (Output[T], Seq[MultiHeadAttentionCache[Float]]) = {
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
-
-    val encodedSequencesMaxLength = tf.shape(encodedSequences.states).slice(1)
-    val inputPadding = tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding").toFloat
-    val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding)
 
     // Add the multi-head attention and the feed-forward layers.
     // TODO: What about the padding remover?
