@@ -196,7 +196,10 @@ object ModelConfigParser {
       case "transformer" =>
         new TransformerEncoder[T](
           numUnits = encoderConfig.getInt("num-units"),
-          numLayers = encoderConfig.getInt("num-layers")
+          numLayers = encoderConfig.getInt("num-layers"),
+          attentionKeysDepth = encoderConfig.getInt("attention-keys-depth"),
+          attentionValuesDepth = encoderConfig.getInt("attention-values-depth"),
+          attentionNumHeads = encoderConfig.getInt("attention-num-heads")
         ).asInstanceOf[Encoder[Any]]
       case _ => throw new IllegalArgumentException(s"'$encoderType' does not represent a valid encoder type.")
     }
@@ -288,7 +291,10 @@ object ModelConfigParser {
         ).asInstanceOf[Decoder[Any]]
       case "transformer" =>
         new TransformerDecoder[T](
-          numLayers = decoderConfig.getInt("num-layers")
+          numLayers = decoderConfig.getInt("num-layers"),
+          attentionKeysDepth = decoderConfig.getInt("attention-keys-depth"),
+          attentionValuesDepth = decoderConfig.getInt("attention-values-depth"),
+          attentionNumHeads = decoderConfig.getInt("attention-num-heads")
         ).asInstanceOf[Decoder[Any]]
       case _ => throw new IllegalArgumentException(s"'$decoderType' does not represent a valid decoder type.")
     }
