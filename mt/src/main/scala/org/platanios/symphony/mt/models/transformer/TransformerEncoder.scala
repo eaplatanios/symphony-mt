@@ -40,7 +40,7 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
     val layerPreprocessors: Seq[LayerProcessor] = Seq(
       Normalize(LayerNormalization(), 1e-6f)),
     val layerPostprocessors: Seq[LayerProcessor] = Seq(
-      Dropout(0.9f, broadcastAxes = Set(1)),
+      Dropout(0.1f, broadcastAxes = Set(1)),
       AddResidualConnection),
     val attentionKeysDepth: Int = 128,
     val attentionValuesDepth: Int = 128,
@@ -51,15 +51,15 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
   override def apply(sequences: Sequences[Int])(implicit context: Context): EncodedSequences[T] = {
     // `embeddedSequences.sequences` has shape [BatchSize, MaxLength, WordEmbeddingSize]
     // `embeddedSequence.lengths` has shape [BatchSize]
-    val embeddedSequences = maybeTransposeInputSequences(embedSrcSequences(sequences))
+    val embeddedSequences = embedSrcSequences(sequences)
     val embeddedSequencesMaxLength = tf.shape(embeddedSequences.sequences).slice(1)
 
     // Perform some pre-processing to the token embeddings sequence.
     val padding = tf.sequenceMask(embeddedSequences.lengths, embeddedSequencesMaxLength, name = "Padding").toFloat
-    val attentionBias = Attention.attentionBiasIgnorePadding(padding)
-    var encoderSelfAttentionBias = attentionBias
+    var encoderSelfAttentionBias = Attention.attentionBiasIgnorePadding(padding)
     if (useSelfAttentionProximityBias)
       encoderSelfAttentionBias += Attention.attentionBiasProximal(embeddedSequencesMaxLength)
+
     var encoderInput = positionEmbeddings.addTo(embeddedSequences.sequences)
     if (context.mode.isTraining)
       encoderInput = tf.dropout(encoderInput, 1.0f - postPositionEmbeddingsDropout)

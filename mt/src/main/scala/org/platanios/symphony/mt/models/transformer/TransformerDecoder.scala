@@ -36,7 +36,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val layerPreprocessors: Seq[LayerProcessor] = Seq(
       Normalize(LayerNormalization(), 1e-6f)),
     val layerPostprocessors: Seq[LayerProcessor] = Seq(
-      Dropout(0.9f, broadcastAxes = Set(1)),
+      Dropout(0.1f, broadcastAxes = Set(1)),
       AddResidualConnection),
     val attentionKeysDepth: Int = 128,
     val attentionValuesDepth: Int = 128,
@@ -84,7 +84,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 
     // Finally, apply the decoding model.
     val (decodedSequences, _) = decode(
-      encodedSequences, decoderInputSequences, decoderSelfAttentionBias, encoderDecoderAttentionBias)
+      encodedSequences.states.toFloat, decoderInputSequences, decoderSelfAttentionBias, encoderDecoderAttentionBias)
     val outputSequences = outputLayer(decodedSequences)
     Sequences(outputSequences.toFloat, encodedSequences.lengths)
   }
@@ -108,10 +108,6 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     if (useSelfAttentionProximityBias)
       decoderSelfAttentionBias += Attention.attentionBiasProximal(maxDecodingLength)
 
-    val encodedSequencesMaxLength = tf.shape(encodedSequences.states).slice(1)
-    val inputPadding = tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding").toFloat
-    val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding)
-
     // Create the decoder RNN cell.
     val zero = tf.constant[Int](0)
     val one = tf.constant[Int](1)
@@ -131,17 +127,22 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       override def forward(
           input: RNNTuple[Output[T], (EncodedSequences[T], Output[T], Seq[MultiHeadAttentionCache[Float]])]
       ): RNNTuple[Output[T], (EncodedSequences[T], Output[T], Seq[MultiHeadAttentionCache[Float]])] = {
+        val encodedSequences = input.state._1
+        val encodedSequencesMaxLength = tf.shape(encodedSequences.states).slice(1)
+        val inputPadding = tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding")
+        val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding.toFloat)
+
         val step = tf.shape(input.state._2).slice(1)
         val currentStepPositionEmbeddings = positionEmbeddings(0).gather(step).expandDims(0).expandDims(1)
         val currentStepInput = input.output.expandDims(1) + currentStepPositionEmbeddings
         val concatenatedOutput = tf.concatenate(Seq(input.state._2, currentStepInput), axis = 1)
-        val decoderInput = currentStepInput
         val selfAttentionBias = tf.slice(
           decoderSelfAttentionBias(0, 0, ::, ::).gather(step),
           Seq(zero),
           Seq(step + one))
         val (output, updatedMultiHeadAttentionCache) = decode(
-          input.state._1, decoderInput, selfAttentionBias, encoderDecoderAttentionBias, Some(input.state._3))
+          input.state._1.states.toFloat, currentStepInput, selfAttentionBias, encoderDecoderAttentionBias,
+          Some(input.state._3))
         val currentStepOutput = output(::, 0, ::)
         RNNTuple(currentStepOutput, (input.state._1, concatenatedOutput, updatedMultiHeadAttentionCache))
       }
@@ -222,7 +223,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
   }
 
   protected def decode(
-      encodedSequences: EncodedSequences[T],
+      encoderOutput: Output[Float],
       decoderInputSequences: Output[T],
       decoderSelfAttentionBias: Output[Float],
       encoderDecoderAttentionBias: Output[Float],
@@ -258,7 +259,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
           val queryAntecedent = LayerProcessor.layerPreprocess(x, layerPreprocessors)
           y = Attention.multiHeadAttention(
             queryAntecedent = queryAntecedent,
-            memoryAntecedent = encodedSequences.states.toFloat,
+            memoryAntecedent = encoderOutput,
             bias = encoderDecoderAttentionBias,
             totalKeysDepth = attentionKeysDepth,
             totalValuesDepth = attentionValuesDepth,

@@ -101,7 +101,7 @@ object PositionEmbeddings {
       minScale: Float = 1.0f,
       maxScale: Float = 1.0e4f
   ): Output[T] = {
-    val inputShape = tf.shape(input).toInt
+    val inputShape = tf.shape(input)
     val length = inputShape(1)
     val depth = inputShape(2)
     val embedding = positionalEmbeddings1D(length, depth, minScale, maxScale)
