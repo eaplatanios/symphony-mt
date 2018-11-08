@@ -38,11 +38,11 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val layerPostprocessors: Seq[LayerProcessor] = Seq(
       Dropout(0.9f, broadcastAxes = Set(1)),
       AddResidualConnection),
-    val attentionKeysDepth: Int = 32,
-    val attentionValuesDepth: Int = 32,
+    val attentionKeysDepth: Int = 512,
+    val attentionValuesDepth: Int = 512,
     val attentionNumHeads: Int = 8,
     val selfAttention: Attention = DotProductAttention(0.1f, Set.empty, "DotProductAttention"),
-    val feedForwardLayer: FeedForwardLayer = DenseReLUDenseFeedForwardLayer(2048, 32, 0.0f, Set.empty, "FeedForward")
+    val feedForwardLayer: FeedForwardLayer = DenseReLUDenseFeedForwardLayer(2048, 512, 0.0f, Set.empty, "FeedForward")
 ) extends Decoder[EncodedSequences[T]] {
   override def applyTrain(
       encodedSequences: EncodedSequences[T]
@@ -122,10 +122,11 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
           input: RNNTuple[Output[T], (EncodedSequences[T], Output[T], Seq[MultiHeadAttentionCache[Float]])]
       ): RNNTuple[Output[T], (EncodedSequences[T], Output[T], Seq[MultiHeadAttentionCache[Float]])] = {
         val step = tf.shape(input.state._2).slice(1)
+        val currentStepPositionEmbeddings = positionEmbeddings(0).gather(step).expandDims(0).expandDims(1)
         val concatenatedOutput = tf.concatenate(
-          Seq(input.state._2, input.output.expandDims(1)),
+          Seq(input.state._2, input.output.expandDims(1) + currentStepPositionEmbeddings),
           axis = 1)
-        val decoderInput = concatenatedOutput + positionEmbeddings(0).gather(step).expandDims(0).expandDims(1)
+        val decoderInput = concatenatedOutput
         val selfAttentionBias = tf.slice(
           decoderSelfAttentionBias(0, 0, ::, ::).gather(step),
           Seq(zero),

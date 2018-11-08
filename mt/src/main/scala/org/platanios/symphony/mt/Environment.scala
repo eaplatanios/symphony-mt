@@ -22,7 +22,6 @@ import java.nio.file.Path
   */
 case class Environment(
     workingDir: Path,
-    traceSteps: Option[Int] = None,
     allowSoftPlacement: Boolean = true,
     logDevicePlacement: Boolean = false,
     gpuAllowMemoryGrowth: Boolean = false,
@@ -30,4 +29,5 @@ case class Environment(
     numGPUs: Int = 0,
     parallelIterations: Int = 32,
     swapMemory: Boolean = true,
-    randomSeed: Option[Int] = None)
+    randomSeed: Option[Int] = None,
+    traceSteps: Option[Int] = None)
