@@ -269,29 +269,28 @@ object Attention {
       qPaddingMode: ConvPaddingMode = ValidConvPadding,
       kvPaddingMode: ConvPaddingMode = ValidConvPadding
   )(implicit context: Context): (Output[T], Output[T], Output[T]) = {
+    val q = computeAttentionComponent(queryAntecedent, totalKeysDepth, qNumFilters, qPaddingMode, "Q")
+    val k = computeAttentionComponent(memoryAntecedent, totalKeysDepth, kvNumFilters, kvPaddingMode, "K")
+    val v = computeAttentionComponent(memoryAntecedent, totalValuesDepth, kvNumFilters, kvPaddingMode, "V")
+    (q, k, v)
+  }
 
-    def compute(
-        input: Output[T],
-        depth: Int,
-        numFilters: Int,
-        paddingMode: ConvPaddingMode,
-        name: String
-    ): Output[T] = {
-      tf.variableScope(name) {
-        if (numFilters == 1) {
-          val weights = context.parameterManager.get[T](
-            "Weights", Shape(input.shape(-1), depth))
-          tf.linear(input, weights)
-        } else {
-          ???
-        }
+  def computeAttentionComponent[T: TF : IsNotQuantized](
+      input: Output[T],
+      depth: Int,
+      numFilters: Int = 1,
+      paddingMode: ConvPaddingMode = ValidConvPadding,
+      name: String = "AttentionComponent"
+  )(implicit context: Context): Output[T] = {
+    tf.variableScope(name) {
+      if (numFilters == 1) {
+        val weights = context.parameterManager.get[T](
+          "Weights", Shape(input.shape(-1), depth))
+        tf.linear(input, weights)
+      } else {
+        ???
       }
     }
-
-    val q = compute(queryAntecedent, totalKeysDepth, qNumFilters, qPaddingMode, "Q")
-    val k = compute(memoryAntecedent, totalKeysDepth, kvNumFilters, kvPaddingMode, "K")
-    val v = compute(memoryAntecedent, totalValuesDepth, kvNumFilters, kvPaddingMode, "V")
-    (q, k, v)
   }
 
   /** Applies multi-head attention using input and output projections.
@@ -325,7 +324,7 @@ object Attention {
   @throws[IllegalArgumentException]
   def multiHeadAttention[T: TF : IsHalfOrFloatOrDouble](
       queryAntecedent: Output[T],
-      memoryAntecedent: Output[T],
+      memoryAntecedent: Option[Output[T]],
       bias: Output[T],
       totalKeysDepth: Int,
       totalValuesDepth: Int,
@@ -338,39 +337,61 @@ object Attention {
       kvPaddingMode: ConvPaddingMode = ValidConvPadding,
       cache: Option[MultiHeadAttentionCache[T]] = None,
       name: String = "MultiHeadAttention"
-  )(implicit context: Context): (Output[T], MultiHeadAttentionCache[T]) = {
+  )(implicit context: Context): (Output[T], Option[MultiHeadAttentionCache[T]]) = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.variableScope(name) {
-      var (q, k, v) = computeQKV(
-        queryAntecedent = queryAntecedent,
-        memoryAntecedent = memoryAntecedent,
-        totalKeysDepth = totalKeysDepth,
-        totalValuesDepth = totalValuesDepth,
-        qNumFilters = qNumFilters,
-        kvNumFilters = kvNumFilters,
-        qPaddingMode = qPaddingMode,
-        kvPaddingMode = kvPaddingMode)
-      val updatedCache = cache match {
+      val (q, k, v) = cache match {
+        case None =>
+          var (q, k, v) = computeQKV(
+            queryAntecedent = queryAntecedent,
+            memoryAntecedent = memoryAntecedent.getOrElse(queryAntecedent),
+            totalKeysDepth = totalKeysDepth,
+            totalValuesDepth = totalValuesDepth,
+            qNumFilters = qNumFilters,
+            kvNumFilters = kvNumFilters,
+            qPaddingMode = qPaddingMode,
+            kvPaddingMode = kvPaddingMode)
+          q = splitHeads(q, numHeads)
+          k = splitHeads(k, numHeads)
+          v = splitHeads(v, numHeads)
+          (q, k, v)
         case Some(c) =>
           require(
             attention.isInstanceOf[DotProductAttention],
             "Caching is not guaranteed to work with attention types other than 'DotProductAttention'.")
           require(bias != null, "Bias is required for caching.")
-          k = tf.concatenate(Seq(c.keys, k), axis = 1)
-          v = tf.concatenate(Seq(c.values, v), axis = 1)
-          MultiHeadAttentionCache(k, v)
-        case None =>
-          MultiHeadAttentionCache(k, v)
+          memoryAntecedent match {
+            case None =>
+              var (q, k, v) = computeQKV(
+                queryAntecedent = queryAntecedent,
+                memoryAntecedent = memoryAntecedent.getOrElse(queryAntecedent),
+                totalKeysDepth = totalKeysDepth,
+                totalValuesDepth = totalValuesDepth,
+                qNumFilters = qNumFilters,
+                kvNumFilters = kvNumFilters,
+                qPaddingMode = qPaddingMode,
+                kvPaddingMode = kvPaddingMode)
+              q = splitHeads(q, numHeads)
+              k = splitHeads(k, numHeads)
+              v = splitHeads(v, numHeads)
+              k = tf.concatenate(Seq(c.keys, k), axis = 2)
+              v = tf.concatenate(Seq(c.values, v), axis = 2)
+              (q, k, v)
+            case Some(m) =>
+              var q = computeAttentionComponent(queryAntecedent, totalKeysDepth, qNumFilters, qPaddingMode, "Q")
+              val k = c.keys
+              val v = c.values
+              q = splitHeads(q, numHeads)
+              (q, k, v)
+          }
       }
-      q = splitHeads(q, numHeads)
-      k = splitHeads(k, numHeads)
-      v = splitHeads(v, numHeads)
-      q = q * tf.pow(
+      val updatedCache = cache.map(_ => MultiHeadAttentionCache(k, v))
+      val scaledQ = q * tf.pow(
         tf.constant[Int](totalKeysDepth / numHeads).toFloat,
         tf.constant[Float](-0.5f)
       ).castTo[T]
-      var result = attention(q, k, v, Some(bias))
+      var result = attention(scaledQ, k, v, Some(bias))
       result = combineHeads(result)
       val w = context.parameterManager.get[T](
         "OutputTransformWeights", Shape(result.shape(-1), outputsDepth))

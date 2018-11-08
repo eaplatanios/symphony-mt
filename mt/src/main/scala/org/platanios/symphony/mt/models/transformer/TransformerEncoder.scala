@@ -74,7 +74,7 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
           val queryAntecedent = LayerProcessor.layerPreprocess(x, layerPreprocessors)
           y = Attention.multiHeadAttention(
             queryAntecedent = queryAntecedent,
-            memoryAntecedent = queryAntecedent,
+            memoryAntecedent = None,
             bias = encoderSelfAttentionBias,
             totalKeysDepth = attentionKeysDepth,
             totalValuesDepth = attentionValuesDepth,

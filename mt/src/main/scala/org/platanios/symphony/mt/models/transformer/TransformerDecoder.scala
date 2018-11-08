@@ -84,7 +84,12 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 
     // Finally, apply the decoding model.
     val (decodedSequences, _) = decode(
-      encodedSequences.states.toFloat, decoderInputSequences, decoderSelfAttentionBias, encoderDecoderAttentionBias)
+      encoderOutput = encodedSequences.states.toFloat,
+      decoderInputSequences = decoderInputSequences,
+      decoderSelfAttentionBias = decoderSelfAttentionBias,
+      decoderSelfAttentionCache = None,
+      encoderDecoderAttentionBias = encoderDecoderAttentionBias,
+      encoderDecoderAttentionCache = None)
     val outputSequences = outputLayer(decodedSequences)
     Sequences(outputSequences.toFloat, encodedSequences.lengths)
   }
@@ -108,6 +113,16 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     if (useSelfAttentionProximityBias)
       decoderSelfAttentionBias += Attention.attentionBiasProximal(maxDecodingLength)
 
+    // Pre-compute the encoder-decoder attention keys and values.
+    val encoderOutput = encodedSequences.states
+    val encoderDecoderAttentionKeys = Attention.computeAttentionComponent(
+      encoderOutput, attentionKeysDepth, name = "K").toFloat
+    val encoderDecoderAttentionValues = Attention.computeAttentionComponent(
+      encoderOutput, attentionValuesDepth, name = "V").toFloat
+    val encoderDecoderAttentionCache = MultiHeadAttentionCache(
+      keys = Attention.splitHeads(encoderDecoderAttentionKeys, attentionNumHeads),
+      values = Attention.splitHeads(encoderDecoderAttentionValues, attentionNumHeads))
+
     // Create the decoder RNN cell.
     val zero = tf.constant[Int](0)
     val one = tf.constant[Int](1)
@@ -121,7 +136,8 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
         ((Shape(-1, wordEmbeddingsSize), Shape()),
             Shape(-1, wordEmbeddingsSize),
             (0 until numLayers).map(_ =>
-              (Shape(-1, attentionKeysDepth), Shape(-1, attentionValuesDepth))))
+              (Shape(attentionNumHeads, -1, attentionKeysDepth / attentionNumHeads),
+                  Shape(attentionNumHeads, -1, attentionValuesDepth / attentionNumHeads))))
       }
 
       override def forward(
@@ -141,10 +157,14 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
           Seq(zero),
           Seq(step + one))
         val (output, updatedMultiHeadAttentionCache) = decode(
-          input.state._1.states.toFloat, currentStepInput, selfAttentionBias, encoderDecoderAttentionBias,
-          Some(input.state._3))
+          encoderOutput = input.state._1.states.toFloat,
+          decoderInputSequences = currentStepInput,
+          decoderSelfAttentionBias = selfAttentionBias,
+          decoderSelfAttentionCache = Some(input.state._3),
+          encoderDecoderAttentionBias = encoderDecoderAttentionBias,
+          encoderDecoderAttentionCache = Some(encoderDecoderAttentionCache))
         val currentStepOutput = output(::, 0, ::)
-        RNNTuple(currentStepOutput, (input.state._1, concatenatedOutput, updatedMultiHeadAttentionCache))
+        RNNTuple(currentStepOutput, (input.state._1, concatenatedOutput, updatedMultiHeadAttentionCache.map(_.get)))
       }
     }
 
@@ -163,8 +183,8 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val embeddings = (ids: Output[Int]) => this.embeddings(ids)
     val batchSize = tf.shape(encodedSequences.lengths).slice(0)
     val multiHeadAttentionCache = (0 until numLayers).map(_ => MultiHeadAttentionCache(
-      keys = tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionKeysDepth))),
-      values = tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionValuesDepth)))))
+      keys = Attention.splitHeads(tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionKeysDepth))), attentionNumHeads),
+      values = Attention.splitHeads(tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionValuesDepth))), attentionNumHeads)))
     val initialState = (
         encodedSequences,
         tf.zeros[T](tf.stack[Int](Seq(batchSize, zero, wordEmbeddingsSize))),
@@ -226,9 +246,10 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       encoderOutput: Output[Float],
       decoderInputSequences: Output[T],
       decoderSelfAttentionBias: Output[Float],
+      decoderSelfAttentionCache: Option[Seq[MultiHeadAttentionCache[Float]]],
       encoderDecoderAttentionBias: Output[Float],
-      multiHeadAttentionCache: Option[Seq[MultiHeadAttentionCache[Float]]] = None
-  )(implicit context: Context): (Output[T], Seq[MultiHeadAttentionCache[Float]]) = {
+      encoderDecoderAttentionCache: Option[MultiHeadAttentionCache[Float]]
+  )(implicit context: Context): (Output[T], Seq[Option[MultiHeadAttentionCache[Float]]]) = {
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
 
     // Add the multi-head attention and the feed-forward layers.
@@ -241,31 +262,31 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
           val queryAntecedent = LayerProcessor.layerPreprocess(x, layerPreprocessors)
           val (output, updatedMultiHeadAttentionCache) = Attention.multiHeadAttention(
             queryAntecedent = queryAntecedent,
-            memoryAntecedent = queryAntecedent,
+            memoryAntecedent = None,
             bias = decoderSelfAttentionBias,
             totalKeysDepth = attentionKeysDepth,
             totalValuesDepth = attentionValuesDepth,
             outputsDepth = wordEmbeddingsSize,
             numHeads = attentionNumHeads,
             attention = selfAttention,
-            cache = multiHeadAttentionCache.map(_ (layer)),
+            cache = decoderSelfAttentionCache.map(_ (layer)),
             name = "MultiHeadAttention")
           y = output
           x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
           updatedMultiHeadAttentionCache
         }
-        // TODO: Add caching.
         tf.variableScope("EncoderDecoderAttention") {
           val queryAntecedent = LayerProcessor.layerPreprocess(x, layerPreprocessors)
           y = Attention.multiHeadAttention(
             queryAntecedent = queryAntecedent,
-            memoryAntecedent = encoderOutput,
+            memoryAntecedent = Some(encoderOutput),
             bias = encoderDecoderAttentionBias,
             totalKeysDepth = attentionKeysDepth,
             totalValuesDepth = attentionValuesDepth,
             outputsDepth = wordEmbeddingsSize,
             numHeads = attentionNumHeads,
             attention = selfAttention,
+            cache = encoderDecoderAttentionCache,
             name = "MultiHeadAttention")._1
           x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
         }
