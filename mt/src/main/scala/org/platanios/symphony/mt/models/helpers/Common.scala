@@ -41,7 +41,7 @@ object Common {
       input: Output[T],
       n: Int
   ): Output[T] = {
-    val inputShape = tf.shape(input).toInt
+    val inputShape = tf.shape(input)
     val result = tf.reshape(input, tf.concatenate(Seq(
       inputShape(0 :: -1),
       tf.constant(n, shape = Shape(1)),

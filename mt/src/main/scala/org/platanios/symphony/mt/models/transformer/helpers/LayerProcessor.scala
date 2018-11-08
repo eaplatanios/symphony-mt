@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.attention
+package org.platanios.symphony.mt.models.transformer.helpers
 
 import org.platanios.symphony.mt.models.Context
 import org.platanios.symphony.mt.models.helpers.Common

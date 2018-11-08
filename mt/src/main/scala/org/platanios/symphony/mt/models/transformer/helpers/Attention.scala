@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.attention
+package org.platanios.symphony.mt.models.transformer.helpers
 
 import org.platanios.symphony.mt.models.Context
 import org.platanios.symphony.mt.models.helpers.Common
@@ -313,8 +313,8 @@ object Attention {
     * @param  kvNumFilters      Integer specifying how wide we want the keys and values to be.
     * @param  qPaddingMode      Convolution padding mode for the case when `qNumFilters > 1`.
     * @param  kvPaddingMode     Convolution padding mode for the case when `kvNumFilters > 1`.
-    * @param  cache             Optional cache containing the result of previous attentions, used for fast decoding.
-    *                           For the initial call, the values for these keys should be
+    * @param  cache             Optional cache containing the result of previous multi-head attentions. This is useful
+    *                           for performing fast decoding.
     * @param  name              Name for the multi-head attention component that also specifies a variable scope.
     * @return Result of the attention transformation, with shape `[batchSize, queryLength, outputDepth]`, unless a cache
     *         is provided, in which case only the last memory position is calculated and the output shape is
@@ -336,9 +336,9 @@ object Attention {
       kvNumFilters: Int = 1,
       qPaddingMode: ConvPaddingMode = ValidConvPadding,
       kvPaddingMode: ConvPaddingMode = ValidConvPadding,
-      cache: Option[Cache[T]] = None,
+      cache: Option[MultiHeadAttentionCache[T]] = None,
       name: String = "MultiHeadAttention"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: Context): (Output[T], MultiHeadAttentionCache[T]) = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.variableScope(name) {
@@ -351,17 +351,17 @@ object Attention {
         kvNumFilters = kvNumFilters,
         qPaddingMode = qPaddingMode,
         kvPaddingMode = kvPaddingMode)
-      cache match {
+      val updatedCache = cache match {
         case Some(c) =>
           require(
             attention.isInstanceOf[DotProductAttention],
             "Caching is not guaranteed to work with attention types other than 'DotProductAttention'.")
           require(bias != null, "Bias is required for caching.")
-          k = tf.concatenate(Seq(c.k, k), axis = 1)
-          v = tf.concatenate(Seq(c.v, v), axis = 1)
-          c.k = k
-          c.v = v
-        case None => ()
+          k = tf.concatenate(Seq(c.keys, k), axis = 1)
+          v = tf.concatenate(Seq(c.values, v), axis = 1)
+          MultiHeadAttentionCache(k, v)
+        case None =>
+          MultiHeadAttentionCache(k, v)
       }
       q = splitHeads(q, numHeads)
       k = splitHeads(k, numHeads)
@@ -374,22 +374,13 @@ object Attention {
       result = combineHeads(result)
       val w = context.parameterManager.get[T](
         "OutputTransformWeights", Shape(result.shape(-1), outputsDepth))
-      tf.linear(result, w)
+      (tf.linear(result, w), updatedCache)
     }
   }
 
-  class Cache[T] protected(
-      var k: Output[T],
-      var v: Output[T])
-
-  object Cache {
-    def apply[T](
-        k: Output[T],
-        v: Output[T]
-    ): Cache[T] = {
-      new Cache(k, v)
-    }
-  }
+  case class MultiHeadAttentionCache[T](
+      keys: Output[T],
+      values: Output[T])
 
   //endregion Multi-Head Attention
 }

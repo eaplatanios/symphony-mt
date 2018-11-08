@@ -24,6 +24,7 @@ import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot, SinglePivot}
 import org.platanios.symphony.mt.models.{Model, ModelConfig}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
+import org.platanios.symphony.mt.models.transformer.{TransformerEncoder, TransformerDecoder}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.types.{IsDecimal, IsReal, TF}
@@ -35,7 +36,7 @@ import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputTo
 sealed trait ModelArchitecture {
   val name: String
 
-  def model[T: TF : IsDecimal](
+  def model[T: TF : IsHalfOrFloatOrDouble](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -67,13 +68,13 @@ sealed trait ModelArchitecture {
       attention, labelSmoothing, summarySteps, checkpointSteps, beamWidth, lengthPenaltyWeight, maxDecodingLengthFactor,
       optConfig, logConfig, evalDatasets, evalMetrics
     )(
-      TF[T], IsDecimal[T],
+      TF[T], IsHalfOrFloatOrDouble[T],
       cell.evOutputStructureState.asInstanceOf[OutputStructure[cell.StateType]],
       cell.evOutputToShapeState.asInstanceOf[OutputToShape.Aux[cell.StateType, cell.StateShapeType]],
       cell.evZeroState.asInstanceOf[Zero.Aux[cell.StateType, cell.StateShapeType]])
   }
 
-  protected def createModel[T: TF : IsDecimal, State: OutputStructure, StateShape](
+  protected def createModel[T: TF : IsHalfOrFloatOrDouble, State: OutputStructure, StateShape](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -139,6 +140,7 @@ object ModelArchitecture {
         case "rnn" if parts.length == 3 => RNN(parts(1).toInt, parts(2).toInt)
         case "bi_rnn" if parts.length == 3 => BiRNN(parts(1).toInt, parts(2).toInt)
         case "gnmt" if parts.length == 4 => GNMT(parts(1).toInt, parts(2).toInt, parts(3).toInt)
+        case "transformer" if parts.length == 3 => Transformer(parts(1).toInt, parts(2).toInt)
         case _ => throw new IllegalArgumentException(s"'$value' does not represent a valid model architecture.")
       }
     })
@@ -161,7 +163,7 @@ case class RNN(
 ) extends ModelArchitecture {
   override val name: String = "rnn"
 
-  override protected def createModel[T: TF : IsDecimal, State: OutputStructure, StateShape](
+  override protected def createModel[T: TF : IsHalfOrFloatOrDouble, State: OutputStructure, StateShape](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -247,7 +249,7 @@ case class BiRNN(
 ) extends ModelArchitecture {
   override val name: String = "bi_rnn"
 
-  override protected def createModel[T: TF : IsDecimal, State: OutputStructure, StateShape](
+  override protected def createModel[T: TF : IsHalfOrFloatOrDouble, State: OutputStructure, StateShape](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -334,7 +336,7 @@ case class GNMT(
 ) extends ModelArchitecture {
   override val name: String = "gnmt"
 
-  override protected def createModel[T: TF : IsDecimal, State: OutputStructure, StateShape](
+  override protected def createModel[T: TF : IsHalfOrFloatOrDouble, State: OutputStructure, StateShape](
       name: String,
       languages: Seq[(Language, Vocabulary)],
       dataConfig: DataConfig,
@@ -404,4 +406,70 @@ case class GNMT(
   }
 
   override def toString: String = s"gnmt:$numBiLayers:$numUniLayers:$numUniResLayers"
+}
+
+case class Transformer(
+    encoderNumLayers: Int = 6,
+    decoderNumLayers: Int = 6
+) extends ModelArchitecture {
+  override val name: String = "transformer"
+
+  override protected def createModel[T: TF : IsHalfOrFloatOrDouble, State: OutputStructure, StateShape](
+      name: String,
+      languages: Seq[(Language, Vocabulary)],
+      dataConfig: DataConfig,
+      env: Environment,
+      parameterManager: ParameterManager,
+      trainIdentityTranslations: Boolean,
+      languagePairs: Set[(Language, Language)],
+      evalLanguagePairs: Set[(Language, Language)],
+      cell: Cell[T, State, StateShape],
+      numUnits: Int,
+      residual: Boolean,
+      dropout: Option[Float],
+      attention: Boolean,
+      labelSmoothing: Float,
+      summarySteps: Int,
+      checkpointSteps: Int,
+      beamWidth: Int,
+      lengthPenaltyWeight: Float,
+      maxDecodingLengthFactor: Float,
+      optConfig: ModelConfig.OptConfig,
+      logConfig: ModelConfig.LogConfig,
+      evalDatasets: Seq[(String, FileParallelDataset, Float)],
+      evalMetrics: Seq[MTMetric]
+  )(implicit
+      evOutputToShapeState: OutputToShape.Aux[State, StateShape],
+      evZeroState: Zero.Aux[State, StateShape]
+  ): Model[_] = {
+    new Model(
+      name = name,
+      languages = languages,
+      encoder = new TransformerEncoder[T](
+        numUnits = numUnits,
+        numLayers = encoderNumLayers),
+      decoder = new TransformerDecoder[T](
+        numLayers = decoderNumLayers),
+      env = env,
+      parameterManager = parameterManager,
+      dataConfig = dataConfig,
+      modelConfig = ModelConfig(
+        pivot = ModelArchitecture.pivot(parameterManager, languagePairs),
+        optConfig = optConfig,
+        logConfig = logConfig,
+        beamWidth = beamWidth,
+        lengthPenalty = GoogleLengthPenalty(lengthPenaltyWeight),
+        maxDecodingLengthFactor = maxDecodingLengthFactor,
+        labelSmoothing = labelSmoothing,
+        summarySteps = summarySteps,
+        checkpointSteps = checkpointSteps,
+        trainIdentityTranslations = trainIdentityTranslations,
+        languagePairs = languagePairs,
+        evalLanguagePairs = evalLanguagePairs)
+    )(
+      evalDatasets = evalDatasets,
+      evalMetrics = evalMetrics)
+  }
+
+  override def toString: String = s"transformer:$encoderNumLayers:$decoderNumLayers"
 }

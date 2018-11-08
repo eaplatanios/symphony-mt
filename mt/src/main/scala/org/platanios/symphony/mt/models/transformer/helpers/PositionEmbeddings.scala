@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.attention
+package org.platanios.symphony.mt.models.transformer.helpers
 
 import org.platanios.tensorflow.api._
 

@@ -43,8 +43,11 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
       tgtSequences.sequences), axis = 1)
     val shiftedTgtSequenceLengths = tgtSequences.lengths + 1
     val (cell, initialState) = cellAndInitialState(encodedSequences, Some(tgtSequences))
+
+    // Obtain the output projection layer.
+    val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
     val outputWeights = context.parameterManager.getProjectionToWords(
-      cell.outputShape.apply(-1), context.tgtLanguageID).castTo[T]
+      wordEmbeddingsSize, context.tgtLanguageID).castTo[T]
 
     // Time-major transpose
     val transposedTgtSequences = {
@@ -53,6 +56,8 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
       else
         shiftedTgtSequences
     }
+
+    // Embed the target sequences.
     val embeddedTgtSequences = embeddings(transposedTgtSequences)
 
     // Decoder RNN
@@ -73,6 +78,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
   )(implicit context: Context): Sequences[Int] = {
     val (cell, initialState) = cellAndInitialState(encodedSequences)
 
+    // Determine the maximum allowed sequence length to consider while decoding.
     val maxDecodingLength = {
       if (!context.mode.isTraining && context.dataConfig.tgtMaxLength != -1)
         tf.constant(context.dataConfig.tgtMaxLength)
@@ -80,14 +86,14 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
         tf.round(tf.max(encodedSequences.lengths).toFloat * context.modelConfig.maxDecodingLengthFactor).toInt
     }
 
-    // Decoder embeddings
+    // Create some constants that will be used during decoding.
     val bosToken = tf.constant[String](context.dataConfig.beginOfSequenceToken)
     val eosToken = tf.constant[String](context.dataConfig.endOfSequenceToken)
     val tgtVocabLookupTable = context.parameterManager.stringToIndexLookup(context.tgtLanguageID)
     val tgtBosID = tgtVocabLookupTable(bosToken).toInt
     val tgtEosID = tgtVocabLookupTable(eosToken).toInt
 
-    // Decoder RNN
+    // Create the decoder RNN.
     val batchSize = tf.shape(encodedSequences.lengths).slice(0).expandDims(0)
     val embeddings = (ids: Output[Int]) => this.embeddings(ids)
     val outputWeights = context.parameterManager.getProjectionToWords(
@@ -132,6 +138,13 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     Sequences(outputSequences(---, 0 :: -1), output.lengths - 1)
   }
 
+  protected def embeddings(
+      ids: Output[Int]
+  )(implicit context: Context): Output[T] = {
+    val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
+    embeddingsTable(ids).castTo[T]
+  }
+
   protected def outputLayer(outputWeights: Output[T])(logits: Output[T]): Output[T] = {
     if (logits.rank == 3) {
       val reshapedLogits = tf.reshape(logits, Shape(-1, logits.shape(-1)))
@@ -148,13 +161,6 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     } else {
       tf.matmul(logits, outputWeights)
     }
-  }
-
-  protected def embeddings(
-      ids: Output[Int]
-  )(implicit context: Context): Output[T] = {
-    val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
-    embeddingsTable(ids).castTo[T]
   }
 
   protected def cellAndInitialState(
