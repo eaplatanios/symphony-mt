@@ -110,14 +110,18 @@ object ModelConfigConfigParser extends ConfigParser[ModelConfig] {
     val bothDirections = config.getBoolean("both-directions")
     val providedLanguages = config.getString("languages")
     val optimizer = config.getString("training.optimization.optimizer")
-    val learningRate = config.getString("training.optimization.learning-rate")
 
     val stringBuilder = new StringBuilder()
     stringBuilder.append(s"${providedLanguages.replace(',', '.')}")
     stringBuilder.append(s".bd:$bothDirections")
     stringBuilder.append(s".it:${parsedValue.trainingConfig.useIdentityTranslations}")
     stringBuilder.append(s".ls:${parsedValue.trainingConfig.labelSmoothing}")
-    stringBuilder.append(s".opt:$optimizer:$learningRate")
+
+    if (config.hasPath("training.optimization.learning-rate"))
+      stringBuilder.append(s".opt:$optimizer:${config.getDouble("training.optimization.learning-rate").toFloat}")
+    else
+      stringBuilder.append(s".opt:$optimizer")
+
     Some(stringBuilder.toString)
   }
 }
