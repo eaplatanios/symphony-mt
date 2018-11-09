@@ -34,7 +34,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val layerPreprocessors: Seq[LayerProcessor] = Seq(
       Normalize(LayerNormalization(), 1e-6f)),
     val layerPostprocessors: Seq[LayerProcessor] = Seq(
-      Dropout(0.1f, broadcastAxes = Set(1)),
+      Dropout(0.1f, broadcastAxes = Set.empty),
       AddResidualConnection),
     val attentionKeysDepth: Int = 128,
     val attentionValuesDepth: Int = 128,
@@ -280,14 +280,13 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
 
     // Add the multi-head attention and the feed-forward layers.
-    // TODO: What about the padding remover?
     var x = decoderInputSequences.toFloat
     var y = x
-    val updatedMultiHeadAttentionCache = (0 until numLayers).map(layer => {
+    val updatedDecoderSelfAttentionCache = (0 until numLayers).map(layer => {
       tf.variableScope(s"Layer$layer") {
-        val updatedMultiHeadAttentionCache = tf.variableScope("SelfAttention") {
+        val updatedDecoderSelfAttentionCache = tf.variableScope("SelfAttention") {
           val queryAntecedent = LayerProcessor.layerPreprocess(x, layerPreprocessors)
-          val (output, updatedMultiHeadAttentionCache) = Attention.multiHeadAttention(
+          val (output, updatedDecoderSelfAttentionCache) = Attention.multiHeadAttention(
             queryAntecedent = queryAntecedent,
             memoryAntecedent = None,
             bias = decoderSelfAttentionBias,
@@ -300,7 +299,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
             name = "MultiHeadAttention")
           y = output
           x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
-          updatedMultiHeadAttentionCache
+          updatedDecoderSelfAttentionCache
         }
         tf.variableScope("EncoderDecoderAttention") {
           val queryAntecedent = LayerProcessor.layerPreprocess(x, layerPreprocessors)
@@ -319,15 +318,16 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
         }
         tf.variableScope("FeedForward") {
           val xx = LayerProcessor.layerPreprocess(x, layerPreprocessors)
+          // TODO: What about the pad remover?
           y = feedForwardLayer(xx, None)
           x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
         }
-        updatedMultiHeadAttentionCache
+        updatedDecoderSelfAttentionCache
       }
     })
 
     // If normalization is done during layer preprocessing, then it should also be done on the output, since the
     // output can grow very large, being the sum of a whole stack of unnormalized layer outputs.
-    (LayerProcessor.layerPreprocess(x, layerPreprocessors).castTo[T], updatedMultiHeadAttentionCache)
+    (LayerProcessor.layerPreprocess(x, layerPreprocessors).castTo[T], updatedDecoderSelfAttentionCache)
   }
 }

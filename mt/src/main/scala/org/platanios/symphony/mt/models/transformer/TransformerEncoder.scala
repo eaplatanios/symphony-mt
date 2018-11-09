@@ -40,7 +40,7 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
     val layerPreprocessors: Seq[LayerProcessor] = Seq(
       Normalize(LayerNormalization(), 1e-6f)),
     val layerPostprocessors: Seq[LayerProcessor] = Seq(
-      Dropout(0.1f, broadcastAxes = Set(1)),
+      Dropout(0.1f, broadcastAxes = Set.empty),
       AddResidualConnection),
     val attentionKeysDepth: Int = 128,
     val attentionValuesDepth: Int = 128,
