@@ -49,7 +49,12 @@ object ModelConfigConfigParser extends ConfigParser[ModelConfig] {
         config.getBoolean("training.use-identity-translations")
     }
     val optimizer = config.getString("training.optimization.optimizer")
-    val learningRate = config.getDouble("training.optimization.learning-rate").toFloat
+    val learningRate = {
+      if (config.hasPath("training.optimization.learning-rate"))
+        Some(config.getDouble("training.optimization.learning-rate").toFloat)
+      else
+        None
+    }
     ModelConfig(
       trainingConfig = TrainingConfig(
         useIdentityTranslations = useIdentityTranslations,
@@ -59,15 +64,16 @@ object ModelConfigConfigParser extends ConfigParser[ModelConfig] {
         checkpointSteps = config.getInt("training.checkpoint-steps"),
         optConfig = OptConfig(
           optimizer = optimizer match {
-            case "gd" => tf.train.GradientDescent(learningRate, learningRateSummaryTag = "LearningRate")
-            case "adadelta" => tf.train.AdaDelta(learningRate, learningRateSummaryTag = "LearningRate")
-            case "adagrad" => tf.train.AdaGrad(learningRate, learningRateSummaryTag = "LearningRate")
-            case "rmsprop" => tf.train.RMSProp(learningRate, learningRateSummaryTag = "LearningRate")
-            case "adam" => tf.train.Adam(learningRate, learningRateSummaryTag = "LearningRate")
-            case "lazy_adam" => tf.train.LazyAdam(learningRate, learningRateSummaryTag = "LearningRate")
-            case "amsgrad" => tf.train.AMSGrad(learningRate, learningRateSummaryTag = "LearningRate")
-            case "lazy_amsgrad" => tf.train.LazyAMSGrad(learningRate, learningRateSummaryTag = "LearningRate")
-            case "yellowfin" => tf.train.YellowFin(learningRate, learningRateSummaryTag = "LearningRate")
+            case "gd" => tf.train.GradientDescent(learningRate.get, learningRateSummaryTag = "LearningRate")
+            case "adadelta" => tf.train.AdaDelta(learningRate.get, learningRateSummaryTag = "LearningRate")
+            case "adafactor" => tf.train.Adafactor(learningRate, learningRateSummaryTag = "LearningRate")
+            case "adagrad" => tf.train.AdaGrad(learningRate.get, learningRateSummaryTag = "LearningRate")
+            case "rmsprop" => tf.train.RMSProp(learningRate.get, learningRateSummaryTag = "LearningRate")
+            case "adam" => tf.train.Adam(learningRate.get, learningRateSummaryTag = "LearningRate")
+            case "lazy_adam" => tf.train.LazyAdam(learningRate.get, learningRateSummaryTag = "LearningRate")
+            case "amsgrad" => tf.train.AMSGrad(learningRate.get, learningRateSummaryTag = "LearningRate")
+            case "lazy_amsgrad" => tf.train.LazyAMSGrad(learningRate.get, learningRateSummaryTag = "LearningRate")
+            case "yellowfin" => tf.train.YellowFin(learningRate.get, learningRateSummaryTag = "LearningRate")
             case _ => throw new IllegalArgumentException(s"'$optimizer' does not represent a valid optimizer.")
           },
           maxGradNorm = {
