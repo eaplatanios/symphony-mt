@@ -125,7 +125,7 @@ abstract class Decoder[
     }
     // Create a new variable scope in which the caching device is either determined by the parent scope, or is set to
     // place the cached variables using the same device placement as for the rest of the RNN.
-    val currentVariableScope = tf.variableScope(name)(tf.VariableScope.current)
+    val currentVariableScope = tf.VariableScope.current
     val cachingDevice = {
       if (currentVariableScope.cachingDevice == null)
         (opSpecification: tf.OpSpecification) => opSpecification.device
@@ -133,101 +133,103 @@ abstract class Decoder[
         currentVariableScope.cachingDevice
     }
     tf.updatedVariableScope(currentVariableScope, cachingDevice = cachingDevice) {
-      var (initialFinished, initialInput, initialState) = initialize()
-      val zeroOutput = this.zeroOutput
-      val zeroOutputs = evStructureDecOut.outputs(zeroOutput)
-      val initialOutputTensorArrays = zeroOutputs.map(output => {
-        TensorArray.create(
-          size = 0,
-          dynamicSize = true,
-          elementShape = output.shape
-        )(TF.fromDataType(output.dataType))
-      })
-      if (maximumIterations != null)
-        initialFinished = tf.logicalOr(initialFinished, tf.greaterEqual(0, maximumIterations))
-      val initialSequenceLengths = tf.zerosLike(initialFinished).castTo[Int]
-      val initialTime = tf.zeros[Int](Shape.scalar())
-
-      type LoopVariables = (
-          Output[Int],
-              Seq[TensorArray[Any]],
-              DecState,
-              Out,
-              Output[Boolean],
-              Output[Int])
-
-      def condition(loopVariables: LoopVariables): Output[Boolean] = {
-        tf.logicalNot(tf.all(loopVariables._5))
-      }
-
-      def body(loopVariables: LoopVariables): LoopVariables = {
-        val (time, outputTensorArrays, state, input, finished, sequenceLengths) = loopVariables
-        val (decoderOutput, decoderState, nextInput, decoderFinished) = next(time, input, state)
-        val decoderOutputs = evStructureDecOut.outputs(decoderOutput)
-        val decoderStates = evStructureDecState.outputs(decoderState)
-        var nextFinished = {
-          if (tracksOwnFinished)
-            decoderFinished
-          else
-            tf.logicalOr(decoderFinished, finished)
-        }
-        if (maximumIterations != null)
-          nextFinished = tf.logicalOr(nextFinished, tf.greaterEqual(time + 1, maximumIterations))
-        val nextSequenceLengths = tf.select(
-          tf.logicalAnd(tf.logicalNot(finished), nextFinished),
-          tf.fill[Int, Int](tf.shape(sequenceLengths))(time + 1),
-          sequenceLengths)
-
-        // Zero out output values past finish and pass through state when appropriate
-        val (nextOutputs, nextStates) = {
-          if (imputeFinished) {
-            val nextOutputs = decoderOutputs.zip(zeroOutputs).map(o => {
-              tf.select(finished, o._2, o._1)(TF.fromDataType(o._2.dataType))
-            })
-            // Passes `decoderStates` through as the next state depending on their corresponding value in `finished` and
-            // on their type and shape. Tensor arrays and scalar states are always passed through.
-            val states = evStructureDecState.outputs(state)
-            val nextStates = decoderStates.zip(states).map(s => {
-              s._1.setShape(s._2.shape)
-              if (s._1.rank == 0) {
-                s._1
-              } else {
-                tf.select(finished, s._2, s._1)(TF.fromDataType(s._2.dataType))
-              }
-            })
-            (nextOutputs, nextStates)
-          } else {
-            (decoderOutputs, decoderStates)
-          }
-        }
-        val nextState = evStructureDecState.decodeOutput(state, nextStates)._1
-        val nextOutputTensorArrays = outputTensorArrays.zip(nextOutputs).map(t => {
-          t._1.write(time, t._2)
+      tf.nameScope(name) {
+        var (initialFinished, initialInput, initialState) = initialize()
+        val zeroOutput = this.zeroOutput
+        val zeroOutputs = evStructureDecOut.outputs(zeroOutput)
+        val initialOutputTensorArrays = zeroOutputs.map(output => {
+          TensorArray.create(
+            size = 0,
+            dynamicSize = true,
+            elementShape = output.shape
+          )(TF.fromDataType(output.dataType))
         })
-        (time + 1, nextOutputTensorArrays, nextState, nextInput, nextFinished, nextSequenceLengths)
+        if (maximumIterations != null)
+          initialFinished = tf.logicalOr(initialFinished, tf.greaterEqual(0, maximumIterations))
+        val initialSequenceLengths = tf.zerosLike(initialFinished).castTo[Int]
+        val initialTime = tf.zeros[Int](Shape.scalar())
+
+        type LoopVariables = (
+            Output[Int],
+                Seq[TensorArray[Any]],
+                DecState,
+                Out,
+                Output[Boolean],
+                Output[Int])
+
+        def condition(loopVariables: LoopVariables): Output[Boolean] = {
+          tf.logicalNot(tf.all(loopVariables._5))
+        }
+
+        def body(loopVariables: LoopVariables): LoopVariables = {
+          val (time, outputTensorArrays, state, input, finished, sequenceLengths) = loopVariables
+          val (decoderOutput, decoderState, nextInput, decoderFinished) = next(time, input, state)
+          val decoderOutputs = evStructureDecOut.outputs(decoderOutput)
+          val decoderStates = evStructureDecState.outputs(decoderState)
+          var nextFinished = {
+            if (tracksOwnFinished)
+              decoderFinished
+            else
+              tf.logicalOr(decoderFinished, finished)
+          }
+          if (maximumIterations != null)
+            nextFinished = tf.logicalOr(nextFinished, tf.greaterEqual(time + 1, maximumIterations))
+          val nextSequenceLengths = tf.select(
+            tf.logicalAnd(tf.logicalNot(finished), nextFinished),
+            tf.fill[Int, Int](tf.shape(sequenceLengths))(time + 1),
+            sequenceLengths)
+
+          // Zero out output values past finish and pass through state when appropriate
+          val (nextOutputs, nextStates) = {
+            if (imputeFinished) {
+              val nextOutputs = decoderOutputs.zip(zeroOutputs).map(o => {
+                tf.select(finished, o._2, o._1)(TF.fromDataType(o._2.dataType))
+              })
+              // Passes `decoderStates` through as the next state depending on their corresponding value in `finished`
+              // and on their type and shape. Tensor arrays and scalar states are always passed through.
+              val states = evStructureDecState.outputs(state)
+              val nextStates = decoderStates.zip(states).map(s => {
+                s._1.setShape(s._2.shape)
+                if (s._1.rank == 0) {
+                  s._1
+                } else {
+                  tf.select(finished, s._2, s._1)(TF.fromDataType(s._2.dataType))
+                }
+              })
+              (nextOutputs, nextStates)
+            } else {
+              (decoderOutputs, decoderStates)
+            }
+          }
+          val nextState = evStructureDecState.decodeOutput(state, nextStates)._1
+          val nextOutputTensorArrays = outputTensorArrays.zip(nextOutputs).map(t => {
+            t._1.write(time, t._2)
+          })
+          (time + 1, nextOutputTensorArrays, nextState, nextInput, nextFinished, nextSequenceLengths)
+        }
+
+        val (_, finalOutputTensorArrays, preFinalState, _, _, preFinalSequenceLengths): LoopVariables =
+          tf.whileLoop(
+            (loopVariables: LoopVariables) => condition(loopVariables),
+            (loopVariables: LoopVariables) => body(loopVariables),
+            (initialTime, initialOutputTensorArrays, initialState,
+                initialInput, initialFinished, initialSequenceLengths),
+            parallelIterations = parallelIterations,
+            swapMemory = swapMemory)
+
+        var (finalOutput, finalState, finalSequenceLengths) = finalize(
+          evStructureDecOut.decodeOutput(zeroOutput, finalOutputTensorArrays.map(_.stack()))._1,
+          preFinalState, preFinalSequenceLengths)
+
+        if (!outputTimeMajor) {
+          finalOutput = evStructureDecFinalOut.decodeOutput(
+            finalOutput,
+            evStructureDecFinalOut.outputs(finalOutput).map(o => {
+              RNN.transposeBatchTime(o)(TF.fromDataType(o.dataType))
+            }))._1
+        }
+        (finalOutput, finalState, finalSequenceLengths)
       }
-
-      val (_, finalOutputTensorArrays, preFinalState, _, _, preFinalSequenceLengths): LoopVariables =
-        tf.whileLoop(
-          (loopVariables: LoopVariables) => condition(loopVariables),
-          (loopVariables: LoopVariables) => body(loopVariables),
-          (initialTime, initialOutputTensorArrays, initialState,
-              initialInput, initialFinished, initialSequenceLengths),
-          parallelIterations = parallelIterations,
-          swapMemory = swapMemory)(OutputToShape[LoopVariables])
-
-      var (finalOutput, finalState, finalSequenceLengths) = finalize(
-        evStructureDecOut.decodeOutput(zeroOutput, finalOutputTensorArrays.map(_.stack()))._1,
-        preFinalState, preFinalSequenceLengths)
-
-      if (!outputTimeMajor) {
-        finalOutput = evStructureDecFinalOut.decodeOutput(
-          finalOutput,
-          evStructureDecFinalOut.outputs(finalOutput).map(o => {
-            RNN.transposeBatchTime(o)(TF.fromDataType(o.dataType))
-          }))._1
-      }
-      (finalOutput, finalState, finalSequenceLengths)
     }
   }
 }
