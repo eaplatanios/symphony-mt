@@ -28,8 +28,8 @@ class ParametersConfigParser(
     val dataConfig: DataConfig
 ) extends ConfigParser[ParametersConfigParser.Parameters] {
   override def parse(config: Config): ParametersConfigParser.Parameters = {
-    val wordEmbeddingsSize = config.getInt("word-embeddings-size")
-    val manager = config.getString("manager")
+    val wordEmbeddingsSize = config.get[Int]("word-embeddings-size")
+    val manager = config.get[String]("manager")
     val sharedWordEmbeddings: Boolean = dataConfig.vocabulary match {
       case GeneratedVocabulary(_, true) => true
       case _ => false
@@ -51,15 +51,15 @@ class ParametersConfigParser(
             tf.VarianceScalingInitializer.FanAverageScalingMode,
             tf.VarianceScalingInitializer.UniformDistribution))
       case "contextual-language" =>
-        val languageEmbeddingsSize = config.getInt("language-embeddings-size")
-        val hiddenLayers = config.getString("contextual-hidden-layers").split('-').map(_.toInt)
+        val languageEmbeddingsSize = config.get[Int]("language-embeddings-size")
+        val hiddenLayers = config.get[String]("contextual-hidden-layers", default = "").split('-').map(_.toInt)
         LanguageEmbeddingsManager(
           languageEmbeddingsSize = languageEmbeddingsSize,
           wordEmbeddingsType = wordEmbeddingsType,
           hiddenLayers = hiddenLayers)
       case "contextual-language-pair" =>
-        val languageEmbeddingsSize = config.getInt("language-embeddings-size")
-        val hiddenLayers = config.getString("contextual-hidden-layers").split('-').map(_.toInt)
+        val languageEmbeddingsSize = config.get[Int]("language-embeddings-size")
+        val hiddenLayers = config.get[String]("contextual-hidden-layers", default = "").split('-').map(_.toInt)
         LanguageEmbeddingsPairManager(
           languageEmbeddingsSize = languageEmbeddingsSize,
           wordEmbeddingsType = wordEmbeddingsType,
@@ -77,20 +77,20 @@ class ParametersConfigParser(
   }
 
   override def tag(config: Config, parsedValue: => ParametersConfigParser.Parameters): Option[String] = {
-    val wordEmbeddingsSize = config.getInt("word-embeddings-size")
-    val manager = config.getString("manager")
+    val wordEmbeddingsSize = config.get[Int]("word-embeddings-size")
+    val manager = config.get[String]("manager")
     val parameterManager = manager match {
       case "pairwise" => "pairwise"
       case "contextual-language" =>
-        val languageEmbeddingsSize = config.getInt("language-embeddings-size")
-        val hiddenLayers = config.getString("contextual-hidden-layers")
+        val languageEmbeddingsSize = config.get[Int]("language-embeddings-size")
+        val hiddenLayers = config.get[String]("contextual-hidden-layers")
         if (hiddenLayers.isEmpty)
           s"contextual-language:$languageEmbeddingsSize"
         else
           s"contextual-language:$languageEmbeddingsSize:$hiddenLayers"
       case "contextual-language-pair" =>
-        val languageEmbeddingsSize = config.getInt("language-embeddings-size")
-        val hiddenLayers = config.getString("contextual-hidden-layers")
+        val languageEmbeddingsSize = config.get[Int]("language-embeddings-size")
+        val hiddenLayers = config.get[String]("contextual-hidden-layers")
         if (hiddenLayers.isEmpty)
           s"contextual-language-pair:$languageEmbeddingsSize"
         else
