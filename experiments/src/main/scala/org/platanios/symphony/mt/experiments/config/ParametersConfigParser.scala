@@ -83,14 +83,14 @@ class ParametersConfigParser(
       case "pairwise" => "pairwise"
       case "contextual-language" =>
         val languageEmbeddingsSize = config.get[Int]("language-embeddings-size")
-        val hiddenLayers = config.get[String]("contextual-hidden-layers")
+        val hiddenLayers = config.get[String]("contextual-hidden-layers", default = "")
         if (hiddenLayers.isEmpty)
           s"contextual-language:$languageEmbeddingsSize"
         else
           s"contextual-language:$languageEmbeddingsSize:$hiddenLayers"
       case "contextual-language-pair" =>
         val languageEmbeddingsSize = config.get[Int]("language-embeddings-size")
-        val hiddenLayers = config.get[String]("contextual-hidden-layers")
+        val hiddenLayers = config.get[String]("contextual-hidden-layers", default = "")
         if (hiddenLayers.isEmpty)
           s"contextual-language-pair:$languageEmbeddingsSize"
         else
