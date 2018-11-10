@@ -33,7 +33,7 @@ class GNMTDecoder[T: TF : IsNotQuantized, State: OutputStructure, AttentionState
     val numResLayers: Int,
     val attention: RNNAttention[T, AttentionState, AttentionStateShape],
     val residual: Boolean = false,
-    val dropout: Option[Float] = None,
+    val dropout: Float = 0.0f,
     val useNewAttention: Boolean = true
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape],

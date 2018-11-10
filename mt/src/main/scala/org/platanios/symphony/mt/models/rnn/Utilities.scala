@@ -27,7 +27,7 @@ object Utilities {
       cell: Cell[T, State, StateShape],
       numInputs: Int,
       numUnits: Int,
-      dropout: Option[Float] = None,
+      dropout: Float = 0.0f,
       residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
       device: String = "",
       seed: Option[Int] = None,
@@ -41,14 +41,10 @@ object Utilities {
         // Create the main RNN cell.
         var createdCell = cell.create(name, numInputs, numUnits)
 
-        // Apply dropout.
-        createdCell = dropout.map(p => {
-          if (!context.mode.isTraining) {
-            createdCell
-          } else {
-            tf.DropoutWrapper(createdCell, 1.0f - p, seed = seed, name = "Dropout")
-          }
-        }).getOrElse(createdCell)
+        // Optionally, apply dropout.
+        if (dropout > 0.0f) {
+          createdCell = tf.DropoutWrapper(createdCell, 1.0f - dropout, seed = seed, name = "Dropout")
+        }
 
         // Add residual connections.
         createdCell = residualFn.map(tf.ResidualWrapper(createdCell, _)).getOrElse(createdCell)
@@ -64,7 +60,7 @@ object Utilities {
       numUnits: Int,
       numLayers: Int,
       numResidualLayers: Int,
-      dropout: Option[Float] = None,
+      dropout: Float = 0.0f,
       residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
       seed: Option[Int] = None,
       name: String
@@ -89,7 +85,7 @@ object Utilities {
       numUnits: Int,
       numLayers: Int,
       numResidualLayers: Int,
-      dropout: Option[Float] = None,
+      dropout: Float = 0.0f,
       residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
       seed: Option[Int] = None,
       name: String

@@ -26,6 +26,7 @@ import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot, SinglePivot}
 import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
 import org.platanios.symphony.mt.models.rnn._
 import org.platanios.symphony.mt.models.transformer.{TransformerDecoder, TransformerEncoder}
+import org.platanios.symphony.mt.models.transformer.helpers.{DenseReLUDenseFeedForwardLayer, DotProductAttention}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
@@ -48,7 +49,7 @@ class ModelConfigParser[T: TF : IsHalfOrFloatOrDouble](
 ) extends ConfigParser[Model[_]] {
   override def parse(config: Config): Model[_] = {
     val evalDatasets: Seq[(String, FileParallelDataset, Float)] = {
-      val evalDatasetTags = config.getString("evaluation.datasets").split(',').map(dataset => {
+      val evalDatasetTags = config.get[String]("evaluation.datasets").split(',').map(dataset => {
         val parts = dataset.split(':')
         (parts(0), parts(1).toFloat)
       })
@@ -66,7 +67,7 @@ class ModelConfigParser[T: TF : IsHalfOrFloatOrDouble](
         case Experiment.Translate => Seq.empty
       }
     }
-    val evalMetrics = config.getString("evaluation.metrics").split(',').map(Metric.cliToMTMetric(_)(languages))
+    val evalMetrics = config.get[String]("evaluation.metrics").split(',').map(Metric.cliToMTMetric(_)(languages))
     val encoder = ModelConfigParser.encoderFromConfig[T](config.getConfig("encoder"))
     val decoder = ModelConfigParser.decoderFromConfig[T](config.getConfig("decoder"))
     new Model(
@@ -91,17 +92,17 @@ class ModelConfigParser[T: TF : IsHalfOrFloatOrDouble](
 
     // TODO: !!! Make this more detailed.
     val stringBuilder = new StringBuilder()
-    stringBuilder.append(s"enc:${encoderConfig.getString("type")}")
+    stringBuilder.append(s"enc:${encoderConfig.get[String]("type")}")
     if (encoderConfig.hasPath("num-layers"))
-      stringBuilder.append(s":${encoderConfig.getInt("num-layers")}")
-    if (encoderConfig.hasPath("residual") && encoderConfig.getBoolean("residual"))
+      stringBuilder.append(s":${encoderConfig.get[Int]("num-layers")}")
+    if (encoderConfig.hasPath("residual") && encoderConfig.get[Boolean]("residual"))
       stringBuilder.append(":r")
-    stringBuilder.append(s".dec:${decoderConfig.getString("type")}")
+    stringBuilder.append(s".dec:${decoderConfig.get[String]("type")}")
     if (decoderConfig.hasPath("num-layers"))
-      stringBuilder.append(s":${decoderConfig.getInt("num-layers")}")
-    if (decoderConfig.hasPath("residual") && decoderConfig.getBoolean("residual"))
+      stringBuilder.append(s":${decoderConfig.get[Int]("num-layers")}")
+    if (decoderConfig.hasPath("residual") && decoderConfig.get[Boolean]("residual"))
       stringBuilder.append(":r")
-    if (decoderConfig.hasPath("use-attention") && decoderConfig.getBoolean("use-attention"))
+    if (decoderConfig.hasPath("use-attention") && decoderConfig.get[Boolean]("use-attention"))
       stringBuilder.append(":a")
     Some(stringBuilder.toString)
   }
@@ -109,7 +110,7 @@ class ModelConfigParser[T: TF : IsHalfOrFloatOrDouble](
 
 object ModelConfigParser {
   private def encoderFromConfig[T: TF : IsHalfOrFloatOrDouble](encoderConfig: Config): Encoder[Any] = {
-    val encoderType = encoderConfig.getString("type")
+    val encoderType = encoderConfig.get[String]("type")
     encoderType match {
       case "rnn" =>
         val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.getConfig("cell"))
@@ -128,15 +129,10 @@ object ModelConfigParser {
 
         new UnidirectionalRNNEncoder[T, cell.StateType, cell.StateShapeType](
           cell = cell.asInstanceOf[Cell[cell.DataType, cell.StateType, cell.StateShapeType]],
-          numUnits = encoderConfig.getInt("num-units"),
-          numLayers = encoderConfig.getInt("num-layers"),
-          residual = encoderConfig.getBoolean("residual"),
-          dropout = {
-            if (encoderConfig.hasPath("dropout"))
-              Some(encoderConfig.getDouble("dropout").toFloat)
-            else
-              None
-          }
+          numUnits = encoderConfig.get[Int]("num-units"),
+          numLayers = encoderConfig.get[Int]("num-layers"),
+          residual = encoderConfig.get[Boolean]("residual", default = true),
+          dropout = encoderConfig.get[Float]("dropout", default = 0.0f)
         ).asInstanceOf[Encoder[Any]]
       case "bi-rnn" =>
         val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.getConfig("cell"))
@@ -155,15 +151,10 @@ object ModelConfigParser {
 
         new BidirectionalRNNEncoder[T, cell.StateType, cell.StateShapeType](
           cell = cell.asInstanceOf[Cell[cell.DataType, cell.StateType, cell.StateShapeType]],
-          numUnits = encoderConfig.getInt("num-units"),
-          numLayers = encoderConfig.getInt("num-layers"),
-          residual = encoderConfig.getBoolean("residual"),
-          dropout = {
-            if (encoderConfig.hasPath("dropout"))
-              Some(encoderConfig.getDouble("dropout").toFloat)
-            else
-              None
-          }
+          numUnits = encoderConfig.get[Int]("num-units"),
+          numLayers = encoderConfig.get[Int]("num-layers"),
+          residual = encoderConfig.get[Boolean]("residual", default = true),
+          dropout = encoderConfig.get[Float]("dropout", default = 0.0f)
         ).asInstanceOf[Encoder[Any]]
       case "gnmt" =>
         val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.getConfig("cell"))
@@ -182,49 +173,46 @@ object ModelConfigParser {
 
         new GNMTEncoder[T, cell.StateType, cell.StateShapeType](
           cell = cell.asInstanceOf[Cell[cell.DataType, cell.StateType, cell.StateShapeType]],
-          numUnits = encoderConfig.getInt("num-units"),
-          numBiLayers = encoderConfig.getInt("num-bi-layers"),
-          numUniLayers = encoderConfig.getInt("num-uni-layers"),
-          numUniResLayers = encoderConfig.getInt("num-uni-res-layers"),
-          dropout = {
-            if (encoderConfig.hasPath("dropout"))
-              Some(encoderConfig.getDouble("dropout").toFloat)
-            else
-              None
-          }
+          numUnits = encoderConfig.get[Int]("num-units"),
+          numBiLayers = encoderConfig.get[Int]("num-bi-layers"),
+          numUniLayers = encoderConfig.get[Int]("num-uni-layers"),
+          numUniResLayers = encoderConfig.get[Int]("num-uni-res-layers"),
+          dropout = encoderConfig.get[Float]("dropout", default = 0.0f)
         ).asInstanceOf[Encoder[Any]]
       case "transformer" =>
+        val numUnits = encoderConfig.get[Int]("num-units")
         new TransformerEncoder[T](
-          numUnits = encoderConfig.getInt("num-units"),
-          numLayers = encoderConfig.getInt("num-layers"),
-          attentionKeysDepth = encoderConfig.getInt("attention-keys-depth"),
-          attentionValuesDepth = encoderConfig.getInt("attention-values-depth"),
-          attentionNumHeads = encoderConfig.getInt("attention-num-heads")
+          numUnits = numUnits,
+          numLayers = encoderConfig.get[Int]("num-layers"),
+          useSelfAttentionProximityBias = encoderConfig.get[Boolean]("use-self-attention-proximity-bias", default = false),
+          postPositionEmbeddingsDropout = encoderConfig.get[Float]("post-position-embeddings-dropout"),
+          attentionKeysDepth = encoderConfig.get[Int]("attention-keys-depth"),
+          attentionValuesDepth = encoderConfig.get[Int]("attention-values-depth"),
+          attentionNumHeads = encoderConfig.get[Int]("attention-num-heads"),
+          selfAttention = DotProductAttention(
+            dropoutRate = encoderConfig.get[Float]("dot-product-attention-dropout", default = 0.1f),
+            dropoutBroadcastAxes = Set.empty,
+            name = "DotProductAttention"),
+          feedForwardLayer = DenseReLUDenseFeedForwardLayer(
+            encoderConfig.get[Int]("feed-forward-filter-size"),
+            numUnits,
+            encoderConfig.get[Float]("feed-forward-relu-dropout"),
+            Set.empty, "FeedForward")
         ).asInstanceOf[Encoder[Any]]
       case _ => throw new IllegalArgumentException(s"'$encoderType' does not represent a valid encoder type.")
     }
   }
 
   private def decoderFromConfig[T: TF : IsHalfOrFloatOrDouble](decoderConfig: Config): Decoder[Any] = {
-    val decoderType = decoderConfig.getString("type")
+    val decoderType = decoderConfig.get[String]("type")
     decoderType match {
       case "rnn" =>
         val cell: Cell[T, _, _] = cellFromConfig[T](decoderConfig.getConfig("cell"))
-        val numUnits = decoderConfig.getInt("num-units")
-        val numLayers = decoderConfig.getInt("num-layers")
-        val residual = decoderConfig.getBoolean("residual")
-        val dropout = {
-          if (decoderConfig.hasPath("dropout"))
-            Some(decoderConfig.getDouble("dropout").toFloat)
-          else
-            None
-        }
-        val useAttention = {
-          if (decoderConfig.hasPath("use-attention"))
-            decoderConfig.getBoolean("use-attention")
-          else
-            false
-        }
+        val numUnits = decoderConfig.get[Int]("num-units")
+        val numLayers = decoderConfig.get[Int]("num-layers")
+        val residual = decoderConfig.get[Boolean]("residual", default = true)
+        val dropout = decoderConfig.get[Float]("dropout", default = 0.0f)
+        val useAttention = decoderConfig.get[Boolean]("use-attention", default = false)
 
         implicit val evOutputStructureState: OutputStructure[cell.StateType] = {
           cell.evOutputStructureState.asInstanceOf[OutputStructure[cell.StateType]]
@@ -257,18 +245,8 @@ object ModelConfigParser {
         }
       case "gnmt" =>
         val cell: Cell[T, _, _] = cellFromConfig[T](decoderConfig.getConfig("cell"))
-        val dropout = {
-          if (decoderConfig.hasPath("dropout"))
-            Some(decoderConfig.getDouble("dropout").toFloat)
-          else
-            None
-        }
-        val useNewAttention = {
-          if (decoderConfig.hasPath("use-new-attention"))
-            decoderConfig.getBoolean("use-new-attention")
-          else
-            false
-        }
+        val dropout = decoderConfig.get[Float]("dropout", default = 0.0f)
+        val useNewAttention = decoderConfig.get[Boolean]("use-new-attention", default = false)
 
         implicit val evOutputStructureState: OutputStructure[cell.StateType] = {
           cell.evOutputStructureState.asInstanceOf[OutputStructure[cell.StateType]]
@@ -280,9 +258,9 @@ object ModelConfigParser {
 
         new GNMTDecoder(
           cell = cell.asInstanceOf[Cell[cell.DataType, cell.StateType, cell.StateShapeType]],
-          numUnits = decoderConfig.getInt("num-units"),
-          numLayers = decoderConfig.getInt("num-layers"), // TODO: Should be equal to `numBiLayers + numUniLayers`
-          numResLayers = decoderConfig.getInt("num-res-layers"),
+          numUnits = decoderConfig.get[Int]("num-units"),
+          numLayers = decoderConfig.get[Int]("num-layers"), // TODO: Should be equal to `numBiLayers + numUniLayers`
+          numResLayers = decoderConfig.get[Int]("num-res-layers"),
           attention = new BahdanauRNNAttention(
             normalized = true,
             probabilityFn = (o: Output[T]) => tf.softmax(o)),
@@ -291,23 +269,30 @@ object ModelConfigParser {
         ).asInstanceOf[Decoder[Any]]
       case "transformer" =>
         new TransformerDecoder[T](
-          numLayers = decoderConfig.getInt("num-layers"),
-          attentionKeysDepth = decoderConfig.getInt("attention-keys-depth"),
-          attentionValuesDepth = decoderConfig.getInt("attention-values-depth"),
-          attentionNumHeads = decoderConfig.getInt("attention-num-heads"),
-          useEncoderDecoderAttentionCache = {
-            if (decoderConfig.hasPath("use-encoder-decoder-attention-cache"))
-              decoderConfig.getBoolean("use-encoder-decoder-attention-cache")
-            else
-              true
-          }).asInstanceOf[Decoder[Any]]
+          numLayers = decoderConfig.get[Int]("num-layers"),
+          useSelfAttentionProximityBias = decoderConfig.get[Boolean]("use-self-attention-proximity-bias", default = false),
+          postPositionEmbeddingsDropout = decoderConfig.get[Float]("post-position-embeddings-dropout"),
+          attentionKeysDepth = decoderConfig.get[Int]("attention-keys-depth"),
+          attentionValuesDepth = decoderConfig.get[Int]("attention-values-depth"),
+          attentionNumHeads = decoderConfig.get[Int]("attention-num-heads"),
+          selfAttention = DotProductAttention(
+            dropoutRate = decoderConfig.get[Float]("dot-product-attention-dropout", default = 0.1f),
+            dropoutBroadcastAxes = Set.empty,
+            name = "DotProductAttention"),
+          feedForwardLayer = DenseReLUDenseFeedForwardLayer(
+            decoderConfig.get[Int]("feed-forward-filter-size"),
+            decoderConfig.get[Int]("num-units"),
+            decoderConfig.get[Float]("feed-forward-relu-dropout"),
+            Set.empty, "FeedForward"),
+          useEncoderDecoderAttentionCache = decoderConfig.get[Boolean]("use-encoder-decoder-attention-cache", default = true)
+        ).asInstanceOf[Decoder[Any]]
       case _ => throw new IllegalArgumentException(s"'$decoderType' does not represent a valid decoder type.")
     }
   }
 
   private def cellFromConfig[T: TF : IsReal](cellConfig: Config): Cell[T, _, _] = {
     // Parse the cell activation function.
-    val cellActivation = cellConfig.getString("activation")
+    val cellActivation = cellConfig.get[String]("activation")
     val activation: Output[T] => Output[T] = cellActivation match {
       case "sigmoid" => tf.sigmoid(_)
       case "tanh" => tf.tanh(_)
@@ -319,11 +304,11 @@ object ModelConfigParser {
     }
 
     // Parse the cell type.
-    val cellType = cellConfig.getString("type")
+    val cellType = cellConfig.get[String]("type")
     cellType match {
       case "gru" => GRU(activation)
       case "lstm" =>
-        val forgetBias = if (cellConfig.hasPath("forget-bias")) cellConfig.getDouble("forget-bias").toFloat else 1.0f
+        val forgetBias = if (cellConfig.hasPath("forget-bias")) cellConfig.get[Double]("forget-bias").toFloat else 1.0f
         BasicLSTM(activation, forgetBias)
       case _ => throw new IllegalArgumentException(s"'$cellType' does not represent a valid RNN cell type.")
     }

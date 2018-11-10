@@ -32,7 +32,7 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: OutputStructure, S
     val numUnits: Int,
     val numLayers: Int,
     val residual: Boolean = false,
-    val dropout: Option[Float] = None,
+    val dropout: Float = 0.0f,
     val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape]
@@ -63,7 +63,7 @@ class UnidirectionalRNNDecoderWithAttention[T: TF : IsNotQuantized, State: Outpu
     val numLayers: Int,
     val attention: RNNAttention[T, AttentionState, AttentionStateShape],
     val residual: Boolean = false,
-    val dropout: Option[Float] = None,
+    val dropout: Float = 0.0f,
     val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
     val outputAttention: Boolean = true
 )(implicit

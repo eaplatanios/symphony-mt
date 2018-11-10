@@ -31,7 +31,7 @@ class GNMTEncoder[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
     val numBiLayers: Int,
     val numUniLayers: Int,
     val numUniResLayers: Int,
-    val dropout: Option[Float] = None,
+    val dropout: Float = 0.0f,
     val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape],

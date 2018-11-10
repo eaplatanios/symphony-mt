@@ -35,7 +35,7 @@ class UnidirectionalRNNEncoder[T: TF : IsNotQuantized, State: OutputStructure, S
     val numUnits: Int,
     val numLayers: Int,
     val residual: Boolean = false,
-    val dropout: Option[Float] = None,
+    val dropout: Float = 0.0f,
     val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape],
