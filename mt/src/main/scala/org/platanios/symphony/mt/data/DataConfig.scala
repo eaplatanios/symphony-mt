@@ -37,6 +37,7 @@ case class DataConfig(
     inferBatchSize: Long = 32,
     evalBatchSize: Long = 32,
     numBuckets: Int = 5,
+    bucketAdaptedBatchSize: Boolean = true,
     srcMaxLength: Int = 50,
     tgtMaxLength: Int = 50,
     bufferSize: Long = -1L,
