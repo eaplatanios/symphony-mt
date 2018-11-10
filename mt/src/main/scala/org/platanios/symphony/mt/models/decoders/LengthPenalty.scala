@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.helpers.decoders
+package org.platanios.symphony.mt.models.decoders
 
 import org.platanios.tensorflow.api._
 
@@ -35,7 +35,7 @@ case object NoLengthPenalty extends LengthPenalty {
   }
 }
 
-/** Exponential length penalty function. The penalty is equal to `sequenceLengths ^ alpha`, where all operations a re
+/** Exponential length penalty function. The penalty is equal to `sequenceLengths ^ alpha`, where all operations are
   * performed element-wise.
   *
   * @param  alpha Length penalty weight (disabled if set to `0.0f`).

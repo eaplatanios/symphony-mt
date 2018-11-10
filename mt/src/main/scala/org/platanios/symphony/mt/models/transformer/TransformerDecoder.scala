@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.transformer
 
 import org.platanios.symphony.mt.models.{Context, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
-import org.platanios.symphony.mt.models.helpers.decoders.{BasicDecoder, BeamSearchDecoder}
+import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder}
 import org.platanios.symphony.mt.models.transformer.helpers.Attention.MultiHeadAttentionCache
 import org.platanios.symphony.mt.models.transformer.helpers._
 import org.platanios.tensorflow.api._

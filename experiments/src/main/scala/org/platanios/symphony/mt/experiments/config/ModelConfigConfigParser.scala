@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.experiments.config
 import org.platanios.symphony.mt.experiments.Experiment
 import org.platanios.symphony.mt.models.ModelConfig
 import org.platanios.symphony.mt.models.ModelConfig.{InferenceConfig, LogConfig, OptConfig, TrainingConfig}
-import org.platanios.symphony.mt.models.helpers.decoders.{GoogleLengthPenalty, NoLengthPenalty}
+import org.platanios.symphony.mt.models.decoders.{GoogleLengthPenalty, NoLengthPenalty}
 import org.platanios.symphony.mt.models.pivoting.NoPivot
 import org.platanios.tensorflow.api.tf
 

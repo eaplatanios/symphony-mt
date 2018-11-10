@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.experiments
 
-import com.typesafe.config.{Config, ConfigException}
+import com.typesafe.config.Config
 
 import scala.reflect.runtime.universe._
 

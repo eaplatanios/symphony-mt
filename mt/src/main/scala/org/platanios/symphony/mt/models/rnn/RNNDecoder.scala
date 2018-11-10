@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.models.{Context, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
-import org.platanios.symphony.mt.models.helpers.decoders.{BasicDecoder, BeamSearchDecoder}
+import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.tf.RNNCell

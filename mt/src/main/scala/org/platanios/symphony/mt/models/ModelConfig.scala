@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.models.ModelConfig.{InferenceConfig, LogConfig, TrainingConfig}
-import org.platanios.symphony.mt.models.helpers.decoders.{LengthPenalty, NoLengthPenalty}
+import org.platanios.symphony.mt.models.decoders.{LengthPenalty, NoLengthPenalty}
 import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot}
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 

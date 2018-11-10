@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models.helpers.decoders
+package org.platanios.symphony.mt.models.decoders
 
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.exception.InvalidShapeException
