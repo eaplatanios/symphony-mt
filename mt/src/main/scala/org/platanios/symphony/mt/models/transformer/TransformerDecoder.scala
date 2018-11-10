@@ -70,7 +70,8 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       decoderInputSequences = tf.dropout(decoderInputSequences, 1.0f - postPositionEmbeddingsDropout)
 
     val encodedSequencesMaxLength = tf.shape(encodedSequences.states).slice(1)
-    val inputPadding = tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding").toFloat
+    val inputPadding = tf.logicalNot(
+      tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding")).toFloat
     val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding)
 
     // Obtain the output projection layer weights.
@@ -167,8 +168,9 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       ): RNNTuple[Output[T], (EncodedSequences[T], Output[Int], Seq[MultiHeadAttentionCache[Float]], Seq[MultiHeadAttentionCache[Float]])] = {
         val encodedSequences = input.state._1
         val encodedSequencesMaxLength = tf.shape(encodedSequences.states).slice(1)
-        val inputPadding = tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding")
-        val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding.toFloat)
+        val inputPadding = tf.logicalNot(
+          tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding")).toFloat
+        val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding)
 
         // This is necessary in order to deal with the beam search tiling.
         val step = input.state._2(0)

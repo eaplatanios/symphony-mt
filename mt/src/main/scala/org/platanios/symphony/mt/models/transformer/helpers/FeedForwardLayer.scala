@@ -15,11 +15,9 @@
 
 package org.platanios.symphony.mt.models.transformer.helpers
 
-import org.platanios.symphony.mt.models.{Context, Stage}
+import org.platanios.symphony.mt.models.Context
 import org.platanios.symphony.mt.models.helpers.Common
-import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.Mode
 
 import scala.language.postfixOps
 
@@ -29,7 +27,7 @@ import scala.language.postfixOps
 trait FeedForwardLayer {
   def apply(
       input: Output[Float],
-      paddingRemover: Option[PadRemover]
+      padRemover: Option[PadRemover]
   )(implicit context: Context): Output[Float]
 }
 
@@ -42,12 +40,12 @@ class DenseReLUDenseFeedForwardLayer protected (
 ) extends FeedForwardLayer {
   override def apply(
       input: Output[Float],
-      paddingRemover: Option[PadRemover]
+      padRemover: Option[PadRemover]
   )(implicit context: Context): Output[Float] = {
-    val inputShape = tf.shape(input).toInt
-    val processedInput = paddingRemover.map(pr => {
+    val inputShape = tf.shape(input)
+    val processedInput = padRemover.map(pr => {
       // Collapse `input` across examples.
-      val collapsedShape = tf.concatenate[Int](Seq(Tensor(-1), inputShape(2 ::).toInt), axis = 0)
+      val collapsedShape = tf.concatenate[Int](Seq(Tensor(-1), inputShape(2 ::)), axis = 0)
       val collapsedInput = tf.reshape(input, collapsedShape)
       // Remove the padding positions.
       tf.expandDims(pr.remove(collapsedInput), axis = 0)
@@ -55,7 +53,7 @@ class DenseReLUDenseFeedForwardLayer protected (
     val output = Common.denseReLUDense(
       processedInput, filterSize, outputSize,
       reluDropoutRate, reluDropoutBroadcastAxes, name)
-    paddingRemover.map(pr => {
+    padRemover.map(pr => {
       // Restore `output` to the original shape of `input`, including padding.
       tf.reshape(pr.restore(tf.squeeze(output, axes = Seq(0))), inputShape)
     }).getOrElse(output)

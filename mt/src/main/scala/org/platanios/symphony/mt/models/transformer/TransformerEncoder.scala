@@ -55,7 +55,8 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
     val embeddedSequencesMaxLength = tf.shape(embeddedSequences.sequences).slice(1)
 
     // Perform some pre-processing to the token embeddings sequence.
-    val padding = tf.sequenceMask(embeddedSequences.lengths, embeddedSequencesMaxLength, name = "Padding").toFloat
+    val padding = tf.logicalNot(
+      tf.sequenceMask(embeddedSequences.lengths, embeddedSequencesMaxLength, name = "Padding")).toFloat
     var encoderSelfAttentionBias = Attention.attentionBiasIgnorePadding(padding)
     if (useSelfAttentionProximityBias)
       encoderSelfAttentionBias += Attention.attentionBiasProximal(embeddedSequencesMaxLength)
