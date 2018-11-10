@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.{Context, ModelConfig}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -39,7 +39,8 @@ trait WordEmbeddingsType {
   ): Output[Resource]
 
   def createWordEmbeddings(
-      languages: Seq[(Language, Vocabulary)]
+      languages: Seq[(Language, Vocabulary)],
+      modelConfig: ModelConfig
   ): T
 
   def lookupTable(
@@ -55,7 +56,6 @@ trait WordEmbeddingsType {
   )(implicit context: Context): Output[Float]
 
   def projectionToWords(
-      languages: Seq[(Language, Vocabulary)],
       languageIds: Seq[Output[Int]],
       projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,

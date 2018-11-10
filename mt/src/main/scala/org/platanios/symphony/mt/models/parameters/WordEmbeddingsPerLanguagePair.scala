@@ -16,7 +16,8 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.{Context, ModelConfig}
+import org.platanios.symphony.mt.models.parameters
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -43,13 +44,14 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
   }
 
   override def createWordEmbeddings(
-      languages: Seq[(Language, Vocabulary)]
+      languages: Seq[(Language, Vocabulary)],
+      modelConfig: ModelConfig
   ): T = {
-    val languagePairs = languages
-        .combinations(2)
-        .map(c => (c(0), c(1)))
-        .flatMap(p => Seq(p, (p._2, p._1)))
-        .toSeq
+    // Determine all the language index pairs that are relevant given the current model configuration.
+    val languageIndexPairs = parameters.languageIndexPairs(languages.map(_._1), modelConfig)
+    val languagePairs = languageIndexPairs.map(p => (languages(p._1), languages(p._2)))
+
+    // Create separate word embeddings for each language pair.
     languagePairs.map(pair => tf.variableScope(s"${pair._1._1.abbreviation}-${pair._2._1.abbreviation}") {
       WordEmbeddingsPerLanguagePair.EmbeddingsPair(
         embeddings1 = tf.variable[Float](
@@ -76,11 +78,11 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
       languageId: Output[Int],
       keys: Output[Int]
   )(implicit context: Context): Output[Float] = {
-    val languageIdPairs = languageIds
-        .combinations(2)
-        .map(c => (c(0), c(1)))
-        .flatMap(p => Seq(p, (p._2, p._1)))
-        .toSeq
+    // Determine all the language index pairs that are relevant given the current model configuration.
+    val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.modelConfig)
+    val languageIdPairs = languageIndexPairs.map(p => (languageIds(p._1), languageIds(p._2)))
+
+    // Perform a separate word embedding lookup for each language pair.
     val predicates = embeddingTables.zip(languageIdPairs).flatMap {
       case (embeddings, (srcLangId, tgtLangId)) =>
         val pairPredicate = tf.logicalAnd(
@@ -104,19 +106,18 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
   }
 
   override def projectionToWords(
-      languages: Seq[(Language, Vocabulary)],
       languageIds: Seq[Output[Int]],
       projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
       languageId: Output[Int]
   )(implicit context: Context): Output[Float] = {
+    // Determine all the language index pairs that are relevant given the current model configuration.
+    val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.modelConfig)
+
     val projectionsForSize = projectionsToWords
         .getOrElseUpdate(inputSize, {
-          val languagePairs = languages
-              .combinations(2)
-              .map(c => (c(0), c(1)))
-              .flatMap(p => Seq(p, (p._2, p._1)))
-              .toSeq
+          val languagePairs = languageIndexPairs.map(p => (context.languages(p._1), context.languages(p._2)))
+
           languagePairs.map(pair => tf.variableScope(s"${pair._1._1.abbreviation}-${pair._2._1.abbreviation}") {
             WordEmbeddingsPerLanguagePair.EmbeddingsPair(
               embeddings1 = tf.variable[Float](
@@ -129,11 +130,8 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
                 initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)).value)
           })
         })
-    val languageIdPairs = languageIds
-        .combinations(2)
-        .map(c => (c(0), c(1)))
-        .flatMap(p => Seq(p, (p._2, p._1)))
-        .toSeq
+
+    val languageIdPairs = languageIndexPairs.map(p => (languageIds(p._1), languageIds(p._2)))
     val predicates = projectionsForSize.zip(languageIdPairs).flatMap {
       case (projections, (srcLangId, tgtLangId)) =>
         val pairPredicate = tf.logicalAnd(

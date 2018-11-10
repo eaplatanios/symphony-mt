@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.{Context, ModelConfig}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -42,9 +42,12 @@ class LanguageEmbeddingsPairManager protected (
     parameters -= graph
   }
 
-  override def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
+  override def initialize(
+      languages: Seq[(Language, Vocabulary)],
+      modelConfig: ModelConfig
+  ): Unit = {
     tf.variableScope("ParameterManager") {
-      super.initialize(languages)
+      super.initialize(languages, modelConfig)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {
         languageEmbeddings += graph -> {

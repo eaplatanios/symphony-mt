@@ -59,7 +59,10 @@ class ParameterManager protected (
     projectionsToWords -= graph
   }
 
-  def initialize(languages: Seq[(Language, Vocabulary)]): Unit = {
+  def initialize(
+      languages: Seq[(Language, Vocabulary)],
+      modelConfig: ModelConfig
+  ): Unit = {
     tf.variableScope("ParameterManager") {
       languageIds.keys.filter(_.isClosed).foreach(removeGraph)
       this.languages = languages
@@ -80,7 +83,7 @@ class ParameterManager protected (
         }
 
         wordEmbeddings += graph -> tf.variableScope("WordEmbeddings") {
-          wordEmbeddingsType.createWordEmbeddings(languages)
+          wordEmbeddingsType.createWordEmbeddings(languages, modelConfig)
         }
       }
     }
@@ -145,7 +148,6 @@ class ParameterManager protected (
     tf.variableScope("ParameterManager/ProjectionToWords") {
       val graph = currentGraph
       wordEmbeddingsType.projectionToWords(
-        languages,
         languageIds(graph),
         projectionsToWords.getOrElseUpdate(graph, mutable.HashMap.empty),
         inputSize,

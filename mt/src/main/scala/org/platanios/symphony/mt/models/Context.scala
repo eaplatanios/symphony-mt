@@ -15,9 +15,10 @@
 
 package org.platanios.symphony.mt.models
 
-import org.platanios.symphony.mt.Environment
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.DataConfig
 import org.platanios.symphony.mt.models.parameters.ParameterManager
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api.Output
 import org.platanios.tensorflow.api.learn.Mode
 
@@ -25,6 +26,7 @@ import org.platanios.tensorflow.api.learn.Mode
   * @author Emmanouil Antonios Platanios
   */
 case class Context(
+    languages: Seq[(Language, Vocabulary)],
     env: Environment,
     parameterManager: ParameterManager,
     deviceManager: DeviceManager,

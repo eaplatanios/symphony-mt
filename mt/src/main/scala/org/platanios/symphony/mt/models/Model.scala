@@ -251,16 +251,16 @@ class Model[Code](
         })
   }
 
-//  def translate(
-//      srcLanguage: (Language, Vocabulary),
-//      tgtLanguage: (Language, Vocabulary),
-//      input: (Tensor, Tensor)
-//  ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
-//    TODO: Encode the input tensors.
-//    translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
-//      name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
-//      tensors = Map(srcLanguage._1 -> Seq(input))))
-//  }
+  //  def translate(
+  //      srcLanguage: (Language, Vocabulary),
+  //      tgtLanguage: (Language, Vocabulary),
+  //      input: (Tensor, Tensor)
+  //  ): Iterator[((Tensor, Tensor, Tensor, Tensor), (Tensor, Tensor, Tensor))] = {
+  //    TODO: Encode the input tensors.
+  //    translate(srcLanguage._1, tgtLanguage._1, TensorParallelDataset(
+  //      name = "TranslateTemp", vocabularies = Map(srcLanguage, tgtLanguage),
+  //      tensors = Map(srcLanguage._1 -> Seq(input))))
+  //  }
 
   def evaluate(
       datasets: Seq[(String, FileParallelDataset, Float)],
@@ -320,7 +320,7 @@ class Model[Code](
           input: (SentencesWithLanguagePair[String], Sentences[String])
       )(implicit mode: Mode): SentencesWithLanguage[Float] = {
         tf.createWith(device = deviceManager.nextDevice(env, moveToNext = false)) {
-          parameterManager.initialize(languages)
+          parameterManager.initialize(languages, modelConfig)
 
           val srcLanguageID = input._1._1
           val tgtLanguageID = input._1._2
@@ -336,6 +336,7 @@ class Model[Code](
           // Encode the source sentences.
           val encoderOutput = tf.variableScope("Encoder") {
             implicit val context: Context = Context(
+              languages = languages,
               env = env,
               parameterManager = parameterManager,
               deviceManager = deviceManager,
@@ -353,6 +354,7 @@ class Model[Code](
           // Decode to obtain the target sentences.
           val decoderOutput = tf.variableScope("Decoder") {
             implicit val context: Context = Context(
+              languages = languages,
               env = env,
               parameterManager = parameterManager,
               deviceManager = deviceManager,
@@ -381,7 +383,7 @@ class Model[Code](
           input: SentencesWithLanguagePair[String]
       )(implicit mode: Mode): SentencesWithLanguage[String] = {
         tf.createWith(device = deviceManager.nextDevice(env, moveToNext = false)) {
-          parameterManager.initialize(languages)
+          parameterManager.initialize(languages, modelConfig)
 
           val srcLanguageID = input._1
           val tgtLanguageID = input._2
@@ -397,6 +399,7 @@ class Model[Code](
               // Encode the source sentences.
               val encoderOutput = tf.variableScope("Encoder") {
                 implicit val context: Context = Context(
+                  languages = languages,
                   env = env,
                   parameterManager = parameterManager,
                   deviceManager = deviceManager,
@@ -414,6 +417,7 @@ class Model[Code](
               // Decode to obtain the target sentences.
               val decoderOutput = tf.variableScope("Decoder") {
                 implicit val context: Context = Context(
+                  languages = languages,
                   env = env,
                   parameterManager = parameterManager,
                   deviceManager = deviceManager,
@@ -454,6 +458,7 @@ class Model[Code](
                 // Encode the source sentences in this step of the pivoting chain.
                 val encoderOutput = tf.variableScope("Encoder") {
                   implicit val context: Context = Context(
+                    languages = languages,
                     env = env,
                     parameterManager = parameterManager,
                     deviceManager = deviceManager,
@@ -474,6 +479,7 @@ class Model[Code](
                 // Decode to obtain the target sentences in this step of the pivoting chain.
                 val decoderOutput = tf.variableScope("Decoder") {
                   implicit val context: Context = Context(
+                    languages = languages,
                     env = env,
                     parameterManager = parameterManager,
                     deviceManager = deviceManager,
@@ -513,7 +519,7 @@ class Model[Code](
           input: (SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String]))
       )(implicit mode: Mode): Output[Float] = {
         tf.createWith(nameScope = "Loss", device = deviceManager.nextDevice(env, moveToNext = false)) {
-          parameterManager.initialize(languages)
+          parameterManager.initialize(languages, modelConfig)
 
           val tgtLanguage = input._1._1
 
