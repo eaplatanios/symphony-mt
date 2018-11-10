@@ -34,25 +34,36 @@ class PairwiseManager protected (
     tf.variableScope("ParameterManager") {
       val graph = currentGraph
 
+      val allLanguages = languages.map(_._1)
+
+      val languagePairs = {
+        if (context.modelConfig.languagePairs.nonEmpty) {
+          context.modelConfig.languagePairs.toSeq
+        } else {
+          allLanguages
+              .combinations(2)
+              .map(c => (c(0), c(1)))
+              .flatMap(p => Seq(p, (p._2, p._1)))
+              .toSeq
+        }
+      }
+
       // Obtain the variable values for all language pairs.
-      val variableValues = languages.map(_._1)
-          .combinations(2)
-          .map(c => (c(0), c(1)))
-          .flatMap(p => Seq(p, (p._2, p._1)))
-          .toSeq
-          .map(pair => {
-            tf.variable[P](
-              s"$name/${pair._1.abbreviation}-${pair._2.abbreviation}", shape,
-              initializer = variableInitializer, reuse = variableReuse).value
-          })
+      val variableValues = languagePairs.map(pair => {
+        tf.variable[P](
+          s"$name/${pair._1.abbreviation}-${pair._2.abbreviation}", shape,
+          initializer = variableInitializer, reuse = variableReuse).value
+      })
 
       // Choose the variable for the current language pair.
       tf.nameScope(name) {
-        val languageIdPairs = languageIds(graph)
-            .combinations(2)
-            .map(c => (c(0), c(1)))
-            .flatMap(p => Seq(p, (p._2, p._1)))
-            .toSeq
+        val languageIndexPairs = languagePairs.map(pair => {
+          (allLanguages.indexOf(pair._1), allLanguages.indexOf(pair._2))
+        })
+        val allLanguageIds = languageIds(graph)
+        val languageIdPairs = languageIndexPairs.map(indicesPair => {
+          (allLanguageIds(indicesPair._1), allLanguageIds(indicesPair._2))
+        })
         val predicates = variableValues.zip(languageIdPairs).map {
           case (v, (srcLangId, tgtLangId)) =>
             (tf.logicalAnd(
