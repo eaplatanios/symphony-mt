@@ -238,14 +238,12 @@ object Inputs {
               d
             }
           })
-          .prefetch(bufferSize)
           // Add sequence lengths.
           .map(d => (
               /* Language pair */ (d._1._1, d._1._2),
               /* Source sentences */ (d._2._1, tf.size(d._2._1).toInt),
               /* Target sentences */ (d._2._2, tf.size(d._2._2).toInt)),
             name = "Map/AddLengths")
-          .prefetch(bufferSize)
 
     val batchingFn = (dataset: SentencePairsDataset) => {
       val zero = Tensor.zeros[Int](Shape())
@@ -286,7 +284,14 @@ object Inputs {
           batchingFn(pair._2)
         }
 
-        datasetBeforeBucketing.groupByWindow(keyFn, reduceFn, _ => batchSize)
+        def windowSizeFn(key: Output[Long]): Output[Long] = {
+          if (dataConfig.bucketAdaptedBatchSize)
+            tf.minimum(tf.truncateDivide(batchSize, key), tf.constant[Long](1L))
+          else
+            batchSize
+        }
+
+        datasetBeforeBucketing.groupByWindow(keyFn, reduceFn, windowSizeFn)
       }
     }
 

@@ -27,13 +27,13 @@ TensorFlow Scala provides, you need to change line 76 in
 the `build.sbt` file, from this:
 
 ```scala
-libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion
+libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowScalaVersion
 ```
 
 to this:
 
 ```scala
-libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowForScalaVersion classifier "linux-cpu-x86_64"
+libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowScalaVersion classifier "linux-cpu-x86_64"
 ```
 
 *Make sure to replace `linux-cpu-x86_64` with the string
@@ -47,12 +47,12 @@ Scala, please refer to the
 
 ## TODOs
 
+- [ ] Add support for separate source/target word
+      embeddings.
 - [ ] Add support for bridges between the encoder and
       the decoder (inspired from OpenNMT).
 - [ ] Add support for merging the bidirectional encoder
       states using either summation or concatenation.
-- [ ] Add support for residual connections in the simple
-      encoders and decoders.
 - [ ] Add support for other attention models, as in
       [here](https://arxiv.org/pdf/1508.04025.pdf).
 - [ ] Add support for scheduled sampling, presented in

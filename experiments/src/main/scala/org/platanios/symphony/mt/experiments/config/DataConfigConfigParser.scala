@@ -28,12 +28,12 @@ import java.nio.file.Paths
   */
 object DataConfigConfigParser extends ConfigParser[DataConfig] {
   override def parse(config: Config): DataConfig = {
-    val tokenizer = config.getString("tokenizer")
-    val cleaner = config.getString("cleaner")
-    val vocabularyType = config.getString("vocabulary.type")
+    val tokenizer = config.get[String]("tokenizer")
+    val cleaner = config.get[String]("cleaner")
+    val vocabularyType = config.get[String]("vocabulary.type")
     DataConfig(
-      dataDir = Paths.get(config.getString("data-dir")),
-      loaderBufferSize = config.getInt("loader-buffer-size"),
+      dataDir = Paths.get(config.get[String]("data-dir")),
+      loaderBufferSize = config.get[Int]("loader-buffer-size"),
       tokenizer = tokenizer.split(":") match {
         case Array(name) if name == "none" => NoTokenizer
         case Array(name) if name == "moses" => MosesTokenizer()
@@ -49,36 +49,37 @@ object DataConfigConfigParser extends ConfigParser[DataConfig] {
         case "none" => NoVocabulary
         case "merged" => MergedVocabularies
         case "word-count" =>
-          val shared = config.getBoolean("vocabulary.shared")
-          val size = config.getInt("vocabulary.size")
-          val minCount = if (config.hasPath("vocabulary.min-count")) config.getInt("vocabulary.min-count") else -1
+          val shared = config.get[Boolean]("vocabulary.shared")
+          val size = config.get[Int]("vocabulary.size")
+          val minCount = config.get[Int]("vocabulary.min-count", default = -1)
           GeneratedVocabulary(
             generator = SimpleVocabularyGenerator(size, minCount),
             shared = shared)
         case "bpe" =>
-          val shared = config.getBoolean("vocabulary.shared")
-          val caseSensitive = config.getBoolean("vocabulary.case-sensitive")
-          val numMergeOps = config.getInt("vocabulary.num-merge-ops")
-          val minCount = if (config.hasPath("vocabulary.min-count")) config.getInt("vocabulary.min-count") else -1
+          val shared = config.get[Boolean]("vocabulary.shared")
+          val caseSensitive = config.get[Boolean]("vocabulary.case-sensitive")
+          val numMergeOps = config.get[Int]("vocabulary.num-merge-ops")
+          val minCount = config.get[Int]("vocabulary.min-count", default = -1)
           GeneratedVocabulary(
             generator = BPEVocabularyGenerator(numMergeOps, caseSensitive = caseSensitive, countThreshold = minCount),
             shared = shared)
         case _ => throw new IllegalArgumentException(s"'$vocabularyType' does not represent a valid vocabulary type.")
       },
-      parallelPortion = config.getDouble("parallel-portion").toFloat,
-      trainBatchSize = config.getInt("train-batch-size"),
-      inferBatchSize = config.getInt("infer-batch-size"),
-      evalBatchSize = config.getInt("eval-batch-size"),
-      numBuckets = config.getInt("num-buckets"),
-      srcMaxLength = config.getInt("src-max-length"),
-      tgtMaxLength = config.getInt("tgt-max-length"),
-      bufferSize = config.getInt("input-pipeline-buffer-size"),
-      numShards = config.getInt("input-pipeline-num-shards"),
-      shardIndex = config.getInt("input-pipeline-shard-index"),
-      numParallelCalls = config.getInt("input-pipeline-num-parallel-calls"),
-      unknownToken = config.getString("vocabulary.unknown-token"),
-      beginOfSequenceToken = config.getString("vocabulary.begin-of-sequence-token"),
-      endOfSequenceToken = config.getString("vocabulary.end-of-sequence-token"))
+      parallelPortion = config.get[Float]("parallel-portion"),
+      trainBatchSize = config.get[Int]("train-batch-size"),
+      inferBatchSize = config.get[Int]("infer-batch-size"),
+      evalBatchSize = config.get[Int]("eval-batch-size"),
+      numBuckets = config.get[Int]("num-buckets"),
+      bucketAdaptedBatchSize = config.get[Boolean]("bucket-adapted-batch-size"),
+      srcMaxLength = config.get[Int]("src-max-length"),
+      tgtMaxLength = config.get[Int]("tgt-max-length"),
+      bufferSize = config.get[Int]("input-pipeline-buffer-size"),
+      numShards = config.get[Int]("input-pipeline-num-shards"),
+      shardIndex = config.get[Int]("input-pipeline-shard-index"),
+      numParallelCalls = config.get[Int]("input-pipeline-num-parallel-calls"),
+      unknownToken = config.get[String]("vocabulary.unknown-token"),
+      beginOfSequenceToken = config.get[String]("vocabulary.begin-of-sequence-token"),
+      endOfSequenceToken = config.get[String]("vocabulary.end-of-sequence-token"))
   }
 
   override def tag(config: Config, parsedValue: => DataConfig): Option[String] = {
