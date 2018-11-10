@@ -52,18 +52,18 @@ class ParametersConfigParser(
             tf.VarianceScalingInitializer.UniformDistribution))
       case "contextual-language" =>
         val languageEmbeddingsSize = config.get[Int]("language-embeddings-size")
-        val hiddenLayers = config.get[String]("contextual-hidden-layers", default = "").split('-').map(_.toInt)
+        val hiddenLayers = config.get[String]("contextual-hidden-layers", default = "")
         LanguageEmbeddingsManager(
           languageEmbeddingsSize = languageEmbeddingsSize,
           wordEmbeddingsType = wordEmbeddingsType,
-          hiddenLayers = hiddenLayers)
+          hiddenLayers = if (hiddenLayers.nonEmpty) hiddenLayers.split('-').map(_.toInt) else Seq.empty)
       case "contextual-language-pair" =>
         val languageEmbeddingsSize = config.get[Int]("language-embeddings-size")
-        val hiddenLayers = config.get[String]("contextual-hidden-layers", default = "").split('-').map(_.toInt)
+        val hiddenLayers = config.get[String]("contextual-hidden-layers", default = "")
         LanguageEmbeddingsPairManager(
           languageEmbeddingsSize = languageEmbeddingsSize,
           wordEmbeddingsType = wordEmbeddingsType,
-          hiddenLayers = hiddenLayers)
+          hiddenLayers = if (hiddenLayers.nonEmpty) hiddenLayers.split('-').map(_.toInt) else Seq.empty)
       case "google-multilingual" =>
         GoogleMultilingualManager(
           wordEmbeddingsType = wordEmbeddingsType,
