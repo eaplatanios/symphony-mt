@@ -17,6 +17,8 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.models.ModelConfig.{InferenceConfig, LogConfig, TrainingConfig}
+import org.platanios.symphony.mt.models.curriculum.competency.LinearStepCompetency
+import org.platanios.symphony.mt.models.curriculum.{Curriculum, SentenceLengthCurriculum}
 import org.platanios.symphony.mt.models.decoders.{LengthPenalty, NoLengthPenalty}
 import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot}
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
@@ -41,7 +43,13 @@ object ModelConfig {
       numSteps: Int,
       summarySteps: Int,
       checkpointSteps: Int,
-      optConfig: OptConfig)
+      optConfig: OptConfig,
+      curriculum: Curriculum[SentencePairs[String]] = defaultCurriculum)
+
+  val defaultCurriculum: Curriculum[SentencePairs[String]] = {
+//     Curriculum.none[SentencePairs[String]]
+    new SentenceLengthCurriculum(new LinearStepCompetency[Float](0, 10000))
+  }
 
   case class InferenceConfig(
       pivot: Pivot = NoPivot,

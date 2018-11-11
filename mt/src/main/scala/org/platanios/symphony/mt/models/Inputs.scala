@@ -17,8 +17,11 @@ package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data._
+import org.platanios.symphony.mt.models.curriculum.Curriculum
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.learn.Counter
+import org.platanios.tensorflow.api.ops.FunctionGraph
 
 import java.nio.charset.StandardCharsets
 
@@ -76,6 +79,7 @@ object Inputs {
 
   def createTrainDataset(
       dataConfig: DataConfig,
+      modelConfig: ModelConfig,
       datasets: Seq[FileParallelDataset],
       languages: Seq[(Language, Vocabulary)],
       includeIdentityTranslations: Boolean = false,
@@ -124,7 +128,7 @@ object Inputs {
         }.reduce((d1, d2) => d1.concatenateWith(d2))
 
     val parallelDatasetCreator: (Output[Int], Output[Int], Output[String], Output[String], Output[Int], Output[Int]) => TrainDataset =
-      createSingleParallelDataset(dataConfig, repeat, isEval)
+      createSingleParallelDataset(dataConfig, modelConfig, repeat, isEval)
 
     filesDataset
         .shuffle(filteredDatasets.size)
@@ -154,6 +158,7 @@ object Inputs {
 
   def createEvalDatasets(
       dataConfig: DataConfig,
+      modelConfig: ModelConfig,
       datasets: Seq[(String, FileParallelDataset, Float)],
       languages: Seq[(Language, Vocabulary)],
       languagePairs: Option[Set[(Language, Language)]] = None
@@ -174,7 +179,11 @@ object Inputs {
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
             (datasetName, () => tf.nameScope(datasetName) {
               createTrainDataset(
-                dataConfig.copy(parallelPortion = parallelPortion), Seq(dataset), languages,
+                dataConfig.copy(parallelPortion = parallelPortion),
+                modelConfig = modelConfig.copy(
+                  trainingConfig = modelConfig.trainingConfig.copy(
+                    curriculum = Curriculum.none)),
+                Seq(dataset), languages,
                 includeIdentityTranslations = false, repeat = false, isEval = true,
                 languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
             })
@@ -183,6 +192,7 @@ object Inputs {
 
   private def createSingleParallelDataset(
       dataConfig: DataConfig,
+      modelConfig: ModelConfig,
       repeat: Boolean,
       isEval: Boolean
   )(
@@ -208,7 +218,7 @@ object Inputs {
       trueFn = () => srcLength.toLong,
       falseFn = () => (srcLength.toFloat * dataConfig.parallelPortion).floor.toLong)
 
-    val datasetBeforeBucketing =
+    val datasetBeforeCurriculum =
       srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset)
           .take(numParallel))
           .shard(dataConfig.numShards, dataConfig.shardIndex)
@@ -244,6 +254,17 @@ object Inputs {
               /* Source sentences */ (d._2._1, tf.size(d._2._1).toInt),
               /* Target sentences */ (d._2._2, tf.size(d._2._2).toInt)),
             name = "Map/AddLengths")
+
+    // Obtain the outer graph (outside this function call) and get the global step variable defined in that graph.
+    var graph = tf.currentGraph
+    while (graph.isInstanceOf[FunctionGraph])
+      graph = graph.asInstanceOf[FunctionGraph].outerGraph
+    val globalStep = Counter.getOrCreate(Graph.Keys.GLOBAL_STEP, local = false, graph = graph)
+
+    val datasetBeforeBucketing = modelConfig.trainingConfig.curriculum.samplesFilter(globalStep.value) match {
+      case None => datasetBeforeCurriculum
+      case Some(samplesFilter) => datasetBeforeCurriculum.filter(samplesFilter)
+    }
 
     val batchingFn = (dataset: SentencePairsDataset) => {
       val zero = Tensor.zeros[Int](Shape())
@@ -285,10 +306,13 @@ object Inputs {
         }
 
         def windowSizeFn(key: Output[Long]): Output[Long] = {
-          if (dataConfig.bucketAdaptedBatchSize)
-            tf.minimum(tf.truncateDivide(batchSize, key), tf.constant[Long](1L))
-          else
-            batchSize
+          val providedBatchSize = tf.constant[Long](batchSize)
+          if (dataConfig.bucketAdaptedBatchSize) {
+            val one = tf.constant[Long](1L)
+            tf.maximum(tf.truncateDivide(providedBatchSize, key + one), one)
+          } else {
+            providedBatchSize
+          }
         }
 
         datasetBeforeBucketing.groupByWindow(keyFn, reduceFn, windowSizeFn)
