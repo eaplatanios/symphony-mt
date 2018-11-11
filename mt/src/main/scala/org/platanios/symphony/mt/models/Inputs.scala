@@ -204,7 +204,7 @@ object Inputs {
       tgtLength: Output[Int]
   ): TrainDataset = {
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evalBatchSize
-    val bufferSize = if (dataConfig.bufferSize == -1L) 64L * batchSize else dataConfig.bufferSize
+    val shuffleBufferSize = if (dataConfig.shuffleBufferSize == -1L) 64L * batchSize else dataConfig.shuffleBufferSize
 
     val srcLanguageDataset = tf.data.datasetFromOutputs(srcLanguage).repeat()
     val tgtLanguageDataset = tf.data.datasetFromOutputs(tgtLanguage).repeat()
@@ -223,7 +223,7 @@ object Inputs {
           .take(numParallel))
           .shard(dataConfig.numShards, dataConfig.shardIndex)
           .transform(d => if (repeat) d.repeat() else d)
-          .transform(d => if (!isEval) d.shuffle(bufferSize) else d)
+          .transform(d => if (!isEval) d.shuffle(shuffleBufferSize) else d)
           // Tokenize by splitting on white spaces.
           .map(
             d => (d._1, (tf.stringSplit(d._2._1(NewAxis)).values, tf.stringSplit(d._2._2(NewAxis)).values)),
@@ -324,6 +324,6 @@ object Inputs {
             (/* Source language */ d._1._1(0), /* Target language */ d._1._2(0), /* Source sentences */ d._2),
             /* Target sentences */ d._3),
           name = "AddLanguageIDs")
-        .prefetch(bufferSize)
+        .prefetch(dataConfig.numPrefetchedBatches)
   }
 }
