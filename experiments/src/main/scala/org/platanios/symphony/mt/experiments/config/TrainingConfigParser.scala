@@ -69,24 +69,24 @@ object TrainingConfigParser extends ConfigParser[TrainingConfig] {
         tensorBoardConfig = (
             config.get[String]("tensorboard.host"),
             config.get[Int]("tensorboard.port"))),
-      curriculum = parseCurriculum(config))
+      curriculum =
+          config.getOption[Config]("curriculum").map(parseCurriculum)
+              .getOrElse(Curriculum.none[SentencePairs[String]]))
   }
 
   @throws[IllegalArgumentException]
-  private def parseCurriculum(config: Config): Curriculum[SentencePairs[String]] = {
-    config.getOption[Config]("curriculum").map(_.get[String]("type")) match {
-      case None => Curriculum.none[SentencePairs[String]]
-      case Some("sentence-length") =>
-        val competency = parseCompetency(config.get[Config]("curriculum.competency"))
+  private def parseCurriculum(curriculumConfig: Config): Curriculum[SentencePairs[String]] = {
+    curriculumConfig.get[String]("type") match {
+      case "sentence-length" =>
+        val competency = parseCompetency(curriculumConfig.get[Config]("curriculum.competency"))
         new SentenceLengthCurriculum(competency)
-      case Some(curriculumType) =>
+      case curriculumType =>
         throw new IllegalArgumentException(s"'$curriculumType' does not represent a valid curriculum type.")
     }
   }
 
   @throws[IllegalArgumentException]
-  private def parseCompetency(config: Config): Competency[Output[Float]] = {
-    val competencyConfig = config.get[Config]("curriculum.competency")
+  private def parseCompetency(competencyConfig: Config): Competency[Output[Float]] = {
     competencyConfig.get[String]("type") match {
       case "linear-step" =>
         val offset = competencyConfig.get[Float]("offset")
