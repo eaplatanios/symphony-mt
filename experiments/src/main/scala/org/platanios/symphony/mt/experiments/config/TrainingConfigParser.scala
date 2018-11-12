@@ -102,7 +102,7 @@ object TrainingConfigParser extends ConfigParser[TrainingConfig] {
     val bothDirections = config.get[Boolean]("both-directions")
 
     val stringBuilder = new StringBuilder()
-    stringBuilder.append(s".bd:$bothDirections")
+    stringBuilder.append(s"bd:$bothDirections")
     stringBuilder.append(s".it:${bothDirections && config.get[Boolean]("use-identity-translations")}")
     stringBuilder.append(s".ls:${config.get[Float]("label-smoothing")}")
     stringBuilder.append(s".opt:${config.get[String]("optimization.optimizer")}")

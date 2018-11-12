@@ -267,7 +267,9 @@ object Inputs {
     val datasetBeforeBucketing = trainingConfig.curriculum.samplesFilter match {
       case None => datasetBeforeCurriculum
       case Some(samplesFilter) => datasetBeforeCurriculum.filter(sample => {
-        val step = Variable.readVariable(globalStep.handle, globalStep.dataType)
+        val step = tf.colocateWith(Set(globalStep.handle.op), ignoreExisting = true) {
+          Variable.readVariable(globalStep.handle, globalStep.dataType)
+        }
         samplesFilter(step, sample)
       })
     }
