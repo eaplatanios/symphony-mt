@@ -170,7 +170,7 @@ case class TrainingLogger(
                     f"Perplexity: $avgPerplexity%12.4f, " +
                     f"GradNorm: $avgGradientsNorm%12.4f, " +
                     f"AvgSrcSenLen: $avgSrcSentenceLength%6.2f, " +
-                    f"AvgTgtSenLen $avgTgtSentenceLength%6.2f"
+                    f"AvgTgtSenLen: $avgTgtSentenceLength%6.2f"
             }
           }
         }
@@ -182,6 +182,7 @@ case class TrainingLogger(
         writeSummary(lastStep, s"$summaryTag/AverageTargetSentenceLength", avgTgtSentenceLength)
         totalGradientsNorm = 0.0f
         totalLoss = 0.0f
+        totalNumSamples = 0L
         totalSrcWordCount = 0L
         totalTgtWordCount = 0L
       }
