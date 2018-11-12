@@ -62,6 +62,7 @@ case class TrainingLogger(
   private var step         : Variable[Long] = _
   private var gradientsNorm: Output[Float]  = _
   private var loss         : Output[Float]  = _
+  private var batchSize    : Output[Long]   = _
   private var srcWordCount : Output[Long]   = _
   private var tgtWordCount : Output[Long]   = _
 
@@ -70,6 +71,7 @@ case class TrainingLogger(
   private var shouldTrigger     : Boolean     = false
   private var totalGradientsNorm: Float       = 0.0f
   private var totalLoss         : Float       = 0.0f
+  private var totalNumSamples   : Long        = 0L
   private var totalSrcWordCount : Long        = 0L
   private var totalTgtWordCount : Long        = 0L
 
@@ -82,6 +84,7 @@ case class TrainingLogger(
     loss = modelInstance.loss.map(_.toFloat).flatMap(l => {
       modelInstance.trainInput.map(o => l * /* batch size */ tf.size(o._2._2).toFloat)
     }).orNull
+    batchSize = modelInstance.trainInput.map(o => tf.size(o._2._2)).orNull
     srcWordCount = modelInstance.trainInput.map(o => {
       /* source sentence lengths */ tf.sum(o._1._3._2).toLong
     }).orNull
@@ -89,6 +92,7 @@ case class TrainingLogger(
       /* target sentence lengths */ tf.sum(o._2._2).toLong + /* batch size */ tf.size(o._2._2)
     }).orNull
     totalLoss = 0.0f
+    totalNumSamples = 0L
     totalSrcWordCount = 0L
     totalTgtWordCount = 0L
   }
@@ -122,7 +126,7 @@ case class TrainingLogger(
     if (triggerAtEnd && lastStep.toInt != internalTrigger.lastTriggerStep().getOrElse(-1)) {
       shouldTrigger = true
       processFetches(session.run(fetches = Seq[Output[Any]](
-        step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
+        step.value, gradientsNorm, loss, batchSize, srcWordCount, tgtWordCount)))
     }
   }
 
@@ -131,8 +135,9 @@ case class TrainingLogger(
     if (average || shouldTrigger) {
       totalGradientsNorm += fetches(1).scalar.asInstanceOf[Float]
       totalLoss += fetches(2).scalar.asInstanceOf[Float]
-      totalSrcWordCount += fetches(3).scalar.asInstanceOf[Long].toInt
-      totalTgtWordCount += fetches(4).scalar.asInstanceOf[Long].toInt
+      totalNumSamples += fetches(3).scalar.asInstanceOf[Long]
+      totalSrcWordCount += fetches(4).scalar.asInstanceOf[Long].toInt
+      totalTgtWordCount += fetches(5).scalar.asInstanceOf[Long].toInt
       if (shouldTrigger) {
         val numSteps = (lastStep * dataParallelFactor).toInt
         val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt)
@@ -140,8 +145,8 @@ case class TrainingLogger(
         val totalWordCount = (totalSrcWordCount + totalTgtWordCount) * dataParallelFactor
         val avgPerplexity = Math.exp(totalLoss / totalTgtWordCount).toFloat
         val avgGradientsNorm = totalGradientsNorm / elapsed.map(_._2).getOrElse(1)
-        val avgSrcSentenceLength = totalSrcWordCount * dataParallelFactor / numSteps
-        val avgTgtSentenceLength = totalTgtWordCount * dataParallelFactor / numSteps
+        val avgSrcSentenceLength = totalSrcWordCount * dataParallelFactor / totalNumSamples
+        val avgTgtSentenceLength = totalTgtWordCount * dataParallelFactor / totalNumSamples
         val message = {
           if (formatter != null) {
             formatter(
@@ -154,16 +159,16 @@ case class TrainingLogger(
                 f"($s%9.3f s / $wps%6.2fk words/s ) " +
                     f"Step: $numSteps%6d, " +
                     f"Perplexity: $avgPerplexity%12.4f, " +
-                    f"Gradients Norm: $avgGradientsNorm%12.4f, " +
-                    f"Average Source Sentence Length: $avgSrcSentenceLength%6.2f, " +
-                    f"Average Target Sentence Length: $avgTgtSentenceLength%6.2f"
+                    f"GradNorm: $avgGradientsNorm%12.4f, " +
+                    f"AvgSrcSenLen: $avgSrcSentenceLength%6.2f, " +
+                    f"AvgTgtSenLen: $avgTgtSentenceLength%6.2f"
               case None =>
                 f"(     timing not available yet ) " +
                     f"Step: $numSteps%6d, " +
                     f"Perplexity: $avgPerplexity%12.4f, " +
-                    f"Gradients Norm: $avgGradientsNorm%12.4f, " +
-                    f"Average Source Sentence Length: $avgSrcSentenceLength%6.2f, " +
-                    f"Average Target Sentence Length: $avgTgtSentenceLength%6.2f"
+                    f"GradNorm: $avgGradientsNorm%12.4f, " +
+                    f"AvgSrcSenLen: $avgSrcSentenceLength%6.2f, " +
+                    f"AvgTgtSenLen $avgTgtSentenceLength%6.2f"
             }
           }
         }
