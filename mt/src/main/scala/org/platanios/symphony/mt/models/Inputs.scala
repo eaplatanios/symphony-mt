@@ -87,7 +87,7 @@ object Inputs {
       repeat: Boolean = true,
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
-  ): () => TrainDataset = () => {
+  ): () => TrainDataset = () => tf.device("/CPU:0") {
     val languageIds = languages.map(_._1).zipWithIndex.toMap
     val filteredDatasets = datasets
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))
@@ -252,6 +252,7 @@ object Inputs {
               /* Target sentences */ (d._2._2, tf.size(d._2._2).toInt)),
             name = "Map/AddLengths")
           .transform(d => if (repeat) d.repeat() else d)
+          .transform(d => if (!isEval) d.shuffle(shuffleBufferSize) else d)
 
     // Obtain the outer graph (outside this function call) and get the global step variable defined in that graph.
     var graph = tf.currentGraph
@@ -259,13 +260,10 @@ object Inputs {
       graph = graph.asInstanceOf[FunctionGraph].outerGraph
     val globalStep = Counter.getOrCreate(Graph.Keys.GLOBAL_STEP, local = false, graph = graph)
 
-    val datasetAfterCurriculum = trainingConfig.curriculum.samplesFilter(globalStep.value) match {
+    val datasetBeforeBucketing = trainingConfig.curriculum.samplesFilter(globalStep.value) match {
       case None => datasetBeforeCurriculum
       case Some(samplesFilter) => datasetBeforeCurriculum.filter(samplesFilter)
     }
-
-    val datasetBeforeBucketing = datasetAfterCurriculum
-        .transform(d => if (!isEval) d.shuffle(shuffleBufferSize) else d)
 
     val batchingFn = (dataset: SentencePairsDataset) => {
       val zero = Tensor.zeros[Int](Shape())
