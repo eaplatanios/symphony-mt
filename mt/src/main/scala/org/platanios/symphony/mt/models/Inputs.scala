@@ -23,6 +23,7 @@ import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.learn.Counter
 import org.platanios.tensorflow.api.ops.FunctionGraph
+import org.platanios.tensorflow.api.ops.variables.Variable
 
 import java.nio.charset.StandardCharsets
 
@@ -260,9 +261,12 @@ object Inputs {
       graph = graph.asInstanceOf[FunctionGraph].outerGraph
     val globalStep = Counter.getOrCreate(Graph.Keys.GLOBAL_STEP, local = false, graph = graph)
 
-    val datasetBeforeBucketing = trainingConfig.curriculum.samplesFilter(globalStep.value) match {
+    val datasetBeforeBucketing = trainingConfig.curriculum.samplesFilter match {
       case None => datasetBeforeCurriculum
-      case Some(samplesFilter) => datasetBeforeCurriculum.filter(samplesFilter)
+      case Some(samplesFilter) => datasetBeforeCurriculum.filter(sample => {
+        var step = Variable.readVariable(globalStep.handle, globalStep.dataType)
+        samplesFilter(step, sample)
+      })
     }
 
     val batchingFn = (dataset: SentencePairsDataset) => {

@@ -21,7 +21,7 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 trait Curriculum[Sample] {
-  def samplesFilter(step: Output[Long]): Option[Sample => Output[Boolean]] = {
+  def samplesFilter: Option[(Output[Long], Sample) => Output[Boolean]] = {
     None
   }
 
@@ -31,13 +31,13 @@ trait Curriculum[Sample] {
 
   def compose(other: Curriculum[Sample]): Curriculum[Sample] = {
     new Curriculum[Sample] {
-      override def samplesFilter(numSamplesSeen: Output[Long]): Option[Sample => Output[Boolean]] = {
-        (samplesFilter(numSamplesSeen), other.samplesFilter(numSamplesSeen)) match {
+      override def samplesFilter: Option[(Output[Long], Sample) => Output[Boolean]] = {
+        (samplesFilter, other.samplesFilter) match {
           case (Some(thisFilter), Some(otherFilter)) =>
-            Some((sample: Sample) => {
+            Some((step: Output[Long], sample: Sample) => {
               tf.cond(
-                thisFilter(sample),
-                () => otherFilter(sample),
+                thisFilter(step, sample),
+                () => otherFilter(step, sample),
                 () => tf.constant[Boolean](false))
             })
           case (Some(thisFilter), None) => Some(thisFilter)

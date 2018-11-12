@@ -33,8 +33,8 @@ abstract class DifficultyBasedCurriculum[Sample](
 ) extends Curriculum[Sample] {
   def difficulty(sample: Sample): Output[Float]
 
-  override final def samplesFilter(step: Output[Long]): Option[Sample => Output[Boolean]] = {
-    Some((sample: Sample) => {
+  override final def samplesFilter: Option[(Output[Long], Sample) => Output[Boolean]] = {
+    Some((step: Output[Long], sample: Sample) => {
       tf.lessEqual(difficulty(sample), competency.currentLevel(step))
     })
   }
