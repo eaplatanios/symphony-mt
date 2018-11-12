@@ -23,18 +23,15 @@ import org.platanios.tensorflow.api._
 trait Curriculum[Sample] {
   private var currentStep: Variable[Long] = _
 
-  protected def getCurrentStep: Output[Long] = {
+  protected def getCurrentStep: Variable[Long] = {
     if (currentStep == null)
       currentStep = tf.variable[Long]("Curriculum/Step", Shape(), tf.ZerosInitializer, trainable = false)
-    currentStep.value
+    currentStep
   }
 
   def updateState(step: Output[Long]): UntypedOp = {
-    if (currentStep == null)
-      currentStep = tf.variable[Long]("Curriculum/Step", Shape(), tf.ZerosInitializer, trainable = false)
-    currentStep.assign(step).op
+    getCurrentStep.assign(step).op
   }
-
 
   def samplesFilter: Option[Sample => Output[Boolean]] = {
     None

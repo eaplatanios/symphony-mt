@@ -59,12 +59,12 @@ case class TrainingLogger(
     with SummaryWriterHookAddOn {
   require(log || summaryDir != null, "At least one of 'log' and 'summaryDir' needs to be provided.")
 
-  private var step         : Variable[Long] = _
-  private var gradientsNorm: Output[Float]  = _
-  private var loss         : Output[Float]  = _
-  private var batchSize    : Output[Long]   = _
-  private var srcWordCount : Output[Long]   = _
-  private var tgtWordCount : Output[Long]   = _
+  private var step         : Output[Long]  = _
+  private var gradientsNorm: Output[Float] = _
+  private var loss         : Output[Float] = _
+  private var batchSize    : Output[Long]  = _
+  private var srcWordCount : Output[Long]  = _
+  private var tgtWordCount : Output[Long]  = _
 
   private val internalTrigger   : HookTrigger = trigger.copy()
   private var lastStep          : Long        = 0L
@@ -77,7 +77,8 @@ case class TrainingLogger(
 
   override protected def begin(): Unit = {
     step = Counter.get(Graph.Keys.GLOBAL_STEP, local = false).getOrElse(throw new IllegalStateException(
-      s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'TrainingLogger'."))
+      s"A ${Graph.Keys.GLOBAL_STEP.name} variable should be created in order to use the 'TrainingLogger'.")
+    ).value
     internalTrigger.reset()
     shouldTrigger = false
     gradientsNorm = modelInstance.gradientsAndVariables.map(g => tf.globalNorm(g.map(_._1))).orNull
@@ -98,7 +99,7 @@ case class TrainingLogger(
   }
 
   override protected def afterSessionCreation(session: Session): Unit = {
-    lastStep = session.run(fetches = step.value).scalar
+    lastStep = session.run(fetches = step).scalar
   }
 
   override protected def beforeSessionRun[C: OutputStructure, CV](
@@ -109,9 +110,9 @@ case class TrainingLogger(
     shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt + 1)
     if (average || shouldTrigger) {
       Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](
-        step.value, gradientsNorm, loss, batchSize, srcWordCount, tgtWordCount)))
+        step, gradientsNorm, loss, batchSize, srcWordCount, tgtWordCount)))
     } else {
-      Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](step.value)))
+      Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](step)))
     }
   }
 
@@ -128,7 +129,7 @@ case class TrainingLogger(
     if (triggerAtEnd && lastStep.toInt != internalTrigger.lastTriggerStep().getOrElse(-1)) {
       shouldTrigger = true
       processFetches(session.run(fetches = Seq[Output[Any]](
-        step.value, gradientsNorm, loss, batchSize, srcWordCount, tgtWordCount)))
+        step, gradientsNorm, loss, batchSize, srcWordCount, tgtWordCount)))
     }
   }
 
