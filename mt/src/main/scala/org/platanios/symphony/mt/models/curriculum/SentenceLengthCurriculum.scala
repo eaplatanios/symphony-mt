@@ -32,8 +32,8 @@ class SentenceLengthCurriculum[T](
 ) extends DifficultyBasedCurriculum[SentencePairs[T]](competency) {
   override def difficulty(sample: SentencePairs[T]): Output[Float] = {
     val tgtLength = sample._3._2.toFloat
-    val part1 = 0.0f                        // Length 1 to 5.
-    val part2 = (tgtLength - 5.0f) / 30.0f  // Length 5 to 10.
+    val part1 = 0.0f                        // Length 1 to 10.
+    val part2 = (tgtLength - 10.0f) / 30.0f // Length 10 to 10.
     val part3 = 0.5f + tgtLength / 100.0f   // Length 20 to 100.
     tf.maximum(part1, tf.minimum(part2, part3))
   }
