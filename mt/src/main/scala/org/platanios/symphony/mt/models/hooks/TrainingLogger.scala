@@ -155,15 +155,15 @@ case class TrainingLogger(
                     f"Step: $numSteps%6d, " +
                     f"Perplexity: $avgPerplexity%12.4f, " +
                     f"Gradients Norm: $avgGradientsNorm%12.4f, " +
-                    f"Average Source Sentence Length: $avgSrcSentenceLength%6.2, " +
-                    f"Average Target Sentence Length: $avgTgtSentenceLength%6.2"
+                    f"Average Source Sentence Length: $avgSrcSentenceLength%6.2f, " +
+                    f"Average Target Sentence Length: $avgTgtSentenceLength%6.2f"
               case None =>
                 f"(     timing not available yet ) " +
                     f"Step: $numSteps%6d, " +
                     f"Perplexity: $avgPerplexity%12.4f, " +
                     f"Gradients Norm: $avgGradientsNorm%12.4f, " +
-                    f"Average Source Sentence Length: $avgSrcSentenceLength%6.2, " +
-                    f"Average Target Sentence Length: $avgTgtSentenceLength%6.2"
+                    f"Average Source Sentence Length: $avgSrcSentenceLength%6.2f, " +
+                    f"Average Target Sentence Length: $avgTgtSentenceLength%6.2f"
             }
           }
         }
