@@ -89,7 +89,7 @@ object Inputs {
       repeat: Boolean = true,
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
-  ): () => TrainDataset = () => {
+  ): () => TrainDataset = () => tf.device("/CPU:0") {
     val languageIds = languages.map(_._1).zipWithIndex.toMap
     val filteredDatasets = datasets
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))

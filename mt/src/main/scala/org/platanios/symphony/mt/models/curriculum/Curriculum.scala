@@ -24,8 +24,11 @@ trait Curriculum[Sample] {
   private var currentStep: Variable[Long] = _
 
   protected def getCurrentStep: Variable[Long] = {
-    if (currentStep == null)
-      currentStep = tf.variable[Long]("Curriculum/Step", Shape(), tf.ZerosInitializer, trainable = false)
+    if (currentStep == null) {
+      tf.device("/CPU:0") {
+        currentStep = tf.variable[Long]("Curriculum/Step", Shape(), tf.ZerosInitializer, trainable = false)
+      }
+    }
     currentStep
   }
 
