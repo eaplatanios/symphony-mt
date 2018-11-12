@@ -48,7 +48,7 @@ case class TrainingLogger(
     average: Boolean = true,
     dataParallelFactor: Float = 1.0f,
     formatter: (Option[Double], Long, Float, Float, Option[Double]) => String = null,
-    summaryTag: String = "Perplexity"
+    summaryTag: String = "Training"
 ) extends ModelDependentHook[
     /* In       */ SentencesWithLanguagePair[String],
     /* TrainIn  */ (SentencesWithLanguagePair[String], Sentences[String]),
@@ -138,12 +138,14 @@ case class TrainingLogger(
         val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt)
         val elapsedTime = elapsed.map(_._1)
         val totalWordCount = (totalSrcWordCount + totalTgtWordCount) * dataParallelFactor
-        val meanGradientsNorm = totalGradientsNorm / elapsed.map(_._2).getOrElse(1)
-        val meanPerplexity = Math.exp(totalLoss / totalTgtWordCount).toFloat
+        val avgPerplexity = Math.exp(totalLoss / totalTgtWordCount).toFloat
+        val avgGradientsNorm = totalGradientsNorm / elapsed.map(_._2).getOrElse(1)
+        val avgSrcSentenceLength = totalSrcWordCount * dataParallelFactor / numSteps
+        val avgTgtSentenceLength = totalTgtWordCount * dataParallelFactor / numSteps
         val message = {
           if (formatter != null) {
             formatter(
-              elapsedTime, numSteps, meanGradientsNorm, meanPerplexity,
+              elapsedTime, numSteps, avgGradientsNorm, avgPerplexity,
               elapsedTime.map(s => totalWordCount / (1000 * s)))
           } else {
             elapsedTime match {
@@ -151,19 +153,26 @@ case class TrainingLogger(
                 val wps = totalWordCount / (1000 * s)
                 f"($s%9.3f s / $wps%6.2fk words/s ) " +
                     f"Step: $numSteps%6d, " +
-                    f"Perplexity: $meanPerplexity%12.4f, " +
-                    f"Gradients Norm: $meanGradientsNorm%12.4f"
+                    f"Perplexity: $avgPerplexity%12.4f, " +
+                    f"Gradients Norm: $avgGradientsNorm%12.4f, " +
+                    f"Average Source Sentence Length: $avgSrcSentenceLength%6.2, " +
+                    f"Average Target Sentence Length: $avgTgtSentenceLength%6.2"
               case None =>
-                f"(    timing not available yet ) " +
+                f"(     timing not available yet ) " +
                     f"Step: $numSteps%6d, " +
-                    f"Perplexity: $meanPerplexity%12.4f, " +
-                    f"Gradients Norm: $meanGradientsNorm%12.4f"
+                    f"Perplexity: $avgPerplexity%12.4f, " +
+                    f"Gradients Norm: $avgGradientsNorm%12.4f, " +
+                    f"Average Source Sentence Length: $avgSrcSentenceLength%6.2, " +
+                    f"Average Target Sentence Length: $avgTgtSentenceLength%6.2"
             }
           }
         }
         if (log)
           TrainingLogger.logger.info(message)
-        writeSummary(lastStep, summaryTag, meanPerplexity)
+        writeSummary(lastStep, s"$summaryTag/Perplexity", avgPerplexity)
+        writeSummary(lastStep, s"$summaryTag/GradientsNorm", avgGradientsNorm)
+        writeSummary(lastStep, s"$summaryTag/AverageSourceSentenceLength", avgSrcSentenceLength)
+        writeSummary(lastStep, s"$summaryTag/AverageTargetSentenceLength", avgTgtSentenceLength)
         totalGradientsNorm = 0.0f
         totalLoss = 0.0f
         totalSrcWordCount = 0L
