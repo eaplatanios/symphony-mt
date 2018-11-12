@@ -107,10 +107,12 @@ case class TrainingLogger(
       evOutputToTensorC: OutputToTensor.Aux[C, CV]
   ): Option[Hook.SessionRunArgs[Seq[Output[Any]], Seq[Tensor[Any]]]] = {
     shouldTrigger = gradientsNorm != null && loss != null && internalTrigger.shouldTriggerForStep(lastStep.toInt + 1)
-    if (average || shouldTrigger)
-      Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](step.value, gradientsNorm, loss, srcWordCount, tgtWordCount)))
-    else
+    if (average || shouldTrigger) {
+      Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](
+        step.value, gradientsNorm, loss, batchSize, srcWordCount, tgtWordCount)))
+    } else {
       Some(Hook.SessionRunArgs(fetches = Seq[Output[Any]](step.value)))
+    }
   }
 
   override protected def afterSessionRun[C: OutputStructure, CV](
