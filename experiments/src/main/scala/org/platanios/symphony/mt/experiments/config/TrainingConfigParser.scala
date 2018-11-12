@@ -43,6 +43,7 @@ object TrainingConfigParser extends ConfigParser[TrainingConfig] {
     TrainingConfig(
       languagePairs = languagePairs,
       useIdentityTranslations = bothDirections && config.get[Boolean]("use-identity-translations"),
+      cacheData = config.get[Boolean]("cache-data"),
       labelSmoothing = config.get[Float]("label-smoothing"),
       numSteps = config.get[Int]("num-steps"),
       summarySteps = config.get[Int]("summary-frequency"),

@@ -202,6 +202,7 @@ class Model[Code](
         datasets = datasets,
         languages = languages,
         includeIdentityTranslations = trainingConfig.useIdentityTranslations,
+        cache = trainingConfig.cacheData,
         repeat = true,
         isEval = false,
         languagePairs = languagePairs),

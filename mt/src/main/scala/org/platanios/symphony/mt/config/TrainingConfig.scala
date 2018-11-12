@@ -26,6 +26,7 @@ import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Op
 case class TrainingConfig(
     languagePairs: Set[(Language, Language)],
     useIdentityTranslations: Boolean,
+    cacheData: Boolean,
     labelSmoothing: Float,
     numSteps: Int,
     summarySteps: Int,

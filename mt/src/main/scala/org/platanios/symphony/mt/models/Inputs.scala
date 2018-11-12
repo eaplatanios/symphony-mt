@@ -85,6 +85,7 @@ object Inputs {
       datasets: Seq[FileParallelDataset],
       languages: Seq[(Language, Vocabulary)],
       includeIdentityTranslations: Boolean = false,
+      cache: Boolean = false,
       repeat: Boolean = true,
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
@@ -130,7 +131,7 @@ object Inputs {
         }.reduce((d1, d2) => d1.concatenateWith(d2))
 
     val parallelDatasetCreator: (Output[Int], Output[Int], Output[String], Output[String], Output[Int], Output[Int]) => TrainDataset =
-      createSingleParallelDataset(dataConfig, trainingConfig, repeat, isEval)
+      createSingleParallelDataset(dataConfig, trainingConfig, cache, repeat, isEval)
 
     filesDataset
         .shuffle(filteredDatasets.size)
@@ -184,7 +185,7 @@ object Inputs {
                 dataConfig.copy(parallelPortion = parallelPortion),
                 trainingConfig = trainingConfig.copy(curriculum = Curriculum.none),
                 Seq(dataset), languages,
-                includeIdentityTranslations = false, repeat = false, isEval = true,
+                includeIdentityTranslations = false, cache = false, repeat = false, isEval = true,
                 languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
             })
         }
@@ -193,6 +194,7 @@ object Inputs {
   private def createSingleParallelDataset(
       dataConfig: DataConfig,
       trainingConfig: TrainingConfig,
+      cache: Boolean,
       repeat: Boolean,
       isEval: Boolean
   )(
@@ -252,6 +254,7 @@ object Inputs {
               /* Source sentences */ (d._2._1, tf.size(d._2._1).toInt),
               /* Target sentences */ (d._2._2, tf.size(d._2._2).toInt)),
             name = "Map/AddLengths")
+          .transform(d => if (cache) d.cache("") else d)
           .transform(d => if (repeat) d.repeat() else d)
           .transform(d => if (!isEval) d.shuffle(shuffleBufferSize) else d)
 
@@ -264,7 +267,7 @@ object Inputs {
     val datasetBeforeBucketing = trainingConfig.curriculum.samplesFilter match {
       case None => datasetBeforeCurriculum
       case Some(samplesFilter) => datasetBeforeCurriculum.filter(sample => {
-        var step = Variable.readVariable(globalStep.handle, globalStep.dataType)
+        val step = Variable.readVariable(globalStep.handle, globalStep.dataType)
         samplesFilter(step, sample)
       })
     }
