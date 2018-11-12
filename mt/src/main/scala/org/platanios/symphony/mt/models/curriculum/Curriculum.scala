@@ -21,7 +21,22 @@ import org.platanios.tensorflow.api._
   * @author Emmanouil Antonios Platanios
   */
 trait Curriculum[Sample] {
-  def samplesFilter: Option[(Output[Long], Sample) => Output[Boolean]] = {
+  private var currentStep: Variable[Long] = _
+
+  protected def getCurrentStep: Output[Long] = {
+    if (currentStep == null)
+      currentStep = tf.variable[Long]("Curriculum/Step", Shape(), tf.ZerosInitializer, trainable = false)
+    currentStep.value
+  }
+
+  def updateState(step: Output[Long]): UntypedOp = {
+    if (currentStep == null)
+      currentStep = tf.variable[Long]("Curriculum/Step", Shape(), tf.ZerosInitializer, trainable = false)
+    currentStep.assign(step).op
+  }
+
+
+  def samplesFilter: Option[Sample => Output[Boolean]] = {
     None
   }
 
@@ -31,13 +46,13 @@ trait Curriculum[Sample] {
 
   def compose(other: Curriculum[Sample]): Curriculum[Sample] = {
     new Curriculum[Sample] {
-      override def samplesFilter: Option[(Output[Long], Sample) => Output[Boolean]] = {
+      override def samplesFilter: Option[Sample => Output[Boolean]] = {
         (samplesFilter, other.samplesFilter) match {
           case (Some(thisFilter), Some(otherFilter)) =>
-            Some((step: Output[Long], sample: Sample) => {
+            Some((sample: Sample) => {
               tf.cond(
-                thisFilter(step, sample),
-                () => otherFilter(step, sample),
+                thisFilter(sample),
+                () => otherFilter(sample),
                 () => tf.constant[Boolean](false))
             })
           case (Some(thisFilter), None) => Some(thisFilter)

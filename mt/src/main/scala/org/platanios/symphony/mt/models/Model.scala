@@ -28,7 +28,7 @@ import org.platanios.symphony.mt.utilities.Encoding.tfStringToUTF8
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.core.client.SessionConfig
-import org.platanios.tensorflow.api.learn.{Mode, StopCriteria}
+import org.platanios.tensorflow.api.learn.{Counter, Mode, StopCriteria}
 import org.platanios.tensorflow.api.learn.layers.{Input, Layer}
 import org.platanios.tensorflow.api.learn.hooks.StepHookTrigger
 
@@ -472,7 +472,12 @@ class Model[Code](
       override def forwardWithoutContext(
           input: (SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String]))
       )(implicit mode: Mode): Output[Float] = {
-        tf.createWith(nameScope = "Loss", device = deviceManager.nextDevice(env, moveToNext = false)) {
+        val globalStep = Counter.getOrCreate(Graph.Keys.GLOBAL_STEP, local = false)
+        tf.createWith(
+          nameScope = "Loss",
+          device = deviceManager.nextDevice(env, moveToNext = false),
+          controlDependencies = Set(trainingConfig.curriculum.updateState(globalStep.value))
+        ) {
           parameterManager.initialize(languages, trainingConfig)
 
           val tgtLanguage = input._1._1
