@@ -45,8 +45,8 @@ object TrainingConfigParser extends ConfigParser[TrainingConfig] {
       useIdentityTranslations = bothDirections && config.get[Boolean]("use-identity-translations"),
       labelSmoothing = config.get[Float]("label-smoothing"),
       numSteps = config.get[Int]("num-steps"),
-      summarySteps = config.get[Int]("summary-steps"),
-      checkpointSteps = config.get[Int]("checkpoint-steps"),
+      summarySteps = config.get[Int]("summary-frequency"),
+      checkpointSteps = config.get[Int]("checkpoint-frequency"),
       optimization = TrainingConfig.OptimizationConfig(
         optimizer = optimizer match {
           case "gd" => tf.train.GradientDescent(learningRate.get, learningRateSummaryTag = "LearningRate")
