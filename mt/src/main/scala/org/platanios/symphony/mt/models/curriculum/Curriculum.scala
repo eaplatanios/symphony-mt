@@ -16,21 +16,19 @@
 package org.platanios.symphony.mt.models.curriculum
 
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.learn.Counter
+import org.platanios.tensorflow.api.ops.FunctionGraph
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 trait Curriculum[Sample] {
-  private var currentStep: Variable[Long] = _
-
-  protected def getCurrentStep: Variable[Long] = {
-    if (currentStep == null)
-      currentStep = tf.variable[Long]("Curriculum/Step", Shape(), tf.ZerosInitializer, trainable = false)
-    currentStep
-  }
-
-  def updateState(step: Output[Long]): UntypedOp = {
-    getCurrentStep.assign(step).op
+  protected def currentStep: Output[Long] = {
+    // Obtain the outer graph (outside this function call) and get the global step variable defined in that graph.
+    var graph = tf.currentGraph
+    while (graph.isInstanceOf[FunctionGraph])
+      graph = graph.asInstanceOf[FunctionGraph].outerGraph
+    Counter.getOrCreate(Graph.Keys.GLOBAL_STEP, local = false, graph = graph).value
   }
 
   def samplesFilter: Option[Sample => Output[Boolean]] = {
