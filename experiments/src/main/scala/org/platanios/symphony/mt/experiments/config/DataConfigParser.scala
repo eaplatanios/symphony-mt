@@ -27,6 +27,7 @@ import java.nio.file.Paths
   * @author Emmanouil Antonios Platanios
   */
 object DataConfigParser extends ConfigParser[DataConfig] {
+  @throws[IllegalArgumentException]
   override def parse(config: Config): DataConfig = {
     val tokenizer = config.get[String]("tokenizer")
     val cleaner = config.get[String]("cleaner")

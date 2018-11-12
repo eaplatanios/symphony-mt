@@ -47,6 +47,7 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
     dataConfig: => DataConfig,
     name: String
 ) extends ConfigParser[Model[_]] {
+  @throws[IllegalArgumentException]
   override def parse(config: Config): Model[_] = {
     val trainingConfig = TrainingConfigParser.parse(config.get[Config]("training"))
     val evalLanguagePairs = {
@@ -118,6 +119,7 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
 }
 
 object ModelParser {
+  @throws[IllegalArgumentException]
   private def encoderFromConfig[T: TF : IsHalfOrFloatOrDouble](encoderConfig: Config): Encoder[Any] = {
     val encoderType = encoderConfig.get[String]("type")
     encoderType match {
@@ -212,6 +214,7 @@ object ModelParser {
     }
   }
 
+  @throws[IllegalArgumentException]
   private def decoderFromConfig[T: TF : IsHalfOrFloatOrDouble](decoderConfig: Config): Decoder[Any] = {
     val decoderType = decoderConfig.get[String]("type")
     decoderType match {
@@ -299,6 +302,7 @@ object ModelParser {
     }
   }
 
+  @throws[IllegalArgumentException]
   private def cellFromConfig[T: TF : IsReal](cellConfig: Config): Cell[T, _, _] = {
     // Parse the cell activation function.
     val cellActivation = cellConfig.get[String]("activation")

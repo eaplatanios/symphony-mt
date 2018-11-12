@@ -24,9 +24,8 @@ import com.typesafe.config.Config
 /**
   * @author Emmanouil Antonios Platanios
   */
-class ParametersParser(
-    val dataConfig: DataConfig
-) extends ConfigParser[ParametersParser.Parameters] {
+class ParametersParser(val dataConfig: DataConfig) extends ConfigParser[ParametersParser.Parameters] {
+  @throws[IllegalArgumentException]
   override def parse(config: Config): ParametersParser.Parameters = {
     val wordEmbeddingsSize = config.get[Int]("word-embeddings-size")
     val manager = config.get[String]("manager")

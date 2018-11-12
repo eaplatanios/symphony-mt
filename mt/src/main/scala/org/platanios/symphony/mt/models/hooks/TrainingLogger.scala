@@ -149,7 +149,7 @@ case class TrainingLogger(
             elapsedTime match {
               case Some(s) =>
                 val wps = totalWordCount / (1000 * s)
-                f"($s%9.3f s / $wps%5.2fk words/s ) " +
+                f"($s%9.3f s / $wps%6.2fk words/s ) " +
                     f"Step: $numSteps%6d, " +
                     f"Perplexity: $meanPerplexity%12.4f, " +
                     f"Gradients Norm: $meanGradientsNorm%12.4f"

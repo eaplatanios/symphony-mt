@@ -24,9 +24,8 @@ import java.nio.file.Paths
 /**
   * @author Emmanouil Antonios Platanios
   */
-class EnvironmentParser(
-  val experimentTag: String
-) extends ConfigParser[Environment] {
+class EnvironmentParser(val experimentTag: String) extends ConfigParser[Environment] {
+  @throws[IllegalArgumentException]
   override def parse(config: Config): Environment = {
     Environment(
       workingDir = Paths.get(config.get[String]("working-dir")).resolve(experimentTag),

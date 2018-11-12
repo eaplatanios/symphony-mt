@@ -25,6 +25,7 @@ import com.typesafe.config.Config
   * @author Emmanouil Antonios Platanios
   */
 object InferenceConfigParser extends ConfigParser[InferenceConfig] {
+  @throws[IllegalArgumentException]
   override def parse(config: Config): InferenceConfig = {
     InferenceConfig(
       pivot = NoPivot,
