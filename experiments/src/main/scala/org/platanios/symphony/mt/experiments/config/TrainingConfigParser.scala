@@ -78,7 +78,7 @@ object TrainingConfigParser extends ConfigParser[TrainingConfig] {
   private def parseCurriculum(curriculumConfig: Config): Curriculum[SentencePairs[String]] = {
     curriculumConfig.get[String]("type") match {
       case "sentence-length" =>
-        val competency = parseCompetency(curriculumConfig.get[Config]("curriculum.competency"))
+        val competency = parseCompetency(curriculumConfig.get[Config]("competency"))
         new SentenceLengthCurriculum(competency)
       case curriculumType =>
         throw new IllegalArgumentException(s"'$curriculumType' does not represent a valid curriculum type.")
