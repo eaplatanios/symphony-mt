@@ -35,7 +35,7 @@ abstract class DifficultyBasedCurriculum[Sample](
 
   override final def samplesFilter: Option[Sample => Output[Boolean]] = {
     Some((sample: Sample) => tf.nameScope("Curriculum/SamplesFilter") {
-      tf.lessEqual(difficulty(sample), competency.currentLevel(currentStep))
+      tf.lessEqual(difficulty(sample), competency.currentLevel(getCurrentStep.value))
     })
   }
 }
