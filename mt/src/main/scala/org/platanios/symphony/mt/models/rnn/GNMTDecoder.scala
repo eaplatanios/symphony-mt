@@ -42,7 +42,7 @@ class GNMTDecoder[T: TF : IsNotQuantized, State: OutputStructure, AttentionState
   override protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]]
-  )(implicit context: Context): (GNMTDecoder.StackedCell[T, State, AttentionState, StateShape, AttentionStateShape], (AttentionWrapperState[T, State, AttentionState], Seq[State])) = {
+  )(implicit context: ModelConstructionContext): (GNMTDecoder.StackedCell[T, State, AttentionState, StateShape, AttentionStateShape], (AttentionWrapperState[T, State, AttentionState], Seq[State])) = {
     // RNN cells
     val cells = (0 until numLayers).foldLeft(Seq.empty[tf.RNNCell[Output[T], State, Shape, StateShape]])((cells, i) => {
       val cellNumInputs = if (i == 0) 2 * numUnits else cells(i - 1).outputShape.apply(-1) + numUnits
@@ -73,12 +73,7 @@ class GNMTDecoder[T: TF : IsNotQuantized, State: OutputStructure, AttentionState
     // Attention
     val initialState = encodedSequences.rnnTuple.state
     val memory = Sequences(
-      sequences = {
-        if (context.modelConfig.timeMajor)
-          encodedSequences.rnnTuple.output.transpose(Tensor(1, 0, 2))
-        else
-          encodedSequences.rnnTuple.output
-      },
+      sequences = encodedSequences.rnnTuple.output,
       lengths = encodedSequences.lengths)
     val attentionCell = attention.createCell[State, StateShape](
       cells.head, memory, numUnits, numUnits, useAttentionLayer = false, outputAttention = false)

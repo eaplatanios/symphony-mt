@@ -71,6 +71,8 @@ class BLEU protected (
         val seq = s(0 :: lenScalar).entriesIterator.map(v => Encoding.tfStringToUTF8(v)).toSeq
         Seq(languages(tgtLanguage)._2.decodeSequence(seq))
     }
+    println("Hyp: " + hypSeq.head.mkString(" "))
+    println("Ref: " + refSeq.head.head.mkString(" "))
     val (matchesByOrder, possibleMatchesByOrder, refLen, hypLen) = BLEU.nGramMatches(refSeq, hypSeq, maxOrder)
     (matchesByOrder, possibleMatchesByOrder, refLen, hypLen)
   }

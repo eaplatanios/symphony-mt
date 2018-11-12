@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.parameters
 
-import org.platanios.symphony.mt.models.{Context, parameters}
+import org.platanios.symphony.mt.models.{ModelConstructionContext, parameters}
 import org.platanios.tensorflow.api._
 
 /**
@@ -30,12 +30,12 @@ class PairwiseManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit context: Context): Output[P] = {
+  )(implicit context: ModelConstructionContext): Output[P] = {
     tf.variableScope("ParameterManager") {
       val graph = currentGraph
 
       // Determine all the language index pairs that are relevant given the current model configuration.
-      val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.modelConfig)
+      val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.trainingConfig)
       val languagePairs = languageIndexPairs.map(p => (context.languages(p._1)._1, context.languages(p._2)._1))
       val languageIdPairs = languageIndexPairs.map(p => (languageIds(graph)(p._1), languageIds(graph)(p._2)))
 

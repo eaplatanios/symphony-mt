@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.transformer.helpers
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 
@@ -28,7 +28,7 @@ trait LayerProcessor {
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "LayerProcessor"
-  )(implicit context: Context): Output[T]
+  )(implicit context: ModelConstructionContext): Output[T]
 }
 
 case object AddResidualConnection extends LayerProcessor {
@@ -37,7 +37,7 @@ case object AddResidualConnection extends LayerProcessor {
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "AddResidualConnection"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     previousValue match {
       case Some(v) => value + v
       case None => throw new IllegalArgumentException(
@@ -52,7 +52,7 @@ case class Normalize(normalization: Normalization, epsilon: Float = 1e-12f) exte
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "Normalize"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     normalization(value, epsilon = epsilon, name = name)
   }
 }
@@ -67,7 +67,7 @@ case class Dropout(
       value: Output[T],
       previousValue: Option[Output[T]],
       name: String = "Dropout"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     if (context.mode.isTraining)
       Common.dropoutWithBroadcastAxes(value, 1.0f - dropoutRate, scaleOutput, broadcastAxes)
     else
@@ -85,7 +85,7 @@ object LayerProcessor {
   def layerPreprocess[T: TF : IsHalfOrFloatOrDouble](
       input: Output[T],
       processors: Seq[LayerProcessor]
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     processors.foldLeft(input) {
       case (value, processor) => processor(value, None)
     }
@@ -102,7 +102,7 @@ object LayerProcessor {
       input: Output[T],
       output: Output[T],
       processors: Seq[LayerProcessor]
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     processors.foldLeft(output) {
       case (value, processor) => processor(value, Some(input))
     }

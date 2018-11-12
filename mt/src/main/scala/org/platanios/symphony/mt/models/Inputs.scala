@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models
 
 import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.config.TrainingConfig
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.curriculum.Curriculum
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -79,7 +80,7 @@ object Inputs {
 
   def createTrainDataset(
       dataConfig: DataConfig,
-      modelConfig: ModelConfig,
+      trainingConfig: TrainingConfig,
       datasets: Seq[FileParallelDataset],
       languages: Seq[(Language, Vocabulary)],
       includeIdentityTranslations: Boolean = false,
@@ -128,7 +129,7 @@ object Inputs {
         }.reduce((d1, d2) => d1.concatenateWith(d2))
 
     val parallelDatasetCreator: (Output[Int], Output[Int], Output[String], Output[String], Output[Int], Output[Int]) => TrainDataset =
-      createSingleParallelDataset(dataConfig, modelConfig, repeat, isEval)
+      createSingleParallelDataset(dataConfig, trainingConfig, repeat, isEval)
 
     filesDataset
         .shuffle(filteredDatasets.size)
@@ -158,7 +159,7 @@ object Inputs {
 
   def createEvalDatasets(
       dataConfig: DataConfig,
-      modelConfig: ModelConfig,
+      trainingConfig: TrainingConfig,
       datasets: Seq[(String, FileParallelDataset, Float)],
       languages: Seq[(Language, Vocabulary)],
       languagePairs: Option[Set[(Language, Language)]] = None
@@ -180,9 +181,7 @@ object Inputs {
             (datasetName, () => tf.nameScope(datasetName) {
               createTrainDataset(
                 dataConfig.copy(parallelPortion = parallelPortion),
-                modelConfig = modelConfig.copy(
-                  trainingConfig = modelConfig.trainingConfig.copy(
-                    curriculum = Curriculum.none)),
+                trainingConfig = trainingConfig.copy(curriculum = Curriculum.none),
                 Seq(dataset), languages,
                 includeIdentityTranslations = false, repeat = false, isEval = true,
                 languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
@@ -192,7 +191,7 @@ object Inputs {
 
   private def createSingleParallelDataset(
       dataConfig: DataConfig,
-      modelConfig: ModelConfig,
+      trainingConfig: TrainingConfig,
       repeat: Boolean,
       isEval: Boolean
   )(
@@ -261,7 +260,7 @@ object Inputs {
       graph = graph.asInstanceOf[FunctionGraph].outerGraph
     val globalStep = Counter.getOrCreate(Graph.Keys.GLOBAL_STEP, local = false, graph = graph)
 
-    val datasetBeforeBucketing = modelConfig.trainingConfig.curriculum.samplesFilter(globalStep.value) match {
+    val datasetBeforeBucketing = trainingConfig.curriculum.samplesFilter(globalStep.value) match {
       case None => datasetBeforeCurriculum
       case Some(samplesFilter) => datasetBeforeCurriculum.filter(samplesFilter)
     }

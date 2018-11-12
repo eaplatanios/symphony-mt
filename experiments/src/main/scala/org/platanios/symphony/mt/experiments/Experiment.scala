@@ -19,7 +19,7 @@ import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.data.loaders._
 import org.platanios.symphony.mt.experiments.config._
-import org.platanios.symphony.mt.models.{Model, ModelConfig}
+import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.models.parameters._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 
@@ -39,7 +39,7 @@ class Experiment(val configFile: Path) {
   lazy val config: Config = ConfigFactory.parseFile(configFile.toFile).resolve()
 
   lazy val task: Experiment.Task = {
-    config.getString("task") match {
+    config.get[String]("task") match {
       case "train" => Experiment.Train
       case "translate" => Experiment.Translate
       case "evaluate" => Experiment.Evaluate
@@ -48,12 +48,12 @@ class Experiment(val configFile: Path) {
   }
 
   lazy val dataset: String = {
-    config.getString("data.dataset")
+    config.get[String]("data.dataset")
   }
 
   lazy val (datasets, languages): (Seq[FileParallelDataset], Seq[(Language, Vocabulary)]) = {
-    val languagePairs = Experiment.parseLanguagePairs(config.getString("model.languages"))
-    val providedEvalLanguagePairs = Experiment.parseLanguagePairs(config.getString("model.eval-languages"))
+    val languagePairs = Experiment.parseLanguagePairs(config.get[String]("training.languages"))
+    val providedEvalLanguagePairs = Experiment.parseLanguagePairs(config.get[String]("evaluation.languages"))
     val evalLanguagePairs = if (providedEvalLanguagePairs.isEmpty) languagePairs else providedEvalLanguagePairs
     ParallelDatasetLoader.load(
       loaders = dataset match {
@@ -67,28 +67,35 @@ class Experiment(val configFile: Path) {
       workingDir = Some(environment.workingDir))
   }
 
-  private lazy val environmentConfigParser = new EnvironmentConfigParser(toString)
-  private lazy val modelConfigConfigParser = ModelConfigConfigParser
-  private lazy val dataConfigConfigParser  = DataConfigConfigParser
-  private lazy val parametersConfigParser  = new ParametersConfigParser(dataConfig)
-
-  private lazy val modelConfigParser = {
-    // TODO: [EXPERIMENTS] Add support for other data types.
-    new ModelConfigParser[Float](
-      task, dataset, datasets, languages, environment, parameterManager, dataConfig, modelConfig, "Model")
+  private lazy val parametersParser = {
+    new ParametersParser(dataConfig)
   }
 
-  private lazy val environmentConfig: Config = config.getConfig("environment")
-  private lazy val modelConfigConfig: Config = config.getConfig("model")
-  private lazy val dataConfigConfig : Config = config.getConfig("data")
-  private lazy val parametersConfig : Config = config.getConfig("model.parameters")
+  lazy val environment: Environment = {
+    new EnvironmentParser(toString).parse(config.get[Config]("environment"))
+  }
 
-  lazy val environment     : Environment                       = environmentConfigParser.parse(environmentConfig)
-  lazy val modelConfig     : ModelConfig                       = modelConfigConfigParser.parse(modelConfigConfig)
-  lazy val dataConfig      : DataConfig                        = dataConfigConfigParser.parse(dataConfigConfig)
-  lazy val parameters      : ParametersConfigParser.Parameters = parametersConfigParser.parse(parametersConfig)
-  lazy val parameterManager: ParameterManager                  = parameters.parameterManager
-  lazy val model           : Model[_]                          = modelConfigParser.parse(modelConfigConfig)
+  lazy val dataConfig: DataConfig = {
+    DataConfigParser.parse(config.get[Config]("data"))
+  }
+
+  lazy val parameters: ParametersParser.Parameters = {
+    parametersParser.parse(config.get[Config]("model.parameters"))
+  }
+
+  lazy val parameterManager: ParameterManager = {
+    parameters.parameterManager
+  }
+
+  private lazy val modelParser = {
+    // TODO: [EXPERIMENTS] Add support for other data types.
+    new ModelParser[Float](
+      task, dataset, datasets, languages, environment, parameterManager, dataConfig, "Model")
+  }
+
+  lazy val model: Model[_] = {
+    modelParser.parse(config)
+  }
 
   def initialize(): Unit = {
     val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
@@ -110,12 +117,12 @@ class Experiment(val configFile: Path) {
     task match {
       case Experiment.Train => model.train(datasets.map(_.filterTypes(Train)))
       case Experiment.Translate => ???
-      case Experiment.Evaluate => model.evaluate(model.evalDatasets)
+      case Experiment.Evaluate => model.evaluate(model.evaluationConfig.datasets)
     }
   }
 
   protected def languagesStringHelper(languagePairs: Seq[(Language, Language)]): (String, Seq[String]) = {
-    "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").toSeq.sorted
+    "Language Pairs" -> languagePairs.map(p => s"${p._1.abbreviation}-${p._2.abbreviation}").sorted
   }
 
   // def logSummary(): Unit = {
@@ -218,10 +225,9 @@ class Experiment(val configFile: Path) {
 
   override def toString: String = {
     val stringBuilder = new StringBuilder(s"$dataset")
-    stringBuilder.append(s".${modelConfigConfigParser.tag(modelConfigConfig, modelConfig).get}")
-    stringBuilder.append(s".${modelConfigParser.tag(modelConfigConfig, model).get}")
-    stringBuilder.append(s".${parametersConfigParser.tag(parametersConfig, parameters).get}")
-    stringBuilder.append(s".${dataConfigConfigParser.tag(dataConfigConfig, dataConfig).get}")
+    stringBuilder.append(s".${modelParser.tag(config, model).get}")
+    stringBuilder.append(s".${parametersParser.tag(config.get[Config]("model.parameters"), parameters).get}")
+    stringBuilder.append(s".${DataConfigParser.tag(config.get[Config]("data"), dataConfig).get}")
     stringBuilder.toString
   }
 }

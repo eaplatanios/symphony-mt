@@ -13,30 +13,20 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models
+package org.platanios.symphony.mt.config
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.config.TrainingConfig
+import org.platanios.symphony.mt.data.FileParallelDataset
+import org.platanios.symphony.mt.evaluation.{MTMetric, SentenceCount, SentenceLength}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-package object parameters {
-  /** Determines all language index pairs that are relevant given the current model configuration. */
-  def languageIndexPairs(
-      languages: Seq[Language],
-      trainingConfig: TrainingConfig
-  ): Seq[(Int, Int)] = {
-    if (trainingConfig.languagePairs.nonEmpty) {
-      trainingConfig.languagePairs.toSeq.map(pair => {
-        (languages.indexOf(pair._1), languages.indexOf(pair._2))
-      })
-    } else {
-      languages.indices
-          .combinations(2)
-          .map(c => (c(0), c(1)))
-          .flatMap(p => Seq(p, (p._2, p._1)))
-          .toSeq
-    }
-  }
-}
+case class EvaluationConfig(
+    frequency: Int = 1000,
+    metrics: Seq[MTMetric] = Seq(
+      SentenceLength(forHypothesis = true, name = "HypLen"),
+      SentenceLength(forHypothesis = false, name = "RefLen"),
+      SentenceCount(name = "#Sentences")),
+    datasets: Seq[(String, FileParallelDataset, Float)] = Seq.empty,
+    languagePairs: Set[(Language, Language)] = Set.empty)

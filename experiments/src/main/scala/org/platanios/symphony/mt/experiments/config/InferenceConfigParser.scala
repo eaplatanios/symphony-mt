@@ -15,14 +15,21 @@
 
 package org.platanios.symphony.mt.experiments.config
 
+import org.platanios.symphony.mt.config.InferenceConfig
+import org.platanios.symphony.mt.models.decoders.{GoogleLengthPenalty, NoLengthPenalty}
+import org.platanios.symphony.mt.models.pivoting.NoPivot
+
 import com.typesafe.config.Config
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-trait ConfigParser[T] {
-  @throws[IllegalArgumentException]
-  def parse(config: Config): T
-
-  def tag(config: Config, parsedValue: => T): Option[String] = None
+object InferenceConfigParser extends ConfigParser[InferenceConfig] {
+  override def parse(config: Config): InferenceConfig = {
+    InferenceConfig(
+      pivot = NoPivot,
+      beamWidth = config.get[Int]("beam-width"),
+      lengthPenalty = config.getOption[Float]("length-penalty").map(GoogleLengthPenalty).getOrElse(NoLengthPenalty),
+      maxDecodingLengthFactor = config.get[Float]("max-decoding-length-factor"))
+  }
 }

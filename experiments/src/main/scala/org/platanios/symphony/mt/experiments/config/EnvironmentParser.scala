@@ -24,21 +24,21 @@ import java.nio.file.Paths
 /**
   * @author Emmanouil Antonios Platanios
   */
-class EnvironmentConfigParser(
+class EnvironmentParser(
   val experimentTag: String
 ) extends ConfigParser[Environment] {
   override def parse(config: Config): Environment = {
     Environment(
-      workingDir = Paths.get(config.getString("working-dir")).resolve(experimentTag),
-      allowSoftPlacement = config.getBoolean("allow-soft-placement"),
-      logDevicePlacement = config.getBoolean("log-device-placement"),
-      gpuAllowMemoryGrowth = config.getBoolean("gpu-allow-memory-growth"),
-      useXLA = config.getBoolean("use-xla"),
-      numGPUs = config.getInt("num-gpus"),
-      parallelIterations = config.getInt("parallel-iterations"),
-      swapMemory = config.getBoolean("swap-memory"),
+      workingDir = Paths.get(config.get[String]("working-dir")).resolve(experimentTag),
+      allowSoftPlacement = config.get[Boolean]("allow-soft-placement"),
+      logDevicePlacement = config.get[Boolean]("log-device-placement"),
+      gpuAllowMemoryGrowth = config.get[Boolean]("gpu-allow-memory-growth"),
+      useXLA = config.get[Boolean]("use-xla"),
+      numGPUs = config.get[Int]("num-gpus"),
+      parallelIterations = config.get[Int]("parallel-iterations"),
+      swapMemory = config.get[Boolean]("swap-memory"),
       randomSeed = {
-        val value = config.getString("random-seed")
+        val value = config.get[String]("random-seed")
         if (value == "none")
           None
         else
@@ -46,7 +46,7 @@ class EnvironmentConfigParser(
       },
       traceSteps = {
         if (config.hasPath("trace-steps"))
-          Some(config.getInt("trace-steps"))
+          Some(config.get[Int]("trace-steps"))
         else
           None
       })

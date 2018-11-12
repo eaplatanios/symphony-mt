@@ -86,7 +86,7 @@ object ResultsAggregator {
 
     val workingDir = File.currentWorkingDirectory / "temp" / "results"
     workingDir.createIfNotExists(asDirectory = true)
-    val server = GoogleCloudServer
+    val server = GPU3Server
 //     val remotePath = "~/code/symphony-mt/temp/experiments/iwslt15.en-cs.en-de.en-fr.en-th.en-vi.both:true.back:true.bi_rnn:2:2.lstm:tanh.hyper_lang.l:8.w:512.r.a.dropout:0.2.ls:0.1.t:moses.c:moses.v:generated-simple-20000-5.pp:100.bs:128.nb:5.sml:80.tml:80/experiment.log"
 //    val remotePath = "~/code/symphony-mt/temp/experiments/iwslt15.en-cs.en-de.en-fr.en-th.en-vi.both:true.back:true.bi_rnn:2:2.lstm:tanh.hyper_lang.l:8.w:512.r.a.dropout:0.2.ls:0.1.t:moses.c:moses.v:generated-bpe-10000.pp:100.bs:128.nb:5.sml:80.tml:80/experiment.log"
 //    val remotePath = "~/code/symphony-mt/temp/experiments/iwslt14.en-de.en-es.en-fr.en-he.en-it.en-nl.en-pt-br.en-ro.en-ru.both:true.back:true.bi_rnn:2:2.lstm:tanh.hyper_lang.l:8.w:512.r.a.dropout:0.2.ls:0.1.t:moses.c:moses.v:generated-bpe-10000.pp:100.bs:128.nb:5.sml:80.tml:80/experiment.log"
@@ -96,8 +96,10 @@ object ResultsAggregator {
     val languagePairs = Set("en", "de", "it", "nl", "ro").toSeq.combinations(2).map(p => s"${p(0)}-${p(1)}").toSet -- zsLanguagePairs
 //    val remotePath = "~/code/symphony-mt/temp/experiments/iwslt15.en-cs.en-de.en-fr.en-th.en-vi.tw:true.ae:true.bi_rnn:2:2.lstm:tanh.google_multilingual.w:512.r.a.d:0.2.ls:0.1.t:moses.c:moses.v:simple-20000-5.pp:1.bs:128.nb:5.sml:50.tml:50/experiment.log"
 //    val remotePath = "~/code/symphony-mt/temp/experiments/iwslt17.de:en.de:it.de:ro.en:it.en:nl.en:ro.it:nl.nl:ro.tw:true.ae:true.bi_rnn:2:2.lstm:tanh.hyper_lang:4.l:8.w:512.r.a.d:0.2.ls:0.1.t:moses.c:moses.v:simple-20000-5.pp:100.bs:128.nb:5.sml:50.tml:50/experiment.log"
-    val remotePath = "~/../e_a_platanios/code/symphony-mt/temp/experiments/iwslt17.de:en.de:it.de:ro.en:it.en:nl.en:ro.it:nl.nl:ro.tw:true.ae:true.bi_rnn:2:2.lstm:tanh.hyper_lang:8.l:512.w:512.r.a.d:0.2.ls:0.1.t:moses.c:moses.v:simple-20000-5.pp:100.bs:128.nb:5.sml:50.tml:50/experiment.log"
-//    val remotePath = "~/code/symphony-mt/temp/experiments/iwslt17.de-en.de-it.de-ro.en-it.en-nl.en-ro.it-nl.nl-ro.tw:true.ae:true.bi_rnn:2:2.lstm:tanh.hyper_lang.l:32.w:512.r.a.d:0.2.ls:0.1.t:moses.c:moses.v:simple-20000-5.pp:100.bs:128.nb:5.sml:50.tml:50/experiment.log"
+//    val remotePath = "~/../e_a_platanios/code/symphony-mt/temp/experiments/iwslt17.de:en.de:it.de:ro.en:it.en:nl.en:ro.it:nl.nl:ro.tw:true.ae:true.bi_rnn:2:2.lstm:tanh.hyper_lang:8.l:512.w:512.r.a.d:0.2.ls:0.1.t:moses.c:moses.v:simple-20000-5.pp:100.bs:128.nb:5.sml:50.tml:50/experiment.log"
+
+//    val remotePath = "~/code/symphony-mt/temp_new/experiments/iwslt17.de:en.tw:false.ae:false.bi_rnn:2:2.lstm:tanh.pairwise.w:256.r.a.d:0.2.ls:0.1.t:moses.c:moses.v:simple-20000-5.pp:100.bs:128.nb:5.sml:50.tml:50/experiment.log"
+    val remotePath = "~/code/symphony-mt/temp_new/experiments/iwslt17.it:en.en:ro.tw:false.ae:false.bi_rnn:2:2.lstm:tanh.pairwise.w:256.r.a.d:0.2.ls:0.1.t:moses.c:moses.v:simple-10000-20.pp:100.bs:128.nb:5.sml:50.tml:50/experiment.log"
 
     //    val languagePairs = Set("de", "ro").toSeq.combinations(2).map(p => s"${p(0)}-${p(1)}").toSet
 //    val remotePath = "~/code/symphony-mt/temp/experiments/iwslt17.de-ro.tw:false.ae:false.bi_rnn:2:2.lstm:tanh.pairwise.w:512.r.a.d:0.2.ls:0.1.t:moses.c:moses.v:simple-20000-5.pp:100.bs:128.nb:5.sml:50.tml:50/experiment.log"
@@ -115,7 +117,7 @@ object ResultsAggregator {
         metric = BLEU,
         datasets = Set("IWSLT-17"),
         datasetTags = Set("tst2017"),
-        languagePairs = zsLanguagePairs)
+        languagePairs = languagePairs)
       println(mean)
     } finally {
       ssh.disconnect()

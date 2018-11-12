@@ -16,10 +16,11 @@
 package org.platanios.symphony.mt.experiments.config
 
 import org.platanios.symphony.mt.{Environment, Language}
+import org.platanios.symphony.mt.config.EvaluationConfig
 import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
 import org.platanios.symphony.mt.data.loaders._
 import org.platanios.symphony.mt.experiments.{Experiment, Metric}
-import org.platanios.symphony.mt.models.{Model, ModelConfig}
+import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.models.Transformation.{Decoder, Encoder}
 import org.platanios.symphony.mt.models.parameters.{PairwiseManager, ParameterManager}
 import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot, SinglePivot}
@@ -36,7 +37,7 @@ import com.typesafe.config.Config
 /**
   * @author Emmanouil Antonios Platanios
   */
-class ModelConfigParser[T: TF : IsHalfOrFloatOrDouble](
+class ModelParser[T: TF : IsHalfOrFloatOrDouble](
     task: Experiment.Task,
     dataset: String,
     datasets: => Seq[FileParallelDataset],
@@ -44,10 +45,14 @@ class ModelConfigParser[T: TF : IsHalfOrFloatOrDouble](
     environment: => Environment,
     parameterManager: => ParameterManager,
     dataConfig: => DataConfig,
-    modelConfig: => ModelConfig,
     name: String
 ) extends ConfigParser[Model[_]] {
   override def parse(config: Config): Model[_] = {
+    val trainingConfig = TrainingConfigParser.parse(config.get[Config]("training"))
+    val evalLanguagePairs = {
+      val providedPairs = Experiment.parseLanguagePairs(config.get[String]("evaluation.languages"))
+      if (providedPairs.isEmpty) trainingConfig.languagePairs else providedPairs
+    }
     val evalDatasets: Seq[(String, FileParallelDataset, Float)] = {
       val evalDatasetTags = config.get[String]("evaluation.datasets").split(',').map(dataset => {
         val parts = dataset.split(':')
@@ -68,27 +73,29 @@ class ModelConfigParser[T: TF : IsHalfOrFloatOrDouble](
       }
     }
     val evalMetrics = config.get[String]("evaluation.metrics").split(',').map(Metric.cliToMTMetric(_)(languages))
-    val encoder = ModelConfigParser.encoderFromConfig[T](config.getConfig("encoder"))
-    val decoder = ModelConfigParser.decoderFromConfig[T](config.getConfig("decoder"))
+    val encoder = ModelParser.encoderFromConfig[T](config.get[Config]("model.encoder"))
+    val decoder = ModelParser.decoderFromConfig[T](config.get[Config]("model.decoder"))
     new Model(
       name = name,
-      languages = languages,
       encoder = encoder,
       decoder = decoder,
+      languages = languages,
       env = environment,
       parameterManager = parameterManager,
       dataConfig = dataConfig,
-      modelConfig = modelConfig.copy(
-        inferenceConfig = modelConfig.inferenceConfig.copy(
-          pivot = ModelConfigParser.pivot(parameterManager, modelConfig.languagePairs)))
-    )(
-      evalDatasets = evalDatasets,
-      evalMetrics = evalMetrics)
+      trainingConfig = trainingConfig,
+      inferenceConfig = InferenceConfigParser.parse(config.get[Config]("inference")).copy(
+        pivot = ModelParser.pivot(parameterManager, trainingConfig.languagePairs)),
+      evaluationConfig = EvaluationConfig(
+        frequency = config.get[Int]("evaluation.frequency"),
+        metrics = evalMetrics,
+        datasets = evalDatasets,
+        languagePairs = evalLanguagePairs))
   }
 
   override def tag(config: Config, parsedValue: => Model[_]): Option[String] = {
-    val encoderConfig = config.getConfig("encoder")
-    val decoderConfig = config.getConfig("decoder")
+    val encoderConfig = config.get[Config]("model.encoder")
+    val decoderConfig = config.get[Config]("model.decoder")
 
     // TODO: !!! Make this more detailed.
     val stringBuilder = new StringBuilder()
@@ -104,16 +111,18 @@ class ModelConfigParser[T: TF : IsHalfOrFloatOrDouble](
       stringBuilder.append(":r")
     if (decoderConfig.hasPath("use-attention") && decoderConfig.get[Boolean]("use-attention"))
       stringBuilder.append(":a")
+    stringBuilder.append(s".${TrainingConfigParser.tag(config.get[Config]("training"), parsedValue.trainingConfig).get}")
+
     Some(stringBuilder.toString)
   }
 }
 
-object ModelConfigParser {
+object ModelParser {
   private def encoderFromConfig[T: TF : IsHalfOrFloatOrDouble](encoderConfig: Config): Encoder[Any] = {
     val encoderType = encoderConfig.get[String]("type")
     encoderType match {
       case "rnn" =>
-        val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.getConfig("cell"))
+        val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.get[Config]("cell"))
 
         implicit val evOutputStructureState: OutputStructure[cell.StateType] = {
           cell.evOutputStructureState.asInstanceOf[OutputStructure[cell.StateType]]
@@ -135,7 +144,7 @@ object ModelConfigParser {
           dropout = encoderConfig.get[Float]("dropout", default = 0.0f)
         ).asInstanceOf[Encoder[Any]]
       case "bi-rnn" =>
-        val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.getConfig("cell"))
+        val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.get[Config]("cell"))
 
         implicit val evOutputStructureState: OutputStructure[cell.StateType] = {
           cell.evOutputStructureState.asInstanceOf[OutputStructure[cell.StateType]]
@@ -157,7 +166,7 @@ object ModelConfigParser {
           dropout = encoderConfig.get[Float]("dropout", default = 0.0f)
         ).asInstanceOf[Encoder[Any]]
       case "gnmt" =>
-        val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.getConfig("cell"))
+        val cell: Cell[T, _, _] = cellFromConfig[T](encoderConfig.get[Config]("cell"))
 
         implicit val evOutputStructureState: OutputStructure[cell.StateType] = {
           cell.evOutputStructureState.asInstanceOf[OutputStructure[cell.StateType]]
@@ -207,7 +216,7 @@ object ModelConfigParser {
     val decoderType = decoderConfig.get[String]("type")
     decoderType match {
       case "rnn" =>
-        val cell: Cell[T, _, _] = cellFromConfig[T](decoderConfig.getConfig("cell"))
+        val cell: Cell[T, _, _] = cellFromConfig[T](decoderConfig.get[Config]("cell"))
         val numUnits = decoderConfig.get[Int]("num-units")
         val numLayers = decoderConfig.get[Int]("num-layers")
         val residual = decoderConfig.get[Boolean]("residual", default = true)
@@ -244,7 +253,7 @@ object ModelConfigParser {
           ).asInstanceOf[Decoder[Any]]
         }
       case "gnmt" =>
-        val cell: Cell[T, _, _] = cellFromConfig[T](decoderConfig.getConfig("cell"))
+        val cell: Cell[T, _, _] = cellFromConfig[T](decoderConfig.get[Config]("cell"))
         val dropout = decoderConfig.get[Float]("dropout", default = 0.0f)
         val useNewAttention = decoderConfig.get[Boolean]("use-new-attention", default = false)
 

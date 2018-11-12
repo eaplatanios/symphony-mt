@@ -15,7 +15,8 @@
 
 package org.platanios.symphony.mt.models.parameters
 
-import org.platanios.symphony.mt.{Environment, Language}
+import org.platanios.symphony.mt.config.TrainingConfig
+import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.models._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -61,7 +62,7 @@ class ParameterManager protected (
 
   def initialize(
       languages: Seq[(Language, Vocabulary)],
-      modelConfig: ModelConfig
+      trainingConfig: TrainingConfig
   ): Unit = {
     tf.variableScope("ParameterManager") {
       languageIds.keys.filter(_.isClosed).foreach(removeGraph)
@@ -83,7 +84,7 @@ class ParameterManager protected (
         }
 
         wordEmbeddings += graph -> tf.variableScope("WordEmbeddings") {
-          wordEmbeddingsType.createWordEmbeddings(languages, modelConfig)
+          wordEmbeddingsType.createWordEmbeddings(languages, trainingConfig)
         }
       }
     }
@@ -121,7 +122,7 @@ class ParameterManager protected (
 
   def wordEmbeddings(
       languageId: Output[Int]
-  )(implicit context: Context): Output[Int] => Output[Float] = {
+  )(implicit context: ModelConstructionContext): Output[Int] => Output[Float] = {
     keys: Output[Int] => {
       tf.variableScope("ParameterManager/WordEmbeddings") {
         val graph = currentGraph
@@ -135,7 +136,7 @@ class ParameterManager protected (
       shape: Shape,
       variableInitializer: tf.VariableInitializer = variableInitializer,
       variableReuse: tf.VariableReuse = tf.ReuseOrCreateNewVariable
-  )(implicit context: Context): Output[P] = {
+  )(implicit context: ModelConstructionContext): Output[P] = {
     tf.variableScope("ParameterManager") {
       tf.variable[P](name, shape, initializer = variableInitializer, reuse = variableReuse).value
     }
@@ -144,7 +145,7 @@ class ParameterManager protected (
   def getProjectionToWords(
       inputSize: Int,
       languageId: Output[Int]
-  )(implicit context: Context): Output[Float] = {
+  )(implicit context: ModelConstructionContext): Output[Float] = {
     tf.variableScope("ParameterManager/ProjectionToWords") {
       val graph = currentGraph
       wordEmbeddingsType.projectionToWords(
@@ -157,7 +158,7 @@ class ParameterManager protected (
 
   def postprocessEmbeddedSequences(
       sequences: Sequences[Float]
-  )(implicit context: Context): Sequences[Float] = {
+  )(implicit context: ModelConstructionContext): Sequences[Float] = {
     sequences
   }
 }

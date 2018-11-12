@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.transformer.helpers
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 
@@ -28,7 +28,7 @@ trait FeedForwardLayer {
   def apply(
       input: Output[Float],
       padRemover: Option[PadRemover]
-  )(implicit context: Context): Output[Float]
+  )(implicit context: ModelConstructionContext): Output[Float]
 }
 
 class DenseReLUDenseFeedForwardLayer protected (
@@ -41,7 +41,7 @@ class DenseReLUDenseFeedForwardLayer protected (
   override def apply(
       input: Output[Float],
       padRemover: Option[PadRemover]
-  )(implicit context: Context): Output[Float] = {
+  )(implicit context: ModelConstructionContext): Output[Float] = {
     val inputShape = tf.shape(input)
     val processedInput = padRemover.map(pr => {
       // Collapse `input` across examples.

@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.helpers
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.tensorflow.api._
 
 import scala.language.postfixOps
@@ -348,21 +348,18 @@ object Common {
       labelLengths: Output[Int],
       labelSmoothing: Float = 0.0f,
       sum: Boolean = true,
-      gaussian: Boolean = false,
-      timeMajor: Boolean = false
+      gaussian: Boolean = false
   ): (Output[T], Output[T]) = {
     // TODO: Factored padded cross-entropy.
     tf.nameScope("PaddedCrossEntropy") {
       val maxLength = tf.shape(labels).slice(1).toInt
       // val (processedLogits, processedLabels) = padToSameLengthWithZeros(logits, labels)
-      val transposedLabels = if (timeMajor) labels.transpose() else labels
-      val crossEntropy = smoothingCrossEntropy(logits, transposedLabels, labelSmoothing, gaussian)
+      val crossEntropy = smoothingCrossEntropy(logits, labels, labelSmoothing, gaussian)
       val weights = tf.sequenceMask(labelLengths, maxLength).castTo[T]
-      val transposedWeights = if (timeMajor) weights.transpose() else weights
       if (!sum) {
-        (crossEntropy * transposedWeights, transposedWeights)
+        (crossEntropy * weights, weights)
       } else {
-        (tf.sum(crossEntropy * transposedWeights), tf.sum(transposedWeights))
+        (tf.sum(crossEntropy * weights), tf.sum(weights))
       }
     }
   }
@@ -424,7 +421,7 @@ object Common {
       reluDropoutRate: Float = 0.0f,
       reluDropoutBroadcastAxes: Set[Int] = Set.empty,
       name: String = "DenseReLUDense"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     tf.variableScope(name) {
       val weights1 = context.parameterManager.get[T]("Dense1/Weights", Shape(input.shape(-1), filterSize))
       val bias1 = context.parameterManager.get[T]("Dense1/Bias", Shape(filterSize))

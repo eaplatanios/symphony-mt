@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{Context, Sequences}
+import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Utilities._
 import org.platanios.symphony.mt.models.rnn.Utilities._
 import org.platanios.tensorflow.api._
@@ -43,8 +43,8 @@ class UnidirectionalRNNEncoder[T: TF : IsNotQuantized, State: OutputStructure, S
 ) extends RNNEncoder[T, State]() {
   override def apply(
       sequences: Sequences[Int]
-  )(implicit context: Context): EncodedSequences[T, State] = {
-    val embeddedSequences = maybeTransposeInputSequences(embedSrcSequences(sequences))
+  )(implicit context: ModelConstructionContext): EncodedSequences[T, State] = {
+    val embeddedSequences = embedSrcSequences(sequences)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = stackedCell[T, State, StateShape](
       cell = cell,
@@ -61,7 +61,7 @@ class UnidirectionalRNNEncoder[T: TF : IsNotQuantized, State: OutputStructure, S
       cell = uniCell,
       input = embeddedSequences.sequences.castTo[T],
       initialState = None,
-      timeMajor = context.modelConfig.timeMajor,
+      timeMajor = false,
       parallelIterations = context.env.parallelIterations,
       swapMemory = context.env.swapMemory,
       sequenceLengths = embeddedSequences.lengths,

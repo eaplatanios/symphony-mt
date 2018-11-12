@@ -16,7 +16,8 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.{Context, ModelConfig, Sequences}
+import org.platanios.symphony.mt.config.TrainingConfig
+import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -40,10 +41,10 @@ class GoogleMultilingualManager protected (
 
   override def initialize(
       languages: Seq[(Language, Vocabulary)],
-      modelConfig: ModelConfig
+      trainingConfig: TrainingConfig
   ): Unit = {
     tf.variableScope("ParameterManager") {
-      super.initialize(languages, modelConfig)
+      super.initialize(languages, trainingConfig)
       val graph = currentGraph
       if (!languageEmbeddings.contains(graph)) {
         languageEmbeddings += graph -> {
@@ -58,7 +59,7 @@ class GoogleMultilingualManager protected (
 
   override def postprocessEmbeddedSequences(
       sequences: Sequences[Float]
-  )(implicit context: Context): Sequences[Float] = {
+  )(implicit context: ModelConstructionContext): Sequences[Float] = {
     val batchSize = tf.shape(sequences.sequences).slice(0).toInt
     val tgtLanguageEmbedding = languageEmbeddings(currentGraph).gather(context.tgtLanguageID).reshape(Shape(1, 1, -1))
     val tgtLanguageEmbeddingTiled = tf.tile(tgtLanguageEmbedding, tf.stack[Int](Seq(batchSize, 1, 1)))

@@ -16,8 +16,8 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.{Context, ModelConfig}
-import org.platanios.symphony.mt.models.parameters
+import org.platanios.symphony.mt.config.TrainingConfig
+import org.platanios.symphony.mt.models.{ModelConstructionContext, parameters}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -45,10 +45,10 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
 
   override def createWordEmbeddings(
       languages: Seq[(Language, Vocabulary)],
-      modelConfig: ModelConfig
+      trainingConfig: TrainingConfig
   ): T = {
     // Determine all the language index pairs that are relevant given the current model configuration.
-    val languageIndexPairs = parameters.languageIndexPairs(languages.map(_._1), modelConfig)
+    val languageIndexPairs = parameters.languageIndexPairs(languages.map(_._1), trainingConfig)
     val languagePairs = languageIndexPairs.map(p => (languages(p._1), languages(p._2)))
 
     // Create separate word embeddings for each language pair.
@@ -77,9 +77,9 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
       languageIds: Seq[Output[Int]],
       languageId: Output[Int],
       keys: Output[Int]
-  )(implicit context: Context): Output[Float] = {
+  )(implicit context: ModelConstructionContext): Output[Float] = {
     // Determine all the language index pairs that are relevant given the current model configuration.
-    val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.modelConfig)
+    val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.trainingConfig)
     val languageIdPairs = languageIndexPairs.map(p => (languageIds(p._1), languageIds(p._2)))
 
     // Perform a separate word embedding lookup for each language pair.
@@ -110,9 +110,9 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
       projectionsToWords: mutable.Map[Int, T],
       inputSize: Int,
       languageId: Output[Int]
-  )(implicit context: Context): Output[Float] = {
+  )(implicit context: ModelConstructionContext): Output[Float] = {
     // Determine all the language index pairs that are relevant given the current model configuration.
-    val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.modelConfig)
+    val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.trainingConfig)
 
     val projectionsForSize = projectionsToWords
         .getOrElseUpdate(inputSize, {

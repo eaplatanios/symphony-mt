@@ -15,28 +15,24 @@
 
 package org.platanios.symphony.mt.models
 
-import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.config.TrainingConfig
+import org.platanios.tensorflow.api.Output
+import org.platanios.tensorflow.api.learn.Mode
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-package object parameters {
-  /** Determines all language index pairs that are relevant given the current model configuration. */
-  def languageIndexPairs(
-      languages: Seq[Language],
-      trainingConfig: TrainingConfig
-  ): Seq[(Int, Int)] = {
-    if (trainingConfig.languagePairs.nonEmpty) {
-      trainingConfig.languagePairs.toSeq.map(pair => {
-        (languages.indexOf(pair._1), languages.indexOf(pair._2))
-      })
-    } else {
-      languages.indices
-          .combinations(2)
-          .map(c => (c(0), c(1)))
-          .flatMap(p => Seq(p, (p._2, p._1)))
-          .toSeq
-    }
+case class ModelConstructionContext(
+    stage: Stage,
+    mode: Mode,
+    srcLanguageID: Output[Int],
+    tgtLanguageID: Output[Int],
+    tgtSequences: Option[Sequences[Int]]
+)(implicit val context: Context)
+
+object ModelConstructionContext {
+  implicit def toContext(
+      modelConstructionContext: ModelConstructionContext
+  ): Context = {
+    modelConstructionContext.context
   }
 }

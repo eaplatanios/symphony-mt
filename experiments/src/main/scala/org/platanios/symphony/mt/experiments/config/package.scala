@@ -26,6 +26,7 @@ package object config {
   implicit class ConfigWithDefaults(config: Config) {
     def get[T: TypeTag](path: String): T = {
       val value = typeOf[T] match {
+        case t if t =:= typeOf[Config] => config.getConfig(path)
         case t if t =:= typeOf[Boolean] => config.getBoolean(path)
         case t if t =:= typeOf[Int] => config.getInt(path)
         case t if t =:= typeOf[Long] => config.getLong(path)
@@ -36,9 +37,10 @@ package object config {
       value.asInstanceOf[T]
     }
 
-    def get[T: TypeTag](path: String, default: T): T = {
+    def getOption[T: TypeTag](path: String): Option[T] = {
       if (config.hasPath(path)) {
         val value = typeOf[T] match {
+          case t if t =:= typeOf[Config] => config.getConfig(path)
           case t if t =:= typeOf[Boolean] => config.getBoolean(path)
           case t if t =:= typeOf[Int] => config.getInt(path)
           case t if t =:= typeOf[Long] => config.getLong(path)
@@ -46,10 +48,14 @@ package object config {
           case t if t =:= typeOf[Double] => config.getDouble(path)
           case t if t =:= typeOf[String] => config.getString(path)
         }
-        value.asInstanceOf[T]
+        Some(value.asInstanceOf[T])
       } else {
-        default
+        None
       }
+    }
+
+    def get[T: TypeTag](path: String, default: T): T = {
+      getOption[T](path).getOrElse(default)
     }
   }
 }

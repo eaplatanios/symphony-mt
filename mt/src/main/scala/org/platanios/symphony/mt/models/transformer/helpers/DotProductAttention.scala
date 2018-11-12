@@ -15,11 +15,9 @@
 
 package org.platanios.symphony.mt.models.transformer.helpers
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.symphony.mt.models.helpers.Common
-import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.Mode
 
 /** Dot-product attention.
   *
@@ -47,7 +45,7 @@ class DotProductAttention protected (
       k: Output[T],
       v: Output[T],
       bias: Option[Output[T]]
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     tf.nameScope(name) {
       // `logits` shape: [batchSize, numHeads, queryLength, memoryLength]
       var logits = tf.matmul(q, k, transposeB = true)

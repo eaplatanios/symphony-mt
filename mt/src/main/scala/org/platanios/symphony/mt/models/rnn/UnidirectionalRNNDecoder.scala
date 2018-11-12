@@ -40,7 +40,7 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: OutputStructure, S
   override protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]]
-  )(implicit context: Context): (RNNCell[Output[T], Seq[State], Shape, Seq[StateShape]], Seq[State]) = {
+  )(implicit context: ModelConstructionContext): (RNNCell[Output[T], Seq[State], Shape, Seq[StateShape]], Seq[State]) = {
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = stackedCell[T, State, StateShape](
       cell = cell,
@@ -73,7 +73,7 @@ class UnidirectionalRNNDecoderWithAttention[T: TF : IsNotQuantized, State: Outpu
   override protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]]
-  )(implicit context: Context): (AttentionWrapperCell[T, Seq[State], AttentionState, Seq[StateShape], AttentionStateShape], AttentionWrapperState[T, Seq[State], AttentionState]) = {
+  )(implicit context: ModelConstructionContext): (AttentionWrapperCell[T, Seq[State], AttentionState, Seq[StateShape], AttentionStateShape], AttentionWrapperState[T, Seq[State], AttentionState]) = {
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = stackedCell[T, State, StateShape](
       cell = cell,
@@ -86,12 +86,7 @@ class UnidirectionalRNNDecoderWithAttention[T: TF : IsNotQuantized, State: Outpu
       seed = context.env.randomSeed,
       name = "StackedUniCell")
     val memory = Sequences(
-      sequences = {
-        if (context.modelConfig.timeMajor)
-          encodedSequences.rnnTuple.output.transpose(Tensor(1, 0, 2))
-        else
-          encodedSequences.rnnTuple.output
-      },
+      sequences = encodedSequences.rnnTuple.output,
       lengths = encodedSequences.lengths)
     val attentionCell = attention.createCell(uniCell, memory, numUnits, numUnits, useAttentionLayer = true, outputAttention)
     val initialState = attentionCell.initialState(encodedSequences.rnnTuple.state)

@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{Context, Sequences}
+import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Utilities._
 import org.platanios.symphony.mt.models.rnn.Utilities._
 import org.platanios.tensorflow.api._
@@ -44,8 +44,8 @@ class BidirectionalRNNEncoder[T: TF : IsNotQuantized, State: OutputStructure, St
 ) extends RNNEncoder[T, State]() {
   override def apply(
       sequences: Sequences[Int]
-  )(implicit context: Context): EncodedSequences[T, State] = {
-    val embeddedSequences = maybeTransposeInputSequences(embedSrcSequences(sequences))
+  )(implicit context: ModelConstructionContext): EncodedSequences[T, State] = {
+    val embeddedSequences = embedSrcSequences(sequences)
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
 
     // Build the forward RNN cell.
@@ -78,7 +78,7 @@ class BidirectionalRNNEncoder[T: TF : IsNotQuantized, State: OutputStructure, St
       input = embeddedSequences.sequences.castTo[T],
       initialStateFw = None,
       initialStateBw = None,
-      timeMajor = context.modelConfig.timeMajor,
+      timeMajor = false,
       parallelIterations = context.env.parallelIterations,
       swapMemory = context.env.swapMemory,
       sequenceLengths = embeddedSequences.lengths,

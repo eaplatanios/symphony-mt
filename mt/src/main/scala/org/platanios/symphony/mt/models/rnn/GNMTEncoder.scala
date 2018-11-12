@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{Context, Sequences}
+import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Utilities._
 import org.platanios.symphony.mt.models.rnn.Utilities._
 import org.platanios.tensorflow.api._
@@ -39,8 +39,8 @@ class GNMTEncoder[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
 ) extends RNNEncoder[T, State]() {
   override def apply(
       sequences: Sequences[Int]
-  )(implicit context: Context): EncodedSequences[T, State] = {
-    val embeddedSequences = maybeTransposeInputSequences(embedSrcSequences(sequences))
+  )(implicit context: ModelConstructionContext): EncodedSequences[T, State] = {
+    val embeddedSequences = embedSrcSequences(sequences)
 
     // Bidirectional RNN layers
     val biTuple = {
@@ -71,7 +71,7 @@ class GNMTEncoder[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
           input = embeddedSequences.sequences.castTo[T],
           initialStateFw = None,
           initialStateBw = None,
-          timeMajor = context.modelConfig.timeMajor,
+          timeMajor = false,
           parallelIterations = context.env.parallelIterations,
           swapMemory = context.env.swapMemory,
           sequenceLengths = embeddedSequences.lengths,
@@ -97,7 +97,7 @@ class GNMTEncoder[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
       cell = uniCell,
       input = biTuple.output,
       initialState = None,
-      timeMajor = context.modelConfig.timeMajor,
+      timeMajor = false,
       parallelIterations = context.env.parallelIterations,
       swapMemory = context.env.swapMemory,
       sequenceLengths = embeddedSequences.lengths,

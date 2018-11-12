@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn.attention
 
-import org.platanios.symphony.mt.models.{Context, Sequences}
+import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.ops.rnn.attention.{Attention, AttentionWrapperCell}
@@ -37,7 +37,7 @@ class BahdanauRNNAttention[T: TF : IsDecimal](
       useAttentionLayer: Boolean,
       outputAttention: Boolean
   )(implicit
-      context: Context,
+      context: ModelConstructionContext,
       evOutputToShapeCellState: OutputToShape.Aux[CellState, CellStateShape]
   ): AttentionWrapperCell[T, CellState, Output[T], CellStateShape, Shape] = {
     tf.variableScope("BahdanauAttention") {

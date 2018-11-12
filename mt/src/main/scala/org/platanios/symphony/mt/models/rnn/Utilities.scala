@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 
@@ -33,7 +33,7 @@ object Utilities {
       seed: Option[Int] = None,
       name: String
   )(implicit
-      context: Context,
+      context: ModelConstructionContext,
       evOutputToShape: OutputToShape.Aux[State, StateShape]
   ): tf.RNNCell[Output[T], State, Shape, StateShape] = {
     tf.variableScope(name) {
@@ -65,7 +65,7 @@ object Utilities {
       seed: Option[Int] = None,
       name: String
   )(implicit
-      context: Context,
+      context: ModelConstructionContext,
       evOutputToShape: OutputToShape.Aux[State, StateShape]
   ): Seq[tf.RNNCell[Output[T], State, Shape, StateShape]] = {
     tf.variableScope(name) {
@@ -90,7 +90,7 @@ object Utilities {
       seed: Option[Int] = None,
       name: String
   )(implicit
-      context: Context,
+      context: ModelConstructionContext,
       evOutputToShape: OutputToShape.Aux[State, StateShape]
   ): tf.RNNCell[Output[T], Seq[State], Shape, Seq[StateShape]] = {
     tf.StackedCell(cells[T, State, StateShape](

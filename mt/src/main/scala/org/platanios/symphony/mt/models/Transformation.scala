@@ -19,8 +19,8 @@ package org.platanios.symphony.mt.models
   * @author Emmanouil Antonios Platanios
   */
 trait Transformation[TrainIn, InferIn, TrainOut, InferOut] {
-  def applyTrain(value: TrainIn)(implicit context: Context): TrainOut
-  def applyInfer(value: InferIn)(implicit context: Context): InferOut
+  def applyTrain(value: TrainIn)(implicit context: ModelConstructionContext): TrainOut
+  def applyInfer(value: InferIn)(implicit context: ModelConstructionContext): InferOut
 
   def >>[ComposedTrainOut, ComposedInferOut](
       other: Transformation[TrainOut, InferOut, ComposedTrainOut, ComposedInferOut]
@@ -33,11 +33,11 @@ trait Transformation[TrainIn, InferIn, TrainOut, InferOut] {
   ): Transformation[TrainIn, InferIn, ComposedTrainOut, ComposedInferOut] = {
     val outerTransformation = this
     new Transformation[TrainIn, InferIn, ComposedTrainOut, ComposedInferOut] {
-      override def applyTrain(source: TrainIn)(implicit context: Context): ComposedTrainOut = {
+      override def applyTrain(source: TrainIn)(implicit context: ModelConstructionContext): ComposedTrainOut = {
         other.applyTrain(outerTransformation.applyTrain(source))
       }
 
-      override def applyInfer(source: InferIn)(implicit context: Context): ComposedInferOut = {
+      override def applyInfer(source: InferIn)(implicit context: ModelConstructionContext): ComposedInferOut = {
         other.applyInfer(outerTransformation.applyInfer(source))
       }
     }
@@ -45,13 +45,13 @@ trait Transformation[TrainIn, InferIn, TrainOut, InferOut] {
 }
 
 trait SimpleTransformation[In, Out] extends Transformation[In, In, Out, Out] {
-  def apply(value: In)(implicit context: Context): Out
+  def apply(value: In)(implicit context: ModelConstructionContext): Out
   
-  override def applyTrain(value: In)(implicit context: Context): Out = {
+  override def applyTrain(value: In)(implicit context: ModelConstructionContext): Out = {
     apply(value)
   }
   
-  override def applyInfer(value: In)(implicit context: Context): Out = {
+  override def applyInfer(value: In)(implicit context: ModelConstructionContext): Out = {
     apply(value)
   }
 }

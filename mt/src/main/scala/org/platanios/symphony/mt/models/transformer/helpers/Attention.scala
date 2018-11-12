@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.transformer.helpers
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.ops.NN.{ConvPaddingMode, ValidConvPadding}
@@ -39,7 +39,7 @@ trait Attention {
       k: Output[T],
       v: Output[T],
       bias: Option[Output[T]]
-  )(implicit context: Context): Output[T]
+  )(implicit context: ModelConstructionContext): Output[T]
 
   // TODO: Add support for saving weights.
   // TODO: Add support for image summaries for the weights.
@@ -268,7 +268,7 @@ object Attention {
       kvNumFilters: Int = 1,
       qPaddingMode: ConvPaddingMode = ValidConvPadding,
       kvPaddingMode: ConvPaddingMode = ValidConvPadding
-  )(implicit context: Context): (Output[T], Output[T], Output[T]) = {
+  )(implicit context: ModelConstructionContext): (Output[T], Output[T], Output[T]) = {
     val q = computeAttentionComponent(queryAntecedent, totalKeysDepth, qNumFilters, qPaddingMode, "Q")
     val k = computeAttentionComponent(memoryAntecedent, totalKeysDepth, kvNumFilters, kvPaddingMode, "K")
     val v = computeAttentionComponent(memoryAntecedent, totalValuesDepth, kvNumFilters, kvPaddingMode, "V")
@@ -281,7 +281,7 @@ object Attention {
       numFilters: Int = 1,
       paddingMode: ConvPaddingMode = ValidConvPadding,
       name: String = "AttentionComponent"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     tf.variableScope(name) {
       if (numFilters == 1) {
         val weights = context.parameterManager.get[T](
@@ -337,7 +337,7 @@ object Attention {
       kvPaddingMode: ConvPaddingMode = ValidConvPadding,
       cache: Option[MultiHeadAttentionCache[T]] = None,
       name: String = "MultiHeadAttention"
-  )(implicit context: Context): (Output[T], Option[MultiHeadAttentionCache[T]]) = {
+  )(implicit context: ModelConstructionContext): (Output[T], Option[MultiHeadAttentionCache[T]]) = {
     require(totalKeysDepth % numHeads == 0, "`totalKeyDepth` must be divisible by `numHeads`.")
     require(totalValuesDepth % numHeads == 0, "`totalValueDepth` must be divisible by `numHeads`.")
     tf.variableScope(name) {

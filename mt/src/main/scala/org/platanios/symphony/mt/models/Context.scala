@@ -15,12 +15,11 @@
 
 package org.platanios.symphony.mt.models
 
+import org.platanios.symphony.mt.config.{EvaluationConfig, InferenceConfig, TrainingConfig}
 import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.data.DataConfig
 import org.platanios.symphony.mt.models.parameters.ParameterManager
 import org.platanios.symphony.mt.vocabulary.Vocabulary
-import org.platanios.tensorflow.api.Output
-import org.platanios.tensorflow.api.learn.Mode
 
 /**
   * @author Emmanouil Antonios Platanios
@@ -29,16 +28,21 @@ case class Context(
     languages: Seq[(Language, Vocabulary)],
     env: Environment,
     parameterManager: ParameterManager,
-    deviceManager: DeviceManager,
     dataConfig: DataConfig,
-    modelConfig: ModelConfig,
-    stage: Stage,
-    mode: Mode,
-    srcLanguageID: Output[Int],
-    tgtLanguageID: Output[Int],
-    tgtSequences: Option[Sequences[Int]]
+    trainingConfig: TrainingConfig,
+    inferenceConfig: InferenceConfig,
+    evaluationConfig: EvaluationConfig,
+    deviceManager: DeviceManager
 ) {
   def nextDevice(moveToNext: Boolean = true): String = {
     deviceManager.nextDevice(env, moveToNext)
+  }
+}
+
+object Context {
+  implicit def fromImplicitModelConstructionContext(implicit
+      modelConstructionContext: ModelConstructionContext
+  ): Context = {
+    modelConstructionContext.context
   }
 }

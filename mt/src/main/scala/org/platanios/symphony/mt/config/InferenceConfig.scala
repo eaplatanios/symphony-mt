@@ -13,15 +13,16 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.models
+package org.platanios.symphony.mt.config
+
+import org.platanios.symphony.mt.models.decoders.{LengthPenalty, NoLengthPenalty}
+import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot}
 
 /**
   * @author Emmanouil Antonios Platanios
   */
-object Utilities {
-  def embedSrcSequences(sequences: Sequences[Int])(implicit context: ModelConstructionContext): Sequences[Float] = {
-    val wordEmbeddings = context.parameterManager.wordEmbeddings(context.srcLanguageID)
-    val embeddedSequences = sequences.copy(sequences = wordEmbeddings(sequences.sequences))
-    context.parameterManager.postprocessEmbeddedSequences(embeddedSequences)
-  }
-}
+case class InferenceConfig(
+    pivot: Pivot = NoPivot,
+    beamWidth: Int,
+    lengthPenalty: LengthPenalty = NoLengthPenalty,
+    maxDecodingLengthFactor: Float = 2.0f)

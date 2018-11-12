@@ -48,7 +48,7 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
     val selfAttention: Attention = DotProductAttention(0.1f, Set.empty, "DotProductAttention"),
     val feedForwardLayer: FeedForwardLayer = DenseReLUDenseFeedForwardLayer(256, 128, 0.1f, Set.empty, "FeedForward")
 ) extends Encoder[EncodedSequences[T]] {
-  override def apply(sequences: Sequences[Int])(implicit context: Context): EncodedSequences[T] = {
+  override def apply(sequences: Sequences[Int])(implicit context: ModelConstructionContext): EncodedSequences[T] = {
     // `embeddedSequences.sequences` has shape [BatchSize, MaxLength, WordEmbeddingSize]
     // `embeddedSequence.lengths` has shape [BatchSize]
     val embeddedSequences = embedSrcSequences(sequences)

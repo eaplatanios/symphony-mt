@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.transformer
 
-import org.platanios.symphony.mt.models.{Context, Sequences}
+import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
 import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder}
 import org.platanios.symphony.mt.models.transformer.helpers.Attention.MultiHeadAttentionCache
@@ -45,7 +45,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 ) extends Decoder[EncodedSequences[T]] {
   override def applyTrain(
       encodedSequences: EncodedSequences[T]
-  )(implicit context: Context): Sequences[Float] = {
+  )(implicit context: ModelConstructionContext): Sequences[Float] = {
     // TODO: What if no target sequences are provided?
     val tgtSequences = context.tgtSequences.get
 
@@ -108,7 +108,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 
   override def applyInfer(
       encodedSequences: EncodedSequences[T]
-  )(implicit context: Context): Sequences[Int] = {
+  )(implicit context: ModelConstructionContext): Sequences[Int] = {
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
 
     // Determine the maximum allowed sequence length to consider while decoding.
@@ -116,8 +116,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       if (!context.mode.isTraining && context.dataConfig.tgtMaxLength != -1)
         tf.constant(context.dataConfig.tgtMaxLength)
       else
-        tf.round(tf.max(encodedSequences.lengths).toFloat *
-            context.modelConfig.inferenceConfig.maxDecodingLengthFactor).toInt
+        tf.round(tf.max(encodedSequences.lengths).toFloat * context.inferenceConfig.maxDecodingLengthFactor).toInt
     }
 
     val positionEmbeddings = this.positionEmbeddings.get(maxDecodingLength + 1, wordEmbeddingsSize).castTo[T]
@@ -223,13 +222,13 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 
     // Create the decoder RNN.
     val output = {
-      if (context.modelConfig.inferenceConfig.beamWidth > 1) {
+      if (context.inferenceConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
           cell, initialState, embeddings, tf.fill[Int, Int](batchSize.expandDims(0))(tgtBosID),
-          tgtEosID, context.modelConfig.inferenceConfig.beamWidth, context.modelConfig.inferenceConfig.lengthPenalty,
+          tgtEosID, context.inferenceConfig.beamWidth, context.inferenceConfig.lengthPenalty,
           outputLayer(outputWeights))
         val tuple = decoder.decode(
-          outputTimeMajor = context.modelConfig.timeMajor,
+          outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
           parallelIterations = context.env.parallelIterations,
           swapMemory = context.env.swapMemory)
@@ -241,7 +240,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
           endToken = tgtEosID)
         val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer(outputWeights))
         val tuple = decoder.decode(
-          outputTimeMajor = context.modelConfig.timeMajor,
+          outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
           parallelIterations = context.env.parallelIterations,
           swapMemory = context.env.swapMemory)
@@ -254,7 +253,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 
   protected def embeddings(
       ids: Output[Int]
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
     embeddingsTable(ids).castTo[T]
   }
@@ -280,7 +279,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       decoderSelfAttentionCache: Option[Seq[MultiHeadAttentionCache[Float]]],
       encoderDecoderAttentionBias: Output[Float],
       encoderDecoderAttentionCache: Option[Seq[MultiHeadAttentionCache[Float]]]
-  )(implicit context: Context): (Output[T], Seq[Option[MultiHeadAttentionCache[Float]]]) = {
+  )(implicit context: ModelConstructionContext): (Output[T], Seq[Option[MultiHeadAttentionCache[Float]]]) = {
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
 
     // Add the multi-head attention and the feed-forward layers.

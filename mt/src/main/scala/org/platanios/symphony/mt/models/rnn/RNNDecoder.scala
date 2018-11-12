@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.{Context, Sequences}
+import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
 import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder}
 import org.platanios.tensorflow.api._
@@ -30,7 +30,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
 ) extends Decoder[EncodedSequences[T, State]] {
   override def applyTrain(
       encodedSequences: EncodedSequences[T, State]
-  )(implicit context: Context): Sequences[Float] = {
+  )(implicit context: ModelConstructionContext): Sequences[Float] = {
     // TODO: What if no target sequences are provided?
     val tgtSequences = context.tgtSequences.get
 
@@ -49,25 +49,17 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     val outputWeights = context.parameterManager.getProjectionToWords(
       wordEmbeddingsSize, context.tgtLanguageID).castTo[T]
 
-    // Time-major transpose
-    val transposedTgtSequences = {
-      if (context.modelConfig.timeMajor)
-        shiftedTgtSequences.transpose()
-      else
-        shiftedTgtSequences
-    }
-
     // Embed the target sequences.
-    val embeddedTgtSequences = embeddings(transposedTgtSequences)
+    val embeddedTgtSequences = embeddings(shiftedTgtSequences)
 
     // Decoder RNN
     val helper = BasicDecoder.TrainingHelper[Output[T], DecState, Shape](
       input = embeddedTgtSequences,
       sequenceLengths = shiftedTgtSequenceLengths,
-      timeMajor = context.modelConfig.timeMajor)
+      timeMajor = false)
     val decoder = BasicDecoder(cell, initialState, helper, outputLayer(outputWeights))
     val tuple = decoder.decode(
-      outputTimeMajor = context.modelConfig.timeMajor,
+      outputTimeMajor = false,
       parallelIterations = context.env.parallelIterations,
       swapMemory = context.env.swapMemory)
     Sequences(tuple._1.modelOutput.toFloat, tuple._3)
@@ -75,7 +67,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
 
   override def applyInfer(
       encodedSequences: EncodedSequences[T, State]
-  )(implicit context: Context): Sequences[Int] = {
+  )(implicit context: ModelConstructionContext): Sequences[Int] = {
     val (cell, initialState) = cellAndInitialState(encodedSequences)
 
     // Determine the maximum allowed sequence length to consider while decoding.
@@ -84,7 +76,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
         tf.constant(context.dataConfig.tgtMaxLength)
       else
         tf.round(tf.max(encodedSequences.lengths).toFloat *
-            context.modelConfig.inferenceConfig.maxDecodingLengthFactor).toInt
+            context.inferenceConfig.maxDecodingLengthFactor).toInt
     }
 
     // Create some constants that will be used during decoding.
@@ -100,13 +92,13 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     val outputWeights = context.parameterManager.getProjectionToWords(
       cell.outputShape.apply(-1), context.tgtLanguageID).castTo[T]
     val output = {
-      if (context.modelConfig.inferenceConfig.beamWidth > 1) {
+      if (context.inferenceConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
           cell, initialState, embeddings, tf.fill[Int, Int](batchSize)(tgtBosID),
-          tgtEosID, context.modelConfig.inferenceConfig.beamWidth, context.modelConfig.inferenceConfig.lengthPenalty,
+          tgtEosID, context.inferenceConfig.beamWidth, context.inferenceConfig.lengthPenalty,
           outputLayer(outputWeights))
         val tuple = decoder.decode(
-          outputTimeMajor = context.modelConfig.timeMajor,
+          outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
           parallelIterations = context.env.parallelIterations,
           swapMemory = context.env.swapMemory)
@@ -118,7 +110,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
           endToken = tgtEosID)
         val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer(outputWeights))
         val tuple = decoder.decode(
-          outputTimeMajor = context.modelConfig.timeMajor,
+          outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
           parallelIterations = context.env.parallelIterations,
           swapMemory = context.env.swapMemory)
@@ -129,9 +121,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     // Make sure the outputs are of shape [batchSize, time] or [beamWidth, batchSize, time]
     // when using beam search.
     val outputSequences = {
-      if (context.modelConfig.timeMajor)
-        output.sequences.transpose()
-      else if (output.sequences.rank == 3)
+      if (output.sequences.rank == 3)
         output.sequences.transpose(Tensor(2, 0, 1))
       else
         output.sequences
@@ -141,7 +131,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
 
   protected def embeddings(
       ids: Output[Int]
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
     embeddingsTable(ids).castTo[T]
   }
@@ -167,5 +157,5 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
   protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]] = None
-  )(implicit context: Context): (RNNCell[Output[T], DecState, Shape, DecStateShape], DecState)
+  )(implicit context: ModelConstructionContext): (RNNCell[Output[T], DecState, Shape, DecStateShape], DecState)
 }

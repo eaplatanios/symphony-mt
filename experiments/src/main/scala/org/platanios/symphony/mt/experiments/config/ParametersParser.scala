@@ -24,10 +24,10 @@ import com.typesafe.config.Config
 /**
   * @author Emmanouil Antonios Platanios
   */
-class ParametersConfigParser(
+class ParametersParser(
     val dataConfig: DataConfig
-) extends ConfigParser[ParametersConfigParser.Parameters] {
-  override def parse(config: Config): ParametersConfigParser.Parameters = {
+) extends ConfigParser[ParametersParser.Parameters] {
+  override def parse(config: Config): ParametersParser.Parameters = {
     val wordEmbeddingsSize = config.get[Int]("word-embeddings-size")
     val manager = config.get[String]("manager")
     val sharedWordEmbeddings: Boolean = dataConfig.vocabulary match {
@@ -73,10 +73,10 @@ class ParametersConfigParser(
             tf.VarianceScalingInitializer.UniformDistribution))
       case _ => throw new IllegalArgumentException(s"'$manager' does not represent a valid parameter manager type.")
     }
-    ParametersConfigParser.Parameters(wordEmbeddingsSize, parameterManager)
+    ParametersParser.Parameters(wordEmbeddingsSize, parameterManager)
   }
 
-  override def tag(config: Config, parsedValue: => ParametersConfigParser.Parameters): Option[String] = {
+  override def tag(config: Config, parsedValue: => ParametersParser.Parameters): Option[String] = {
     val wordEmbeddingsSize = config.get[Int]("word-embeddings-size")
     val manager = config.get[String]("manager")
     val parameterManager = manager match {
@@ -102,6 +102,6 @@ class ParametersConfigParser(
   }
 }
 
-object ParametersConfigParser {
+object ParametersParser {
   case class Parameters(wordEmbeddingsSize: Int, parameterManager: ParameterManager)
 }

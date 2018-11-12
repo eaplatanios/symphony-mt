@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.transformer.helpers
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.tensorflow.api._
 
 /**
@@ -27,7 +27,7 @@ trait Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit context: Context): Output[T]
+  )(implicit context: ModelConstructionContext): Output[T]
 }
 
 /** Applies no normalization to the input tensor. */
@@ -37,7 +37,7 @@ case object NoNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     input
   }
 }
@@ -48,7 +48,7 @@ case class LayerNormalization(reuse: tf.VariableReuse = tf.ReuseOrCreateNewVaria
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     val numFilters = depth.getOrElse(input.shape(-1))
     tf.variableScope(name, reuse) {
       val scale = context.parameterManager.get[T]("Scale", Shape(numFilters), tf.OnesInitializer)
@@ -68,7 +68,7 @@ case object BatchNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     ???
   }
 }
@@ -79,7 +79,7 @@ case object NoamNormalization extends Normalization {
       depth: Option[Int] = None,
       epsilon: Float = 1e-12f,
       name: String = "Normalization"
-  )(implicit context: Context): Output[T] = {
+  )(implicit context: ModelConstructionContext): Output[T] = {
     tf.nameScope(name) {
       tf.l2Normalize(input, input.rank - 1, epsilon) * tf.sqrt(tf.constant[Float](input.shape(-1))).castTo[T]
     }

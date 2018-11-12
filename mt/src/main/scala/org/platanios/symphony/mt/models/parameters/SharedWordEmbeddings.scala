@@ -16,7 +16,8 @@
 package org.platanios.symphony.mt.models.parameters
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.{Context, ModelConfig}
+import org.platanios.symphony.mt.config.TrainingConfig
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 
@@ -42,7 +43,7 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
 
   override def createWordEmbeddings(
       languages: Seq[(Language, Vocabulary)],
-      modelConfig: ModelConfig
+      trainingConfig: TrainingConfig
   ): Output[Float] = {
     val someLanguage = languages.head
     tf.variable[Float](
@@ -63,7 +64,7 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
       languageIds: Seq[Output[Int]],
       languageId: Output[Int],
       keys: Output[Int]
-  )(implicit context: Context): Output[Float] = {
+  )(implicit context: ModelConstructionContext): Output[Float] = {
     embeddingTables.gather(keys)
   }
 
@@ -72,7 +73,7 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
       projectionsToWords: mutable.Map[Int, Output[Float]],
       inputSize: Int,
       languageId: Output[Int]
-  )(implicit context: Context): Output[Float] = {
+  )(implicit context: ModelConstructionContext): Output[Float] = {
     projectionsToWords
         .getOrElseUpdate(inputSize, {
           val weightsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)

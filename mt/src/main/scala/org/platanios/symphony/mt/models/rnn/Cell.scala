@@ -15,7 +15,7 @@
 
 package org.platanios.symphony.mt.models.rnn
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.models.ModelConstructionContext
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape, Zero}
 import org.platanios.tensorflow.api.ops.rnn.cell._
@@ -37,7 +37,7 @@ abstract class Cell[T: TF, State, StateShape](implicit
       name: String,
       numInputs: Int,
       numUnits: Int
-  )(implicit context: Context): RNNCell[Output[T], State, Shape, StateShape]
+  )(implicit context: ModelConstructionContext): RNNCell[Output[T], State, Shape, StateShape]
 }
 
 case class GRU[T: TF : IsNotQuantized](
@@ -47,7 +47,7 @@ case class GRU[T: TF : IsNotQuantized](
       name: String,
       numInputs: Int,
       numUnits: Int
-  )(implicit context: Context): RNNCell[Output[T], Output[T], Shape, Shape] = {
+  )(implicit context: ModelConstructionContext): RNNCell[Output[T], Output[T], Shape, Shape] = {
     val gateKernel = context.parameterManager.get[T]("Gate/Weights", Shape(numInputs + numUnits, 2 * numUnits))
     val gateBias = context.parameterManager.get[T]("Gate/Bias", Shape(2 * numUnits), tf.ZerosInitializer)
     val candidateKernel = context.parameterManager.get[T]("Candidate/Weights", Shape(numInputs + numUnits, numUnits))
@@ -64,7 +64,7 @@ case class BasicLSTM[T: TF : IsNotQuantized](
       name: String,
       numInputs: Int,
       numUnits: Int
-  )(implicit context: Context): BasicLSTMCell[T] = {
+  )(implicit context: ModelConstructionContext): BasicLSTMCell[T] = {
     val kernel = context.parameterManager.get[T]("Weights", Shape(numInputs + numUnits, 4 * numUnits))
     val bias = context.parameterManager.get[T]("Bias", Shape(4 * numUnits), tf.ZerosInitializer)
     BasicLSTMCell(kernel, bias, activation, forgetBias, name)
@@ -83,7 +83,7 @@ case class LSTM[T: TF : IsNotQuantized](
       name: String,
       numInputs: Int,
       numUnits: Int
-  )(implicit context: Context): LSTMCell[T] = {
+  )(implicit context: ModelConstructionContext): LSTMCell[T] = {
     val hiddenDepth = if (projectionSize != -1) projectionSize else numUnits
     val kernel = context.parameterManager.get[T]("Weights", Shape(numInputs + hiddenDepth, 4 * numUnits))
     val bias = context.parameterManager.get[T]("Bias", Shape(4 * numUnits), tf.ZerosInitializer)
