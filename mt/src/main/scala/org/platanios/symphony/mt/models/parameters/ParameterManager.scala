@@ -69,7 +69,7 @@ class ParameterManager protected (
       this.languages = languages
       val graph = currentGraph
       if (!languageIds.contains(graph)) {
-        languageIds += graph -> tf.variableScope("LanguageIDs") {
+        languageIds += graph -> tf.nameScope("LanguageIDs") {
           languages.map(_._1).zipWithIndex.map(l => tf.constant(l._2, name = l._1.name))
         }
 

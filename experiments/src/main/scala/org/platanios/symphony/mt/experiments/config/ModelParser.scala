@@ -47,9 +47,13 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
     dataConfig: => DataConfig,
     name: String
 ) extends ConfigParser[Model[_]] {
+  protected val trainingConfigParser: TrainingConfigParser = {
+    new TrainingConfigParser(datasets, dataConfig)
+  }
+
   @throws[IllegalArgumentException]
   override def parse(config: Config): Model[_] = {
-    val trainingConfig = TrainingConfigParser.parse(config.get[Config]("training"))
+    val trainingConfig = trainingConfigParser.parse(config.get[Config]("training"))
     val evalLanguagePairs = {
       val providedPairs = Experiment.parseLanguagePairs(config.get[String]("evaluation.languages"))
       if (providedPairs.isEmpty) trainingConfig.languagePairs else providedPairs
@@ -112,7 +116,7 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
       stringBuilder.append(":r")
     if (decoderConfig.hasPath("use-attention") && decoderConfig.get[Boolean]("use-attention"))
       stringBuilder.append(":a")
-    stringBuilder.append(s".${TrainingConfigParser.tag(config.get[Config]("training"), parsedValue.trainingConfig).get}")
+    stringBuilder.append(s".${trainingConfigParser.tag(config.get[Config]("training"), parsedValue.trainingConfig).get}")
 
     Some(stringBuilder.toString)
   }

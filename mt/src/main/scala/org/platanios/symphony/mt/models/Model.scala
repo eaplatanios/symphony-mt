@@ -321,6 +321,7 @@ class Model[Code](
       override def forwardWithoutContext(
           input: (SentencesWithLanguagePair[String], Sentences[String])
       )(implicit mode: Mode): SentencesWithLanguage[Float] = {
+        trainingConfig.curriculum.initialize()
         tf.createWith(device = deviceManager.nextDevice(env, moveToNext = false)) {
           parameterManager.initialize(languages, trainingConfig)
 
@@ -368,6 +369,7 @@ class Model[Code](
       override def forwardWithoutContext(
           input: SentencesWithLanguagePair[String]
       )(implicit mode: Mode): SentencesWithLanguage[String] = {
+        trainingConfig.curriculum.initialize()
         tf.createWith(device = deviceManager.nextDevice(env, moveToNext = false)) {
           parameterManager.initialize(languages, trainingConfig)
 

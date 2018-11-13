@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.curriculum.difficulty
 
 import org.platanios.symphony.mt.models.SentencePairs
+import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty.{SourceLengthSelector, TargetLengthSelector}
 import org.platanios.tensorflow.api._
 
 /**
@@ -25,7 +26,10 @@ class LengthBasedDifficulty[T](
     val lengthSelector: LengthBasedDifficulty.LengthSelector
 ) extends Difficulty[SentencePairs[T]] {
   override def apply(sample: SentencePairs[T]): Output[Float] = {
-    val length = lengthSelector(srcLength = sample._2._2, tgtLength = sample._3._2)
+    val length = lengthSelector match {
+      case SourceLengthSelector => sample._2._2.toFloat
+      case TargetLengthSelector => sample._3._2.toFloat
+    }
     val part1 = 0.0f                     // Length 1 to 10.
     val part2 = (length - 10.0f) / 30.0f // Length 10 to 10.
     val part3 = 0.5f + length / 100.0f   // Length 20 to 100.
@@ -34,25 +38,7 @@ class LengthBasedDifficulty[T](
 }
 
 object LengthBasedDifficulty {
-  trait LengthSelector {
-    def apply(srcLength: Output[Int], tgtLength: Output[Int]): Output[Float]
-  }
-
-  object SourceLengthSelector extends LengthSelector {
-    override def apply(srcLength: Output[Int], tgtLength: Output[Int]): Output[Float] = {
-      srcLength.toFloat
-    }
-  }
-
-  object TargetLengthSelector extends LengthSelector {
-    override def apply(srcLength: Output[Int], tgtLength: Output[Int]): Output[Float] = {
-      tgtLength.toFloat
-    }
-  }
-
-  object MeanLengthSelector extends LengthSelector {
-    override def apply(srcLength: Output[Int], tgtLength: Output[Int]): Output[Float] = {
-      (srcLength.toFloat + tgtLength.toFloat) / 2.0f
-    }
-  }
+  sealed trait LengthSelector
+  object SourceLengthSelector extends LengthSelector
+  object TargetLengthSelector extends LengthSelector
 }

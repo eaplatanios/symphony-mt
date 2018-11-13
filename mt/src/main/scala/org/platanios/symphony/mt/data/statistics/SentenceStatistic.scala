@@ -38,6 +38,14 @@ trait SentenceStatistic[T] {
     })).groupBy(_._1).mapValues(values => aggregate(values.map(_._2)))
   }
 
+  def forDatasets(language: Language, datasets: Seq[FileParallelDataset]): T = {
+    aggregate(datasets
+        .flatMap(_.files(language)
+            .map(file => forSentences(
+              language = language,
+              sentences = newReader(file).lines().toAutoClosedIterator.map(whitespaceRegex.split(_).toSeq).toSeq))))
+  }
+
   def forSentences(language: Language, sentences: Seq[Seq[String]]): T
   def aggregate(values: Seq[T]): T
 }

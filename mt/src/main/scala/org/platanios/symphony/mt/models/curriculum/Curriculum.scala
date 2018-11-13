@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.models.curriculum
 
+import org.platanios.symphony.mt.models.Context
 import org.platanios.tensorflow.api._
 
 /**
@@ -22,6 +23,8 @@ import org.platanios.tensorflow.api._
   */
 trait Curriculum[Sample] {
   private var currentStep: Variable[Long] = _
+
+  def initialize()(implicit context: Context): Unit = ()
 
   protected def getCurrentStep: Variable[Long] = {
     if (currentStep == null) {

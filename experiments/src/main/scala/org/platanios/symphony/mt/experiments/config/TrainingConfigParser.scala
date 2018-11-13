@@ -15,12 +15,15 @@
 
 package org.platanios.symphony.mt.experiments.config
 
+import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.config.TrainingConfig
+import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
 import org.platanios.symphony.mt.experiments.Experiment
 import org.platanios.symphony.mt.models.SentencePairs
 import org.platanios.symphony.mt.models.curriculum.{Curriculum, DifficultyBasedCurriculum}
 import org.platanios.symphony.mt.models.curriculum.competency.{Competency, LinearStepCompetency}
-import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty
+import org.platanios.symphony.mt.models.curriculum.difficulty.{AdaptiveLengthBasedDifficulty, Difficulty}
+import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty.{SourceLengthSelector, TargetLengthSelector}
 import org.platanios.tensorflow.api._
 
 import com.typesafe.config.Config
@@ -28,7 +31,10 @@ import com.typesafe.config.Config
 /**
   * @author Emmanouil Antonios Platanios
   */
-object TrainingConfigParser extends ConfigParser[TrainingConfig] {
+class TrainingConfigParser(
+    datasets: => Seq[FileParallelDataset],
+    dataConfig: => DataConfig
+) extends ConfigParser[TrainingConfig] {
   @throws[IllegalArgumentException]
   override def parse(config: Config): TrainingConfig = {
     val bothDirections = config.get[Boolean]("both-directions")
@@ -72,16 +78,19 @@ object TrainingConfigParser extends ConfigParser[TrainingConfig] {
             config.get[String]("tensorboard.host"),
             config.get[Int]("tensorboard.port"))),
       curriculum =
-          config.getOption[Config]("curriculum").map(parseCurriculum)
+          config.getOption[Config]("curriculum").map(parseCurriculum(_, languagePairs))
               .getOrElse(Curriculum.none[SentencePairs[String]]))
   }
 
   @throws[IllegalArgumentException]
-  private def parseCurriculum(curriculumConfig: Config): Curriculum[SentencePairs[String]] = {
+  private def parseCurriculum(
+      curriculumConfig: Config,
+      languagePairs: Set[(Language, Language)]
+  ): Curriculum[SentencePairs[String]] = {
     curriculumConfig.get[String]("type") match {
-      case "sentence-length" =>
+      case "difficulty" =>
         new DifficultyBasedCurriculum(
-          difficulty = new LengthBasedDifficulty(LengthBasedDifficulty.SourceLengthSelector),
+          difficulty = parseDifficulty(curriculumConfig.get[Config]("difficulty"), languagePairs),
           competency = parseCompetency(curriculumConfig.get[Config]("competency")))
       case curriculumType =>
         throw new IllegalArgumentException(s"'$curriculumType' does not represent a valid curriculum type.")
@@ -95,6 +104,26 @@ object TrainingConfigParser extends ConfigParser[TrainingConfig] {
         val offset = competencyConfig.get[Float]("offset")
         val slope = competencyConfig.get[Float]("slope")
         new LinearStepCompetency[Float](offset, slope)
+      case competencyType =>
+        throw new IllegalArgumentException(s"'$competencyType' does not represent a valid competency type.")
+    }
+  }
+
+  @throws[IllegalArgumentException]
+  private def parseDifficulty(
+      difficultyConfig: Config,
+      languagePairs: Set[(Language, Language)]
+  ): Difficulty[SentencePairs[String]] = {
+    difficultyConfig.get[String]("type") match {
+      case "adaptive-length" =>
+        val lengthSelectorString = difficultyConfig.get[String]("selector")
+        val lengthSelector = lengthSelectorString match {
+          case "source-sentence-length" => SourceLengthSelector
+          case "target-sentence-length" => TargetLengthSelector
+          case _ => throw new IllegalArgumentException(
+            s"'$lengthSelectorString' does not represent a valid length selector.")
+        }
+        new AdaptiveLengthBasedDifficulty[String](lengthSelector, datasets, languagePairs.toSeq, dataConfig)
       case competencyType =>
         throw new IllegalArgumentException(s"'$competencyType' does not represent a valid competency type.")
     }

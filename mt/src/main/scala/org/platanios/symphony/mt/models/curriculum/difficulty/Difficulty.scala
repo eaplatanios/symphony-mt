@@ -15,11 +15,14 @@
 
 package org.platanios.symphony.mt.models.curriculum.difficulty
 
+import org.platanios.symphony.mt.models.Context
 import org.platanios.tensorflow.api.Output
 
 /**
   * @author Emmanouil Antonios Platanios
   */
 trait Difficulty[Sample] {
+  def initialize()(implicit context: Context): Unit = ()
+
   def apply(sample: Sample): Output[Float]
 }

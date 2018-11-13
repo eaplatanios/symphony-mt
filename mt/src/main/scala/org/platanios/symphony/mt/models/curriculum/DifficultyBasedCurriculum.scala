@@ -15,6 +15,7 @@
 
 package org.platanios.symphony.mt.models.curriculum
 
+import org.platanios.symphony.mt.models.Context
 import org.platanios.symphony.mt.models.curriculum.competency.Competency
 import org.platanios.symphony.mt.models.curriculum.difficulty.Difficulty
 import org.platanios.tensorflow.api._
@@ -31,6 +32,13 @@ class DifficultyBasedCurriculum[Sample](
     val difficulty: Difficulty[Sample],
     val competency: Competency[Output[Float]]
 ) extends Curriculum[Sample] {
+  override def initialize()(implicit context: Context): Unit = {
+    tf.device("/CPU:0") {
+      super.initialize()
+      difficulty.initialize()
+    }
+  }
+
   override final def samplesFilter: Option[Sample => Output[Boolean]] = {
     Some((sample: Sample) => tf.nameScope("Curriculum/SamplesFilter") {
       tf.lessEqual(difficulty(sample), competency.currentLevel(getCurrentStep.value))
