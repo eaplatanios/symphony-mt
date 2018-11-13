@@ -21,9 +21,6 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.curriculum.Curriculum
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.learn.Counter
-import org.platanios.tensorflow.api.ops.FunctionGraph
-import org.platanios.tensorflow.api.ops.variables.Variable
 
 import java.nio.charset.StandardCharsets
 

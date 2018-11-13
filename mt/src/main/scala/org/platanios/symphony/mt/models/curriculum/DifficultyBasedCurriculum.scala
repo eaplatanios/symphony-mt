@@ -16,11 +16,10 @@
 package org.platanios.symphony.mt.models.curriculum
 
 import org.platanios.symphony.mt.models.curriculum.competency.Competency
+import org.platanios.symphony.mt.models.curriculum.difficulty.Difficulty
 import org.platanios.tensorflow.api._
 
 // TODO: Things to consider:
-//   - Source sentence length
-//   - Target sentence length
 //   - Length discrepancy
 //   - Word frequency
 //   - Alignment
@@ -28,11 +27,10 @@ import org.platanios.tensorflow.api._
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class DifficultyBasedCurriculum[Sample](
+class DifficultyBasedCurriculum[Sample](
+    val difficulty: Difficulty[Sample],
     val competency: Competency[Output[Float]]
 ) extends Curriculum[Sample] {
-  def difficulty(sample: Sample): Output[Float]
-
   override final def samplesFilter: Option[Sample => Output[Boolean]] = {
     Some((sample: Sample) => tf.nameScope("Curriculum/SamplesFilter") {
       tf.lessEqual(difficulty(sample), competency.currentLevel(getCurrentStep.value))

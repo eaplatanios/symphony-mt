@@ -18,8 +18,9 @@ package org.platanios.symphony.mt.experiments.config
 import org.platanios.symphony.mt.config.TrainingConfig
 import org.platanios.symphony.mt.experiments.Experiment
 import org.platanios.symphony.mt.models.SentencePairs
-import org.platanios.symphony.mt.models.curriculum.{Curriculum, SentenceLengthCurriculum}
+import org.platanios.symphony.mt.models.curriculum.{Curriculum, DifficultyBasedCurriculum}
 import org.platanios.symphony.mt.models.curriculum.competency.{Competency, LinearStepCompetency}
+import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty
 import org.platanios.tensorflow.api._
 
 import com.typesafe.config.Config
@@ -79,8 +80,9 @@ object TrainingConfigParser extends ConfigParser[TrainingConfig] {
   private def parseCurriculum(curriculumConfig: Config): Curriculum[SentencePairs[String]] = {
     curriculumConfig.get[String]("type") match {
       case "sentence-length" =>
-        val competency = parseCompetency(curriculumConfig.get[Config]("competency"))
-        new SentenceLengthCurriculum(competency)
+        new DifficultyBasedCurriculum(
+          difficulty = new LengthBasedDifficulty(LengthBasedDifficulty.SourceLengthSelector),
+          competency = parseCompetency(curriculumConfig.get[Config]("competency")))
       case curriculumType =>
         throw new IllegalArgumentException(s"'$curriculumType' does not represent a valid curriculum type.")
     }
