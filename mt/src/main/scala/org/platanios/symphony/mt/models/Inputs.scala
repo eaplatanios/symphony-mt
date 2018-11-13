@@ -203,7 +203,7 @@ object Inputs {
       tgtLength: Output[Int]
   ): TrainDataset = {
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evalBatchSize
-    val shuffleBufferSize = if (dataConfig.shuffleBufferSize == -1L) 64L * batchSize else dataConfig.shuffleBufferSize
+    val shuffleBufferSize = if (dataConfig.shuffleBufferSize == -1L) 10L * batchSize else dataConfig.shuffleBufferSize
 
     val srcLanguageDataset = tf.data.datasetFromOutputs(srcLanguage).repeat()
     val tgtLanguageDataset = tf.data.datasetFromOutputs(tgtLanguage).repeat()
@@ -217,7 +217,7 @@ object Inputs {
       trueFn = () => srcLength.toLong,
       falseFn = () => (srcLength.toFloat * dataConfig.parallelPortion).floor.toLong)
 
-    val datasetBeforeCurriculum =
+    val datasetBeforeBucketing =
       srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset)
           .take(numParallel))
           .shard(dataConfig.numShards, dataConfig.shardIndex)
@@ -252,13 +252,18 @@ object Inputs {
               /* Target sentences */ (d._2._2, tf.size(d._2._2).toInt)),
             name = "Map/AddLengths")
           .transform(d => if (cache) d.cache("") else d)
-          .transform(d => if (repeat) d.repeat() else d)
-          .transform(d => if (!isEval) d.shuffle(shuffleBufferSize) else d)
-
-    val datasetBeforeBucketing = trainingConfig.curriculum.samplesFilter match {
-      case None => datasetBeforeCurriculum
-      case Some(samplesFilter) => datasetBeforeCurriculum.filter(samplesFilter)
-    }
+          .transform(d => trainingConfig.curriculum.samplesFilter match {
+            case None => d
+            case Some(samplesFilter) => d.filter(samplesFilter)
+          })
+          .transform(d => {
+            if (isEval)
+              d
+            else if (repeat)
+              d.shuffleAndRepeat(shuffleBufferSize)
+            else
+              d.shuffle(shuffleBufferSize)
+          })
 
     val batchingFn = (dataset: SentencePairsDataset) => {
       val zero = Tensor.zeros[Int](Shape())
