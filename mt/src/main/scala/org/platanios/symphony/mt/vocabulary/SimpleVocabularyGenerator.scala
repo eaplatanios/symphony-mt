@@ -23,6 +23,8 @@ import better.files._
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
+import scala.util.matching.Regex
+
 /** Simple vocabulary generator that generates a vocabulary by simply splitting the input text files on spaces.
   *
   * @param  sizeThreshold   Vocabulary size threshold. If non-negative, then the created vocabulary size will be
@@ -41,6 +43,8 @@ class SimpleVocabularyGenerator protected (
     val replaceExisting: Boolean = false,
     val bufferSize: Int = 8192
 ) extends VocabularyGenerator {
+  protected val whitespaceRegex: Regex = "\\s+".r
+
   /** Returns the vocabulary file name that this generator uses / will use.
     *
     * @param  languages Languages for which a vocabulary will be generated.
@@ -74,7 +78,6 @@ class SimpleVocabularyGenerator protected (
     if (replaceExisting || vocabFile.notExists) {
       SimpleVocabularyGenerator.logger.info(s"Generating vocabulary file for ${languages.mkString(", ")}.")
       vocabFile.parent.createDirectories()
-      val whitespaceRegex = "\\s+".r
       val writer = newWriter(vocabFile)
       tokenizedFiles.map(_.get).toIterator.flatMap(file => {
         newReader(file).lines().toAutoClosedIterator
