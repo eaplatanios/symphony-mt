@@ -28,7 +28,7 @@ class RootStepCompetency[T: TF : IsNotQuantized](
   override def currentLevel(step: Output[Long]): Output[T] = {
     val zero = tf.zeros[T](Shape())
     val one = tf.ones[T](Shape())
-    val p = tf.constant[T](p)
+    val p = tf.constant[Int](p).castTo[T]
     val c0Pow = tf.pow(tf.constant[T](initialValue), p)
     val T = tf.constant[T](numStepsToFullCompetency)
     val t = step.castTo[T]
