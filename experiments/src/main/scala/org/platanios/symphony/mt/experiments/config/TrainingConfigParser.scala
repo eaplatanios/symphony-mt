@@ -152,9 +152,13 @@ class TrainingConfigParser(
         stringBuilder.append(s".comp:$competencyType")
         competencyType match {
           case "linear-step" =>
-            val offset = config.get[String]("curriculum.competency.offset")
-            val slope = config.get[String]("curriculum.competency.slope")
-            stringBuilder.append(s":$offset:$slope")
+            val initialValue = config.get[String]("curriculum.competency.initial-value")
+            val numStepsToFullCompetency = config.get[String]("curriculum.competency.num-steps-full-competency")
+            stringBuilder.append(s"linear-step:$initialValue:$numStepsToFullCompetency")
+          case "sqrt-step" =>
+            val initialValue = config.get[String]("curriculum.competency.initial-value")
+            val numStepsToFullCompetency = config.get[String]("curriculum.competency.num-steps-full-competency")
+            stringBuilder.append(s"sqrt-step:$initialValue:$numStepsToFullCompetency")
           case _ => ()
         }
       }
