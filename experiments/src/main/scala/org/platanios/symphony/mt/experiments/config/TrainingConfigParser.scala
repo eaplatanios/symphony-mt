@@ -154,11 +154,11 @@ class TrainingConfigParser(
           case "linear-step" =>
             val initialValue = config.get[String]("curriculum.competency.initial-value")
             val numStepsToFullCompetency = config.get[String]("curriculum.competency.num-steps-full-competency")
-            stringBuilder.append(s"linear-step:$initialValue:$numStepsToFullCompetency")
+            stringBuilder.append(s":$initialValue:$numStepsToFullCompetency")
           case "sqrt-step" =>
             val initialValue = config.get[String]("curriculum.competency.initial-value")
             val numStepsToFullCompetency = config.get[String]("curriculum.competency.num-steps-full-competency")
-            stringBuilder.append(s"sqrt-step:$initialValue:$numStepsToFullCompetency")
+            stringBuilder.append(s":$initialValue:$numStepsToFullCompetency")
           case _ => ()
         }
       }
