@@ -21,7 +21,7 @@ import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
 import org.platanios.symphony.mt.experiments.Experiment
 import org.platanios.symphony.mt.models.SentencePairs
 import org.platanios.symphony.mt.models.curriculum.{Curriculum, DifficultyBasedCurriculum}
-import org.platanios.symphony.mt.models.curriculum.competency.{Competency, LinearStepCompetency, SquareRootStepCompetency}
+import org.platanios.symphony.mt.models.curriculum.competency._
 import org.platanios.symphony.mt.models.curriculum.difficulty.{AdaptiveLengthBasedDifficulty, Difficulty}
 import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty.{SourceLengthSelector, TargetLengthSelector}
 import org.platanios.tensorflow.api._
@@ -104,10 +104,15 @@ class TrainingConfigParser(
         val initialValue = competencyConfig.get[Float]("initial-value")
         val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
         new LinearStepCompetency[Float](initialValue, numStepsToFullCompetency)
-      case "sqrt-step" =>
+      case "root-step" =>
         val initialValue = competencyConfig.get[Float]("initial-value")
         val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
-        new SquareRootStepCompetency[Float](initialValue, numStepsToFullCompetency)
+        val power = competencyConfig.get[Int]("power")
+        new RootStepCompetency[Float](initialValue, numStepsToFullCompetency, power)
+      case "log-step" =>
+        val initialValue = competencyConfig.get[Float]("initial-value")
+        val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
+        new LogarithmicStepCompetency[Float](initialValue, numStepsToFullCompetency)
       case competencyType =>
         throw new IllegalArgumentException(s"'$competencyType' does not represent a valid competency type.")
     }
@@ -151,14 +156,15 @@ class TrainingConfigParser(
         val competencyType = config.get[String]("curriculum.competency.type")
         stringBuilder.append(s".comp:$competencyType")
         competencyType match {
-          case "linear-step" =>
+          case "linear-step" | "log-step" =>
             val initialValue = config.get[String]("curriculum.competency.initial-value")
             val numStepsToFullCompetency = config.get[String]("curriculum.competency.num-steps-full-competency")
             stringBuilder.append(s":$initialValue:$numStepsToFullCompetency")
-          case "sqrt-step" =>
+          case "root-step" =>
             val initialValue = config.get[String]("curriculum.competency.initial-value")
             val numStepsToFullCompetency = config.get[String]("curriculum.competency.num-steps-full-competency")
-            stringBuilder.append(s":$initialValue:$numStepsToFullCompetency")
+            val power = config.get[String]("curriculum.competency.power")
+            stringBuilder.append(s":$initialValue:$numStepsToFullCompetency:$power")
           case _ => ()
         }
       }
