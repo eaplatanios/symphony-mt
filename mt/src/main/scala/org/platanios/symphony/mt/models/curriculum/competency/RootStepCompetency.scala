@@ -32,6 +32,6 @@ class RootStepCompetency[T: TF : IsNotQuantized](
     val c0Pow = tf.pow(tf.constant[T](initialValue), p)
     val T = tf.constant[T](numStepsToFullCompetency)
     val t = step.castTo[T]
-    tf.maximum(tf.minimum(tf.pow((t * (one - c0Pow) / T) + c0Pow, p), one), zero)
+    tf.maximum(tf.minimum(tf.pow((t * (one - c0Pow) / T) + c0Pow, one / p), one), zero)
   }
 }
