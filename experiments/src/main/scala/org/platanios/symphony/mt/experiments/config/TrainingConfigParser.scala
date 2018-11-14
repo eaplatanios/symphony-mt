@@ -21,7 +21,7 @@ import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
 import org.platanios.symphony.mt.experiments.Experiment
 import org.platanios.symphony.mt.models.SentencePairs
 import org.platanios.symphony.mt.models.curriculum.{Curriculum, DifficultyBasedCurriculum}
-import org.platanios.symphony.mt.models.curriculum.competency.{Competency, LinearStepCompetency}
+import org.platanios.symphony.mt.models.curriculum.competency.{Competency, LinearStepCompetency, SquareRootStepCompetency}
 import org.platanios.symphony.mt.models.curriculum.difficulty.{AdaptiveLengthBasedDifficulty, Difficulty}
 import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty.{SourceLengthSelector, TargetLengthSelector}
 import org.platanios.tensorflow.api._
@@ -101,9 +101,13 @@ class TrainingConfigParser(
   private def parseCompetency(competencyConfig: Config): Competency[Output[Float]] = {
     competencyConfig.get[String]("type") match {
       case "linear-step" =>
-        val offset = competencyConfig.get[Float]("offset")
-        val slope = competencyConfig.get[Float]("slope")
-        new LinearStepCompetency[Float](offset, slope)
+        val initialValue = competencyConfig.get[Float]("initial-value")
+        val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
+        new LinearStepCompetency[Float](initialValue, numStepsToFullCompetency)
+      case "sqrt-step" =>
+        val initialValue = competencyConfig.get[Float]("initial-value")
+        val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
+        new SquareRootStepCompetency[Float](initialValue, numStepsToFullCompetency)
       case competencyType =>
         throw new IllegalArgumentException(s"'$competencyType' does not represent a valid competency type.")
     }

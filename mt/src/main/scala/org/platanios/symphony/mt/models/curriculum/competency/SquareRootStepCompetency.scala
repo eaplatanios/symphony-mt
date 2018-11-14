@@ -20,16 +20,16 @@ import org.platanios.tensorflow.api._
 /**
   * @author Emmanouil Antonios Platanios
   */
-class LinearStepCompetency[T: TF : IsNotQuantized](
+class SquareRootStepCompetency[T: TF : IsNotQuantized](
     val initialValue: T,
     val numStepsToFullCompetency: T
 ) extends Competency[Output[T]] {
   override def currentLevel(step: Output[Long]): Output[T] = {
     val zero = tf.zeros[T](Shape())
     val one = tf.ones[T](Shape())
-    val c0 = tf.constant[T](initialValue)
+    val c0Square = tf.square(tf.constant[T](initialValue))
     val T = tf.constant[T](numStepsToFullCompetency)
     val t = step.castTo[T]
-    tf.maximum(tf.minimum((t * (one - c0) / T) + c0, one), zero)
+    tf.maximum(tf.minimum(tf.sqrt((t * (one - c0Square) / T) + c0Square), one), zero)
   }
 }
