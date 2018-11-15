@@ -27,9 +27,9 @@ class LogarithmicStepCompetency[T: TF : IsNotQuantized](
   override def currentLevel(step: Output[Long]): Output[T] = {
     val zero = tf.zeros[T](Shape())
     val one = tf.ones[T](Shape())
-    val c0 = tf.constant[T](initialValue)
+    val c0Exp = tf.exp(tf.constant[T](initialValue))
     val T = tf.constant[T](numStepsToFullCompetency)
     val t = step.castTo[T]
-    tf.maximum(tf.minimum(tf.log(t - tf.exp(c0)) / (tf.log(T) - c0), one), zero)
+    tf.maximum(tf.minimum(tf.log(t + c0Exp) / tf.log(T + c0Exp), one), zero)
   }
 }
