@@ -50,7 +50,11 @@ class IWSLT16Loader(
   private[this] def directoryName: String = s"$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(s"${IWSLT16Loader.url}/$src/$tgt/$directoryName.tgz")
+  override def filesToDownload: Seq[String] = {
+    Seq(
+      s"${IWSLT16Loader.url}/texts/$src/$tgt/$directoryName.tgz",
+      s"${IWSLT16Loader.url}-test/texts/$src/$tgt/$directoryName.tgz")
+  }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
@@ -84,13 +88,21 @@ class IWSLT16Loader(
         (IWSLT16Loader.Test2014,
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2014.$directoryName.$src.xml",
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2014.$directoryName.$tgt.xml",
+            SGMConverter >> Normalizer),
+        (IWSLT16Loader.Test2015,
+            File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2015.$directoryName.$src.xml",
+            File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2015.$directoryName.$tgt.xml",
+            SGMConverter >> Normalizer),
+        (IWSLT16Loader.Test2016,
+            File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2016.$directoryName.$src.xml",
+            File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2016.$directoryName.$tgt.xml",
             SGMConverter >> Normalizer))
     }
   }
 }
 
 object IWSLT16Loader {
-  val url: String = "https://wit3.fbk.eu/archive/2016-01/texts"
+  val url: String = "https://wit3.fbk.eu/archive/2016-01"
 
   val supportedLanguagePairs: Set[(Language, Language)] = Set(
     (English, Arabic), (English, Czech), (English, German), (English, French),
@@ -121,6 +133,8 @@ object IWSLT16Loader {
       case "tst2012" => Test2012
       case "tst2013" => Test2013
       case "tst2014" => Test2014
+      case "tst2015" => Test2015
+      case "tst2016" => Test2016
       case _ => throw new IllegalArgumentException(s"'$name' is not a valid IWSLT-16 tag.")
     }
   }
@@ -151,5 +165,13 @@ object IWSLT16Loader {
 
   case object Test2014 extends Tag {
     override val value: String = "tst2014"
+  }
+
+  case object Test2015 extends Tag {
+    override val value: String = "tst2015"
+  }
+
+  case object Test2016 extends Tag {
+    override val value: String = "tst2016"
   }
 }
