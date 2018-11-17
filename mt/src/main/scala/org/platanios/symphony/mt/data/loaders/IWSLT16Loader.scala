@@ -53,7 +53,8 @@ class IWSLT16Loader(
   override def filesToDownload: Seq[(String, String)] = {
     Seq(
       (s"${IWSLT16Loader.url}/texts/$src/$tgt/$directoryName.tgz", s"$directoryName.tgz"),
-      (s"${IWSLT16Loader.url}-test/texts/$src/$tgt/$directoryName.tgz", s"$directoryName-test.tgz"))
+      (s"${IWSLT16Loader.url}-test/texts/$src/$tgt/$directoryName.tgz", s"$directoryName-test.tgz"),
+      (s"${IWSLT16Loader.url}-test/texts/$tgt/$src/$tgt-$src.tgz", s"$tgt-$src-test.tgz"))
   }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
@@ -90,16 +91,15 @@ class IWSLT16Loader(
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2014.$directoryName.$tgt.xml",
             SGMConverter >> Normalizer),
         (IWSLT16Loader.Test2015,
-            File(downloadsDir) / s"$directoryName-test" / directoryName / s"IWSLT16.TED.tst2015.$directoryName.$src.xml",
-            File(downloadsDir) / s"$directoryName-test" / directoryName / s"IWSLT16.TED.tst2015.$directoryName.$tgt.xml",
+            File(downloadsDir) / s"$src-$tgt-test" / s"$src-$tgt" / s"IWSLT16.TED.tst2015.$src-$tgt.$src.xml",
+            File(downloadsDir) / s"$tgt-$src-test" / s"$tgt-$src" / s"IWSLT16.TED.tst2015.$tgt-$src.$tgt.xml",
             SGMConverter >> Normalizer),
         (IWSLT16Loader.Test2016,
-            File(downloadsDir) / s"$directoryName-test" / directoryName / s"IWSLT16.TED.tst2016.$directoryName.$src.xml",
-            File(downloadsDir) / s"$directoryName-test" / directoryName / s"IWSLT16.TED.tst2016.$directoryName.$tgt.xml",
+            File(downloadsDir) / s"$src-$tgt-test" / s"$src-$tgt" / s"IWSLT16.TED.tst2016.$src-$tgt.$src.xml",
+            File(downloadsDir) / s"$tgt-$src-test" / s"$tgt-$src" / s"IWSLT16.TED.tst2016.$tgt-$src.$tgt.xml",
             SGMConverter >> Normalizer))
     }
-  }
-}
+  }}
 
 object IWSLT16Loader {
   val url: String = "https://wit3.fbk.eu/archive/2016-01"
