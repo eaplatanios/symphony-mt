@@ -47,16 +47,16 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
   protected def tgt: String = tgtLanguage.abbreviation
 
   /** Sequence of files to download as part of this dataset. */
-  def filesToDownload: Seq[String]
+  def filesToDownload: Seq[(String, String)]
 
   /** Downloaded files listed in `filesToDownload`. */
   protected val downloadedFiles: Seq[File] = {
-    filesToDownload.map(url => {
-      val (_, filename) = url.splitAt(url.lastIndexOf('/') + 1)
-      val path = File(downloadsDir) / filename
-      ParallelDatasetLoader.maybeDownload(path, url, dataConfig.loaderBufferSize)
-      path
-    })
+    filesToDownload.map {
+      case (url, filename) =>
+        val path = File(downloadsDir) / filename
+        ParallelDatasetLoader.maybeDownload(path, url, dataConfig.loaderBufferSize)
+        path
+    }
   }
 
   /** Extracted files (if needed) from `downloadedFiles`. */

@@ -50,10 +50,10 @@ class IWSLT16Loader(
   private[this] def directoryName: String = s"$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = {
+  override def filesToDownload: Seq[(String, String)] = {
     Seq(
-      s"${IWSLT16Loader.url}/texts/$src/$tgt/$directoryName.tgz",
-      s"${IWSLT16Loader.url}-test/texts/$src/$tgt/$directoryName.tgz")
+      (s"${IWSLT16Loader.url}/texts/$src/$tgt/$directoryName.tgz", s"$directoryName.tgz"),
+      (s"${IWSLT16Loader.url}-test/texts/$src/$tgt/$directoryName.tgz", s"$directoryName-test.tgz"))
   }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
@@ -90,12 +90,12 @@ class IWSLT16Loader(
             File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2014.$directoryName.$tgt.xml",
             SGMConverter >> Normalizer),
         (IWSLT16Loader.Test2015,
-            File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2015.$directoryName.$src.xml",
-            File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2015.$directoryName.$tgt.xml",
+            File(downloadsDir) / s"$directoryName-test" / directoryName / s"IWSLT16.TED.tst2015.$directoryName.$src.xml",
+            File(downloadsDir) / s"$directoryName-test" / directoryName / s"IWSLT16.TED.tst2015.$directoryName.$tgt.xml",
             SGMConverter >> Normalizer),
         (IWSLT16Loader.Test2016,
-            File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2016.$directoryName.$src.xml",
-            File(downloadsDir) / directoryName / directoryName / s"IWSLT16.TED.tst2016.$directoryName.$tgt.xml",
+            File(downloadsDir) / s"$directoryName-test" / directoryName / s"IWSLT16.TED.tst2016.$directoryName.$src.xml",
+            File(downloadsDir) / s"$directoryName-test" / directoryName / s"IWSLT16.TED.tst2016.$directoryName.$tgt.xml",
             SGMConverter >> Normalizer))
     }
   }

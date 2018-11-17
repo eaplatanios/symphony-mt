@@ -56,8 +56,8 @@ class CommonCrawlLoader(
   }
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(
-    s"${CommonCrawlLoader.url}/${CommonCrawlLoader.archivePrefix}.tgz")
+  override def filesToDownload: Seq[(String, String)] = Seq(
+    (s"${CommonCrawlLoader.url}/${CommonCrawlLoader.archivePrefix}.tgz", s"${CommonCrawlLoader.archivePrefix}.tgz"))
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */

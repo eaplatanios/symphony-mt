@@ -50,7 +50,9 @@ class IWSLT14Loader(
   private[this] def directoryName: String = s"$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(s"${IWSLT14Loader.url}/$src/$tgt/$directoryName.tgz")
+  override def filesToDownload: Seq[(String, String)] = {
+    Seq((s"${IWSLT14Loader.url}/$src/$tgt/$directoryName.tgz", s"$directoryName.tgz"))
+  }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */

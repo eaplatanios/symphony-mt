@@ -58,7 +58,9 @@ class EuroparlV7Loader(
   }
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(s"${EuroparlV7Loader.url}/$corpusArchiveFile.tgz")
+  override def filesToDownload: Seq[(String, String)] = {
+    Seq((s"${EuroparlV7Loader.url}/$corpusArchiveFile.tgz", s"$corpusArchiveFile.tgz"))
+  }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */

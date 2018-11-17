@@ -56,8 +56,11 @@ class NewsCommentaryV11Loader(
   }
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(
-    s"${NewsCommentaryV11Loader.url}/${NewsCommentaryV11Loader.archivePrefix}.tgz")
+  override def filesToDownload: Seq[(String, String)] = {
+    Seq(
+      (s"${NewsCommentaryV11Loader.url}/${NewsCommentaryV11Loader.archivePrefix}.tgz",
+          s"${NewsCommentaryV11Loader.archivePrefix}.tgz"))
+  }
 
   /** Returns all the corpora (tuples containing name, source file, target file, and a file processor to use)
     * of this dataset type. */

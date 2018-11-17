@@ -54,15 +54,18 @@ class IWSLT15StanfordLoader(
   private[this] def directoryName: String = if (reversed) s"iwslt15.$tgt-$src" else s"iwslt15.$src-$tgt"
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(
-    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.trainPrefix}.$src",
-    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.trainPrefix}.$tgt",
-    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.devPrefix}.$src",
-    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.devPrefix}.$tgt",
-    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.testPrefix}.$src",
-    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.testPrefix}.$tgt",
-    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.vocabPrefix}.$src",
-    s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.vocabPrefix}.$tgt")
+  override def filesToDownload: Seq[(String, String)] = {
+    Seq(
+      s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.trainPrefix}.$src",
+      s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.trainPrefix}.$tgt",
+      s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.devPrefix}.$src",
+      s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.devPrefix}.$tgt",
+      s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.testPrefix}.$src",
+      s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.testPrefix}.$tgt",
+      s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.vocabPrefix}.$src",
+      s"${IWSLT15StanfordLoader.url}/$directoryName/${IWSLT15StanfordLoader.vocabPrefix}.$tgt"
+    ).map(url => (url, url.splitAt(url.lastIndexOf('/') + 1)._2))
+  }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */

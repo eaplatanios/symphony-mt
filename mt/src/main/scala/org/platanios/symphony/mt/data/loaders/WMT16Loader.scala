@@ -85,9 +85,10 @@ class WMT16Loader(
   // TODO: Add support for the "SETIMES2" dataset.
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = {
-    WMT16Loader.devArchives.map(archive => s"${WMT16Loader.newsCommentaryUrl}/$archive.tgz") ++
-        WMT16Loader.testArchives.map(archive => s"${WMT16Loader.newsCommentaryUrl}/$archive.tgz")
+  override def filesToDownload: Seq[(String, String)] = {
+    (WMT16Loader.devArchives.map(archive => s"${WMT16Loader.newsCommentaryUrl}/$archive.tgz") ++
+        WMT16Loader.testArchives.map(archive => s"${WMT16Loader.newsCommentaryUrl}/$archive.tgz"))
+        .map(url => (url, url.splitAt(url.lastIndexOf('/') + 1)._2))
   }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)

@@ -48,10 +48,12 @@ class IWSLT17Loader(
   override def downloadsDir: Path = config.dataDir.resolve("iwslt-17").resolve("downloads")
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(
-    s"${IWSLT17Loader.url}/${IWSLT17Loader.filename}.tgz",
-    s"${IWSLT17Loader.testUrl}/$src/$tgt/$src-$tgt.tgz",
-    s"${IWSLT17Loader.testUrl}/$tgt/$src/$tgt-$src.tgz")
+  override def filesToDownload: Seq[(String, String)] = {
+    Seq(
+      (s"${IWSLT17Loader.url}/${IWSLT17Loader.filename}.tgz", s"${IWSLT17Loader.filename}.tgz"),
+      (s"${IWSLT17Loader.testUrl}/$src/$tgt/$src-$tgt.tgz", s"$src-$tgt.tgz"),
+      (s"${IWSLT17Loader.testUrl}/$tgt/$src/$tgt-$src.tgz", s"$tgt-$src.tgz"))
+  }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */

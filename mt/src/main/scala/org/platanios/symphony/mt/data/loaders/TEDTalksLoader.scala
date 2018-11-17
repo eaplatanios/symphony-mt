@@ -49,7 +49,9 @@ class TEDTalksLoader(
   override def downloadsDir: Path = config.dataDir.resolve("ted-talks").resolve("downloads")
 
   /** Sequence of files to download as part of this dataset. */
-  override def filesToDownload: Seq[String] = Seq(s"${TEDTalksLoader.url}/${TEDTalksLoader.filename}.tar.gz")
+  override def filesToDownload: Seq[(String, String)] = {
+    Seq((s"${TEDTalksLoader.url}/${TEDTalksLoader.filename}.tar.gz", s"${TEDTalksLoader.filename}.tar.gz"))
+  }
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
