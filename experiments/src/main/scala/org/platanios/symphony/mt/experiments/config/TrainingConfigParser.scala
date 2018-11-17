@@ -116,15 +116,11 @@ class TrainingConfigParser(
         val initialValue = competencyConfig.get[Float]("initial-value")
         val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
         new LinearStepCompetency[Float](initialValue, numStepsToFullCompetency)
-      case "root-step" =>
+      case "exp-step" =>
         val initialValue = competencyConfig.get[Float]("initial-value")
         val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
         val power = competencyConfig.get[Int]("power")
-        new RootStepCompetency[Float](initialValue, numStepsToFullCompetency, power)
-      case "log-step" =>
-        val initialValue = competencyConfig.get[Float]("initial-value")
-        val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
-        new LogarithmicStepCompetency[Float](initialValue, numStepsToFullCompetency)
+        new ExponentialStepCompetency[Float](initialValue, numStepsToFullCompetency, power)
       case competencyType =>
         throw new IllegalArgumentException(s"'$competencyType' does not represent a valid competency type.")
     }
@@ -176,11 +172,11 @@ class TrainingConfigParser(
         val competencyType = config.get[String]("curriculum.competency.type")
         stringBuilder.append(s".comp:$competencyType")
         competencyType match {
-          case "linear-step" | "log-step" =>
+          case "linear-step" =>
             val initialValue = config.get[String]("curriculum.competency.initial-value")
             val numStepsToFullCompetency = config.get[String]("curriculum.competency.num-steps-full-competency")
             stringBuilder.append(s":$initialValue:$numStepsToFullCompetency")
-          case "root-step" =>
+          case "exp-step" =>
             val initialValue = config.get[String]("curriculum.competency.initial-value")
             val numStepsToFullCompetency = config.get[String]("curriculum.competency.num-steps-full-competency")
             val power = config.get[String]("curriculum.competency.power")

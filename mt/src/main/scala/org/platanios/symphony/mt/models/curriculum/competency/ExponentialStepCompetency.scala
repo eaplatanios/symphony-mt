@@ -20,7 +20,7 @@ import org.platanios.tensorflow.api._
 /**
   * @author Emmanouil Antonios Platanios
   */
-class RootStepCompetency[T: TF : IsNotQuantized](
+class ExponentialStepCompetency[T: TF : IsNotQuantized](
     val initialValue: T,
     val numStepsToFullCompetency: T,
     val power: Int
