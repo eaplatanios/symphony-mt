@@ -33,6 +33,13 @@ case class TrieWordCounter() {
     currentNode.incrementCount()
   }
 
+  def insertWordWithCount(word: String, count: Long): Unit = {
+    var currentNode = rootNode
+    for (char <- word)
+      currentNode = currentNode.child(char)
+    currentNode.setCount(count)
+  }
+
   def words(sizeThreshold: Int = -1, countThreshold: Int = -1): Iterable[(Long, String)] = {
     if (sizeThreshold == -1 && countThreshold == -1) {
       rootNode.words.filter(_._2 != "")
@@ -56,6 +63,7 @@ object TrieWordCounter {
 
     def count: Long = _count.get()
     def incrementCount(): Long = _count.incrementAndGet()
+    def setCount(count: Long): Unit = _count.set(count)
 
     def child(char: Long): TrieNode = _children.getOrElseUpdate(char, TrieNode())
     def children: Seq[(Long, TrieNode)] = _children.toSeq

@@ -121,6 +121,20 @@ object Score {
         }
       }
 
+      val (summaryScoreFile, computeSummaryScore) = {
+        if (computingSummaryScore) {
+          val summaryScore = scoresToCompute.head.asInstanceOf[SummaryScore]
+          val summaryScoreFile = summaryScoresDir.map(_ / s"$summaryScore")
+          if (alwaysRecompute || summaryScoreFile.isEmpty || summaryScoreFile.get.notExists) {
+            (summaryScoreFile, Some(true))
+          } else {
+            (summaryScoreFile, Some(false))
+          }
+        } else {
+          (None, None)
+        }
+      }
+
       logger.info(s"Computing scores: ${scoresToCompute.map(s => s"'$s'").mkString(", ")}.")
       datasets.foreach(dataset => {
         dataset.files.foreach {
@@ -145,9 +159,8 @@ object Score {
 
             if (computingSummaryScore) {
               val summaryScore = scoresToCompute.head.asInstanceOf[SummaryScore]
-              val summaryScoreFile = summaryScoresDir.map(_ / s"$summaryScore")
 
-              if (alwaysRecompute || summaryScoreFile.isEmpty || summaryScoreFile.get.notExists) {
+              if (computeSummaryScore.get) {
                 val requiredSentenceScores = summaryScore.requiredSentenceScores.map(s => {
                   val index = sentenceScoreNames.indexOf(s.toString)
                   sentenceScoreValues(index)
@@ -165,22 +178,7 @@ object Score {
                     requiredValues = requiredSentenceScores.map(_.apply(sentence._2)),
                     requiredSummaries = requiredSummaryScores)
                 })
-
-                // Save state to file, if necessary.
-                summaryScoreFile.foreach(file => {
-                  if (!file.exists)
-                    file.parent.createDirectories()
-                  summaryScore.saveStateToFile(file)
-                })
-              } else {
-                // Load state from file.
-                summaryScoreFile.foreach(file => {
-                  summaryScore.loadStateFromFile(file)
-                  summaryScore.setDatasetsHashFromFile(file)
-                })
               }
-
-              computedSummaryScores += summaryScore
             } else {
               // Determine which scores need to be computed/re-computed.
               val sentenceScoresToCompute = {
@@ -239,6 +237,25 @@ object Score {
           })
         }
       })
+
+      if (computingSummaryScore) {
+        val summaryScore = scoresToCompute.head.asInstanceOf[SummaryScore]
+
+        summaryScoreFile.foreach(file => {
+          if (computeSummaryScore.get) {
+            // Save state to file, if necessary.
+            if (!file.exists)
+              file.parent.createDirectories()
+            summaryScore.saveStateToFile(file)
+          } else {
+            // Load state from file.
+            summaryScore.loadStateFromFile(file)
+            summaryScore.setDatasetsHashFromFile(file)
+          }
+        })
+
+        computedSummaryScores += summaryScore
+      }
 
       scores = scores.drop(scoresToCompute.size)
     }
