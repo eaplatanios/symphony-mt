@@ -25,6 +25,10 @@ import scala.util.matching.Regex
 object SentenceLength extends SentenceScore {
   protected val whitespaceRegex: Regex = "\\s+".r
 
+  override def name: String = {
+    "sentence-length"
+  }
+
   override def processSentence(
       language: Language,
       sentence: String,
@@ -32,9 +36,5 @@ object SentenceLength extends SentenceScore {
       requiredSummaries: Seq[SummaryScore]
   ): Float = {
     whitespaceRegex.split(sentence).length
-  }
-
-  override def toString: String = {
-    "sentence-length"
   }
 }

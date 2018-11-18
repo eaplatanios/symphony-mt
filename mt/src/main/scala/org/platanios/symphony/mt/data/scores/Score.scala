@@ -33,6 +33,8 @@ trait Score {
 
   val isSummary: Boolean
 
+  def name: String
+
   def requiredSentenceScores: Seq[SentenceScore] = {
     Seq.empty
   }
@@ -48,7 +50,9 @@ trait Score {
       requiredSummaries: Seq[SummaryScore]
   ): T
 
-  override def toString: String
+  override def toString: String = {
+    name
+  }
 }
 
 trait SentenceScore extends Score {
@@ -60,11 +64,31 @@ trait SentenceScore extends Score {
 trait SummaryScore extends Score {
   override type T = Unit
 
+  private var hash: Option[String] = None
+
   override val isSummary: Boolean = true
 
-  def resetState(): Unit
+  private[scores] def setDatasetsHash(hash: String): Unit = {
+    this.hash = Some(hash)
+  }
+
+  private[scores] def setDatasetsHashFromFile(file: File): Unit = {
+    setDatasetsHash(file.extension(includeDot = false).get)
+  }
+
+  private[scores] def reset(): Unit = {
+    hash = None
+    resetState()
+  }
+
+  protected def resetState(): Unit
+
   def saveStateToFile(file: File): Unit
   def loadStateFromFile(file: File): Unit
+
+  override def toString: String = {
+    hash.map(h => s"$name.$h").getOrElse(name)
+  }
 }
 
 object Score {
@@ -88,7 +112,10 @@ object Score {
       val computingSummaryScore = scores.head.isSummary
       val scoresToCompute = {
         if (computingSummaryScore) {
-          scores.take(1)
+          val summaryScore = scores.head.asInstanceOf[SummaryScore]
+          summaryScore.reset()
+          summaryScore.setDatasetsHash(datasets.hashCode.toHexString)
+          Seq(summaryScore)
         } else {
           scores.takeWhile(!_.isSummary)
         }
@@ -147,7 +174,10 @@ object Score {
                 })
               } else {
                 // Load state from file.
-                summaryScoreFile.foreach(summaryScore.loadStateFromFile)
+                summaryScoreFile.foreach(file => {
+                  summaryScore.loadStateFromFile(file)
+                  summaryScore.setDatasetsHashFromFile(file)
+                })
               }
 
               computedSummaryScores += summaryScore

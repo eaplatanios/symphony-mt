@@ -30,6 +30,10 @@ class SentenceScoreHistogram(
 ) extends SummaryScore {
   protected var histogram: Histogram = Histogram(maxNumBins)
 
+  override def name: String = {
+    s"$score.$maxNumBins.bins.histogram"
+  }
+
   override def requiredSentenceScores: Seq[SentenceScore] = {
     Seq(score)
   }
@@ -47,6 +51,10 @@ class SentenceScoreHistogram(
   def cdfScore: SentenceScore = {
     val histogramScore = this
     new SentenceScore {
+      override def name: String = {
+        s"$histogramScore.cdf"
+      }
+
       override def requiredSentenceScores: Seq[SentenceScore] = {
         Seq(score)
       }
@@ -62,10 +70,6 @@ class SentenceScoreHistogram(
           requiredSummaries: Seq[SummaryScore]
       ): Float = {
         histogramScore.histogram.cdf(requiredValues.head).toFloat
-      }
-
-      override def toString: String = {
-        s"$histogramScore.cdf"
       }
     }
   }
@@ -84,15 +88,11 @@ class SentenceScoreHistogram(
   }
 
   override def loadStateFromFile(file: File): Unit = {
-    resetState()
+    reset()
     newReader(file).lines().toAutoClosedIterator.foreach(line => {
       val lineParts = line.split('\t')
       histogram.insertBin(Histogram.Bin(mean = lineParts(0).toDouble, numSamples = lineParts(1).toLong))
     })
-  }
-
-  override def toString: String = {
-    s"$score.$maxNumBins.bins.histogram"
   }
 }
 

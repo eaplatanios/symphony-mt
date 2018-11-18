@@ -78,6 +78,29 @@ class Vocabulary protected (
     * @return Decoded sequence of tokens that may differ in size from the input sequence.
     */
   def decodeSequence(sequence: Seq[String]): Seq[String] = sequence
+
+  override def hashCode(): Int = {
+    val prime = 31
+    var result = 1
+    result = prime * result + file.hashCode
+    result = prime * result + size.hashCode
+    result = prime * result + unknownToken.hashCode
+    result = prime * result + beginOfSequenceToken.hashCode
+    result = prime * result + endOfSequenceToken.hashCode
+    result
+  }
+
+  override def equals(that: Any): Boolean = {
+    that match {
+      case other: Vocabulary =>
+        file == other.file &&
+            size == other.size &&
+            unknownToken == other.unknownToken &&
+            beginOfSequenceToken == other.beginOfSequenceToken &&
+            endOfSequenceToken == other.endOfSequenceToken
+      case _ => false
+    }
+  }
 }
 
 /** Contains utilities for dealing with vocabularies. */

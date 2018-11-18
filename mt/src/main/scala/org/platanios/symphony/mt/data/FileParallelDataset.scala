@@ -51,13 +51,36 @@ class FileParallelDataset protected (
   }
 
   override def filterTags(tags: ParallelDataset.Tag*): FileParallelDataset = {
-    require(fileTags.nonEmpty, "Cannot filter a parallel dataset by file key when it contains no file keys.")
+    require(fileTags.nonEmpty, "Cannot filter a parallel dataset by file tag when it contains no file tags.")
     val filteredGroupedFiles = files.mapValues(_.zip(fileTags).filter(f => tags.contains(f._2)).map(_._1))
     val filteredFileTypes = fileTags.zip(fileTypes).filter(f => tags.contains(f._1)).map(_._2)
     val filteredFileKeys = fileTags.filter(tags.contains)
     FileParallelDataset(
       s"$name/${tags.mkString("-")}", vocabulary, dataConfig,
       filteredGroupedFiles, filteredFileTypes, filteredFileKeys)
+  }
+
+  override def hashCode(): Int = {
+    val prime = 31
+    var result = 1
+    result = prime * result + vocabulary.hashCode
+    result = prime * result + dataConfig.hashCode
+    result = prime * result + files.hashCode
+    result = prime * result + (if (fileTypes == null) 0 else fileTypes.hashCode)
+    result = prime * result + (if (fileTags == null) 0 else fileTags.hashCode)
+    result
+  }
+
+  override def equals(that: Any): Boolean = {
+    that match {
+      case other: FileParallelDataset =>
+        vocabulary == other.vocabulary &&
+            dataConfig == other.dataConfig &&
+            files == other.files &&
+            fileTypes == other.fileTypes &&
+            fileTags == other.fileTags
+      case _ => false
+    }
   }
 }
 
