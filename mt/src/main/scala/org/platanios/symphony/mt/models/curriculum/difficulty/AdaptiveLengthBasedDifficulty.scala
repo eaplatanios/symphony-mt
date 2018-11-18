@@ -16,9 +16,9 @@
 package org.platanios.symphony.mt.models.curriculum.difficulty
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.statistics.SentenceLengthsHistogram
+import org.platanios.symphony.mt.data.scores.SentenceLengthsHistogram
 import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
-import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty.{SourceLengthSelector, TargetLengthSelector}
+import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty._
 import org.platanios.symphony.mt.models.{Context, SentencePairs}
 import org.platanios.tensorflow.api._
 

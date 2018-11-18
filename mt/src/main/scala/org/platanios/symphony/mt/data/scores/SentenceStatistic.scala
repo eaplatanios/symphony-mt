@@ -13,7 +13,7 @@
  * the License.
  */
 
-package org.platanios.symphony.mt.data.statistics
+package org.platanios.symphony.mt.data.scores
 
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.data.{FileParallelDataset, newReader}
