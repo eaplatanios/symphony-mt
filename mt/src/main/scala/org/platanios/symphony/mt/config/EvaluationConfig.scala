@@ -28,5 +28,5 @@ case class EvaluationConfig(
       SentenceLength(forHypothesis = true, name = "HypLen"),
       SentenceLength(forHypothesis = false, name = "RefLen"),
       SentenceCount(name = "#Sentences")),
-    datasets: Seq[(String, FileParallelDataset, Float)] = Seq.empty,
+    datasets: Seq[(String, FileParallelDataset)] = Seq.empty,
     languagePairs: Set[(Language, Language)] = Set.empty)

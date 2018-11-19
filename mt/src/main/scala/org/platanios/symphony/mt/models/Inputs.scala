@@ -21,8 +21,7 @@ import org.platanios.symphony.mt.data._
 import org.platanios.symphony.mt.models.curriculum.Curriculum
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
-
-import java.nio.charset.StandardCharsets
+import org.platanios.tensorflow.api.ops.Parsing.FixedLengthFeature
 
 // TODO: Sample files with probability proportional to their size.
 
@@ -35,7 +34,8 @@ object Inputs {
       dataset: FileParallelDataset,
       srcLanguage: Language,
       tgtLanguage: Language,
-      languages: Seq[(Language, Vocabulary)]
+      languages: Seq[(Language, Vocabulary)],
+      useTFRecords: Boolean = true
   ): () => InputDataset = () => {
     def createSingleInputDataset(
         srcLanguage: Output[Int],
@@ -43,8 +43,18 @@ object Inputs {
         file: Output[String]
     ): InputDataset = {
       val endSeqToken = Tensor.fill[String](Shape())(dataConfig.endOfSequenceToken)
-      tf.data.datasetFromDynamicTextFiles(file)
-          .map(o => tf.stringSplit(o.expandDims(0)).values)
+
+      val dataset = {
+        if (useTFRecords) {
+          tf.data.datasetFromDynamicTFRecordFiles(file, bufferSize = dataConfig.loaderBufferSize)
+              .map(parseTFRecord, name = "Map/ParseExample")
+        } else {
+          tf.data.datasetFromDynamicTextFiles(file)
+              .map(o => tf.stringSplit(o.expandDims(0)).values)
+        }
+      }
+
+      dataset
           // Crop based on the maximum allowed sequence length.
           .transform(d => if (dataConfig.srcMaxLength != -1) d.map(dd => dd(0 :: dataConfig.srcMaxLength)) else d)
           // Add sequence lengths.
@@ -92,9 +102,7 @@ object Inputs {
         .map(_.filterLanguages(languageIds.keys.toSeq: _*))
         .filter(_.nonEmpty)
         .flatMap(d => {
-          var currentLanguagePairs = d.languagePairs(includeIdentityTranslations)
-          if (dataConfig.parallelPortion == 0.0f)
-            currentLanguagePairs = currentLanguagePairs.filter(p => p._1 == p._2)
+          val currentLanguagePairs = d.languagePairs(includeIdentityTranslations)
           val providedLanguagePairs = languagePairs match {
             case Some(pairs) if includeIdentityTranslations => pairs.flatMap(p => Seq(p, (p._1, p._1), (p._2, p._2)))
             case Some(pairs) => pairs
@@ -113,41 +121,33 @@ object Inputs {
           case ((srcLanguage, tgtLanguage), parallelDatasets) =>
             val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage))
             val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage))
-            val srcLengths = srcFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
-            val tgtLengths = tgtFiles.map(_.lineIterator(StandardCharsets.UTF_8).size)
             val srcLanguageDataset = tf.data.datasetFromTensors(languageIds(srcLanguage): Tensor[Int])
             val tgtLanguageDataset = tf.data.datasetFromTensors(languageIds(tgtLanguage): Tensor[Int])
             val srcFilesDataset = tf.data.datasetFromTensors(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor[String])
             val tgtFilesDataset = tf.data.datasetFromTensors(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor[String])
-            val srcLengthsDataset = tf.data.datasetFromTensors(srcLengths: Tensor[Int])
-            val tgtLengthsDataset = tf.data.datasetFromTensors(tgtLengths: Tensor[Int])
             srcLanguageDataset.zip(tgtLanguageDataset)
                 .zip(srcFilesDataset.zip(tgtFilesDataset))
-                .zip(srcLengthsDataset.zip(tgtLengthsDataset))
-                .map(d => (d._1._1._1, d._1._1._2, d._1._2._1, d._1._2._2, d._2._1, d._2._2), name = "AddLanguageIDs")
+                .map(d => (d._1._1, d._1._2, d._2._1, d._2._2), name = "AddLanguageIDs")
         }.reduce((d1, d2) => d1.concatenateWith(d2))
 
-    val parallelDatasetCreator: (Output[Int], Output[Int], Output[String], Output[String], Output[Int], Output[Int]) => TrainDataset =
+    val parallelDatasetCreator: (Output[Int], Output[Int], Output[String], Output[String]) => TrainDataset =
       createSingleParallelDataset(dataConfig, trainingConfig, cache, repeat, isEval)
 
     filesDataset
         .shuffle(filteredDatasets.size)
         .interleave(
           function = d => {
-            val (srcLanguage, tgtLanguage, srcFiles, tgtFiles, srcLengths, tgtLengths) = d
+            val (srcLanguage, tgtLanguage, srcFiles, tgtFiles) = d
             val srcLanguageDataset = tf.data.datasetFromOutputs(srcLanguage).repeat()
             val tgtLanguageDataset = tf.data.datasetFromOutputs(tgtLanguage).repeat()
             val srcFilesDataset = tf.data.datasetFromOutputSlices(srcFiles)
             val tgtFilesDataset = tf.data.datasetFromOutputSlices(tgtFiles)
-            val srcLengthsDataset = tf.data.datasetFromOutputSlices(srcLengths)
-            val tgtLengthsDataset = tf.data.datasetFromOutputSlices(tgtLengths)
             srcLanguageDataset.zip(tgtLanguageDataset)
                 .zip(srcFilesDataset.zip(tgtFilesDataset))
-                .zip(srcLengthsDataset.zip(tgtLengthsDataset))
-                .map(d => (d._1._1._1, d._1._1._2, d._1._2._1, d._1._2._2, d._2._1, d._2._2), name = "AddLanguageIDs")
+                .map(d => (d._1._1, d._1._2, d._2._1, d._2._2), name = "AddLanguageIDs")
                 .shuffle(maxNumFiles)
                 .interleave(
-                  function = d => parallelDatasetCreator(d._1, d._2, d._3, d._4, d._5, d._6),
+                  function = d => parallelDatasetCreator(d._1, d._2, d._3, d._4),
                   cycleLength = maxNumFiles,
                   name = "FilesInterleave")
           },
@@ -159,27 +159,27 @@ object Inputs {
   def createEvalDatasets(
       dataConfig: DataConfig,
       trainingConfig: TrainingConfig,
-      datasets: Seq[(String, FileParallelDataset, Float)],
+      datasets: Seq[(String, FileParallelDataset)],
       languages: Seq[(Language, Vocabulary)],
       languagePairs: Option[Set[(Language, Language)]] = None
   ): Seq[(String, () => TrainDataset)] = {
     datasets
-        .map(d => (d._1, d._2.filterLanguages(languages.map(_._1): _*), d._3))
+        .map(d => (d._1, d._2.filterLanguages(languages.map(_._1): _*)))
         .flatMap(d => {
           val currentLanguagePairs = d._2.languagePairs()
           languagePairs.getOrElse(currentLanguagePairs)
               .intersect(currentLanguagePairs)
-              .map(l => (d._1, l, d._3) -> d._2)
+              .map(l => (d._1, l) -> d._2)
         })
         .toMap
         .toSeq
         .sortBy(d => (d._1._1, (d._1._2._1.abbreviation, d._1._2._2.abbreviation)))
         .map {
-          case ((name, (srcLanguage, tgtLanguage), parallelPortion), dataset) =>
+          case ((name, (srcLanguage, tgtLanguage)), dataset) =>
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
             (datasetName, () => tf.nameScope(datasetName) {
               createTrainDataset(
-                dataConfig.copy(parallelPortion = parallelPortion),
+                dataConfig,
                 trainingConfig = trainingConfig.copy(curriculum = Curriculum.none),
                 Seq(dataset), languages,
                 includeIdentityTranslations = false, cache = false, repeat = false, isEval = true,
@@ -198,34 +198,24 @@ object Inputs {
       srcLanguage: Output[Int],
       tgtLanguage: Output[Int],
       srcFile: Output[String],
-      tgtFile: Output[String],
-      srcLength: Output[Int],
-      tgtLength: Output[Int]
+      tgtFile: Output[String]
   ): TrainDataset = {
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evalBatchSize
     val shuffleBufferSize = if (dataConfig.shuffleBufferSize == -1L) 10L * batchSize else dataConfig.shuffleBufferSize
 
     val srcLanguageDataset = tf.data.datasetFromOutputs(srcLanguage).repeat()
     val tgtLanguageDataset = tf.data.datasetFromOutputs(tgtLanguage).repeat()
-    val srcDataset = tf.data.datasetFromDynamicTextFiles(srcFile)
-    val tgtDataset = tf.data.datasetFromDynamicTextFiles(tgtFile)
+
+    val srcDataset = tf.data.datasetFromDynamicTFRecordFiles(srcFile, bufferSize = dataConfig.loaderBufferSize)
+    val tgtDataset = tf.data.datasetFromDynamicTFRecordFiles(tgtFile, bufferSize = dataConfig.loaderBufferSize)
 
     // TODO: We currently do not use `tgtLength`, but it may be useful for invalid dataset checks.
 
-    val numParallel = tf.cond(
-      predicate = srcLanguage.equal(tgtLanguage),
-      trueFn = () => srcLength.toLong,
-      falseFn = () => (srcLength.toFloat * dataConfig.parallelPortion).floor.toLong)
-
     val datasetBeforeBucketing =
-      srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset)
-          .take(numParallel))
-          .shard(dataConfig.numShards, dataConfig.shardIndex)
-          // Tokenize by splitting on white spaces.
-          .map(
-            d => (d._1, (tf.stringSplit(d._2._1(NewAxis)).values, tf.stringSplit(d._2._2(NewAxis)).values)),
-            name = "Map/StringSplit")
-          // Filter zero length input sequences and sequences exceeding the maximum length.
+      srcLanguageDataset.zip(tgtLanguageDataset)
+          .zip(srcDataset.zip(tgtDataset)
+              .map(d => (parseTFRecord(d._1), parseTFRecord(d._2)), name = "Map/ParseExample"))
+          // Filter zero length input sequences.
           .filter(d => tf.logicalAnd(tf.size(d._2._1) > 0, tf.size(d._2._2) > 0), "Filter/NonZeroLength")
           // Crop based on the maximum allowed sequence lengths.
           .transform(d => {
@@ -324,5 +314,12 @@ object Inputs {
             /* Target sentences */ d._3),
           name = "AddLanguageIDs")
         .prefetch(dataConfig.numPrefetchedBatches)
+  }
+
+  private def parseTFRecord(serialized: Output[String]): Output[String] = {
+    tf.parseSingleExample(
+      serialized = serialized,
+      features = FixedLengthFeature[String](key = "sentence", shape = Shape(-1)),
+      name = "ParseExample")
   }
 }

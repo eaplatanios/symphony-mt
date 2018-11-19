@@ -66,7 +66,6 @@ object DataConfigParser extends ConfigParser[DataConfig] {
             shared = shared)
         case _ => throw new IllegalArgumentException(s"'$vocabularyType' does not represent a valid vocabulary type.")
       },
-      parallelPortion = config.get[Float]("parallel-portion"),
       trainBatchSize = config.get[Int]("train-batch-size"),
       inferBatchSize = config.get[Int]("infer-batch-size"),
       evalBatchSize = config.get[Int]("eval-batch-size"),
@@ -76,8 +75,6 @@ object DataConfigParser extends ConfigParser[DataConfig] {
       tgtMaxLength = config.get[Int]("tgt-max-length"),
       shuffleBufferSize = config.get[Int]("shuffle-buffer-size"),
       numPrefetchedBatches = config.get[Int]("num-prefetched-batches"),
-      numShards = config.get[Int]("input-pipeline-num-shards"),
-      shardIndex = config.get[Int]("input-pipeline-shard-index"),
       numParallelCalls = config.get[Int]("input-pipeline-num-parallel-calls"),
       unknownToken = config.get[String]("vocabulary.unknown-token"),
       beginOfSequenceToken = config.get[String]("vocabulary.begin-of-sequence-token"),
@@ -89,7 +86,6 @@ object DataConfigParser extends ConfigParser[DataConfig] {
     stringBuilder.append(s"${parsedValue.tokenizer}")
     stringBuilder.append(s".${parsedValue.cleaner}")
     stringBuilder.append(s".${parsedValue.vocabulary}")
-    stringBuilder.append(s".pp:${(parsedValue.parallelPortion * 100).toInt}")
     stringBuilder.append(s".bs:${parsedValue.trainBatchSize}")
     stringBuilder.append(s".nb:${parsedValue.numBuckets}")
     stringBuilder.append(s".sml:${parsedValue.srcMaxLength}")

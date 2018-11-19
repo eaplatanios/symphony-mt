@@ -58,22 +58,19 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
       val providedPairs = Experiment.parseLanguagePairs(config.get[String]("evaluation.languages"))
       if (providedPairs.isEmpty) trainingConfig.languagePairs else providedPairs
     }
-    val evalDatasets: Seq[(String, FileParallelDataset, Float)] = {
-      val evalDatasetTags = config.get[String]("evaluation.datasets").split(',').map(dataset => {
-        val parts = dataset.split(':')
-        (parts(0), parts(1).toFloat)
-      })
+    val evalDatasets: Seq[(String, FileParallelDataset)] = {
+      val evalDatasetTags = config.get[String]("evaluation.datasets").split(',')
       task match {
         case Experiment.Train | Experiment.Evaluate =>
           val evalTags = dataset match {
-            case "iwslt14" => evalDatasetTags.map(t => (s"IWSLT-14/${t._1}", IWSLT14Loader.Tag.fromName(t._1), t._2))
-            case "iwslt15" => evalDatasetTags.map(t => (s"IWSLT-15/${t._1}", IWSLT15Loader.Tag.fromName(t._1), t._2))
-            case "iwslt16" => evalDatasetTags.map(t => (s"IWSLT-16/${t._1}", IWSLT16Loader.Tag.fromName(t._1), t._2))
-            case "iwslt17" => evalDatasetTags.map(t => (s"IWSLT-17/${t._1}", IWSLT17Loader.Tag.fromName(t._1), t._2))
-            case "wmt16" => evalDatasetTags.map(t => (s"WMT-16/${t._1}", WMT16Loader.Tag.fromName(t._1), t._2))
-            case "ted_talks" => evalDatasetTags.map(t => (s"TED-Talks/${t._1}", TEDTalksLoader.Tag.fromName(t._1), t._2))
+            case "iwslt14" => evalDatasetTags.map(t => (s"IWSLT-14/$t", IWSLT14Loader.Tag.fromName(t)))
+            case "iwslt15" => evalDatasetTags.map(t => (s"IWSLT-15/$t", IWSLT15Loader.Tag.fromName(t)))
+            case "iwslt16" => evalDatasetTags.map(t => (s"IWSLT-16/$t", IWSLT16Loader.Tag.fromName(t)))
+            case "iwslt17" => evalDatasetTags.map(t => (s"IWSLT-17/$t", IWSLT17Loader.Tag.fromName(t)))
+            case "wmt16" => evalDatasetTags.map(t => (s"WMT-16/$t", WMT16Loader.Tag.fromName(t)))
+            case "ted_talks" => evalDatasetTags.map(t => (s"TED-Talks/$t", TEDTalksLoader.Tag.fromName(t)))
           }
-          evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2), t._3)))
+          evalTags.flatMap(t => datasets.map(d => (t._1, d.filterTags(t._2))))
         case Experiment.Translate => Seq.empty
       }
     }

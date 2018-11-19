@@ -67,6 +67,23 @@ class Experiment(val configFile: Path) {
       workingDir = Some(environment.workingDir))
   }
 
+//  {
+//    import org.platanios.symphony.mt.data.scores._
+//    val sentenceLengthHistogram = SentenceScoreHistogram(SentenceLength, 1000)
+//    val sentenceLengthCDF = sentenceLengthHistogram.cdfScore
+//    Score.scoreDatasets(
+//      datasets,
+//      sentenceLengthCDF,
+//      summaryScoresDir = Some(dataConfig.dataDir.resolve("scores").resolve("summaries")),
+//      alwaysRecompute = false)
+//    Score.scoreDatasets(
+//      datasets,
+//      WordCounts(caseSensitive = false),
+//      summaryScoresDir = Some(dataConfig.dataDir.resolve("scores").resolve("summaries")),
+//      alwaysRecompute = false)
+//    System.exit(0)
+//  }
+
   private lazy val parametersParser = {
     new ParametersParser(dataConfig)
   }
@@ -202,8 +219,6 @@ class Experiment(val configFile: Path) {
   //        "Maximum Source Length" -> dataConfig.srcMaxLength.toString,
   //        "Maximum Target Length" -> dataConfig.tgtMaxLength.toString,
   //        "Prefetching Buffer Size" -> dataConfig.bufferSize.toString,
-  //        "Number of Shards" -> dataConfig.numShards.toString,
-  //        "Shard Index" -> dataConfig.shardIndex.toString,
   //        "TF - Number of Parallel Calls" -> dataConfig.numParallelCalls.toString,
   //        "" -> "", // This acts as a separator to help improve readability of the table.
   //        "Unknown Token" -> dataConfig.unknownToken,

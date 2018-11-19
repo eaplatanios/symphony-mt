@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.processors.FileProcessor
+import org.platanios.symphony.mt.data.processors.{FileProcessor, TFRecordsConverter}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.symphony.mt.utilities.{CompressedFiles, MutableFile}
 
@@ -69,13 +69,19 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
 
   /** Returns all the corpora (tuples containing tag, source file, target file, and a file processor to use)
     * of this dataset type. */
-  def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = Seq.empty
+  def corpora(datasetType: DatasetType): Seq[(ParallelDataset.Tag, File, File, FileProcessor)] = {
+    Seq.empty
+  }
 
   /** Returns the source and the target language vocabularies of this dataset. */
-  def vocabularies: (Seq[File], Seq[File]) = (Seq.empty, Seq.empty)
+  def vocabularies: (Seq[File], Seq[File]) = {
+    (Seq.empty, Seq.empty)
+  }
 
   /** Returns the files included in this dataset, grouped based on their role. */
-  def load(): FileParallelDataset = ParallelDatasetLoader.load(Seq(this))._1.head
+  def load(): FileParallelDataset = {
+    ParallelDatasetLoader.load(Seq(this))._1.head
+  }
 }
 
 object ParallelDatasetLoader {
@@ -232,6 +238,8 @@ object ParallelDatasetLoader {
 
     val datasets = loaders.zip(files).map {
       case (loader, (srcFiles, tgtFiles, fileTypes, fileTags)) =>
+        srcFiles.foreach(file => file.set(TFRecordsConverter.process(file.get, loader.srcLanguage)))
+        tgtFiles.foreach(file => file.set(TFRecordsConverter.process(file.get, loader.tgtLanguage)))
         val groupedFiles = Map(loader.srcLanguage -> srcFiles.map(_.get), loader.tgtLanguage -> tgtFiles.map(_.get))
         val filteredVocabulary = vocabulary.filterKeys(l => l == loader.srcLanguage || l == loader.tgtLanguage)
         FileParallelDataset(loader.name, filteredVocabulary, loader.dataConfig, groupedFiles, fileTypes, fileTags)

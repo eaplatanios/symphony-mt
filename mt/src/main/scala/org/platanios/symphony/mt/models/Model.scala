@@ -212,14 +212,16 @@ class Model[Code](
   def translate(
       srcLanguage: Language,
       tgtLanguage: Language,
-      dataset: FileParallelDataset
+      dataset: FileParallelDataset,
+      useTFRecords: Boolean = true
   ): Iterator[(SentencesWithLanguagePairValue, SentencesWithLanguageValue)] = {
     val inputDataset = Inputs.createInputDataset(
       dataConfig = dataConfig,
       dataset = dataset,
       srcLanguage = srcLanguage,
       tgtLanguage = tgtLanguage,
-      languages = languages)
+      languages = languages,
+      useTFRecords = useTFRecords)
     estimator.infer(inputDataset)
         .asInstanceOf[Iterator[(SentencesWithLanguagePairValue, SentencesWithLanguageValue)]]
         .map(pair => {
@@ -264,7 +266,7 @@ class Model[Code](
   //  }
 
   def evaluate(
-      datasets: Seq[(String, FileParallelDataset, Float)] = evaluationConfig.datasets,
+      datasets: Seq[(String, FileParallelDataset)] = evaluationConfig.datasets,
       metrics: Seq[MTMetric] = evaluationConfig.metrics,
       maxSteps: Long = -1L,
       log: Boolean = true,
