@@ -43,6 +43,33 @@ class Vocabulary protected (
   val beginOfSequenceTokenId: Int = 1
   val endOfSequenceTokenId  : Int = 2
 
+  /** Creates a vocabulary hash map (from word string to word ID), from the provided vocabulary file.
+    *
+    * @return Vocabulary hash map.
+    */
+  lazy val stringToIndexHashMap: Map[String, Long] = {
+    newReader(file).lines()
+        .toAutoClosedIterator
+        .toSeq
+        .zipWithIndex.map(p => (p._1, p._2.toLong))
+        .toMap
+        .withDefaultValue(unknownTokenId)
+  }
+
+  /** Creates a vocabulary hash map (from word ID to word string), from the provided vocabulary file.
+    *
+    * @return Vocabulary hash map.
+    */
+  lazy val indexToStringHashMap: Map[Long, String] = {
+    newReader(file).lines()
+        .toAutoClosedIterator
+        .toSeq
+        .zipWithIndex
+        .map(p => (p._2.toLong, p._1))
+        .toMap
+        .withDefaultValue(unknownToken)
+  }
+
   /** Creates a vocabulary lookup table (from word string to word ID), from the provided vocabulary file.
     *
     * @return Vocabulary lookup table.
