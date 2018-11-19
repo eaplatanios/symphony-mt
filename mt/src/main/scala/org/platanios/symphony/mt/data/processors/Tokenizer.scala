@@ -26,7 +26,9 @@ import org.slf4j.LoggerFactory
   * @author Emmanouil Antonios Platanios
   */
 trait Tokenizer extends FileProcessor {
-  override def process(file: File, language: Language): File = tokenizeCorpus(file, language)
+  override def process(file: File, language: Language): File = {
+    tokenizeCorpus(file, language)
+  }
 
   def tokenizedFile(originalFile: File): File
   def tokenize(sentence: String, language: Language): String

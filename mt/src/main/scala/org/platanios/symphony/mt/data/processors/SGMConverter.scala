@@ -36,17 +36,11 @@ object SGMConverter extends FileProcessor {
   private val startStopCaptureRegex: Regex = """(?i)<seg[^>]+>\s*(.*)\s*<\/seg>""".r
   private val whitespaceRegex      : Regex = """\s+""".r
 
-  override def process(file: File, language: Language): File = convertSGMToText(file)
-
-  private def convertedFile(originalFile: File): File = {
-    originalFile.sibling(originalFile.nameWithoutExtension(includeAll = false))
-  }
-
-  def convertSGMToText(sgmFile: File): File = {
-    val textFile = convertedFile(sgmFile)
+  override def process(file: File, language: Language): File = {
+    val textFile = convertedFile(file)
     if (textFile.notExists) {
-      logger.info(s"Converting SGM file '$sgmFile' to text file '$textFile'.")
-      val reader = newReader(sgmFile)
+      logger.info(s"Converting SGM file '$file' to text file '$textFile'.")
+      val reader = newReader(file)
       val writer = newWriter(textFile)
       val linesIterator = reader.lines().iterator().asScala
       while (linesIterator.nonEmpty) {
@@ -67,8 +61,12 @@ object SGMConverter extends FileProcessor {
       }
       writer.flush()
       writer.close()
-      logger.info(s"Converted SGM file '$sgmFile' to text file '$textFile'.")
+      logger.info(s"Converted SGM file '$file' to text file '$textFile'.")
     }
     textFile
+  }
+
+  private def convertedFile(originalFile: File): File = {
+    originalFile.sibling(originalFile.nameWithoutExtension(includeAll = false))
   }
 }

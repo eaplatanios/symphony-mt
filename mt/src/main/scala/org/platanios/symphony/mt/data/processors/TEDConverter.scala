@@ -33,17 +33,11 @@ object TEDConverter extends FileProcessor {
   private val ignoredRegex: Regex = """.*(?:<url>|<talkid>|<keywords>|<speaker|<reviewer|<translator).*""".r
   private val removeRegex : Regex = """(?:<title>|</title>|<doc .*>|</doc>|<description>|</description>)""".r
 
-  override def process(file: File, language: Language): File = convertTEDToText(file)
-
-  private def convertedFile(originalFile: File): File = {
-    originalFile.sibling("converted." + originalFile.name)
-  }
-
-  def convertTEDToText(tedFile: File): File = {
-    val textFile = convertedFile(tedFile)
+  override def process(file: File, language: Language): File = {
+    val textFile = convertedFile(file)
     if (textFile.notExists) {
-      logger.info(s"Converting TED file '$tedFile' to text file '$textFile'.")
-      val reader = newReader(tedFile)
+      logger.info(s"Converting TED file '$file' to text file '$textFile'.")
+      val reader = newReader(file)
       val writer = newWriter(textFile)
       reader.lines().toAutoClosedIterator.foreach(line => {
         ignoredRegex.findFirstMatchIn(line) match {
@@ -53,8 +47,12 @@ object TEDConverter extends FileProcessor {
       })
       writer.flush()
       writer.close()
-      logger.info(s"Converted TED file '$tedFile' to text file '$textFile'.")
+      logger.info(s"Converted TED file '$file' to text file '$textFile'.")
     }
     textFile
+  }
+
+  private def convertedFile(originalFile: File): File = {
+    originalFile.sibling("converted." + originalFile.name)
   }
 }
