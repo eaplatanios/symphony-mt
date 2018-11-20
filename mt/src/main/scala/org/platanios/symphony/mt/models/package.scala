@@ -29,8 +29,7 @@ package object models {
 
   type LanguageID = Output[Int]
   type LanguagePair = (LanguageID, LanguageID)
-  type SentenceLengths = Output[Int]
-  type Sentences[T] = (Output[T], SentenceLengths)
+  type Sentences[T] = (Output[T], Output[Int])
   type SentencesWithLanguage[T] = (LanguageID, Sentences[T])
   type SentencesWithLanguagePair[T] = (LanguageID, LanguageID, Sentences[T])
   type SentencePairs[T] = (LanguagePair, Sentences[T], Sentences[T])

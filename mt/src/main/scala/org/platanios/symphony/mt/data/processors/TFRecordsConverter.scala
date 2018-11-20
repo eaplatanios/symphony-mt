@@ -38,7 +38,7 @@ object TFRecordsConverter extends FileProcessor {
   override def process(file: File, language: Language): File = {
     val tfRecordsFile = convertedFile(file)
     if (tfRecordsFile.notExists) {
-      TFRecordsConverter.logger.info(s"Converting file '$file' to TF records file '$tfRecordsFile'.")
+      logger.info(s"Converting file '$file' to TF records file '$tfRecordsFile'.")
       val reader = newReader(file)
       val writer = new TFRecordWriter(tfRecordsFile.path)
       reader.lines().toAutoClosedIterator.foreach(line => {
@@ -46,16 +46,17 @@ object TFRecordsConverter extends FileProcessor {
       })
       writer.flush()
       writer.close()
-      TFRecordsConverter.logger.info(s"Converted file '$file' to TF records file '$tfRecordsFile'.")
+      logger.info(s"Converted file '$file' to TF records file '$tfRecordsFile'.")
     }
     tfRecordsFile
   }
 
-  private def convertedFile(originalFile: File): File = {
+  protected def convertedFile(originalFile: File): File = {
     originalFile.sibling(originalFile.name + ".tfrecords")
   }
 
-  private def encodeSentenceAsTFExample(sentence: String, language: Language): Example = {
+  protected def encodeSentenceAsTFExample(sentence: String, language: Language): Example = {
+    val processedSentence = preprocessSentence(sentence, language)
     Example.newBuilder()
         .setFeatures(
           Features.newBuilder()
@@ -64,10 +65,17 @@ object TFRecordsConverter extends FileProcessor {
                 Feature.newBuilder()
                     .setBytesList(
                       BytesList.newBuilder()
-                          .addAllValue(whitespaceRegex.split(sentence).map(ByteString.copyFromUtf8).toIterable.asJava)
-                          .build())
+                          .addAllValue(processedSentence.map(ByteString.copyFromUtf8).asJava))
                     .build())
-              .build())
+              .putFeature(
+                "length",
+                Feature.newBuilder()
+                    .setInt64List(Int64List.newBuilder().addValue(processedSentence.length))
+                    .build()))
         .build()
+  }
+
+  protected def preprocessSentence(sentence: String, language: Language): Seq[String] = {
+    whitespaceRegex.split(sentence)
   }
 }

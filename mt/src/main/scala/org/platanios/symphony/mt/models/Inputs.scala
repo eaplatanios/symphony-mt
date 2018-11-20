@@ -44,31 +44,33 @@ object Inputs {
     ): tf.data.Dataset[SentencesWithLanguagePair[String]] = {
       val endSeqToken = Tensor.fill[String](Shape())(Vocabulary.END_OF_SEQUENCE_TOKEN)
 
-      val dataset = {
+      var dataset = {
         if (useTFRecords) {
           tf.data.datasetFromDynamicTFRecordFiles(file, bufferSize = dataConfig.loaderBufferSize)
               .map(parseTFRecord, name = "Map/ParseExample")
         } else {
           tf.data.datasetFromDynamicTextFiles(file)
               .map(o => tf.stringSplit(o.expandDims(0)).values)
+              // Add sequence lengths.
+              .map(d => (d, tf.size(d).toInt))
         }
       }
 
-      dataset
-          // Crop based on the maximum allowed sequence length.
-          .transform(d => if (dataConfig.srcMaxLength != -1) d.map(dd => dd(0 :: dataConfig.srcMaxLength)) else d)
-          // Add sequence lengths.
-          .map(d => (d, tf.size(d).toInt))
-          .paddedBatch(
-            batchSize = dataConfig.inferBatchSize,
-            // The first entry represents the source line rows, which are unknown-length vectors.
-            // The last entry is the source row size, which is a scalar.
-            paddedShapes = (Shape(-1), Shape()),
-            // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
-            // not generally need to do this since later on we will be masking out calculations past
-            // the true sequence.
-            paddingValues = Some((endSeqToken, Tensor.zeros[Int](Shape()))))
-          .map(d => (srcLanguage, tgtLanguage, (d._1, d._2)))
+      // Crop based on the maximum allowed sequence length.
+      if (dataConfig.srcMaxLength != -1)
+        dataset = dataset.map(d => (d._1(0 :: dataConfig.srcMaxLength), tf.minimum(d._2, dataConfig.srcMaxLength)))
+
+      dataset = dataset.paddedBatch(
+        batchSize = dataConfig.inferBatchSize,
+        // The first entry represents the source line rows, which are unknown-length vectors.
+        // The last entry is the source row size, which is a scalar.
+        paddedShapes = (Shape(-1), Shape()),
+        // We pad the source sequences with 'endSequenceToken' tokens. Though notice that we do
+        // not generally need to do this since later on we will be masking out calculations past
+        // the true sequence.
+        paddingValues = Some((endSeqToken, Tensor.zeros[Int](Shape()))))
+
+      dataset.map(d => (srcLanguage, tgtLanguage, (d._1, d._2)))
     }
 
     val languageIds = languages.map(_._1).zipWithIndex.toMap
@@ -210,51 +212,38 @@ object Inputs {
     val srcDataset = tf.data.datasetFromDynamicTFRecordFiles(srcFile, bufferSize = dataConfig.loaderBufferSize)
     val tgtDataset = tf.data.datasetFromDynamicTFRecordFiles(tgtFile, bufferSize = dataConfig.loaderBufferSize)
 
-    // TODO: We currently do not use `tgtLength`, but it may be useful for invalid dataset checks.
+    var datasetBeforeBucketing = srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset))
+        .map(d => (d._1, parseTFRecord(d._2._1), parseTFRecord(d._2._2)), name = "Map/ParseExample")
 
-    val datasetBeforeBucketing =
-      srcLanguageDataset.zip(tgtLanguageDataset)
-          .zip(srcDataset.zip(tgtDataset)
-              .map(d => (parseTFRecord(d._1), parseTFRecord(d._2)), name = "Map/ParseExample"))
-          // Filter zero length input sequences.
-          .filter(d => tf.logicalAnd(tf.size(d._2._1) > 0, tf.size(d._2._2) > 0), "Filter/NonZeroLength")
-          // Crop based on the maximum allowed sequence lengths.
-          .transform(d => {
-            if (!isEval && dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1) {
-              d.map(
-                dd => (dd._1, (dd._2._1(0 :: dataConfig.srcMaxLength), dd._2._2(0 :: dataConfig.tgtMaxLength))),
-                name = "Map/MaxLength")
-            } else if (!isEval && dataConfig.srcMaxLength != -1) {
-              d.map(
-                dd => (dd._1, (dd._2._1(0 :: dataConfig.srcMaxLength), dd._2._2)),
-                name = "Map/MaxLength")
-            } else if (!isEval && dataConfig.tgtMaxLength != -1) {
-              d.map(
-                dd => (dd._1, (dd._2._1, dd._2._2(0 :: dataConfig.tgtMaxLength))),
-                name = "Map/MaxLength")
-            } else {
-              d
-            }
-          })
-          // Add sequence lengths.
-          .map(d => (
-              /* Language pair */ (d._1._1, d._1._2),
-              /* Source sentences */ (d._2._1, tf.size(d._2._1).toInt),
-              /* Target sentences */ (d._2._2, tf.size(d._2._2).toInt)),
-            name = "Map/AddLengths")
-          .transform(d => if (cache) d.cache("") else d)
-          .transform(d => trainingConfig.curriculum.samplesFilter match {
-            case None => d
-            case Some(samplesFilter) => d.filter(samplesFilter)
-          })
-          .transform(d => {
-            if (isEval)
-              d
-            else if (repeat)
-              d.shuffleAndRepeat(shuffleBufferSize)
-            else
-              d.shuffle(shuffleBufferSize)
-          })
+    // Crop based on the maximum allowed sequence lengths.
+    if (!isEval && dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1) {
+      datasetBeforeBucketing = datasetBeforeBucketing.map(d => (
+          d._1,
+          (d._2._1(0 :: dataConfig.srcMaxLength), tf.minimum(d._2._2, dataConfig.srcMaxLength)),
+          (d._3._1(0 :: dataConfig.tgtMaxLength), tf.minimum(d._3._2, dataConfig.tgtMaxLength))),
+        name = "Map/MaxLength")
+    } else if (!isEval && dataConfig.srcMaxLength != -1) {
+      datasetBeforeBucketing = datasetBeforeBucketing.map(d =>
+        (d._1, (d._2._1(0 :: dataConfig.srcMaxLength), tf.minimum(d._2._2, dataConfig.srcMaxLength)), d._3),
+        name = "Map/MaxLength")
+    } else if (!isEval && dataConfig.tgtMaxLength != -1) {
+      datasetBeforeBucketing = datasetBeforeBucketing.map(d =>
+        (d._1, d._2, (d._3._1(0 :: dataConfig.tgtMaxLength), tf.minimum(d._3._2, dataConfig.tgtMaxLength))),
+        name = "Map/MaxLength")
+    }
+
+    if (cache)
+      datasetBeforeBucketing = datasetBeforeBucketing.cache("")
+
+    trainingConfig.curriculum.samplesFilter match {
+      case Some(samplesFilter) => datasetBeforeBucketing = datasetBeforeBucketing.filter(samplesFilter)
+      case None => ()
+    }
+
+    if (!isEval && repeat)
+      datasetBeforeBucketing = datasetBeforeBucketing.shuffleAndRepeat(shuffleBufferSize)
+    else if (!isEval)
+      datasetBeforeBucketing = datasetBeforeBucketing.shuffle(shuffleBufferSize)
 
     val batchingFn = (dataset: tf.data.Dataset[SentencePairs[String]]) => {
       val zero = Tensor.zeros[Int](Shape())
@@ -313,16 +302,19 @@ object Inputs {
 
     parallelDataset
         .map(d => (
-            (/* Source language */ d._1._1(0), /* Target language */ d._1._2(0), /* Source sentences */ d._2),
+            ( /* Source language */ d._1._1(0), /* Target language */ d._1._2(0), /* Source sentences */ d._2),
             /* Target sentences */ d._3),
           name = "AddLanguageIDs")
         .prefetch(dataConfig.numPrefetchedBatches)
   }
 
-  private def parseTFRecord(serialized: Output[String]): Output[String] = {
-    tf.parseSingleExample(
+  private def parseTFRecord(serialized: Output[String]): (Output[String], Output[Int]) = {
+    val parsedExample = tf.parseSingleExample(
       serialized = serialized,
-      features = FixedLengthFeature[String](key = "sentence", shape = Shape(-1)),
+      features = (
+          FixedLengthFeature[String](key = "sentence", shape = Shape(-1)),
+          FixedLengthFeature[Long](key = "length", shape = Shape())),
       name = "ParseExample")
+    (parsedExample._1, parsedExample._2.toInt)
   }
 }
