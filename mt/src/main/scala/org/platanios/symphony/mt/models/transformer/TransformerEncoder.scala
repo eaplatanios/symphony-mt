@@ -84,7 +84,7 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
             numHeads = attentionNumHeads,
             attention = selfAttention,
             name = "MultiHeadAttention")._1
-          if (removeFirstLayerResidualConnection)
+          if (layer == 0 && removeFirstLayerResidualConnection)
             x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors.filter(_ != AddResidualConnection))
           else
             x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)

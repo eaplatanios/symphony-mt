@@ -299,7 +299,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
             cache = decoderSelfAttentionCache.map(_ (layer)),
             name = "MultiHeadAttention")
           y = output
-          if (removeFirstLayerResidualConnection)
+          if (layer == 0 && removeFirstLayerResidualConnection)
             x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors.filter(_ != AddResidualConnection))
           else
             x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
