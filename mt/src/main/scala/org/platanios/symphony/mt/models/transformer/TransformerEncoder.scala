@@ -42,6 +42,7 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
     val layerPostprocessors: Seq[LayerProcessor] = Seq(
       Dropout(0.1f, broadcastAxes = Set.empty),
       AddResidualConnection),
+    val removeFirstLayerResidualConnection: Boolean = false,
     val attentionKeysDepth: Int = 128,
     val attentionValuesDepth: Int = 128,
     val attentionNumHeads: Int = 8,
@@ -83,7 +84,10 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
             numHeads = attentionNumHeads,
             attention = selfAttention,
             name = "MultiHeadAttention")._1
-          x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
+          if (removeFirstLayerResidualConnection)
+            x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors.filter(_ != AddResidualConnection))
+          else
+            x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
         }
         tf.variableScope("FeedForward") {
           val xx = LayerProcessor.layerPreprocess(x, layerPreprocessors)

@@ -37,6 +37,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val layerPostprocessors: Seq[LayerProcessor] = Seq(
       Dropout(0.1f, broadcastAxes = Set.empty),
       AddResidualConnection),
+    val removeFirstLayerResidualConnection: Boolean = false,
     val attentionKeysDepth: Int = 128,
     val attentionValuesDepth: Int = 128,
     val attentionNumHeads: Int = 8,
@@ -298,7 +299,10 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
             cache = decoderSelfAttentionCache.map(_ (layer)),
             name = "MultiHeadAttention")
           y = output
-          x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
+          if (removeFirstLayerResidualConnection)
+            x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors.filter(_ != AddResidualConnection))
+          else
+            x = LayerProcessor.layerPostprocess(x, y, layerPostprocessors)
           updatedDecoderSelfAttentionCache
         }
         tf.variableScope("EncoderDecoderAttention") {

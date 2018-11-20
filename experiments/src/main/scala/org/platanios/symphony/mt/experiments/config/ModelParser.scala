@@ -106,6 +106,8 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
       stringBuilder.append(s":${encoderConfig.get[Int]("num-layers")}")
     if (encoderConfig.hasPath("residual") && encoderConfig.get[Boolean]("residual"))
       stringBuilder.append(":r")
+    if (encoderConfig.get[Boolean]("remove-first-layer-residual-connection", false))
+      stringBuilder.append(":no-first-residual")
     stringBuilder.append(s".dec:${decoderConfig.get[String]("type")}")
     if (decoderConfig.hasPath("num-layers"))
       stringBuilder.append(s":${decoderConfig.get[Int]("num-layers")}")
@@ -113,6 +115,8 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
       stringBuilder.append(":r")
     if (decoderConfig.hasPath("use-attention") && decoderConfig.get[Boolean]("use-attention"))
       stringBuilder.append(":a")
+    if (decoderConfig.get[Boolean]("remove-first-layer-residual-connection", false))
+      stringBuilder.append(":no-first-residual")
     stringBuilder.append(s".${trainingConfigParser.tag(config.get[Config]("training"), parsedValue.trainingConfig).get}")
 
     Some(stringBuilder.toString)
@@ -198,6 +202,7 @@ object ModelParser {
           numLayers = encoderConfig.get[Int]("num-layers"),
           useSelfAttentionProximityBias = encoderConfig.get[Boolean]("use-self-attention-proximity-bias", default = false),
           postPositionEmbeddingsDropout = encoderConfig.get[Float]("post-position-embeddings-dropout"),
+          removeFirstLayerResidualConnection = encoderConfig.get[Boolean]("remove-first-layer-residual-connection", false),
           attentionKeysDepth = encoderConfig.get[Int]("attention-keys-depth"),
           attentionValuesDepth = encoderConfig.get[Int]("attention-values-depth"),
           attentionNumHeads = encoderConfig.get[Int]("attention-num-heads"),
@@ -297,6 +302,7 @@ object ModelParser {
             decoderConfig.get[Int]("num-units"),
             decoderConfig.get[Float]("feed-forward-relu-dropout"),
             Set.empty, "FeedForward"),
+          removeFirstLayerResidualConnection = decoderConfig.get[Boolean]("remove-first-layer-residual-connection", false),
           useEncoderDecoderAttentionCache = decoderConfig.get[Boolean]("use-encoder-decoder-attention-cache", default = true)
         ).asInstanceOf[Decoder[Any]]
       case _ => throw new IllegalArgumentException(s"'$decoderType' does not represent a valid decoder type.")
