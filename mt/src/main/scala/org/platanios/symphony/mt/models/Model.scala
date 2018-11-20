@@ -148,7 +148,8 @@ class Model[Code](
         }
         val datasets = evaluationConfig.datasets.filter(_._2.nonEmpty)
         if (datasets.nonEmpty) {
-          val evalDatasets = Inputs.createEvalDatasets(dataConfig, trainingConfig, datasets, languages, languagePairs)
+          val evalDatasets = Inputs.createEvalDatasets(
+            env, dataConfig, trainingConfig, datasets, languages, languagePairs)
           hooks += tf.learn.Evaluator(
             log = true, summariesDir, evalDatasets, evaluationConfig.metrics, StepHookTrigger(
               numSteps = evaluationConfig.frequency,
@@ -197,6 +198,7 @@ class Model[Code](
     val languagePairs = if (trainingConfig.languagePairs.nonEmpty) Some(trainingConfig.languagePairs) else None
     estimator.train(
       data = Inputs.createTrainDataset(
+        env = env,
         dataConfig = dataConfig,
         trainingConfig = trainingConfig,
         datasets = datasets,
@@ -216,6 +218,7 @@ class Model[Code](
       useTFRecords: Boolean = true
   ): Iterator[(SentencesWithLanguagePairValue, SentencesWithLanguageValue)] = {
     val inputDataset = Inputs.createInputDataset(
+      env = env,
       dataConfig = dataConfig,
       dataset = dataset,
       srcLanguage = srcLanguage,
@@ -275,6 +278,7 @@ class Model[Code](
     // Create the evaluation datasets that may only consider a subset of the language pairs.
     val languagePairs = if (trainingConfig.languagePairs.nonEmpty) Some(trainingConfig.languagePairs) else None
     val evalDatasets = Inputs.createEvalDatasets(
+      env = env,
       dataConfig = dataConfig,
       trainingConfig = trainingConfig,
       datasets = datasets.filter(_._2.nonEmpty),
@@ -323,7 +327,7 @@ class Model[Code](
       override def forwardWithoutContext(
           input: (SentencesWithLanguagePair[String], Sentences[String])
       )(implicit mode: Mode): SentencesWithLanguage[Float] = {
-        trainingConfig.curriculum.initialize()
+        trainingConfig.curriculum.foreach(_.initialize())
         tf.createWith(device = deviceManager.nextDevice(env, moveToNext = false)) {
           parameterManager.initialize(languages, trainingConfig)
 
@@ -371,7 +375,7 @@ class Model[Code](
       override def forwardWithoutContext(
           input: SentencesWithLanguagePair[String]
       )(implicit mode: Mode): SentencesWithLanguage[String] = {
-        trainingConfig.curriculum.initialize()
+        trainingConfig.curriculum.foreach(_.initialize())
         tf.createWith(device = deviceManager.nextDevice(env, moveToNext = false)) {
           parameterManager.initialize(languages, trainingConfig)
 
@@ -480,7 +484,7 @@ class Model[Code](
         tf.createWith(
           nameScope = "Loss",
           device = deviceManager.nextDevice(env, moveToNext = false),
-          controlDependencies = Set(trainingConfig.curriculum.updateState(globalStep.value))
+          controlDependencies = trainingConfig.curriculum.map(_.updateState(globalStep.value)).toSet
         ) {
           parameterManager.initialize(languages, trainingConfig)
 

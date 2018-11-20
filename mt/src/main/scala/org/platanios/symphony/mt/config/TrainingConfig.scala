@@ -16,8 +16,8 @@
 package org.platanios.symphony.mt.config
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.models.SentencePairs
-import org.platanios.symphony.mt.models.curriculum.Curriculum
+import org.platanios.symphony.mt.models.SentencePairsWithScores
+import org.platanios.symphony.mt.models.curriculum.DifficultyBasedCurriculum
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 
 /**
@@ -33,7 +33,7 @@ case class TrainingConfig(
     checkpointSteps: Int,
     optimization: TrainingConfig.OptimizationConfig,
     logging: TrainingConfig.LoggingConfig,
-    curriculum: Curriculum[SentencePairs[String]])
+    curriculum: Option[DifficultyBasedCurriculum[SentencePairsWithScores[String]]] = None)
 
 object TrainingConfig {
   case class OptimizationConfig(

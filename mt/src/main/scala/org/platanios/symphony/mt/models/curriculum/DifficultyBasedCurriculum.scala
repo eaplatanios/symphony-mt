@@ -15,9 +15,8 @@
 
 package org.platanios.symphony.mt.models.curriculum
 
-import org.platanios.symphony.mt.models.Context
+import org.platanios.symphony.mt.data.scores.{SentenceScore, SentenceScoreHistogram}
 import org.platanios.symphony.mt.models.curriculum.competency.Competency
-import org.platanios.symphony.mt.models.curriculum.difficulty.Difficulty
 import org.platanios.tensorflow.api._
 
 // TODO: Things to consider:
@@ -28,20 +27,20 @@ import org.platanios.tensorflow.api._
 /**
   * @author Emmanouil Antonios Platanios
   */
-class DifficultyBasedCurriculum[Sample](
-    val difficulty: Difficulty[Sample],
-    val competency: Competency[Output[Float]]
+abstract class DifficultyBasedCurriculum[Sample](
+    val competency: Competency[Output[Float]],
+    val score: SentenceScore,
+    val maxNumHistogramBins: Int = 1000
 ) extends Curriculum[Sample] {
-  override def initialize()(implicit context: Context): Unit = {
-    tf.device("/CPU:0") {
-      super.initialize()
-      difficulty.initialize()
-    }
+  private[models] val cdfScore: SentenceScore = {
+    SentenceScoreHistogram(score, maxNumHistogramBins).cdfScore
   }
 
   override final def samplesFilter: Option[Sample => Output[Boolean]] = {
     Some((sample: Sample) => tf.nameScope("Curriculum/SamplesFilter") {
-      tf.lessEqual(difficulty(sample), competency.currentLevel(getCurrentStep.value))
+      tf.lessEqual(sampleScore(sample), competency.currentLevel(getCurrentStep.value))
     })
   }
+
+  protected def sampleScore(sample: Sample): Output[Float]
 }

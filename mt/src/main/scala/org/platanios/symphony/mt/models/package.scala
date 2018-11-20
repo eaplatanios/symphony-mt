@@ -34,6 +34,9 @@ package object models {
   type SentencesWithLanguagePair[T] = (LanguageID, LanguageID, Sentences[T])
   type SentencePairs[T] = (LanguagePair, Sentences[T], Sentences[T])
 
+  type SentencesWithScores[T] = (Output[T], Output[Int], Option[Output[Float]])
+  type SentencePairsWithScores[T] = (LanguagePair, SentencesWithScores[T], SentencesWithScores[T])
+
   type SentencesWithLanguageValue = (Tensor[Int], Tensor[String], Tensor[Int])
   type SentencesWithLanguagePairValue = (Tensor[Int], Tensor[Int], Tensor[String], Tensor[Int])
 

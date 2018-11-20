@@ -67,23 +67,6 @@ class Experiment(val configFile: Path) {
       workingDir = Some(environment.workingDir))
   }
 
-//  {
-//    import org.platanios.symphony.mt.data.scores._
-//    val sentenceLengthHistogram = SentenceScoreHistogram(SentenceLength, 1000)
-//    val sentenceLengthCDF = sentenceLengthHistogram.cdfScore
-//    Score.scoreDatasets(
-//      datasets,
-//      sentenceLengthCDF,
-//      summaryScoresDir = Some(dataConfig.dataDir.resolve("scores").resolve("summaries")),
-//      alwaysRecompute = false)
-//    Score.scoreDatasets(
-//      datasets,
-//      WordCounts(caseSensitive = false),
-//      summaryScoresDir = Some(dataConfig.dataDir.resolve("scores").resolve("summaries")),
-//      alwaysRecompute = false)
-//    System.exit(0)
-//  }
-
   private lazy val parametersParser = {
     new ParametersParser(dataConfig)
   }

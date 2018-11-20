@@ -15,11 +15,11 @@
 
 package org.platanios.symphony.mt.models
 
-import org.platanios.symphony.mt.Language
+import org.platanios.symphony.mt.{Environment, Language}
 import org.platanios.symphony.mt.config.TrainingConfig
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.processors.FileProcessor
-import org.platanios.symphony.mt.models.curriculum.Curriculum
+import org.platanios.symphony.mt.data.scores.Score
+import org.platanios.symphony.mt.models.curriculum.DifficultyBasedCurriculum
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.io.TFRecordWriter
@@ -31,6 +31,9 @@ import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 import org.tensorflow.example._
 
+import java.nio.file.Path
+
+import scala.collection.JavaConverters._
 import scala.util.matching.Regex
 
 // TODO: Sample files with probability proportional to their size.
@@ -40,6 +43,7 @@ import scala.util.matching.Regex
   */
 object Inputs {
   def createInputDataset(
+      env: Environment,
       dataConfig: DataConfig,
       dataset: FileParallelDataset,
       srcLanguage: Language,
@@ -57,7 +61,10 @@ object Inputs {
       var dataset = {
         if (useTFRecords) {
           tf.data.datasetFromDynamicTFRecordFiles(file, bufferSize = dataConfig.loaderBufferSize)
-              .map(parseTFRecord, name = "Map/ParseExample")
+              .map(d => {
+                val parsed = parseTFRecord(d, includeScore = false)
+                (parsed._1, parsed._2)
+              }, name = "Map/ParseExample")
         } else {
           tf.data.datasetFromDynamicTextFiles(file)
               .map(o => tf.stringSplit(o.expandDims(0)).values)
@@ -86,7 +93,7 @@ object Inputs {
     val languageIds = languages.map(_._1).zipWithIndex.toMap
     val files = dataset.files(srcLanguage).map(file => {
       if (useTFRecords)
-        TFRecordsConverter.process(file, srcLanguage)
+        createTFRecordsFile(file, scoresDir = env.workingDir.resolve("scores"), curriculum = None)
       else
         file
     }).map(_.path.toAbsolutePath.toString()): Tensor[String]
@@ -103,6 +110,7 @@ object Inputs {
   }
 
   def createTrainDataset(
+      env: Environment,
       dataConfig: DataConfig,
       trainingConfig: TrainingConfig,
       datasets: Seq[FileParallelDataset],
@@ -113,6 +121,18 @@ object Inputs {
       isEval: Boolean = false,
       languagePairs: Option[Set[(Language, Language)]] = None
   ): () => tf.data.Dataset[(SentencesWithLanguagePair[String], Sentences[String])] = () => {
+    // If there exists a training curriculum, compute any scores it may require.
+    val scoresDir = env.workingDir.resolve("scores")
+    trainingConfig.curriculum match {
+      case None => ()
+      case Some(curriculum) =>
+        Score.scoreDatasets(
+          datasets,
+          curriculum.cdfScore,
+          scoresDir = scoresDir,
+          alwaysRecompute = false)
+    }
+
     tf.device("/CPU:0") {
       val languageIds = languages.map(_._1).zipWithIndex.toMap
       val filteredDatasets = datasets
@@ -136,8 +156,8 @@ object Inputs {
       val filesDataset = filteredDatasets
           .map {
             case ((srcLanguage, tgtLanguage), parallelDatasets) =>
-              val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage)).map(f => TFRecordsConverter.process(f, srcLanguage))
-              val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage)).map(f => TFRecordsConverter.process(f, tgtLanguage))
+              val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage)).map(f => createTFRecordsFile(f, scoresDir, trainingConfig.curriculum))
+              val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage)).map(f => createTFRecordsFile(f, scoresDir, trainingConfig.curriculum))
               val srcLanguageDataset = tf.data.datasetFromTensors(languageIds(srcLanguage): Tensor[Int])
               val tgtLanguageDataset = tf.data.datasetFromTensors(languageIds(tgtLanguage): Tensor[Int])
               val srcFilesDataset = tf.data.datasetFromTensors(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor[String])
@@ -174,6 +194,7 @@ object Inputs {
   }
 
   def createEvalDatasets(
+      env: Environment,
       dataConfig: DataConfig,
       trainingConfig: TrainingConfig,
       datasets: Seq[(String, FileParallelDataset)],
@@ -196,8 +217,9 @@ object Inputs {
             val datasetName = s"$name/${srcLanguage.abbreviation}-${tgtLanguage.abbreviation}"
             (datasetName, () => tf.nameScope(datasetName) {
               createTrainDataset(
+                env,
                 dataConfig,
-                trainingConfig = trainingConfig.copy(curriculum = Curriculum.none),
+                trainingConfig = trainingConfig.copy(curriculum = None),
                 Seq(dataset), languages,
                 includeIdentityTranslations = false, cache = false, repeat = false, isEval = true,
                 languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
@@ -226,33 +248,40 @@ object Inputs {
     val srcDataset = tf.data.datasetFromDynamicTFRecordFiles(srcFile, bufferSize = dataConfig.loaderBufferSize)
     val tgtDataset = tf.data.datasetFromDynamicTFRecordFiles(tgtFile, bufferSize = dataConfig.loaderBufferSize)
 
-    var datasetBeforeBucketing = srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset))
-        .map(d => (d._1, parseTFRecord(d._2._1), parseTFRecord(d._2._2)), name = "Map/ParseExample")
+    val includeScore = trainingConfig.curriculum.isDefined
+    var datasetBeforeCurriculum = srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset))
+        .map(d => {
+          (d._1,
+              parseTFRecord(d._2._1, includeScore = includeScore),
+              parseTFRecord(d._2._2, includeScore = includeScore))
+        }, name = "Map/ParseExample")
 
     // Crop based on the maximum allowed sequence lengths.
     if (!isEval && dataConfig.srcMaxLength != -1 && dataConfig.tgtMaxLength != -1) {
-      datasetBeforeBucketing = datasetBeforeBucketing.map(d => (
+      datasetBeforeCurriculum = datasetBeforeCurriculum.map(d => (
           d._1,
-          (d._2._1(0 :: dataConfig.srcMaxLength), tf.minimum(d._2._2, dataConfig.srcMaxLength)),
-          (d._3._1(0 :: dataConfig.tgtMaxLength), tf.minimum(d._3._2, dataConfig.tgtMaxLength))),
+          (d._2._1(0 :: dataConfig.srcMaxLength), tf.minimum(d._2._2, dataConfig.srcMaxLength), d._2._3),
+          (d._3._1(0 :: dataConfig.tgtMaxLength), tf.minimum(d._3._2, dataConfig.tgtMaxLength), d._3._3)),
         name = "Map/MaxLength")
     } else if (!isEval && dataConfig.srcMaxLength != -1) {
-      datasetBeforeBucketing = datasetBeforeBucketing.map(d =>
-        (d._1, (d._2._1(0 :: dataConfig.srcMaxLength), tf.minimum(d._2._2, dataConfig.srcMaxLength)), d._3),
+      datasetBeforeCurriculum = datasetBeforeCurriculum.map(d =>
+        (d._1, (d._2._1(0 :: dataConfig.srcMaxLength), tf.minimum(d._2._2, dataConfig.srcMaxLength), d._2._3), d._3),
         name = "Map/MaxLength")
     } else if (!isEval && dataConfig.tgtMaxLength != -1) {
-      datasetBeforeBucketing = datasetBeforeBucketing.map(d =>
-        (d._1, d._2, (d._3._1(0 :: dataConfig.tgtMaxLength), tf.minimum(d._3._2, dataConfig.tgtMaxLength))),
+      datasetBeforeCurriculum = datasetBeforeCurriculum.map(d =>
+        (d._1, d._2, (d._3._1(0 :: dataConfig.tgtMaxLength), tf.minimum(d._3._2, dataConfig.tgtMaxLength), d._3._3)),
         name = "Map/MaxLength")
     }
 
     if (cache)
-      datasetBeforeBucketing = datasetBeforeBucketing.cache("")
+      datasetBeforeCurriculum = datasetBeforeCurriculum.cache("")
 
-    trainingConfig.curriculum.samplesFilter match {
-      case Some(samplesFilter) => datasetBeforeBucketing = datasetBeforeBucketing.filter(samplesFilter)
+    trainingConfig.curriculum.flatMap(_.samplesFilter) match {
+      case Some(samplesFilter) => datasetBeforeCurriculum = datasetBeforeCurriculum.filter(samplesFilter)
       case None => ()
     }
+
+    var datasetBeforeBucketing = datasetBeforeCurriculum.map(d => (d._1, (d._2._1, d._2._2), (d._3._1, d._3._2)))
 
     if (!isEval && repeat)
       datasetBeforeBucketing = datasetBeforeBucketing.shuffleAndRepeat(shuffleBufferSize)
@@ -322,62 +351,102 @@ object Inputs {
         .prefetch(dataConfig.numPrefetchedBatches)
   }
 
-  private def parseTFRecord(serialized: Output[String]): (Output[String], Output[Int]) = {
-    val parsedExample = tf.parseSingleExample(
-      serialized = serialized,
-      features = (
-          FixedLengthFeature[String](key = "sentence", shape = Shape(-1)),
-          FixedLengthFeature[Long](key = "length", shape = Shape())),
-      name = "ParseExample")
-    (parsedExample._1, parsedExample._2.toInt)
+  private def parseTFRecord(
+      serialized: Output[String],
+      includeScore: Boolean
+  ): (Output[String], Output[Int], Option[Output[Float]]) = {
+    val parsedExample: (Output[String], Output[Long], Option[Output[Float]]) = {
+      if (includeScore) {
+        tf.parseSingleExample(
+          serialized = serialized,
+          features = (
+              FixedLengthFeature[String](key = "sentence", shape = Shape(-1)),
+              FixedLengthFeature[Long](key = "length", shape = Shape()),
+              Some(FixedLengthFeature[Float](key = "score", shape = Shape())): Option[FixedLengthFeature[Float]]),
+          name = "ParseExample")
+      } else {
+        tf.parseSingleExample(
+          serialized = serialized,
+          features = (
+              FixedLengthFeature[String](key = "sentence", shape = Shape(-1)),
+              FixedLengthFeature[Long](key = "length", shape = Shape()),
+              None: Option[FixedLengthFeature[Float]]),
+          name = "ParseExample")
+      }
+    }
+    (parsedExample._1, parsedExample._2.toInt, parsedExample._3)
   }
 
-  object TFRecordsConverter extends FileProcessor {
-    private val logger         : Logger = Logger(LoggerFactory.getLogger("Data / TF Records Converter"))
-    private val whitespaceRegex: Regex  = "\\s+".r
+  private val whitespaceRegex: Regex = "\\s+".r
 
-    override def process(file: File, language: Language): File = {
-      val tfRecordsFile = convertedFile(file)
-      if (tfRecordsFile.notExists) {
-        logger.info(s"Converting file '$file' to TF records file '$tfRecordsFile'.")
-        val reader = newReader(file)
-        val writer = new TFRecordWriter(tfRecordsFile.path)
-        reader.lines().toAutoClosedIterator.foreach(line => {
-          writer.write(encodeSentenceAsTFExample(line, language))
-        })
-        writer.flush()
-        writer.close()
-        logger.info(s"Converted file '$file' to TF records file '$tfRecordsFile'.")
+  private def createTFRecordsFile(
+      file: File,
+      scoresDir: Path,
+      curriculum: Option[DifficultyBasedCurriculum[SentencePairsWithScores[String]]]
+  ): File = {
+    val logger = Logger(LoggerFactory.getLogger("Models / Inputs / TF Records Converter"))
+    val tfRecordsFile = file.sibling(file.name + ".tfrecords")
+
+    val scoreFile = curriculum.map(c => {
+      val baseFilename = file.path.toAbsolutePath.normalize.toString.replace('/', '_')
+      scoresDir.resolve("sentence_scores").resolve(s"$baseFilename.${c.cdfScore}.score")
+    })
+
+    if (tfRecordsFile.notExists) {
+      logger.info(s"Converting file '$file' to TF records file '$tfRecordsFile'.")
+      val reader = newReader(file)
+      val writer = new TFRecordWriter(tfRecordsFile.path)
+
+      scoreFile match {
+        case Some(f) =>
+          val scoresReader = newReader(f)
+          reader.lines().toAutoClosedIterator.zip(scoresReader.lines().toAutoClosedIterator).foreach {
+            case (line, scoreLine) =>
+              val sentence = whitespaceRegex.split(line)
+              val features = Features.newBuilder()
+              features.putFeature(
+                "sentence",
+                Feature.newBuilder()
+                    .setBytesList(
+                      BytesList.newBuilder()
+                          .addAllValue(sentence.map(ByteString.copyFromUtf8).toSeq.asJava))
+                    .build())
+              features.putFeature(
+                "length",
+                Feature.newBuilder()
+                    .setInt64List(Int64List.newBuilder().addValue(sentence.length))
+                    .build())
+              features.putFeature(
+                "score",
+                Feature.newBuilder()
+                    .setFloatList(FloatList.newBuilder().addValue(scoreLine.toFloat))
+                    .build())
+              writer.write(Example.newBuilder().setFeatures(features).build())
+          }
+        case None =>
+          reader.lines().toAutoClosedIterator.foreach(line => {
+            val sentence = whitespaceRegex.split(line)
+            val features = Features.newBuilder()
+            features.putFeature(
+              "sentence",
+              Feature.newBuilder()
+                  .setBytesList(
+                    BytesList.newBuilder()
+                        .addAllValue(sentence.map(ByteString.copyFromUtf8).toSeq.asJava))
+                  .build())
+            features.putFeature(
+              "length",
+              Feature.newBuilder()
+                  .setInt64List(Int64List.newBuilder().addValue(sentence.length))
+                  .build())
+            writer.write(Example.newBuilder().setFeatures(features).build())
+          })
       }
-      tfRecordsFile
-    }
 
-    protected def convertedFile(originalFile: File): File = {
-      originalFile.sibling(originalFile.name + ".tfrecords")
+      writer.flush()
+      writer.close()
+      logger.info(s"Converted file '$file' to TF records file '$tfRecordsFile'.")
     }
-
-    protected def encodeSentenceAsTFExample(sentence: String, language: Language): Example = {
-      val processedSentence = preprocessSentence(sentence, language)
-      Example.newBuilder()
-          .setFeatures(
-            Features.newBuilder()
-                .putFeature(
-                  "sentence",
-                  Feature.newBuilder()
-                      .setBytesList(
-                        BytesList.newBuilder()
-                            .addAllValue(processedSentence.map(ByteString.copyFromUtf8).asJava))
-                      .build())
-                .putFeature(
-                  "length",
-                  Feature.newBuilder()
-                      .setInt64List(Int64List.newBuilder().addValue(processedSentence.length))
-                      .build()))
-          .build()
-    }
-
-    protected def preprocessSentence(sentence: String, language: Language): Seq[String] = {
-      whitespaceRegex.split(sentence)
-    }
+    tfRecordsFile
   }
 }

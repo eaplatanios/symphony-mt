@@ -18,12 +18,12 @@ package org.platanios.symphony.mt.experiments.config
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.config.TrainingConfig
 import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
+import org.platanios.symphony.mt.data.scores.SentenceLength
 import org.platanios.symphony.mt.experiments.Experiment
-import org.platanios.symphony.mt.models.SentencePairs
-import org.platanios.symphony.mt.models.curriculum.{Curriculum, DifficultyBasedCurriculum}
+import org.platanios.symphony.mt.models.SentencePairsWithScores
+import org.platanios.symphony.mt.models.curriculum.{DifficultyBasedCurriculum, SentencePairCurriculum}
+import org.platanios.symphony.mt.models.curriculum.SentencePairCurriculum.{SourceSentenceScore, TargetSentenceScore}
 import org.platanios.symphony.mt.models.curriculum.competency._
-import org.platanios.symphony.mt.models.curriculum.difficulty.{AdaptiveLengthBasedDifficulty, Difficulty}
-import org.platanios.symphony.mt.models.curriculum.difficulty.LengthBasedDifficulty.{SourceLengthSelector, TargetLengthSelector}
 import org.platanios.tensorflow.api._
 
 import com.typesafe.config.Config
@@ -89,21 +89,31 @@ class TrainingConfigParser(
         tensorBoardConfig = (
             config.get[String]("tensorboard.host"),
             config.get[Int]("tensorboard.port"))),
-      curriculum =
-          config.getOption[Config]("curriculum").map(parseCurriculum(_, languagePairs))
-              .getOrElse(Curriculum.none[SentencePairs[String]]))
+      curriculum = config.getOption[Config]("curriculum").flatMap(parseCurriculum(_, languagePairs)))
   }
 
   @throws[IllegalArgumentException]
   private def parseCurriculum(
       curriculumConfig: Config,
       languagePairs: Set[(Language, Language)]
-  ): Curriculum[SentencePairs[String]] = {
+  ): Option[DifficultyBasedCurriculum[SentencePairsWithScores[String]]] = {
     curriculumConfig.get[String]("type") match {
       case "difficulty" =>
-        new DifficultyBasedCurriculum(
-          difficulty = parseDifficulty(curriculumConfig.get[Config]("difficulty"), languagePairs),
-          competency = parseCompetency(curriculumConfig.get[Config]("competency")))
+        val competency = parseCompetency(curriculumConfig.get[Config]("competency"))
+        val score = curriculumConfig.get[String]("score") match {
+          case "length" => SentenceLength
+          case difficulty =>
+            throw new IllegalArgumentException(s"'$difficulty' does not represent a valid difficulty type.")
+        }
+        val scoreSelectorString = curriculumConfig.get[String]("score-selector")
+        val scoreSelector = scoreSelectorString match {
+          case "source-sentence" => SourceSentenceScore
+          case "target-sentence" => TargetSentenceScore
+          case _ => throw new IllegalArgumentException(
+            s"'$scoreSelectorString' does not represent a valid score selector.")
+        }
+        val maxNumHistogramBins = curriculumConfig.get[Int]("max-num-histogram-bins")
+        Some(new SentencePairCurriculum(competency, score, scoreSelector, maxNumHistogramBins))
       case curriculumType =>
         throw new IllegalArgumentException(s"'$curriculumType' does not represent a valid curriculum type.")
     }
@@ -121,26 +131,6 @@ class TrainingConfigParser(
         val numStepsToFullCompetency = competencyConfig.get[Float]("num-steps-full-competency")
         val power = competencyConfig.get[Int]("power")
         new ExponentialStepCompetency[Float](initialValue, numStepsToFullCompetency, power)
-      case competencyType =>
-        throw new IllegalArgumentException(s"'$competencyType' does not represent a valid competency type.")
-    }
-  }
-
-  @throws[IllegalArgumentException]
-  private def parseDifficulty(
-      difficultyConfig: Config,
-      languagePairs: Set[(Language, Language)]
-  ): Difficulty[SentencePairs[String]] = {
-    difficultyConfig.get[String]("type") match {
-      case "adaptive-length" =>
-        val lengthSelectorString = difficultyConfig.get[String]("selector")
-        val lengthSelector = lengthSelectorString match {
-          case "source-sentence-length" => SourceLengthSelector
-          case "target-sentence-length" => TargetLengthSelector
-          case _ => throw new IllegalArgumentException(
-            s"'$lengthSelectorString' does not represent a valid length selector.")
-        }
-        new AdaptiveLengthBasedDifficulty[String](lengthSelector, datasets, languagePairs.toSeq, dataConfig)
       case competencyType =>
         throw new IllegalArgumentException(s"'$competencyType' does not represent a valid competency type.")
     }
