@@ -18,11 +18,20 @@ package org.platanios.symphony.mt.models
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.config.TrainingConfig
 import org.platanios.symphony.mt.data._
-import org.platanios.symphony.mt.data.processors.TFRecordsConverter
+import org.platanios.symphony.mt.data.processors.FileProcessor
 import org.platanios.symphony.mt.models.curriculum.Curriculum
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.io.TFRecordWriter
 import org.platanios.tensorflow.api.ops.Parsing.FixedLengthFeature
+
+import better.files._
+import com.google.protobuf.ByteString
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
+import org.tensorflow.example._
+
+import scala.util.matching.Regex
 
 // TODO: Sample files with probability proportional to their size.
 
@@ -321,5 +330,54 @@ object Inputs {
           FixedLengthFeature[Long](key = "length", shape = Shape())),
       name = "ParseExample")
     (parsedExample._1, parsedExample._2.toInt)
+  }
+
+  object TFRecordsConverter extends FileProcessor {
+    private val logger         : Logger = Logger(LoggerFactory.getLogger("Data / TF Records Converter"))
+    private val whitespaceRegex: Regex  = "\\s+".r
+
+    override def process(file: File, language: Language): File = {
+      val tfRecordsFile = convertedFile(file)
+      if (tfRecordsFile.notExists) {
+        logger.info(s"Converting file '$file' to TF records file '$tfRecordsFile'.")
+        val reader = newReader(file)
+        val writer = new TFRecordWriter(tfRecordsFile.path)
+        reader.lines().toAutoClosedIterator.foreach(line => {
+          writer.write(encodeSentenceAsTFExample(line, language))
+        })
+        writer.flush()
+        writer.close()
+        logger.info(s"Converted file '$file' to TF records file '$tfRecordsFile'.")
+      }
+      tfRecordsFile
+    }
+
+    protected def convertedFile(originalFile: File): File = {
+      originalFile.sibling(originalFile.name + ".tfrecords")
+    }
+
+    protected def encodeSentenceAsTFExample(sentence: String, language: Language): Example = {
+      val processedSentence = preprocessSentence(sentence, language)
+      Example.newBuilder()
+          .setFeatures(
+            Features.newBuilder()
+                .putFeature(
+                  "sentence",
+                  Feature.newBuilder()
+                      .setBytesList(
+                        BytesList.newBuilder()
+                            .addAllValue(processedSentence.map(ByteString.copyFromUtf8).asJava))
+                      .build())
+                .putFeature(
+                  "length",
+                  Feature.newBuilder()
+                      .setInt64List(Int64List.newBuilder().addValue(processedSentence.length))
+                      .build()))
+          .build()
+    }
+
+    protected def preprocessSentence(sentence: String, language: Language): Seq[String] = {
+      whitespaceRegex.split(sentence)
+    }
   }
 }
