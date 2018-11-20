@@ -21,14 +21,21 @@ import org.platanios.symphony.mt.utilities.Histogram
 
 import better.files._
 
+import scala.collection.mutable
+
+// TODO: [DATA] [SCORES] Create a `LanguageSpecificSummaryScore` abstraction for this and the `WordCounts` summaries.
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 class SentenceScoreHistogram(
     val score: SentenceScore,
-    val maxNumBins: Int
+    val maxNumBins: Int,
+    val languageSpecific: Boolean = true
 ) extends SummaryScore {
-  protected var histogram: Histogram = Histogram(maxNumBins)
+  protected val histograms: mutable.HashMap[Language, Histogram] = {
+    mutable.HashMap.empty[Language, Histogram]
+  }
 
   override def name: String = {
     s"$score.$maxNumBins.bins.histogram"
@@ -45,7 +52,7 @@ class SentenceScoreHistogram(
       requiredSummaries: Seq[SummaryScore]
   ): Unit = {
     val sentenceScore = score.processSentence(language, sentence, requiredValues, requiredSummaries)
-    histogram.insert(sentenceScore)
+    histogram(language).insert(sentenceScore)
   }
 
   def cdfScore: SentenceScore = {
@@ -69,34 +76,78 @@ class SentenceScoreHistogram(
           requiredValues: Seq[Float],
           requiredSummaries: Seq[SummaryScore]
       ): Float = {
-        histogramScore.histogram.cdf(requiredValues.head).toFloat
+        histogramScore.histogram(language).cdf(requiredValues.head).toFloat
       }
     }
   }
 
   override def resetState(): Unit = {
-    histogram = Histogram(maxNumBins)
+    histograms.clear()
   }
 
   override def saveStateToFile(file: File): Unit = {
     val writer = newWriter(file)
-    histogram.bins.foreach(bin => {
-      writer.write(s"${bin.mean}\t${bin.numSamples}\n")
-    })
+    if (languageSpecific) {
+      histograms.foreach {
+        case (language, histogram) =>
+          writer.write(s"${SentenceScoreHistogram.FILE_LANGUAGE_SEPARATOR}\n")
+          writer.write(s"${language.name}\n")
+          histogram.bins.foreach(bin => {
+            writer.write(s"${bin.mean}\t${bin.numSamples}\n")
+          })
+      }
+    } else {
+      histograms.values.head.bins.foreach(bin => {
+        writer.write(s"${bin.mean}\t${bin.numSamples}\n")
+      })
+    }
     writer.flush()
     writer.close()
   }
 
   override def loadStateFromFile(file: File): Unit = {
     reset()
-    newReader(file).lines().toAutoClosedIterator.foreach(line => {
-      val lineParts = line.split('\t')
-      histogram.insertBin(Histogram.Bin(mean = lineParts(0).toDouble, numSamples = lineParts(1).toLong))
-    })
+    if (languageSpecific) {
+      var currentLanguage: Option[Language] = None
+      newReader(file).lines().toAutoClosedIterator.foreach(line => {
+        if (line == SentenceScoreHistogram.FILE_LANGUAGE_SEPARATOR) {
+          currentLanguage = None
+        } else {
+          currentLanguage match {
+            case None => currentLanguage = Some(Language.fromName(line))
+            case Some(language) =>
+              val lineParts = line.split('\t')
+              histograms.getOrElseUpdate(language, Histogram(maxNumBins))
+                  .insertBin(Histogram.Bin(mean = lineParts(0).toDouble, numSamples = lineParts(1).toLong))
+          }
+        }
+      })
+    } else {
+      val histogram = Histogram(maxNumBins)
+      newReader(file).lines().toAutoClosedIterator.foreach(line => {
+        val lineParts = line.split('\t')
+        histogram.insertBin(Histogram.Bin(mean = lineParts(0).toDouble, numSamples = lineParts(1).toLong))
+      })
+      histograms.update(null, histogram)
+    }
+  }
+
+  /** Obtains the histogram to use for a specific language. */
+  protected def histogram(language: Language): Histogram = {
+    if (languageSpecific) {
+      histograms.getOrElseUpdate(language, Histogram(maxNumBins))
+    } else if (histograms.isEmpty) {
+      histograms.getOrElseUpdate(language, Histogram(maxNumBins))
+    } else {
+      // This is a little hack in case we are using the same histogram for all languages.
+      histograms.values.head
+    }
   }
 }
 
 object SentenceScoreHistogram {
+  private[SentenceScoreHistogram] val FILE_LANGUAGE_SEPARATOR: String = "-" * 100
+
   def apply(
       score: SentenceScore,
       maxNumBins: Int
