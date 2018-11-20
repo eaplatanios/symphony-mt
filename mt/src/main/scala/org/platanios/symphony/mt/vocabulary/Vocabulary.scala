@@ -24,25 +24,15 @@ import org.slf4j.LoggerFactory
 
 /** Represents a vocabulary of words.
   *
-  * @param  file                 File containing the vocabulary, with one word per line.
-  * @param  size                 Size of this vocabulary (i.e., number of words).
-  * @param  unknownToken         Token representing unknown symbols (i.e., not included in this vocabulary).
-  * @param  beginOfSequenceToken Token representing the beginning of a sequence.
-  * @param  endOfSequenceToken   Token representing the end of a sequence.
+  * @param  file File containing the vocabulary, with one word per line.
+  * @param  size Size of this vocabulary (i.e., number of words).
   *
   * @author Emmanouil Antonios Platanios
   */
 class Vocabulary protected (
     val file: File,
-    val size: Int,
-    val unknownToken: String,
-    val beginOfSequenceToken: String,
-    val endOfSequenceToken: String
+    val size: Int
 ) {
-  val unknownTokenId        : Int = 0
-  val beginOfSequenceTokenId: Int = 1
-  val endOfSequenceTokenId  : Int = 2
-
   /** Creates a vocabulary hash map (from word string to word ID), from the provided vocabulary file.
     *
     * @return Vocabulary hash map.
@@ -53,7 +43,7 @@ class Vocabulary protected (
         .toSeq
         .zipWithIndex.map(p => (p._1, p._2.toLong))
         .toMap
-        .withDefaultValue(unknownTokenId)
+        .withDefaultValue(Vocabulary.UNKNOWN_TOKEN_ID)
   }
 
   /** Creates a vocabulary hash map (from word ID to word string), from the provided vocabulary file.
@@ -67,7 +57,7 @@ class Vocabulary protected (
         .zipWithIndex
         .map(p => (p._2.toLong, p._1))
         .toMap
-        .withDefaultValue(unknownToken)
+        .withDefaultValue(Vocabulary.UNKNOWN_TOKEN)
   }
 
   /** Creates a vocabulary lookup table (from word string to word ID), from the provided vocabulary file.
@@ -111,20 +101,12 @@ class Vocabulary protected (
     var result = 1
     result = prime * result + file.hashCode
     result = prime * result + size.hashCode
-    result = prime * result + unknownToken.hashCode
-    result = prime * result + beginOfSequenceToken.hashCode
-    result = prime * result + endOfSequenceToken.hashCode
     result
   }
 
   override def equals(that: Any): Boolean = {
     that match {
-      case other: Vocabulary =>
-        file == other.file &&
-            size == other.size &&
-            unknownToken == other.unknownToken &&
-            beginOfSequenceToken == other.beginOfSequenceToken &&
-            endOfSequenceToken == other.endOfSequenceToken
+      case other: Vocabulary => file == other.file && size == other.size
       case _ => false
     }
   }
@@ -134,22 +116,28 @@ class Vocabulary protected (
 object Vocabulary {
   private[this] val logger: Logger = Logger(LoggerFactory.getLogger("Vocabulary"))
 
+  /* Token representing unknown symbols (i.e., not included in this vocabulary). */
+  val UNKNOWN_TOKEN: String = "<unk>"
+
+  /* Token representing the beginning of a sequence. */
+  val BEGIN_OF_SEQUENCE_TOKEN: String = "<s>"
+
+  /* Token representing the end of a sequence. */
+  val END_OF_SEQUENCE_TOKEN: String = "</s>"
+
+  val UNKNOWN_TOKEN_ID          : Int    = 0
+  val BEGIN_OF_SEQUENCE_TOKEN_ID: Int    = 1
+  val END_OF_SEQUENCE_TOKEN_ID  : Int    = 2
+
   /** Creates a new vocabulary.
     *
-    * @param  file                 File containing the vocabulary, with one word per line.
-    * @param  size                 Size of this vocabulary (i.e., number of words).
-    * @param  unknownToken         Token representing unknown symbols (i.e., not included in this vocabulary).
-    * @param  beginOfSequenceToken Token representing the beginning of a sequence.
-    * @param  endOfSequenceToken   Token representing the end of a sequence.
+    * @param  file File containing the vocabulary, with one word per line.
+    * @param  size Size of this vocabulary (i.e., number of words).
     * @return Created vocabulary.
     */
-  protected def apply(
-      file: File,
-      size: Int,
-      unknownToken: String,
-      beginOfSequenceToken: String,
-      endOfSequenceToken: String
-  ): Vocabulary = new Vocabulary(file, size, unknownToken, beginOfSequenceToken, endOfSequenceToken)
+  protected def apply(file: File, size: Int): Vocabulary = {
+    new Vocabulary(file, size)
+  }
 
   /** Creates a new vocabulary from the provided vocabulary file.
     *
@@ -178,20 +166,12 @@ object Vocabulary {
       directory: File = null,
       dataConfig: DataConfig = DataConfig()
   ): Vocabulary = {
-    val check = Vocabulary.check(
-      file, checkSpecialTokens, directory,
-      dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
+    val check = Vocabulary.check(file, checkSpecialTokens, directory)
     check match {
       case None => throw new IllegalArgumentException(s"Could not load the vocabulary file located at '$file'.")
-      case Some((size, path)) => Vocabulary(
-        path, size, dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
+      case Some((size, path)) => Vocabulary(path, size)
     }
   }
-
-  val UNKNOWN_TOKEN          : String = "<unk>"
-  val BEGIN_OF_SEQUENCE_TOKEN: String = "<s>"
-  val END_OF_SEQUENCE_TOKEN  : String = "</s>"
-  val UNKNOWN_TOKEN_ID       : Int    = 0
 
   /** Checks if the specified vocabulary file exists and if it does, checks that special tokens are being used
     * correctly. If not, this method can optionally create a new file by prepending the appropriate tokens to the
@@ -200,25 +180,19 @@ object Vocabulary {
     * The special tokens check simply involves checking whether the first three tokens in the vocabulary file match the
     * specified `unknownToken`, `beginSequenceToken`, and `endSequenceToken` values.
     *
-    * @param  file                 Vocabulary file to check.
-    * @param  checkSpecialTokens   Boolean value indicating whether or not to check for the use of special tokens, and
-    *                              prepend them while creating a new vocabulary file, if the check fails.
-    * @param  directory            Directory to use when creating the new vocabulary file, in case the special tokens
-    *                              check fails. Defaults to the current directory in which `file` is located, meaning
-    *                              that if the special tokens check fails, `file` will be replaced with the appended
-    *                              vocabulary file.
-    * @param  unknownToken         Special token for unknown tokens. Defaults to `<unk>`.
-    * @param  beginOfSequenceToken Special token for the beginning of a sequence. Defaults to `<s>`.
-    * @param  endOfSequenceToken   Special token for the end of a sequence. Defaults to `</s>`.
+    * @param  file                Vocabulary file to check.
+    * @param  checkSpecialTokens  Boolean value indicating whether or not to check for the use of special tokens, and
+    *                             prepend them while creating a new vocabulary file, if the check fails.
+    * @param  directory           Directory to use when creating the new vocabulary file, in case the special tokens
+    *                             check fails. Defaults to the current directory in which `file` is located, meaning
+    *                             that if the special tokens check fails, `file` will be replaced with the appended
+    *                             vocabulary file.
     * @return Option containing the number of tokens and the checked vocabulary file, which could be a new file.
     */
   private[vocabulary] def check(
       file: File,
       checkSpecialTokens: Boolean = true,
-      directory: File = null,
-      unknownToken: String = UNKNOWN_TOKEN,
-      beginOfSequenceToken: String = BEGIN_OF_SEQUENCE_TOKEN,
-      endOfSequenceToken: String = END_OF_SEQUENCE_TOKEN
+      directory: File = null
   ): Option[(Int, File)] = {
     if (file.notExists) {
       None
@@ -233,13 +207,13 @@ object Vocabulary {
         // Verify that the loaded vocabulary using the right special tokens.
         // If it does not, use those tokens and generate a new vocabulary file.
         assert(tokens.lengthCompare(3) >= 0, "The loaded vocabulary must contain at least three tokens.")
-        if (tokens(0) != unknownToken ||
-            tokens(1) != beginOfSequenceToken ||
-            tokens(2) != endOfSequenceToken) {
+        if (tokens(0) != UNKNOWN_TOKEN ||
+            tokens(1) != BEGIN_OF_SEQUENCE_TOKEN ||
+            tokens(2) != END_OF_SEQUENCE_TOKEN) {
           logger.info(
             s"The first 3 vocabulary tokens [${tokens(0)}, ${tokens(1)}, ${tokens(2)}] " +
-                s"are not equal to [$unknownToken, $beginOfSequenceToken, $endOfSequenceToken].")
-          tokens = Seq(unknownToken, beginOfSequenceToken, endOfSequenceToken) ++ tokens
+                s"are not equal to [$UNKNOWN_TOKEN, $BEGIN_OF_SEQUENCE_TOKEN, $END_OF_SEQUENCE_TOKEN].")
+          tokens = Seq(UNKNOWN_TOKEN, BEGIN_OF_SEQUENCE_TOKEN, END_OF_SEQUENCE_TOKEN) ++ tokens
           val newFile = if (directory != null) directory.sibling(file.name) else file
           val writer = newWriter(newFile)
           tokens.foreach(token => writer.write(s"$token\n"))

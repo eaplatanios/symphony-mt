@@ -21,13 +21,10 @@ import better.files.File
 
 /** Represents a vocabulary of coded words (e.g., using the byte-pair-encoding method).
   *
-  * @param  file                 File containing the vocabulary, with one word per line.
-  * @param  size                 Size of this vocabulary (i.e., number of words).
-  * @param  encoder              Sentence encoding function (each sentence is represented as a sequence of words).
-  * @param  decoder              Sentence decoding function (each sentence is represented as a sequence of words).
-  * @param  unknownToken         Token representing unknown symbols (i.e., not included in this vocabulary).
-  * @param  beginOfSequenceToken Token representing the beginning of a sequence.
-  * @param  endOfSequenceToken   Token representing the end of a sequence.
+  * @param  file    File containing the vocabulary, with one word per line.
+  * @param  size    Size of this vocabulary (i.e., number of words).
+  * @param  encoder Sentence encoding function (each sentence is represented as a sequence of words).
+  * @param  decoder Sentence decoding function (each sentence is represented as a sequence of words).
   *
   * @author Emmanouil Antonios Platanios
   */
@@ -35,11 +32,8 @@ class CodedVocabulary protected (
     override val file: File,
     override val size: Int,
     protected val encoder: Seq[String] => Seq[String],
-    protected val decoder: Seq[String] => Seq[String],
-    override val unknownToken: String,
-    override val beginOfSequenceToken: String,
-    override val endOfSequenceToken: String
-) extends Vocabulary(file, size, unknownToken, beginOfSequenceToken, endOfSequenceToken) {
+    protected val decoder: Seq[String] => Seq[String]
+) extends Vocabulary(file, size) {
   /** Encodes the provided sequence using this vocabulary. This is typically an identity function.
     *
     * This method is useful for coded vocabularies, such as the byte-pair-encoding vocabulary.
@@ -66,25 +60,19 @@ class CodedVocabulary protected (
 object CodedVocabulary {
   /** Creates a new coded vocabulary.
     *
-    * @param  file                 File containing the vocabulary, with one word per line.
-    * @param  size                 Size of this vocabulary (i.e., number of words).
-    * @param  encoder              Sentence encoding function (each sentence is represented as a sequence of words).
-    * @param  decoder              Sentence decoding function (each sentence is represented as a sequence of words).
-    * @param  unknownToken         Token representing unknown symbols (i.e., not included in this vocabulary).
-    * @param  beginOfSequenceToken Token representing the beginning of a sequence.
-    * @param  endOfSequenceToken   Token representing the end of a sequence.
+    * @param  file    File containing the vocabulary, with one word per line.
+    * @param  size    Size of this vocabulary (i.e., number of words).
+    * @param  encoder Sentence encoding function (each sentence is represented as a sequence of words).
+    * @param  decoder Sentence decoding function (each sentence is represented as a sequence of words).
     * @return Created vocabulary.
     */
   protected def apply(
       file: File,
       size: Int,
       encoder: Seq[String] => Seq[String],
-      decoder: Seq[String] => Seq[String],
-      unknownToken: String,
-      beginOfSequenceToken: String,
-      endOfSequenceToken: String
+      decoder: Seq[String] => Seq[String]
   ): CodedVocabulary = {
-    new CodedVocabulary(file, size, encoder, decoder, unknownToken, beginOfSequenceToken, endOfSequenceToken)
+    new CodedVocabulary(file, size, encoder, decoder)
   }
 
   /** Creates a new coded vocabulary from the provided vocabulary file.
@@ -118,14 +106,10 @@ object CodedVocabulary {
       directory: File = null,
       dataConfig: DataConfig = DataConfig()
   ): CodedVocabulary = {
-    val check = Vocabulary.check(
-      file, checkSpecialTokens, directory,
-      dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
+    val check = Vocabulary.check(file, checkSpecialTokens, directory)
     check match {
       case None => throw new IllegalArgumentException(s"Could not load the vocabulary file located at '$file'.")
-      case Some((size, path)) => CodedVocabulary(
-        path, size, encoder, decoder,
-        dataConfig.unknownToken, dataConfig.beginOfSequenceToken, dataConfig.endOfSequenceToken)
+      case Some((size, path)) => CodedVocabulary(path, size, encoder, decoder)
     }
   }
 }

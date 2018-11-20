@@ -75,10 +75,7 @@ object DataConfigParser extends ConfigParser[DataConfig] {
       tgtMaxLength = config.get[Int]("tgt-max-length"),
       shuffleBufferSize = config.get[Int]("shuffle-buffer-size"),
       numPrefetchedBatches = config.get[Int]("num-prefetched-batches"),
-      numParallelCalls = config.get[Int]("input-pipeline-num-parallel-calls"),
-      unknownToken = config.get[String]("vocabulary.unknown-token"),
-      beginOfSequenceToken = config.get[String]("vocabulary.begin-of-sequence-token"),
-      endOfSequenceToken = config.get[String]("vocabulary.end-of-sequence-token"))
+      numParallelCalls = config.get[Int]("input-pipeline-num-parallel-calls"))
   }
 
   override def tag(config: Config, parsedValue: => DataConfig): Option[String] = {

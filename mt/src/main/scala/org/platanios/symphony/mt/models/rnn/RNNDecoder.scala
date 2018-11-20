@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
 import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder}
+import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
 import org.platanios.tensorflow.api.tf.RNNCell
@@ -35,8 +36,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     val tgtSequences = context.tgtSequences.get
 
     // Shift the target sequence one step forward so the decoder learns to output the next word.
-    val bosToken = tf.constant[String](context.dataConfig.beginOfSequenceToken)
-    val tgtBosId = context.parameterManager.stringToIndexLookup(context.tgtLanguageID)(bosToken)
+    val tgtBosId = tf.constant[Int](Vocabulary.BEGIN_OF_SEQUENCE_TOKEN_ID)
     val batchSize = tf.shape(tgtSequences.sequences).slice(0)
     val shiftedTgtSequences = tf.concatenate(Seq(
       tf.fill[Int, Int](tf.stack[Int](Seq(batchSize, 1)))(tgtBosId),
@@ -80,11 +80,8 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     }
 
     // Create some constants that will be used during decoding.
-    val bosToken = tf.constant[String](context.dataConfig.beginOfSequenceToken)
-    val eosToken = tf.constant[String](context.dataConfig.endOfSequenceToken)
-    val tgtVocabLookupTable = context.parameterManager.stringToIndexLookup(context.tgtLanguageID)
-    val tgtBosID = tgtVocabLookupTable(bosToken).toInt
-    val tgtEosID = tgtVocabLookupTable(eosToken).toInt
+    val tgtBosID = tf.constant[Int](Vocabulary.BEGIN_OF_SEQUENCE_TOKEN_ID)
+    val tgtEosID = tf.constant[Int](Vocabulary.END_OF_SEQUENCE_TOKEN_ID)
 
     // Create the decoder RNN.
     val batchSize = tf.shape(encodedSequences.lengths).slice(0).expandDims(0)

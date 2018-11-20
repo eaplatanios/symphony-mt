@@ -242,7 +242,7 @@ class Model[Code](
             val decodedLengths = decodedSentences.map(_.length)
             val maxLength = decodedSentences.map(_.length).max
             val paddedDecodedSentences = decodedSentences.map(s => {
-              s ++ Seq.fill(maxLength - s.length)(languages(languageId)._2.endOfSequenceToken)
+              s ++ Seq.fill(maxLength - s.length)(Vocabulary.END_OF_SEQUENCE_TOKEN)
             })
             (paddedDecodedSentences: Tensor[String], decodedLengths: Tensor[Int])
           }
@@ -494,8 +494,7 @@ class Model[Code](
           // TODO: Handle this shift more efficiently.
           // Shift the target sequence one step backward so the decoder is evaluated based using the correct previous
           // token used as input, rather than the previous predicted token.
-          val tgtEosId = parameterManager
-              .stringToIndexLookup(tgtLanguage)(Output.constant[String](dataConfig.endOfSequenceToken)).toInt
+          val tgtEosId = Output.constant[Int](Vocabulary.END_OF_SEQUENCE_TOKEN_ID)
           tgtSequences = tf.concatenate(Seq(
             tgtSequences,
             tf.fill(tf.stack[Int](Seq(tf.shape(tgtSequences).slice(0).toInt, 1)))(tgtEosId)

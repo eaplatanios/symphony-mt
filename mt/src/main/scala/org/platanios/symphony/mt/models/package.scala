@@ -38,13 +38,6 @@ package object models {
   type SentencesWithLanguageValue = (Tensor[Int], Tensor[String], Tensor[Int])
   type SentencesWithLanguagePairValue = (Tensor[Int], Tensor[Int], Tensor[String], Tensor[Int])
 
-  // Dataset Types
-
-  type SentencesDataset = tf.data.Dataset[Sentences[String]]
-  type SentencePairsDataset = tf.data.Dataset[SentencePairs[String]]
-  type InputDataset = tf.data.Dataset[SentencesWithLanguagePair[String]]
-  type TrainDataset = tf.data.Dataset[(SentencesWithLanguagePair[String], Sentences[String])]
-
   // Estimators
 
   type TranslationEstimator = tf.learn.Estimator[

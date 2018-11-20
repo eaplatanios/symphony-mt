@@ -40,8 +40,4 @@ case class DataConfig(
     tgtMaxLength: Int = 50,
     shuffleBufferSize: Long = -1L,
     numPrefetchedBatches: Long = 10L,
-    numParallelCalls: Int = 4,
-    // Vocabulary
-    unknownToken: String = Vocabulary.UNKNOWN_TOKEN,
-    beginOfSequenceToken: String = Vocabulary.BEGIN_OF_SEQUENCE_TOKEN,
-    endOfSequenceToken: String = Vocabulary.END_OF_SEQUENCE_TOKEN)
+    numParallelCalls: Int = 4)
