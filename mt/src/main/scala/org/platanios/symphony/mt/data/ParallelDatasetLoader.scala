@@ -16,7 +16,7 @@
 package org.platanios.symphony.mt.data
 
 import org.platanios.symphony.mt.Language
-import org.platanios.symphony.mt.data.processors.{FileProcessor, TFRecordsConverter}
+import org.platanios.symphony.mt.data.processors.FileProcessor
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.symphony.mt.utilities.{CompressedFiles, MutableFile}
 
@@ -85,7 +85,7 @@ abstract class ParallelDatasetLoader(val srcLanguage: Language, val tgtLanguage:
 }
 
 object ParallelDatasetLoader {
-  private[data] val logger = Logger(LoggerFactory.getLogger("Dataset"))
+  private[data] val logger = Logger(LoggerFactory.getLogger("Data / Parallel Dataset Loader"))
 
   def maybeDownload(file: File, url: String, bufferSize: Int = 8192): Boolean = {
     if (file.exists) {
@@ -238,8 +238,6 @@ object ParallelDatasetLoader {
 
     val datasets = loaders.zip(files).map {
       case (loader, (srcFiles, tgtFiles, fileTypes, fileTags)) =>
-        srcFiles.foreach(file => file.set(TFRecordsConverter.process(file.get, loader.srcLanguage)))
-        tgtFiles.foreach(file => file.set(TFRecordsConverter.process(file.get, loader.tgtLanguage)))
         val groupedFiles = Map(loader.srcLanguage -> srcFiles.map(_.get), loader.tgtLanguage -> tgtFiles.map(_.get))
         val filteredVocabulary = vocabulary.filterKeys(l => l == loader.srcLanguage || l == loader.tgtLanguage)
         FileParallelDataset(loader.name, filteredVocabulary, loader.dataConfig, groupedFiles, fileTypes, fileTags)

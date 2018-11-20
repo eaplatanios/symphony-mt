@@ -64,20 +64,9 @@ trait SentenceScore extends Score {
 trait SummaryScore extends Score {
   override type T = Unit
 
-  private var hash: Option[String] = None
-
   override val isSummary: Boolean = true
 
-  private[scores] def setDatasetsHash(hash: String): Unit = {
-    this.hash = Some(hash)
-  }
-
-  private[scores] def setDatasetsHashFromFile(file: File): Unit = {
-    setDatasetsHash(file.extension(includeDot = false).get)
-  }
-
   private[scores] def reset(): Unit = {
-    hash = None
     resetState()
   }
 
@@ -85,10 +74,6 @@ trait SummaryScore extends Score {
 
   def saveStateToFile(file: File): Unit
   def loadStateFromFile(file: File): Unit
-
-  override def toString: String = {
-    hash.map(h => s"$name.$h").getOrElse(name)
-  }
 }
 
 object Score {
@@ -98,11 +83,15 @@ object Score {
   def scoreDatasets(
       datasets: Seq[FileParallelDataset],
       score: Score,
-      sentenceScoreNamesFileSuffix: String = ".sentence.scores.names",
-      sentenceScoreValuesFileSuffix: String = ".sentence.scores.values",
-      summaryScoresDir: Option[File] = None,
+      scoresDir: File,
       alwaysRecompute: Boolean = false
   ): Unit = {
+    val summaryScoresDir = scoresDir / "summary_scores"
+    val sentenceScoresDir = scoresDir / "sentence_scores"
+
+    summaryScoresDir.createDirectories()
+    sentenceScoresDir.createDirectories()
+
     var computedSummaryScores = Set.empty[SummaryScore]
     var scores = TopologicalSort.sort[Score](
       values = Set(score),
@@ -114,58 +103,47 @@ object Score {
         if (computingSummaryScore) {
           val summaryScore = scores.head.asInstanceOf[SummaryScore]
           summaryScore.reset()
-          summaryScore.setDatasetsHash(datasets.hashCode.toHexString)
+          logger.info(s"Computing summary score '$summaryScore'.")
           Seq(summaryScore)
         } else {
-          scores.takeWhile(!_.isSummary)
+          val sentenceScores = scores.takeWhile(!_.isSummary)
+          logger.info(s"Computing sentence scores: ${sentenceScores.map(s => s"'$s'").mkString(", ")}.")
+          sentenceScores
         }
       }
 
       val (summaryScoreFile, computeSummaryScore) = {
         if (computingSummaryScore) {
           val summaryScore = scoresToCompute.head.asInstanceOf[SummaryScore]
-          val summaryScoreFile = summaryScoresDir.map(_ / s"$summaryScore")
-          if (alwaysRecompute || summaryScoreFile.isEmpty || summaryScoreFile.get.notExists) {
-            (summaryScoreFile, Some(true))
+          val summaryScoreFile = summaryScoresDir / s"$summaryScore.score"
+          if (alwaysRecompute || summaryScoreFile.notExists) {
+            (summaryScoreFile, true)
           } else {
-            (summaryScoreFile, Some(false))
+            (summaryScoreFile, false)
           }
         } else {
-          (None, None)
+          (null, false)
         }
       }
 
-      logger.info(s"Computing scores: ${scoresToCompute.map(s => s"'$s'").mkString(", ")}.")
       datasets.foreach(dataset => {
         dataset.files.foreach {
           case (language, files) => files.foreach(file => {
-            val fileNameWithoutExtension = file.nameWithoutExtension(includeAll = false)
-            val scoreNamesFile = file.sibling(fileNameWithoutExtension + s"$sentenceScoreNamesFileSuffix")
-            val scoreValuesFile = file.sibling(fileNameWithoutExtension + s"$sentenceScoreValuesFileSuffix")
+            val baseFilename = file.path.toAbsolutePath.normalize.toString.replace('/', '_')
+            val scoreFiles = sentenceScoresDir.collectChildren(_.name.startsWith(baseFilename)).toArray
 
-            var sentenceScoreNames = {
-              if (scoreNamesFile.notExists)
-                Seq.empty
-              else
-                readScoreNames(scoreNamesFile)
-            }
+            val scoreNames = scoreFiles.map(_.name.drop(baseFilename.length + 1).dropRight(6))
+            val scoreValues = scoreFiles.map(file => {
+              mutable.ArrayBuffer(newReader(file).lines().toAutoClosedIterator.map(_.toFloat).toSeq: _*)
+            })
 
-            var sentenceScoreValues = {
-              if (scoreValuesFile.notExists)
-                Seq.empty
-              else
-                readScoreValues(scoreValuesFile).map(v => mutable.ArrayBuffer(v: _*))
-            }
+            var sentenceScores = mutable.HashMap(scoreNames.zip(scoreValues): _*)
 
             if (computingSummaryScore) {
               val summaryScore = scoresToCompute.head.asInstanceOf[SummaryScore]
 
-              if (computeSummaryScore.get) {
-                val requiredSentenceScores = summaryScore.requiredSentenceScores.map(s => {
-                  val index = sentenceScoreNames.indexOf(s.toString)
-                  sentenceScoreValues(index)
-                })
-
+              if (computeSummaryScore) {
+                val requiredSentenceScores = summaryScore.requiredSentenceScores.map(s => sentenceScores(s.toString))
                 val requiredSummaryScores = summaryScore.requiredSummaryScores.map(s => {
                   computedSummaryScores.find(_ == s).get
                 })
@@ -185,30 +163,16 @@ object Score {
                 if (alwaysRecompute)
                   scoresToCompute
                 else
-                  scoresToCompute.filter(s => !sentenceScoreNames.contains(s.toString))
+                  scoresToCompute.filter(s => !sentenceScores.contains(s.toString))
               }
 
               if (sentenceScoresToCompute.nonEmpty) {
-                val scoreNames = sentenceScoresToCompute.map(_.toString)
-                scoreNames.foreach(name => {
-                  val index = sentenceScoreNames.indexOf(name)
-                  if (index >= 0) {
-                    sentenceScoreNames = sentenceScoreNames.take(index) ++ sentenceScoreNames.drop(index + 1)
-                    sentenceScoreValues = sentenceScoreValues.take(index) ++ sentenceScoreValues.drop(index + 1)
-                  }
-                })
-
-                val indexOffset = sentenceScoreValues.size
-
-                sentenceScoreNames ++= scoreNames
-                sentenceScoreValues ++= sentenceScoresToCompute.map(_ => mutable.ArrayBuffer.empty[Float])
+                // Remove the previously computed values for the scores that need to be computed now.
+                sentenceScores ++= sentenceScoresToCompute.map(_.toString)
+                    .zip(sentenceScoresToCompute.map(_ => mutable.ArrayBuffer.empty[Float]))
 
                 val scoresWithRequirements = sentenceScoresToCompute.map(score => {
-                  val requiredSentenceScores = score.requiredSentenceScores.map(s => {
-                    val index = sentenceScoreNames.indexOf(s.toString)
-                    sentenceScoreValues(index)
-                  })
-
+                  val requiredSentenceScores = score.requiredSentenceScores.map(s => sentenceScores(s.toString))
                   val requiredSummaryScores = score.requiredSummaryScores.map(s => {
                     computedSummaryScores.find(_ == s).get
                   })
@@ -218,20 +182,24 @@ object Score {
 
                 // Compute the new scores for all sentences.
                 newReader(file).lines().toAutoClosedIterator.zipWithIndex.foreach(sentence => {
-                  scoresWithRequirements.zipWithIndex.map(score => {
+                  scoresWithRequirements.zipWithIndex.foreach(score => {
                     val sentenceScore = score._1._1.processSentence(
                       language = language,
                       sentence = sentence._1,
                       requiredValues = score._1._2.map(_.apply(sentence._2)),
                       requiredSummaries = score._1._3)
-                    sentenceScoreValues(indexOffset + score._2) += sentenceScore.asInstanceOf[Float]
+                    sentenceScores(score._1._1.toString) :+= sentenceScore.asInstanceOf[Float]
                   })
                 })
 
-                writeScoreNames(scoreNamesFile, sentenceScoreNames)
-                writeScoreValues(scoreValuesFile, sentenceScoreValues)
-
-                logger.info(s"Updated score names file '$scoreNamesFile' and score values file '$scoreValuesFile'.")
+                sentenceScoresToCompute.foreach(score => {
+                  val file = sentenceScoresDir / s"$baseFilename.$score.score"
+                  val writer = newWriter(file)
+                  sentenceScores(score.toString).foreach(v => writer.write(s"$v\n"))
+                  writer.flush()
+                  writer.close()
+                  logger.info(s"Wrote sentence scores file '$file'.")
+                })
               }
             }
           })
@@ -241,61 +209,21 @@ object Score {
       if (computingSummaryScore) {
         val summaryScore = scoresToCompute.head.asInstanceOf[SummaryScore]
 
-        summaryScoreFile.foreach(file => {
-          if (computeSummaryScore.get) {
-            // Save state to file, if necessary.
-            if (!file.exists)
-              file.parent.createDirectories()
-            summaryScore.saveStateToFile(file)
-          } else {
-            // Load state from file.
-            summaryScore.loadStateFromFile(file)
-            summaryScore.setDatasetsHashFromFile(file)
-          }
-        })
+        if (computeSummaryScore) {
+          // Save state to file, if necessary.
+          if (!summaryScoreFile.exists)
+            summaryScoreFile.parent.createDirectories()
+          summaryScore.saveStateToFile(summaryScoreFile)
+          logger.info(s"Wrote summary scores file '$summaryScoreFile'.")
+        } else {
+          // Load state from file.
+          summaryScore.loadStateFromFile(summaryScoreFile)
+        }
 
         computedSummaryScores += summaryScore
       }
 
       scores = scores.drop(scoresToCompute.size)
     }
-  }
-
-  private def writeScoreNames(
-      file: File,
-      names: Seq[String],
-      binaryFormat: Boolean = false
-  ): Unit = {
-    val writer = newWriter(file)
-    writer.write(names.mkString("\t"))
-    writer.flush()
-    writer.close()
-  }
-
-  private def readScoreNames(
-      file: File,
-      binaryFormat: Boolean = false
-  ): Seq[String] = {
-    newReader(file).lines().toAutoClosedIterator.next().split('\t')
-  }
-
-  private def writeScoreValues(
-      file: File,
-      values: Seq[Seq[Float]],
-      binaryFormat: Boolean = false
-  ): Unit = {
-    val writer = newWriter(file)
-    values.transpose.foreach(v => writer.write(s"${v.mkString("\t")}\n"))
-    writer.flush()
-    writer.close()
-  }
-
-  private def readScoreValues(
-      file: File,
-      binaryFormat: Boolean = false
-  ): Seq[Seq[Float]] = {
-    newReader(file).lines().toAutoClosedIterator.map(line => {
-      line.split('\t').map(_.toFloat)
-    }).toSeq.transpose
   }
 }

@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.config.TrainingConfig
 import org.platanios.symphony.mt.data._
+import org.platanios.symphony.mt.data.processors.TFRecordsConverter
 import org.platanios.symphony.mt.models.curriculum.Curriculum
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
@@ -74,17 +75,21 @@ object Inputs {
     }
 
     val languageIds = languages.map(_._1).zipWithIndex.toMap
-    val files = dataset.files(srcLanguage).map(_.path.toAbsolutePath.toString()): Tensor[String]
-    val numFiles = files.size
+    val files = dataset.files(srcLanguage).map(file => {
+      if (useTFRecords)
+        TFRecordsConverter.process(file, srcLanguage)
+      else
+        file
+    }).map(_.path.toAbsolutePath.toString()): Tensor[String]
 
     tf.data.datasetFromTensorSlices(files)
         .map(
           function = d => (tf.constant(languageIds(srcLanguage)), tf.constant(languageIds(tgtLanguage)), d),
           name = "AddLanguageIDs")
-        .shuffle(numFiles)
+        .shuffle(files.size)
         .interleave(
           function = d => createSingleInputDataset(d._1, d._2, d._3),
-          cycleLength = numFiles,
+          cycleLength = files.size,
           name = "Interleave")
   }
 
@@ -122,8 +127,8 @@ object Inputs {
       val filesDataset = filteredDatasets
           .map {
             case ((srcLanguage, tgtLanguage), parallelDatasets) =>
-              val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage))
-              val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage))
+              val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage)).map(f => TFRecordsConverter.process(f, srcLanguage))
+              val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage)).map(f => TFRecordsConverter.process(f, tgtLanguage))
               val srcLanguageDataset = tf.data.datasetFromTensors(languageIds(srcLanguage): Tensor[Int])
               val tgtLanguageDataset = tf.data.datasetFromTensors(languageIds(tgtLanguage): Tensor[Int])
               val srcFilesDataset = tf.data.datasetFromTensors(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor[String])
