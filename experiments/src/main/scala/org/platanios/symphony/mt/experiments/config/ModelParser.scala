@@ -22,6 +22,7 @@ import org.platanios.symphony.mt.data.loaders._
 import org.platanios.symphony.mt.experiments.{Experiment, Metric}
 import org.platanios.symphony.mt.models.Model
 import org.platanios.symphony.mt.models.Transformation.{Decoder, Encoder}
+import org.platanios.symphony.mt.models.decoders.{OutputLayer, ProjectionToWordEmbeddings, ProjectionToWords}
 import org.platanios.symphony.mt.models.parameters.{PairwiseManager, ParameterManager}
 import org.platanios.symphony.mt.models.pivoting.{NoPivot, Pivot, SinglePivot}
 import org.platanios.symphony.mt.models.rnn.attention.{BahdanauRNNAttention, LuongRNNAttention}
@@ -250,7 +251,8 @@ object ModelParser {
             attention = new LuongRNNAttention(
               scaled = true,
               probabilityFn = (o: Output[T]) => tf.softmax(o)),
-            outputAttention = true
+            outputAttention = true,
+            outputLayer = outputLayerFromConfig(decoderConfig)
           ).asInstanceOf[Decoder[Any]]
         } else {
           new UnidirectionalRNNDecoder(
@@ -258,7 +260,8 @@ object ModelParser {
             numUnits = numUnits,
             numLayers = numLayers,
             residual = residual,
-            dropout = dropout
+            dropout = dropout,
+            outputLayer = outputLayerFromConfig(decoderConfig)
           ).asInstanceOf[Decoder[Any]]
         }
       case "gnmt" =>
@@ -283,7 +286,8 @@ object ModelParser {
             normalized = true,
             probabilityFn = (o: Output[T]) => tf.softmax(o)),
           dropout = dropout,
-          useNewAttention = useNewAttention
+          useNewAttention = useNewAttention,
+          outputLayer = outputLayerFromConfig(decoderConfig)
         ).asInstanceOf[Decoder[Any]]
       case "transformer" =>
         new TransformerDecoder[T](
@@ -303,7 +307,8 @@ object ModelParser {
             decoderConfig.get[Float]("feed-forward-relu-dropout"),
             Set.empty, "FeedForward"),
           removeFirstLayerResidualConnection = decoderConfig.get[Boolean]("remove-first-layer-residual-connection", false),
-          useEncoderDecoderAttentionCache = decoderConfig.get[Boolean]("use-encoder-decoder-attention-cache", default = true)
+          useEncoderDecoderAttentionCache = decoderConfig.get[Boolean]("use-encoder-decoder-attention-cache", default = true),
+          outputLayer = outputLayerFromConfig(decoderConfig)
         ).asInstanceOf[Decoder[Any]]
       case _ => throw new IllegalArgumentException(s"'$decoderType' does not represent a valid decoder type.")
     }
@@ -341,6 +346,16 @@ object ModelParser {
     parameterManager match {
       case _: PairwiseManager => SinglePivot(Language.English, languagePairs)
       case _ => NoPivot
+    }
+  }
+
+  @throws[IllegalArgumentException]
+  private def outputLayerFromConfig(decoderConfig: Config): OutputLayer = {
+    val outputLayer = decoderConfig.get[String]("output-layer")
+    outputLayer match {
+      case "projection-to-words" => ProjectionToWords
+      case "projection-to-word-embeddings" => ProjectionToWordEmbeddings
+      case _ => throw new IllegalArgumentException(s"'$outputLayer' does not represent a valid output layer.")
     }
   }
 }

@@ -122,12 +122,10 @@ class ParameterManager protected (
 
   def wordEmbeddings(
       languageId: Output[Int]
-  )(implicit context: ModelConstructionContext): Output[Int] => Output[Float] = {
-    keys: Output[Int] => {
-      tf.variableScope("ParameterManager/WordEmbeddings") {
-        val graph = currentGraph
-        wordEmbeddingsType.embeddingLookup(wordEmbeddings(graph), languageIds(graph), languageId, keys)
-      }
+  )(implicit context: ModelConstructionContext): Output[Float] = {
+    tf.variableScope("ParameterManager/WordEmbeddings") {
+      val graph = currentGraph
+      wordEmbeddingsType.embeddingsTable(wordEmbeddings(graph), languageIds(graph), languageId)
     }
   }
 

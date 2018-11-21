@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.models._
+import org.platanios.symphony.mt.models.decoders.{OutputLayer, ProjectionToWords}
 import org.platanios.symphony.mt.models.rnn.Utilities._
 import org.platanios.symphony.mt.models.rnn.attention.RNNAttention
 import org.platanios.tensorflow.api._
@@ -33,10 +34,11 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: OutputStructure, S
     val numLayers: Int,
     val residual: Boolean = false,
     val dropout: Float = 0.0f,
-    val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None
+    val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
+    override val outputLayer: OutputLayer = ProjectionToWords
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape]
-) extends RNNDecoder[T, State, Seq[State], Seq[StateShape]] {
+) extends RNNDecoder[T, State, Seq[State], Seq[StateShape]](outputLayer) {
   override protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]]
@@ -65,11 +67,12 @@ class UnidirectionalRNNDecoderWithAttention[T: TF : IsNotQuantized, State: Outpu
     val residual: Boolean = false,
     val dropout: Float = 0.0f,
     val residualFn: Option[(Output[T], Output[T]) => Output[T]] = None,
-    val outputAttention: Boolean = true
+    val outputAttention: Boolean = true,
+    override val outputLayer: OutputLayer = ProjectionToWords
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape],
     evOutputToShapeAttentionState: OutputToShape.Aux[AttentionState, AttentionStateShape]
-) extends RNNDecoder[T, State, AttentionWrapperState[T, Seq[State], AttentionState], (Seq[StateShape], Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]])] {
+) extends RNNDecoder[T, State, AttentionWrapperState[T, Seq[State], AttentionState], (Seq[StateShape], Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]])](outputLayer) {
   override protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]]

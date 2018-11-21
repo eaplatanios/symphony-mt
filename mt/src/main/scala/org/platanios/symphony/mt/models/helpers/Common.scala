@@ -205,6 +205,36 @@ object Common {
     }
   }
 
+  //region Math
+
+  def matrixMultiply[T: TF : IsNotQuantized](x: Output[T], y: Output[T], transposeY: Boolean = false): Output[T] = {
+    if (x.rank == 3) {
+      val reshapedLogits = tf.reshape(x, Shape(-1, x.shape(-1)))
+      val product = tf.matmul(reshapedLogits, y, transposeB = transposeY)
+      if (x.shape(1) == -1 || y.shape(1) == -1) {
+        if (transposeY) {
+          tf.reshape(
+            product,
+            tf.concatenate(Seq(
+              tf.shape(x).slice(0 :: -1),
+              tf.shape(y).slice(0, NewAxis)), axis = 0))
+        } else {
+          tf.reshape(
+            product,
+            tf.concatenate(Seq(
+              tf.shape(x).slice(0 :: -1),
+              tf.shape(y).slice(1, NewAxis)), axis = 0))
+        }
+      } else {
+        tf.reshape(product, x.shape(0 :: -1) + y.shape(1))
+      }
+    } else {
+      tf.matmul(x, y, transposeB = transposeY)
+    }
+  }
+
+  //endregion Math
+
   //region Weight Functions
 
   /** Assigns weight `1` to all labels.

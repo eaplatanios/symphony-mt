@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.transformer
 
 import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
-import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder}
+import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder, OutputLayer, ProjectionToWords}
 import org.platanios.symphony.mt.models.transformer.helpers.Attention.MultiHeadAttentionCache
 import org.platanios.symphony.mt.models.transformer.helpers._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -43,7 +43,8 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val attentionNumHeads: Int = 8,
     val selfAttention: Attention = DotProductAttention(0.1f, Set.empty, "DotProductAttention"),
     val feedForwardLayer: FeedForwardLayer = DenseReLUDenseFeedForwardLayer(256, 128, 0.1f, Set.empty, "FeedForward"),
-    val useEncoderDecoderAttentionCache: Boolean = true
+    val useEncoderDecoderAttentionCache: Boolean = true,
+    val outputLayer: OutputLayer = ProjectionToWords
 ) extends Decoder[EncodedSequences[T]] {
   override def applyTrain(
       encodedSequences: EncodedSequences[T]
@@ -77,9 +78,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 
     // Obtain the output projection layer weights.
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
-    val outputWeights = context.parameterManager.getProjectionToWords(
-      wordEmbeddingsSize, context.tgtLanguageID).castTo[T]
-    val outputLayer = this.outputLayer(outputWeights)(_)
+    val outputLayer = this.outputLayer(wordEmbeddingsSize)
 
     // Pre-compute the encoder-decoder attention keys and values.
     val encoderDecoderAttentionCache = (0 until numLayers).map(layer => {
@@ -198,10 +197,6 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val tgtBosID = tf.constant[Int](Vocabulary.BEGIN_OF_SEQUENCE_TOKEN_ID)
     val tgtEosID = tf.constant[Int](Vocabulary.END_OF_SEQUENCE_TOKEN_ID)
 
-    // Obtain the output projection layer weights.
-    val outputWeights = context.parameterManager.getProjectionToWords(
-      wordEmbeddingsSize, context.tgtLanguageID).castTo[T]
-
     // Initialize the cache and the decoder RNN state.
     val embeddings = (ids: Output[Int]) => this.embeddings(ids)
     val batchSize = tf.shape(encodedSequences.lengths).slice(0)
@@ -224,7 +219,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
         val decoder = BeamSearchDecoder(
           cell, initialState, embeddings, tf.fill[Int, Int](batchSize.expandDims(0))(tgtBosID),
           tgtEosID, context.inferenceConfig.beamWidth, context.inferenceConfig.lengthPenalty,
-          outputLayer(outputWeights))
+          outputLayer(wordEmbeddingsSize))
         val tuple = decoder.decode(
           outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
@@ -236,7 +231,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
           embeddingFn = embeddings,
           beginTokens = tf.fill[Int, Int](batchSize.expandDims(0))(tgtBosID),
           endToken = tgtEosID)
-        val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer(outputWeights))
+        val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer(wordEmbeddingsSize))
         val tuple = decoder.decode(
           outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
@@ -253,21 +248,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       ids: Output[Int]
   )(implicit context: ModelConstructionContext): Output[T] = {
     val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
-    embeddingsTable(ids).castTo[T]
-  }
-
-  protected def outputLayer(outputWeights: Output[T])(logits: Output[T]): Output[T] = {
-    val reshapedLogits = tf.reshape(logits, Shape(-1, logits.shape(-1)))
-    val product = tf.matmul(reshapedLogits, outputWeights)
-    if (logits.shape(1) == -1 || outputWeights.shape(1) == -1) {
-      tf.reshape(
-        product,
-        tf.concatenate(Seq(
-          tf.shape(logits).slice(0 :: -1),
-          tf.shape(outputWeights).slice(1, NewAxis)), axis = 0))
-    } else {
-      tf.reshape(product, logits.shape(0 :: -1) + outputWeights.shape(1))
-    }
+    embeddingsTable.gather(ids).castTo[T]
   }
 
   protected def decode(

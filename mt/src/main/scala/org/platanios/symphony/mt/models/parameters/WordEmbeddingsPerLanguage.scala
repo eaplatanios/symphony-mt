@@ -60,11 +60,10 @@ case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddings
     lookupTable.gather(languageId)
   }
 
-  override def embeddingLookup(
+  override def embeddingsTable(
       embeddingTables: Seq[Output[Float]],
       languageIds: Seq[Output[Int]],
-      languageId: Output[Int],
-      keys: Output[Int]
+      languageId: Output[Int]
   )(implicit context: ModelConstructionContext): Output[Float] = {
     val predicates = embeddingTables.zip(languageIds).map {
       case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
@@ -77,7 +76,7 @@ case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddings
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
       tf.identity(embeddingTables.head)
     }
-    tf.cases(predicates, default).gather(keys)
+    tf.cases(predicates, default)
   }
 
   override def projectionToWords(

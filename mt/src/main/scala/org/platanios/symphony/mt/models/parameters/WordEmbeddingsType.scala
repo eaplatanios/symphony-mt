@@ -49,11 +49,10 @@ trait WordEmbeddingsType {
       languageId: Output[Int]
   ): Output[Resource]
 
-  def embeddingLookup(
+  def embeddingsTable(
       embeddingTables: T,
       languageIds: Seq[Output[Int]],
-      languageId: Output[Int],
-      keys: Output[Int]
+      languageId: Output[Int]
   )(implicit context: ModelConstructionContext): Output[Float]
 
   def projectionToWords(

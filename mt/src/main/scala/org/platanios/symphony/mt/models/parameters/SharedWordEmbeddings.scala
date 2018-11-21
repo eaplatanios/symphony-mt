@@ -59,13 +59,12 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
     lookupTable
   }
 
-  override def embeddingLookup(
+  override def embeddingsTable(
       embeddingTables: Output[Float],
       languageIds: Seq[Output[Int]],
-      languageId: Output[Int],
-      keys: Output[Int]
+      languageId: Output[Int]
   )(implicit context: ModelConstructionContext): Output[Float] = {
-    embeddingTables.gather(keys)
+    embeddingTables
   }
 
   override def projectionToWords(

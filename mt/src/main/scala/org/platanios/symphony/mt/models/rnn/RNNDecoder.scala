@@ -17,7 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
-import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder}
+import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder, OutputLayer}
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}
@@ -26,7 +26,9 @@ import org.platanios.tensorflow.api.tf.RNNCell
 /**
   * @author Emmanouil Antonios Platanios
   */
-abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructure, DecStateShape](implicit
+abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructure, DecStateShape](
+    val outputLayer: OutputLayer
+)(implicit
     protected val evOutputToShapeDecState: OutputToShape.Aux[DecState, DecStateShape]
 ) extends Decoder[EncodedSequences[T, State]] {
   override def applyTrain(
@@ -46,8 +48,6 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
 
     // Obtain the output projection layer.
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
-    val outputWeights = context.parameterManager.getProjectionToWords(
-      wordEmbeddingsSize, context.tgtLanguageID).castTo[T]
 
     // Embed the target sequences.
     val embeddedTgtSequences = embeddings(shiftedTgtSequences)
@@ -57,7 +57,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
       input = embeddedTgtSequences,
       sequenceLengths = shiftedTgtSequenceLengths,
       timeMajor = false)
-    val decoder = BasicDecoder(cell, initialState, helper, outputLayer(outputWeights))
+    val decoder = BasicDecoder(cell, initialState, helper, outputLayer[T](wordEmbeddingsSize))
     val tuple = decoder.decode(
       outputTimeMajor = false,
       parallelIterations = context.env.parallelIterations,
@@ -86,14 +86,12 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     // Create the decoder RNN.
     val batchSize = tf.shape(encodedSequences.lengths).slice(0).expandDims(0)
     val embeddings = (ids: Output[Int]) => this.embeddings(ids)
-    val outputWeights = context.parameterManager.getProjectionToWords(
-      cell.outputShape.apply(-1), context.tgtLanguageID).castTo[T]
     val output = {
       if (context.inferenceConfig.beamWidth > 1) {
         val decoder = BeamSearchDecoder(
           cell, initialState, embeddings, tf.fill[Int, Int](batchSize)(tgtBosID),
           tgtEosID, context.inferenceConfig.beamWidth, context.inferenceConfig.lengthPenalty,
-          outputLayer(outputWeights))
+          outputLayer[T](cell.outputShape.apply(-1)))
         val tuple = decoder.decode(
           outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
@@ -105,7 +103,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
           embeddingFn = embeddings,
           beginTokens = tf.fill[Int, Int](batchSize)(tgtBosID),
           endToken = tgtEosID)
-        val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer(outputWeights))
+        val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer[T](cell.outputShape.apply(-1)))
         val tuple = decoder.decode(
           outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
@@ -130,25 +128,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
       ids: Output[Int]
   )(implicit context: ModelConstructionContext): Output[T] = {
     val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
-    embeddingsTable(ids).castTo[T]
-  }
-
-  protected def outputLayer(outputWeights: Output[T])(logits: Output[T]): Output[T] = {
-    if (logits.rank == 3) {
-      val reshapedLogits = tf.reshape(logits, Shape(-1, logits.shape(-1)))
-      val product = tf.matmul(reshapedLogits, outputWeights)
-      if (logits.shape(1) == -1 || outputWeights.shape(1) == -1) {
-        tf.reshape(
-          product,
-          tf.concatenate(Seq(
-            tf.shape(logits).slice(0 :: -1),
-            tf.shape(outputWeights).slice(1, NewAxis)), axis = 0))
-      } else {
-        tf.reshape(product, logits.shape(0 :: -1) + outputWeights.shape(1))
-      }
-    } else {
-      tf.matmul(logits, outputWeights)
-    }
+    embeddingsTable.gather(ids).castTo[T]
   }
 
   protected def cellAndInitialState(
