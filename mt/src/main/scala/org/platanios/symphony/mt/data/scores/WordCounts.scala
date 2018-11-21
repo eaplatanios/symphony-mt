@@ -35,7 +35,10 @@ class WordCounts(val caseSensitive: Boolean = false) extends SummaryScore {
   }
 
   override def name: String = {
-    "word-counts"
+    if (caseSensitive)
+      "case-sensitive-word-counts"
+    else
+      "word-counts"
   }
 
   override def processSentence(
@@ -85,6 +88,14 @@ class WordCounts(val caseSensitive: Boolean = false) extends SummaryScore {
         }
       }
     })
+  }
+
+  def count(language: Language, word: String): Long = {
+    counters(language)(word)
+  }
+
+  def totalCount(language: Language): Long = {
+    counters(language).totalCount
   }
 }
 

@@ -18,7 +18,7 @@ package org.platanios.symphony.mt.experiments.config
 import org.platanios.symphony.mt.Language
 import org.platanios.symphony.mt.config.TrainingConfig
 import org.platanios.symphony.mt.data.{DataConfig, FileParallelDataset}
-import org.platanios.symphony.mt.data.scores.SentenceLength
+import org.platanios.symphony.mt.data.scores.{SentenceLength, SentenceRarity, SentenceScore, WordCounts}
 import org.platanios.symphony.mt.experiments.Experiment
 import org.platanios.symphony.mt.models.SentencePairsWithScores
 import org.platanios.symphony.mt.models.curriculum.{DifficultyBasedCurriculum, SentencePairCurriculum}
@@ -104,12 +104,8 @@ class TrainingConfigParser(
     curriculumConfig.get[String]("type") match {
       case "difficulty" =>
         val competency = parseCompetency(curriculumConfig.get[Config]("competency"))
-        val score = curriculumConfig.get[String]("score") match {
-          case "length" => SentenceLength
-          case difficulty =>
-            throw new IllegalArgumentException(s"'$difficulty' does not represent a valid difficulty type.")
-        }
-        val scoreSelectorString = curriculumConfig.get[String]("score-selector")
+        val score = parseScore(curriculumConfig.get[Config]("score"))
+        val scoreSelectorString = curriculumConfig.get[String]("score.selector")
         val scoreSelector = scoreSelectorString match {
           case "source-sentence" => SourceSentenceScore
           case "target-sentence" => TargetSentenceScore
@@ -137,6 +133,27 @@ class TrainingConfigParser(
         new ExponentialStepCompetency[Float](initialValue, numStepsToFullCompetency, power)
       case competencyType =>
         throw new IllegalArgumentException(s"'$competencyType' does not represent a valid competency type.")
+    }
+  }
+
+  @throws[IllegalArgumentException]
+  private def parseScore(scoreConfig: Config): SentenceScore = {
+    scoreConfig.get[String]("type") match {
+      case "length" => SentenceLength
+      case "sentence-rarity" =>
+        val wordFrequenciesPooling = scoreConfig.get[String]("pooling") match {
+          case "min" => SentenceRarity.MinPooling
+          case "max" => SentenceRarity.MaxPooling
+          case "mean" => SentenceRarity.MeanPooling
+          case "product" => SentenceRarity.ProductPooling
+          case pooling =>
+            throw new IllegalArgumentException(s"'$pooling' does not represent a valid word frequencies pooling method.")
+        }
+        val caseSensitive = scoreConfig.get[Boolean]("case-sensitive", false)
+        val wordCounts = WordCounts(caseSensitive = caseSensitive)
+        SentenceRarity(wordFrequenciesPooling, wordCounts)
+      case scoreType =>
+        throw new IllegalArgumentException(s"'$scoreType' does not represent a valid score type.")
     }
   }
 

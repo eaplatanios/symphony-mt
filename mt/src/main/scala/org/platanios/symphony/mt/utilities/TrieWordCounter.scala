@@ -26,7 +26,12 @@ import scala.collection.mutable
 case class TrieWordCounter() {
   protected val rootNode: TrieWordCounter.TrieNode = TrieWordCounter.TrieNode()
 
+  protected var _totalCount: Long = {
+    0L
+  }
+
   def insertWord(word: String): Long = {
+    _totalCount += 1
     var currentNode = rootNode
     for (char <- word)
       currentNode = currentNode.child(char)
@@ -34,10 +39,22 @@ case class TrieWordCounter() {
   }
 
   def insertWordWithCount(word: String, count: Long): Unit = {
+    _totalCount += count
     var currentNode = rootNode
     for (char <- word)
       currentNode = currentNode.child(char)
     currentNode.setCount(count)
+  }
+
+  def apply(word: String): Long = {
+    var currentNode = rootNode
+    for (char <- word)
+      currentNode = currentNode.child(char)
+    currentNode.count
+  }
+
+  def totalCount: Long = {
+    _totalCount
   }
 
   def words(sizeThreshold: Int = -1, countThreshold: Int = -1): Iterable[(Long, String)] = {
