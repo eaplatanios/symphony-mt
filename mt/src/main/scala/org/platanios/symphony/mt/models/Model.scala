@@ -129,7 +129,8 @@ class Model[Code](
             optimizer = trainingConfig.optimization.optimizer,
             colocateGradientsWithOps = trainingConfig.optimization.colocateGradientsWithOps)
       }
-      val summariesDir = env.workingDir.resolve("summaries")
+
+      val summaryDir = trainingConfig.summaryDir.resolve(name)
 
       // Create estimator hooks.
       var hooks = Set[tf.learn.Hook]()
@@ -151,7 +152,7 @@ class Model[Code](
           val evalDatasets = Inputs.createEvalDatasets(
             env, dataConfig, trainingConfig, datasets, languages, languagePairs)
           hooks += tf.learn.Evaluator(
-            log = true, summariesDir, evalDatasets, evaluationConfig.metrics, StepHookTrigger(
+            log = true, summaryDir, evalDatasets, evaluationConfig.metrics, StepHookTrigger(
               numSteps = evaluationConfig.frequency,
               startStep = evaluationConfig.frequency),
             triggerAtEnd = true, numDecimalPoints = 6, name = "Evaluation")
@@ -161,18 +162,18 @@ class Model[Code](
       // Add summaries/checkpoints hooks.
       val checkpointSteps = math.min(trainingConfig.checkpointSteps, evaluationConfig.frequency)
       hooks ++= Set(
-        tf.learn.StepRateLogger(log = false, summaryDir = summariesDir, trigger = StepHookTrigger(100)),
-        tf.learn.SummarySaver(summariesDir, StepHookTrigger(trainingConfig.summarySteps)),
+        tf.learn.StepRateLogger(log = false, summaryDir = summaryDir, trigger = StepHookTrigger(100)),
+        tf.learn.SummarySaver(summaryDir, StepHookTrigger(trainingConfig.summarySteps)),
         tf.learn.CheckpointSaver(env.workingDir, StepHookTrigger(checkpointSteps)))
 
       env.traceSteps.foreach(numSteps =>
         hooks += tf.learn.TimelineHook(
-          summariesDir, showDataFlow = true, showMemory = true, trigger = StepHookTrigger(numSteps)))
+          summaryDir, showDataFlow = true, showMemory = true, trigger = StepHookTrigger(numSteps)))
 
       // Add TensorBoard hook.
       if (trainingConfig.logging.launchTensorBoard) {
         hooks += tf.learn.TensorBoardHook(tf.learn.TensorBoardConfig(
-          summariesDir,
+          summaryDir.getParent,
           host = trainingConfig.logging.tensorBoardConfig._1,
           port = trainingConfig.logging.tensorBoardConfig._2))
       }

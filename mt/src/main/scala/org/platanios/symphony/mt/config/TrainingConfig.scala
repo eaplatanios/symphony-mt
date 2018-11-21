@@ -20,6 +20,8 @@ import org.platanios.symphony.mt.models.SentencePairsWithScores
 import org.platanios.symphony.mt.models.curriculum.DifficultyBasedCurriculum
 import org.platanios.tensorflow.api.ops.training.optimizers.{GradientDescent, Optimizer}
 
+import java.nio.file.Path
+
 /**
   * @author Emmanouil Antonios Platanios
   */
@@ -30,6 +32,7 @@ case class TrainingConfig(
     labelSmoothing: Float,
     numSteps: Int,
     summarySteps: Int,
+    summaryDir: Path,
     checkpointSteps: Int,
     optimization: TrainingConfig.OptimizationConfig,
     logging: TrainingConfig.LoggingConfig,

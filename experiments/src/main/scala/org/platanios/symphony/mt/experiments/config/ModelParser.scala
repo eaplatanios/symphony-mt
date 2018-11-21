@@ -45,11 +45,10 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
     languages: => Seq[(Language, Vocabulary)],
     environment: => Environment,
     parameterManager: => ParameterManager,
-    dataConfig: => DataConfig,
-    name: String
+    dataConfig: => DataConfig
 ) extends ConfigParser[Model[_]] {
   protected val trainingConfigParser: TrainingConfigParser = {
-    new TrainingConfigParser(datasets, dataConfig)
+    new TrainingConfigParser(dataset, datasets, dataConfig)
   }
 
   @throws[IllegalArgumentException]
@@ -79,7 +78,7 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
     val encoder = ModelParser.encoderFromConfig[T](config.get[Config]("model.encoder"))
     val decoder = ModelParser.decoderFromConfig[T](config.get[Config]("model.decoder"))
     new Model(
-      name = name,
+      name = config.get[String]("model.name"),
       encoder = encoder,
       decoder = decoder,
       languages = languages,
@@ -102,27 +101,28 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
 
     // TODO: !!! Make this more detailed.
     val stringBuilder = new StringBuilder()
-    stringBuilder.append(s"enc:${encoderConfig.get[String]("type")}")
-    if (encoderConfig.hasPath("num-layers"))
-      stringBuilder.append(s":${encoderConfig.get[Int]("num-layers")}")
-    if (encoderConfig.hasPath("residual") && encoderConfig.get[Boolean]("residual"))
-      stringBuilder.append(":r")
-    if (encoderConfig.get[Boolean]("remove-first-layer-residual-connection", false))
-      stringBuilder.append(":no-first-residual")
-    stringBuilder.append(s".dec:${decoderConfig.get[String]("type")}")
-    if (decoderConfig.hasPath("num-layers"))
-      stringBuilder.append(s":${decoderConfig.get[Int]("num-layers")}")
-    if (decoderConfig.hasPath("residual") && decoderConfig.get[Boolean]("residual"))
-      stringBuilder.append(":r")
-    if (decoderConfig.hasPath("use-attention") && decoderConfig.get[Boolean]("use-attention"))
-      stringBuilder.append(":a")
-    if (decoderConfig.get[Boolean]("remove-first-layer-residual-connection", false))
-      stringBuilder.append(":no-first-residual")
-    decoderConfig.get[String]("output-layer") match {
-      case "projection-to-words" => stringBuilder.append(":pw")
-      case "projection-to-word-embeddings" => stringBuilder.append(":pwe")
-      case _ => ()
-    }
+    stringBuilder.append(config.get[String]("model.name"))
+    //    stringBuilder.append(s".enc:${encoderConfig.get[String]("type")}")
+    //    if (encoderConfig.hasPath("num-layers"))
+    //      stringBuilder.append(s":${encoderConfig.get[Int]("num-layers")}")
+    //    if (encoderConfig.hasPath("residual") && encoderConfig.get[Boolean]("residual"))
+    //      stringBuilder.append(":r")
+    //    if (encoderConfig.get[Boolean]("remove-first-layer-residual-connection", false))
+    //      stringBuilder.append(":no-first-residual")
+    //    stringBuilder.append(s".dec:${decoderConfig.get[String]("type")}")
+    //    if (decoderConfig.hasPath("num-layers"))
+    //      stringBuilder.append(s":${decoderConfig.get[Int]("num-layers")}")
+    //    if (decoderConfig.hasPath("residual") && decoderConfig.get[Boolean]("residual"))
+    //      stringBuilder.append(":r")
+    //    if (decoderConfig.hasPath("use-attention") && decoderConfig.get[Boolean]("use-attention"))
+    //      stringBuilder.append(":a")
+    //    if (decoderConfig.get[Boolean]("remove-first-layer-residual-connection", false))
+    //      stringBuilder.append(":no-first-residual")
+    //    decoderConfig.get[String]("output-layer") match {
+    //      case "projection-to-words" => stringBuilder.append(":pw")
+    //      case "projection-to-word-embeddings" => stringBuilder.append(":pwe")
+    //      case _ => ()
+    //    }
     stringBuilder.append(s".${trainingConfigParser.tag(config.get[Config]("training"), parsedValue.trainingConfig).get}")
 
     Some(stringBuilder.toString)

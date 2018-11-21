@@ -28,10 +28,13 @@ import org.platanios.tensorflow.api._
 
 import com.typesafe.config.Config
 
+import java.nio.file.Paths
+
 /**
   * @author Emmanouil Antonios Platanios
   */
 class TrainingConfigParser(
+    dataset: String,
     datasets: => Seq[FileParallelDataset],
     dataConfig: => DataConfig
 ) extends ConfigParser[TrainingConfig] {
@@ -54,6 +57,7 @@ class TrainingConfigParser(
       labelSmoothing = config.get[Float]("label-smoothing"),
       numSteps = config.get[Int]("num-steps"),
       summarySteps = config.get[Int]("summary-frequency"),
+      summaryDir = Paths.get(config.get[String]("summary-dir")).resolve(dataset),
       checkpointSteps = config.get[Int]("checkpoint-frequency"),
       optimization = TrainingConfig.OptimizationConfig(
         optimizer = optimizer match {

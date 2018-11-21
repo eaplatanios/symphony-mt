@@ -90,7 +90,7 @@ class Experiment(val configFile: Path) {
   private lazy val modelParser = {
     // TODO: [EXPERIMENTS] Add support for other data types.
     new ModelParser[Float](
-      task, dataset, datasets, languages, environment, parameterManager, dataConfig, "Model")
+      task, dataset, datasets, languages, environment, parameterManager, dataConfig)
   }
 
   lazy val model: Model[_] = {
