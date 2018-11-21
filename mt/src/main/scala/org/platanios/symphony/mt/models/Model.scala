@@ -104,10 +104,7 @@ class Model[Code](
   }
 
   protected val estimator: TranslationEstimator = {
-    tf.createWith(
-      nameScope = name,
-      device = deviceManager.nextDevice(env, moveToNext = false)
-    ) {
+    tf.device(deviceManager.nextDevice(env, moveToNext = false)) {
       val model = trainingConfig.optimization.maxGradNorm match {
         case Some(norm) =>
           tf.learn.Model.supervised(
@@ -322,7 +319,7 @@ class Model[Code](
   }
 
   protected def trainLayer: Layer[(SentencesWithLanguagePair[String], Sentences[String]), SentencesWithLanguage[Float]] = {
-    new Layer[(SentencesWithLanguagePair[String], Sentences[String]), SentencesWithLanguage[Float]](name) {
+    new Layer[(SentencesWithLanguagePair[String], Sentences[String]), SentencesWithLanguage[Float]]("TrainLayer") {
       override val layerType: String = "TrainLayer"
 
       override def forwardWithoutContext(
@@ -370,7 +367,7 @@ class Model[Code](
   }
 
   protected def inferLayer: Layer[SentencesWithLanguagePair[String], SentencesWithLanguage[String]] = {
-    new Layer[SentencesWithLanguagePair[String], SentencesWithLanguage[String]](name) {
+    new Layer[SentencesWithLanguagePair[String], SentencesWithLanguage[String]]("InferLayer") {
       override val layerType: String = "InferLayer"
 
       override def forwardWithoutContext(
@@ -475,7 +472,7 @@ class Model[Code](
   }
 
   protected def lossLayer: Layer[(SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String])), Output[Float]] = {
-    new Layer[(SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String])), Output[Float]](name) {
+    new Layer[(SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String])), Output[Float]]("Loss") {
       override val layerType: String = "Loss"
 
       override def forwardWithoutContext(
