@@ -118,6 +118,7 @@ class ModelParser[T: TF : IsHalfOrFloatOrDouble](
       stringBuilder.append(":a")
     if (decoderConfig.get[Boolean]("remove-first-layer-residual-connection", false))
       stringBuilder.append(":no-first-residual")
+    stringBuilder.append(s":${decoderConfig.get[String]("output-layer")}")
     stringBuilder.append(s".${trainingConfigParser.tag(config.get[Config]("training"), parsedValue.trainingConfig).get}")
 
     Some(stringBuilder.toString)
