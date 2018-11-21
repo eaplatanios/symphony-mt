@@ -93,7 +93,7 @@ object Inputs {
     val languageIds = languages.map(_._1).zipWithIndex.toMap
     val files = dataset.files(srcLanguage).map(file => {
       if (useTFRecords)
-        createTFRecordsFile(file, scoresDir = env.workingDir.resolve("scores"), curriculum = None)
+        createTFRecordsFile(file, env, curriculum = None)
       else
         file
     }).map(_.path.toAbsolutePath.toString()): Tensor[String]
@@ -122,14 +122,13 @@ object Inputs {
       languagePairs: Option[Set[(Language, Language)]] = None
   ): () => tf.data.Dataset[(SentencesWithLanguagePair[String], Sentences[String])] = () => {
     // If there exists a training curriculum, compute any scores it may require.
-    val scoresDir = env.workingDir.resolve("scores")
     trainingConfig.curriculum match {
       case None => ()
       case Some(curriculum) =>
         Score.scoreDatasets(
           datasets,
           curriculum.cdfScore,
-          scoresDir = scoresDir,
+          scoresDir = scoresDir(env),
           alwaysRecompute = false)
     }
 
@@ -156,8 +155,8 @@ object Inputs {
       val filesDataset = filteredDatasets
           .map {
             case ((srcLanguage, tgtLanguage), parallelDatasets) =>
-              val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage)).map(f => createTFRecordsFile(f, scoresDir, trainingConfig.curriculum))
-              val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage)).map(f => createTFRecordsFile(f, scoresDir, trainingConfig.curriculum))
+              val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage)).map(f => createTFRecordsFile(f, env, trainingConfig.curriculum))
+              val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage)).map(f => createTFRecordsFile(f, env, trainingConfig.curriculum))
               val srcLanguageDataset = tf.data.datasetFromTensors(languageIds(srcLanguage): Tensor[Int])
               val tgtLanguageDataset = tf.data.datasetFromTensors(languageIds(tgtLanguage): Tensor[Int])
               val srcFilesDataset = tf.data.datasetFromTensors(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor[String])
@@ -381,14 +380,22 @@ object Inputs {
 
   private def createTFRecordsFile(
       file: File,
-      scoresDir: Path,
+      env: Environment,
       curriculum: Option[DifficultyBasedCurriculum[SentencePairsWithScores[String]]]
   ): File = {
     val logger = Logger(LoggerFactory.getLogger("Models / Inputs / TF Records Converter"))
-    val tfRecordsFile = file.sibling(file.name + ".tfrecords")
+
+    val baseFilename = file.path.toAbsolutePath.normalize.toString.replace('/', '_')
+    val scoresDir = this.scoresDir(env)
+
+    val tfRecordsFile = curriculum match {
+      case None => file.sibling(file.name + ".tfrecords")
+      case Some(_) => File(env.workingDir.resolve("data").resolve(baseFilename + ".tfrecords"))
+    }
+
+    tfRecordsFile.parent.createDirectories()
 
     val scoreFile = curriculum.map(c => {
-      val baseFilename = file.path.toAbsolutePath.normalize.toString.replace('/', '_')
       scoresDir.resolve("sentence_scores").resolve(s"$baseFilename.${c.cdfScore}.score")
     })
 
@@ -448,5 +455,9 @@ object Inputs {
       logger.info(s"Converted file '$file' to TF records file '$tfRecordsFile'.")
     }
     tfRecordsFile
+  }
+
+  private def scoresDir(env: Environment): Path = {
+    env.workingDir.resolve("scores")
   }
 }
