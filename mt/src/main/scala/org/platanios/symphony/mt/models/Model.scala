@@ -319,7 +319,7 @@ class Model[Code](
   }
 
   protected def trainLayer: Layer[(SentencesWithLanguagePair[String], Sentences[String]), SentencesWithLanguage[Float]] = {
-    new Layer[(SentencesWithLanguagePair[String], Sentences[String]), SentencesWithLanguage[Float]]("TrainLayer") {
+    new Layer[(SentencesWithLanguagePair[String], Sentences[String]), SentencesWithLanguage[Float]](name) {
       override val layerType: String = "TrainLayer"
 
       override def forwardWithoutContext(
@@ -367,7 +367,7 @@ class Model[Code](
   }
 
   protected def inferLayer: Layer[SentencesWithLanguagePair[String], SentencesWithLanguage[String]] = {
-    new Layer[SentencesWithLanguagePair[String], SentencesWithLanguage[String]]("InferLayer") {
+    new Layer[SentencesWithLanguagePair[String], SentencesWithLanguage[String]](name) {
       override val layerType: String = "InferLayer"
 
       override def forwardWithoutContext(
@@ -472,7 +472,7 @@ class Model[Code](
   }
 
   protected def lossLayer: Layer[(SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String])), Output[Float]] = {
-    new Layer[(SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String])), Output[Float]]("Loss") {
+    new Layer[(SentencesWithLanguage[Float], (SentencesWithLanguagePair[String], Sentences[String])), Output[Float]](name) {
       override val layerType: String = "Loss"
 
       override def forwardWithoutContext(
