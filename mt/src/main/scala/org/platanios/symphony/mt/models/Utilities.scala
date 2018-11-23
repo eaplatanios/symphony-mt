@@ -20,8 +20,7 @@ package org.platanios.symphony.mt.models
   */
 object Utilities {
   def embedSrcSequences(sequences: Sequences[Int])(implicit context: ModelConstructionContext): Sequences[Float] = {
-    val wordEmbeddings = context.parameterManager.wordEmbeddings(context.srcLanguageID)
-    val embeddedSequences = sequences.copy(sequences = wordEmbeddings.gather(sequences.sequences))
-    context.parameterManager.postprocessEmbeddedSequences(embeddedSequences)
+    val embeddedSequences = context.parameterManager.wordEmbeddings(context.srcLanguageID, sequences.sequences)
+    context.parameterManager.postprocessEmbeddedSequences(sequences.copy(sequences = embeddedSequences))
   }
 }

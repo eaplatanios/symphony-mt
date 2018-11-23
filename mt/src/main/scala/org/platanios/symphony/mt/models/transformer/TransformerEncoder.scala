@@ -50,9 +50,18 @@ class TransformerEncoder[T: TF : IsHalfOrFloatOrDouble](
     val feedForwardLayer: FeedForwardLayer = DenseReLUDenseFeedForwardLayer(256, 128, 0.1f, Set.empty, "FeedForward")
 ) extends Encoder[EncodedSequences[T]] {
   override def apply(sequences: Sequences[Int])(implicit context: ModelConstructionContext): EncodedSequences[T] = {
-    // `embeddedSequences.sequences` has shape [BatchSize, MaxLength, WordEmbeddingSize]
-    // `embeddedSequence.lengths` has shape [BatchSize]
-    val embeddedSequences = embedSrcSequences(sequences)
+    // `embeddedSequences.sequences` has shape [batchSize, maxLength, wordEmbeddingSize]
+    // `embeddedSequence.lengths` has shape [batchSize]
+    val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
+    var embeddedSequences = embedSrcSequences(sequences)
+    if (wordEmbeddingsSize != numUnits) {
+      val projectionWeights = context.parameterManager.get[Float](
+        "ProjectionToEncoderNumUnits", Shape(wordEmbeddingsSize, numUnits))
+      val projectedSequences = Common.matrixMultiply(embeddedSequences.sequences, projectionWeights)
+      // `embeddedSequences.sequences` has shape [batchSize, maxLength, numUnits]
+      embeddedSequences = embeddedSequences.copy(sequences = projectedSequences)
+    }
+
     val embeddedSequencesMaxLength = tf.shape(embeddedSequences.sequences).slice(1)
 
     // Perform some pre-processing to the token embeddings sequence.

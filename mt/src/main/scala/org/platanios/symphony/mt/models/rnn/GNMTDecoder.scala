@@ -29,7 +29,7 @@ import org.platanios.tensorflow.api.ops.rnn.attention.{Attention, AttentionWrapp
   */
 class GNMTDecoder[T: TF : IsNotQuantized, State: OutputStructure, AttentionState: OutputStructure, StateShape, AttentionStateShape](
     val cell: Cell[T, State, StateShape],
-    val numUnits: Int,
+    override val numUnits: Int,
     val numLayers: Int,
     val numResLayers: Int,
     val attention: RNNAttention[T, AttentionState, AttentionStateShape],
@@ -40,7 +40,7 @@ class GNMTDecoder[T: TF : IsNotQuantized, State: OutputStructure, AttentionState
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape],
     evOutputToShapeAttentionState: OutputToShape.Aux[AttentionState, AttentionStateShape]
-) extends RNNDecoder[T, State, (AttentionWrapperState[T, State, AttentionState], Seq[State]), ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]]), Seq[StateShape])](outputLayer) {
+) extends RNNDecoder[T, State, (AttentionWrapperState[T, State, AttentionState], Seq[State]), ((StateShape, Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]]), Seq[StateShape])](numUnits, outputLayer) {
   override protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]]

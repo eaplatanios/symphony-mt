@@ -18,6 +18,7 @@ package org.platanios.symphony.mt.models.transformer
 import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
 import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder, OutputLayer, ProjectionToWords}
+import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.transformer.helpers.Attention.MultiHeadAttentionCache
 import org.platanios.symphony.mt.models.transformer.helpers._
 import org.platanios.symphony.mt.vocabulary.Vocabulary
@@ -28,6 +29,7 @@ import org.platanios.tensorflow.api.tf.{RNNCell, RNNTuple}
   * @author Emmanouil Antonios Platanios
   */
 class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
+    val numUnits: Int,
     val numLayers: Int,
     val useSelfAttentionProximityBias: Boolean = false,
     val positionEmbeddings: PositionEmbeddings = FixedSinusoidPositionEmbeddings(1.0f, 1e4f),
@@ -71,7 +73,15 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     if (context.mode.isTraining)
       decoderInputSequences = tf.dropout(decoderInputSequences, 1.0f - postPositionEmbeddingsDropout)
 
-    val encodedSequencesMaxLength = tf.shape(encodedSequences.states).slice(1)
+    // Project the encoder output, if necessary.
+    var encoderOutput = encodedSequences.states
+    if (numUnits != encoderOutput.shape(-1)) {
+      val projectionWeights = context.parameterManager.get[T](
+        "ProjectionToDecoderNumUnits", Shape(encoderOutput.shape(-1), numUnits))
+      encoderOutput = Common.matrixMultiply(encoderOutput, projectionWeights)
+    }
+
+    val encodedSequencesMaxLength = tf.shape(encoderOutput).slice(1)
     val inputPadding = tf.logicalNot(
       tf.sequenceMask(encodedSequences.lengths, encodedSequencesMaxLength, name = "Padding")).toFloat
     val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding)
@@ -83,7 +93,6 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     // Pre-compute the encoder-decoder attention keys and values.
     val encoderDecoderAttentionCache = (0 until numLayers).map(layer => {
       tf.variableScope(s"Layer$layer/EncoderDecoderAttention/Cache") {
-        val encoderOutput = encodedSequences.states
         val encoderDecoderAttentionKeys = Attention.computeAttentionComponent(
           encoderOutput, attentionKeysDepth, name = "K").toFloat
         val encoderDecoderAttentionValues = Attention.computeAttentionComponent(
@@ -96,7 +105,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
 
     // Finally, apply the decoding model.
     val (decodedSequences, _) = decode(
-      encoderOutput = encodedSequences.states.toFloat,
+      encoderOutput = encoderOutput.toFloat,
       decoderInputSequences = decoderInputSequences,
       decoderSelfAttentionBias = decoderSelfAttentionBias,
       decoderSelfAttentionCache = None,
@@ -110,6 +119,14 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       encodedSequences: EncodedSequences[T]
   )(implicit context: ModelConstructionContext): Sequences[Int] = {
     val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
+
+    // Project the encoder output, if necessary.
+    var encoderOutput = encodedSequences.states
+    if (numUnits != encoderOutput.shape(-1)) {
+      val projectionWeights = context.parameterManager.get[T](
+        "ProjectionToDecoderNumUnits", Shape(encoderOutput.shape(-1), numUnits))
+      encoderOutput = Common.matrixMultiply(encoderOutput, projectionWeights)
+    }
 
     // Determine the maximum allowed sequence length to consider while decoding.
     val maxDecodingLength = {
@@ -127,7 +144,6 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     // Pre-compute the encoder-decoder attention keys and values.
     val encoderDecoderAttentionCache = (0 until numLayers).map(layer => {
       tf.variableScope(s"Layer$layer/EncoderDecoderAttention/Cache") {
-        val encoderOutput = encodedSequences.states
         val encoderDecoderAttentionKeys = Attention.computeAttentionComponent(
           encoderOutput, attentionKeysDepth, name = "K").toFloat
         val encoderDecoderAttentionValues = Attention.computeAttentionComponent(
@@ -147,12 +163,11 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
         Shape,
         ((Shape, Shape), Shape, Seq[(Shape, Shape)], Seq[(Shape, Shape)])] {
       override def outputShape: Shape = {
-        val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
-        Shape(wordEmbeddingsSize)
+        Shape(numUnits)
       }
 
       override def stateShape: ((Shape, Shape), Shape, Seq[(Shape, Shape)], Seq[(Shape, Shape)]) = {
-        ((Shape(-1, wordEmbeddingsSize), Shape()),
+        ((Shape(-1, numUnits), Shape()),
             Shape(),
             (0 until numLayers).map(_ =>
               (Shape(attentionNumHeads, -1, attentionKeysDepth / attentionNumHeads),
@@ -208,7 +223,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
           tf.zeros[Float](tf.stack[Int](Seq(batchSize, zero, attentionValuesDepth))), attentionNumHeads))
     })
     val initialState = (
-        encodedSequences,
+        encodedSequences.copy(states = encoderOutput),
         tf.zeros[Int](batchSize.expandDims(0)),
         decoderSelfAttentionCache,
         encoderDecoderAttentionCache)
@@ -219,7 +234,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
         val decoder = BeamSearchDecoder(
           cell, initialState, embeddings, tf.fill[Int, Int](batchSize.expandDims(0))(tgtBosID),
           tgtEosID, context.inferenceConfig.beamWidth, context.inferenceConfig.lengthPenalty,
-          outputLayer(wordEmbeddingsSize))
+          outputLayer(numUnits))
         val tuple = decoder.decode(
           outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
@@ -231,7 +246,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
           embeddingFn = embeddings,
           beginTokens = tf.fill[Int, Int](batchSize.expandDims(0))(tgtBosID),
           endToken = tgtEosID)
-        val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer(wordEmbeddingsSize))
+        val decoder = BasicDecoder(cell, initialState, decHelper, outputLayer(numUnits))
         val tuple = decoder.decode(
           outputTimeMajor = false,
           maximumIterations = maxDecodingLength,
@@ -247,8 +262,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
   protected def embeddings(
       ids: Output[Int]
   )(implicit context: ModelConstructionContext): Output[T] = {
-    val embeddingsTable = context.parameterManager.wordEmbeddings(context.tgtLanguageID)
-    embeddingsTable.gather(ids).castTo[T]
+    context.parameterManager.wordEmbeddings(context.tgtLanguageID, ids).castTo[T]
   }
 
   protected def decode(
@@ -259,8 +273,6 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
       encoderDecoderAttentionBias: Output[Float],
       encoderDecoderAttentionCache: Option[Seq[MultiHeadAttentionCache[Float]]]
   )(implicit context: ModelConstructionContext): (Output[T], Seq[Option[MultiHeadAttentionCache[Float]]]) = {
-    val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
-
     // Add the multi-head attention and the feed-forward layers.
     var x = decoderInputSequences.toFloat
     var y = x
@@ -274,7 +286,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
             bias = decoderSelfAttentionBias,
             totalKeysDepth = attentionKeysDepth,
             totalValuesDepth = attentionValuesDepth,
-            outputsDepth = wordEmbeddingsSize,
+            outputsDepth = numUnits,
             numHeads = attentionNumHeads,
             attention = selfAttention,
             cache = decoderSelfAttentionCache.map(_ (layer)),
@@ -294,7 +306,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
             bias = encoderDecoderAttentionBias,
             totalKeysDepth = attentionKeysDepth,
             totalValuesDepth = attentionValuesDepth,
-            outputsDepth = wordEmbeddingsSize,
+            outputsDepth = numUnits,
             numHeads = attentionNumHeads,
             attention = selfAttention,
             cache = encoderDecoderAttentionCache.map(_ (layer)),

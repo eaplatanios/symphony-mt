@@ -213,13 +213,17 @@ object Common {
       val product = tf.matmul(reshapedLogits, y, transposeB = transposeY)
       val yAxis = if (transposeY) 0 else 1
       if (x.shape(1) == -1 || y.shape(yAxis) == -1) {
-        tf.reshape(
+        val result = tf.reshape(
           product,
           tf.concatenate(Seq(
             tf.shape(x).slice(0 :: -1),
             tf.shape(y).slice(yAxis, NewAxis)), axis = 0))
+        result.setShape(x.shape(0 :: -1) + y.shape(yAxis))
+        result
       } else {
-        tf.reshape(product, x.shape(0 :: -1) + y.shape(yAxis))
+        val result = tf.reshape(product, x.shape(0 :: -1) + y.shape(yAxis))
+        result.setShape(x.shape(0 :: -1) + y.shape(yAxis))
+        result
       }
     } else {
       tf.matmul(x, y, transposeB = transposeY)

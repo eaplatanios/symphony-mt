@@ -30,7 +30,7 @@ import org.platanios.tensorflow.api.ops.rnn.cell.RNNCell
   */
 class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: OutputStructure, StateShape](
     val cell: Cell[T, State, StateShape],
-    val numUnits: Int,
+    override val numUnits: Int,
     val numLayers: Int,
     val residual: Boolean = false,
     val dropout: Float = 0.0f,
@@ -38,7 +38,7 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: OutputStructure, S
     override val outputLayer: OutputLayer = ProjectionToWords
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape]
-) extends RNNDecoder[T, State, Seq[State], Seq[StateShape]](outputLayer) {
+) extends RNNDecoder[T, State, Seq[State], Seq[StateShape]](numUnits, outputLayer) {
   override protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]]
@@ -61,7 +61,7 @@ class UnidirectionalRNNDecoder[T: TF : IsNotQuantized, State: OutputStructure, S
 
 class UnidirectionalRNNDecoderWithAttention[T: TF : IsNotQuantized, State: OutputStructure, AttentionState: OutputStructure, StateShape, AttentionStateShape](
     val cell: Cell[T, State, StateShape],
-    val numUnits: Int,
+    override val numUnits: Int,
     val numLayers: Int,
     val attention: RNNAttention[T, AttentionState, AttentionStateShape],
     val residual: Boolean = false,
@@ -72,7 +72,7 @@ class UnidirectionalRNNDecoderWithAttention[T: TF : IsNotQuantized, State: Outpu
 )(implicit
     evOutputToShapeState: OutputToShape.Aux[State, StateShape],
     evOutputToShapeAttentionState: OutputToShape.Aux[AttentionState, AttentionStateShape]
-) extends RNNDecoder[T, State, AttentionWrapperState[T, Seq[State], AttentionState], (Seq[StateShape], Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]])](outputLayer) {
+) extends RNNDecoder[T, State, AttentionWrapperState[T, Seq[State], AttentionState], (Seq[StateShape], Shape, Shape, Seq[Shape], Seq[Shape], Seq[Attention.StateShape[AttentionStateShape]])](numUnits, outputLayer) {
   override protected def cellAndInitialState(
       encodedSequences: EncodedSequences[T, State],
       tgtSequences: Option[Sequences[Int]]

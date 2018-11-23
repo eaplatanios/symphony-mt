@@ -17,6 +17,7 @@ package org.platanios.symphony.mt.models.rnn
 
 import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Utilities._
+import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.models.rnn.Utilities._
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.tf.RNNTuple
@@ -45,7 +46,15 @@ class BidirectionalRNNEncoder[T: TF : IsNotQuantized, State: OutputStructure, St
   override def apply(
       sequences: Sequences[Int]
   )(implicit context: ModelConstructionContext): EncodedSequences[T, State] = {
-    val embeddedSequences = embedSrcSequences(sequences)
+    val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
+    var embeddedSequences = embedSrcSequences(sequences)
+    if (wordEmbeddingsSize != numUnits) {
+      val projectionWeights = context.parameterManager.get[Float](
+        "ProjectionToEncoderNumUnits", Shape(wordEmbeddingsSize, numUnits))
+      val projectedSequences = Common.matrixMultiply(embeddedSequences.sequences, projectionWeights)
+      embeddedSequences = embeddedSequences.copy(sequences = projectedSequences)
+    }
+
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
 
     // Build the forward RNN cell.

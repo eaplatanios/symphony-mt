@@ -296,6 +296,7 @@ object ModelParser {
         ).asInstanceOf[Decoder[Any]]
       case "transformer" =>
         new TransformerDecoder[T](
+          numUnits = decoderConfig.get[Int]("num-units"),
           numLayers = decoderConfig.get[Int]("num-layers"),
           useSelfAttentionProximityBias = decoderConfig.get[Boolean]("use-self-attention-proximity-bias", default = false),
           postPositionEmbeddingsDropout = decoderConfig.get[Float]("post-position-embeddings-dropout"),

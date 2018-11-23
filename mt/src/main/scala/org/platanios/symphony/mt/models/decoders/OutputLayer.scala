@@ -48,7 +48,7 @@ case object ProjectionToWordEmbeddings extends OutputLayer {
       val outputWeights = context.parameterManager.get[T](
         "ProjectionToWordEmbeddings", Shape(inputSize, wordEmbeddingsSize))
       val projectedOutputs = Common.matrixMultiply(logits, outputWeights)
-      val wordEmbeddings = context.parameterManager.wordEmbeddings(context.tgtLanguageID).castTo[T]
+      val wordEmbeddings = context.parameterManager.wordEmbeddingsTable(context.tgtLanguageID).castTo[T]
       Common.matrixMultiply(projectedOutputs, wordEmbeddings, transposeY = true)
     }
   }

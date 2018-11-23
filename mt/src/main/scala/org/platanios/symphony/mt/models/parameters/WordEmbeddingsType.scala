@@ -55,6 +55,15 @@ trait WordEmbeddingsType {
       languageId: Output[Int]
   )(implicit context: ModelConstructionContext): Output[Float]
 
+  def embeddings(
+      embeddingTables: T,
+      languageIds: Seq[Output[Int]],
+      languageId: Output[Int],
+      tokenIndices: Output[Int]
+  )(implicit context: ModelConstructionContext): Output[Float] = {
+    embeddingsTable(embeddingTables, languageIds, languageId).gather(tokenIndices)
+  }
+
   def projectionToWords(
       languageIds: Seq[Output[Int]],
       projectionsToWords: mutable.Map[Int, T],
