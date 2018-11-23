@@ -139,7 +139,7 @@ class TrainingConfigParser(
   @throws[IllegalArgumentException]
   private def parseScore(scoreConfig: Config): SentenceScore = {
     scoreConfig.get[String]("type") match {
-      case "length" => SentenceLength
+      case "sentence-length" => SentenceLength
       case "sentence-rarity" =>
         val wordFrequenciesPooling = scoreConfig.get[String]("pooling") match {
           case "min" => SentenceRarity.MinPooling
