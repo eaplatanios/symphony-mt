@@ -72,7 +72,10 @@ class Experiment(val configFile: Path) {
   }
 
   lazy val environment: Environment = {
-    new EnvironmentParser(toString).parse(config.get[Config]("environment"))
+    new EnvironmentParser(
+      dataset = dataset,
+      modelName = config.get[String]("model.name")
+    ).parse(config.get[Config]("environment"))
   }
 
   lazy val dataConfig: DataConfig = {

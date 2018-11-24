@@ -24,11 +24,14 @@ import java.nio.file.Paths
 /**
   * @author Emmanouil Antonios Platanios
   */
-class EnvironmentParser(val experimentTag: String) extends ConfigParser[Environment] {
+class EnvironmentParser(
+    val dataset: String,
+    val modelName: String
+) extends ConfigParser[Environment] {
   @throws[IllegalArgumentException]
   override def parse(config: Config): Environment = {
     Environment(
-      workingDir = Paths.get(config.get[String]("working-dir")).resolve(experimentTag),
+      workingDir = Paths.get(config.get[String]("working-dir")).resolve(dataset).resolve(modelName),
       allowSoftPlacement = config.get[Boolean]("allow-soft-placement"),
       logDevicePlacement = config.get[Boolean]("log-device-placement"),
       gpuAllowMemoryGrowth = config.get[Boolean]("gpu-allow-memory-growth"),
