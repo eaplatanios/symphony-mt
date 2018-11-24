@@ -18,7 +18,6 @@ package org.platanios.symphony.mt.models.rnn
 import org.platanios.symphony.mt.models.{ModelConstructionContext, Sequences}
 import org.platanios.symphony.mt.models.Transformation.Decoder
 import org.platanios.symphony.mt.models.decoders.{BasicDecoder, BeamSearchDecoder, OutputLayer}
-import org.platanios.symphony.mt.models.helpers.Common
 import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.implicits.helpers.{OutputStructure, OutputToShape}

@@ -80,7 +80,7 @@ class UnidirectionalRNNDecoderWithAttention[T: TF : IsNotQuantized, State: Outpu
     val numResLayers = if (residual && numLayers > 1) numLayers - 1 else 0
     val uniCell = stackedCell[T, State, StateShape](
       cell = cell,
-      numInputs = 2 * numUnits,
+      numInputs = numUnits + context.parameterManager.wordEmbeddingsType.embeddingsSize,
       numUnits = numUnits,
       numLayers = numLayers,
       numResidualLayers = numResLayers,
