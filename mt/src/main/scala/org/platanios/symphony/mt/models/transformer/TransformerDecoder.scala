@@ -73,6 +73,14 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     if (context.mode.isTraining)
       decoderInputSequences = tf.dropout(decoderInputSequences, 1.0f - postPositionEmbeddingsDropout)
 
+    // Project the decoder input sequences, if necessary.
+    val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
+    if (wordEmbeddingsSize != numUnits) {
+      val projectionWeights = context.parameterManager.get[T](
+        "ProjectionToDecoderNumUnits", Shape(wordEmbeddingsSize, numUnits))
+      decoderInputSequences = Common.matrixMultiply(decoderInputSequences, projectionWeights)
+    }
+
     // Project the encoder output, if necessary.
     var encoderOutput = encodedSequences.states
     if (numUnits != encoderOutput.shape(-1)) {
@@ -87,8 +95,7 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
     val encoderDecoderAttentionBias = Attention.attentionBiasIgnorePadding(inputPadding)
 
     // Obtain the output projection layer weights.
-    val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
-    val outputLayer = this.outputLayer(wordEmbeddingsSize)
+    val outputLayer = this.outputLayer(numUnits)
 
     // Pre-compute the encoder-decoder attention keys and values.
     val encoderDecoderAttentionCache = (0 until numLayers).map(layer => {
@@ -189,7 +196,16 @@ class TransformerDecoder[T: TF : IsHalfOrFloatOrDouble](
         // This is necessary in order to deal with the beam search tiling.
         val step = input.state._2(0)
         val currentStepPositionEmbeddings = positionEmbeddings(0).gather(step).expandDims(0).expandDims(1)
-        val currentStepInput = input.output.expandDims(1) + currentStepPositionEmbeddings
+        var currentStepInput = input.output.expandDims(1) + currentStepPositionEmbeddings
+
+        // Project the decoder input sequences, if necessary.
+        val wordEmbeddingsSize = context.parameterManager.wordEmbeddingsType.embeddingsSize
+        if (wordEmbeddingsSize != numUnits) {
+          val projectionWeights = context.parameterManager.get[T](
+            "ProjectionToDecoderNumUnits", Shape(wordEmbeddingsSize, numUnits))
+          currentStepInput = Common.matrixMultiply(currentStepInput, projectionWeights)
+        }
+
         val selfAttentionBias = tf.slice(
           decoderSelfAttentionBias(0, 0, ::, ::).gather(step),
           Seq(zero),
