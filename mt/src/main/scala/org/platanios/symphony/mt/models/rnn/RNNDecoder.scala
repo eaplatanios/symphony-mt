@@ -39,16 +39,6 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     // TODO: What if no target sequences are provided?
     val tgtSequences = context.tgtSequences.get
 
-    // Project the encoder output, if necessary.
-    var projectedEncodedSequences = encodedSequences
-    if (numUnits != projectedEncodedSequences.rnnTuple.output.shape(-1)) {
-      val projectionWeights = context.parameterManager.get[T](
-        "ProjectionToEncoderNumUnits", Shape(projectedEncodedSequences.rnnTuple.output.shape(-1), numUnits))
-      val projectedSequences = Common.matrixMultiply(projectedEncodedSequences.rnnTuple.output, projectionWeights)
-      projectedEncodedSequences = projectedEncodedSequences.copy(
-        rnnTuple = new tf.RNNTuple(projectedSequences, projectedEncodedSequences.rnnTuple.state))
-    }
-
     // Shift the target sequence one step forward so the decoder learns to output the next word.
     val tgtBosId = tf.constant[Int](Vocabulary.BEGIN_OF_SEQUENCE_TOKEN_ID)
     val batchSize = tf.shape(tgtSequences.sequences).slice(0)
@@ -56,7 +46,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
       tf.fill[Int, Int](tf.stack[Int](Seq(batchSize, 1)))(tgtBosId),
       tgtSequences.sequences), axis = 1)
     val shiftedTgtSequenceLengths = tgtSequences.lengths + 1
-    val (cell, initialState) = cellAndInitialState(projectedEncodedSequences, Some(tgtSequences))
+    val (cell, initialState) = cellAndInitialState(encodedSequences, Some(tgtSequences))
 
     // Embed the target sequences.
     val embeddedTgtSequences = embeddings(shiftedTgtSequences)
@@ -77,24 +67,14 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
   override def applyInfer(
       encodedSequences: EncodedSequences[T, State]
   )(implicit context: ModelConstructionContext): Sequences[Int] = {
-    // Project the encoder output, if necessary.
-    var projectedEncodedSequences = encodedSequences
-    if (numUnits != projectedEncodedSequences.rnnTuple.output.shape(-1)) {
-      val projectionWeights = context.parameterManager.get[T](
-        "ProjectionToEncoderNumUnits", Shape(projectedEncodedSequences.rnnTuple.output.shape(-1), numUnits))
-      val projectedSequences = Common.matrixMultiply(projectedEncodedSequences.rnnTuple.output, projectionWeights)
-      projectedEncodedSequences = projectedEncodedSequences.copy(
-        rnnTuple = new tf.RNNTuple(projectedSequences, projectedEncodedSequences.rnnTuple.state))
-    }
-
-    val (cell, initialState) = cellAndInitialState(projectedEncodedSequences)
+    val (cell, initialState) = cellAndInitialState(encodedSequences)
 
     // Determine the maximum allowed sequence length to consider while decoding.
     val maxDecodingLength = {
       if (!context.mode.isTraining && context.dataConfig.tgtMaxLength != -1)
         tf.constant(context.dataConfig.tgtMaxLength)
       else
-        tf.round(tf.max(projectedEncodedSequences.lengths).toFloat *
+        tf.round(tf.max(encodedSequences.lengths).toFloat *
             context.inferenceConfig.maxDecodingLengthFactor).toInt
     }
 
@@ -103,7 +83,7 @@ abstract class RNNDecoder[T: TF : IsNotQuantized, State, DecState: OutputStructu
     val tgtEosID = tf.constant[Int](Vocabulary.END_OF_SEQUENCE_TOKEN_ID)
 
     // Create the decoder RNN.
-    val batchSize = tf.shape(projectedEncodedSequences.lengths).slice(0).expandDims(0)
+    val batchSize = tf.shape(encodedSequences.lengths).slice(0).expandDims(0)
     val embeddings = (ids: Output[Int]) => this.embeddings(ids)
     val output = {
       if (context.inferenceConfig.beamWidth > 1) {
