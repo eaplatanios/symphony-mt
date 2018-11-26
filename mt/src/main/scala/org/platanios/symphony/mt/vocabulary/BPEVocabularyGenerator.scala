@@ -20,6 +20,7 @@ import org.platanios.symphony.mt.data.{newReader, newWriter}
 import org.platanios.symphony.mt.utilities.{MutableFile, PriorityCounter, TrieWordCounter}
 
 import better.files._
+import com.twitter.util.LruMap
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
@@ -58,6 +59,7 @@ class BPEVocabularyGenerator protected (
     val caseSensitive: Boolean = true,
     val countThreshold: Int = -1,
     val replaceExisting: Boolean = false,
+    val cacheSize: Int = 10000,
     val bufferSize: Int = 8192
 ) extends VocabularyGenerator {
   protected val glossaryRegex: Regex = BPEVocabularyGenerator.glossaryRegex(glossary)
@@ -200,7 +202,7 @@ class BPEVocabularyGenerator protected (
       if (replaceExisting || file.notExists) {
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
         val fileWriter = if (replaceExisting || file.notExists) Some(newWriter(file)) else None
-        val cache = mutable.Map.empty[String, Seq[String]]
+        val cache = new LruMap[String, Seq[String]](cacheSize)
         val tokens = newReader(oldFile).lines().toAutoClosedIterator
             .filter(_.length > 0)
             .flatMap(line => {
@@ -411,10 +413,11 @@ object BPEVocabularyGenerator {
       caseSensitive: Boolean = true,
       countThreshold: Int = -1,
       replaceExisting: Boolean = false,
+      cacheSize: Int = 10000,
       bufferSize: Int = 8192
   ): BPEVocabularyGenerator = {
     new BPEVocabularyGenerator(
-      numMergeOps, separator, glossary, caseSensitive, countThreshold, replaceExisting, bufferSize)
+      numMergeOps, separator, glossary, caseSensitive, countThreshold, replaceExisting, cacheSize, bufferSize)
   }
 
   /** End-of-word symbol used by the BPE vocabulary generator. */

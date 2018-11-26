@@ -101,7 +101,8 @@ lazy val mt = (project in file("./mt"))
     .settings(
       libraryDependencies ++= Seq(
         "com.github.pathikrit" %% "better-files" % "3.4.0",
-        "org.apache.commons" % "commons-compress" % "1.16.1"),
+        "org.apache.commons" % "commons-compress" % "1.16.1",
+        "com.twitter" %% "util-collection" % "18.11.0"),
         // Scalac Profiling Settings
       libraryDependencies ++= {
         if (scalacProfilingEnabled.value)
