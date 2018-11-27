@@ -73,7 +73,7 @@ class BPEVocabularyGenerator protected (
   }
 
   protected def mergePairsFilename(languages: Seq[Language]): String = {
-    s"merge_pairs.bpe.$numMergeOps.${suffix(languages)}"
+    s"merge_pairs.bpe${if (!caseSensitive) ".nc" else ""}.$numMergeOps.${suffix(languages)}"
   }
 
   /** Returns the vocabulary file name that this generator uses / will use.
@@ -82,7 +82,7 @@ class BPEVocabularyGenerator protected (
     * @return Vocabulary file name.
     */
   override def filename(languages: Seq[Language]): String = {
-    s"vocab.bpe.$numMergeOps.${suffix(languages)}"
+    s"vocab.bpe${if (!caseSensitive) ".nc" else ""}.$numMergeOps.${suffix(languages)}"
   }
 
   /** Generates/Replaces a vocabulary file given a sequence of tokenized text files.
@@ -196,7 +196,8 @@ class BPEVocabularyGenerator protected (
       val oldFile = mutableFile.get
       val file = oldFile.sibling(
         s"${oldFile.nameWithoutExtension(includeAll = false)}" +
-            s".bpe.$numMergeOps.${languages.map(_.abbreviation).sorted.mkString(".")}" +
+            s".bpe${if (!caseSensitive) ".nc" else ""}" +
+            s".$numMergeOps.${languages.map(_.abbreviation).sorted.mkString(".")}" +
             s".${oldFile.extension(includeDot = false, includeAll = false).get}")
       mutableFile.set(file)
       if (replaceExisting || file.notExists) {
