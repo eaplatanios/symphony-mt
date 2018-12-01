@@ -24,6 +24,7 @@ import org.platanios.symphony.mt.models.SentencePairsWithScores
 import org.platanios.symphony.mt.models.curriculum.{DifficultyBasedCurriculum, SentencePairCurriculum}
 import org.platanios.symphony.mt.models.curriculum.SentencePairCurriculum.{SourceSentenceScore, TargetSentenceScore}
 import org.platanios.symphony.mt.models.curriculum.competency._
+import org.platanios.symphony.mt.models.helpers.AdaptiveAMSGrad
 import org.platanios.tensorflow.api._
 
 import com.typesafe.config.Config
@@ -82,6 +83,10 @@ class TrainingConfigParser(
             val beta1 = config.get[Float]("optimization.beta1", 0.9f)
             val beta2 = config.get[Float]("optimization.beta2", 0.999f)
             tf.train.LazyAMSGrad(learningRate.get, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
+          case "adaptive_amsgrad" =>
+            val beta1 = config.get[Float]("optimization.beta1", 0.9f)
+            val beta2 = config.get[Float]("optimization.beta2", 0.999f)
+            AdaptiveAMSGrad(learningRate.get, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
           case "yellowfin" => tf.train.YellowFin(learningRate.get, learningRateSummaryTag = "LearningRate")
           case _ => throw new IllegalArgumentException(s"'$optimizer' does not represent a valid optimizer.")
         },
