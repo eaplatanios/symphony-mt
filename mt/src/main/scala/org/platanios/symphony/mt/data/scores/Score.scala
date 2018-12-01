@@ -195,7 +195,7 @@ object Score {
                       sentence = sentence._1,
                       requiredValues = score._1._2.map(_.apply(sentence._2)),
                       requiredSummaries = score._1._3)
-                    sentenceScores(score._1._1.toString)(score._2) = sentenceScore.asInstanceOf[Float]
+                    sentenceScores(score._1._1.toString)(sentence._2) = sentenceScore.asInstanceOf[Float]
                     progress += 1
                     val time = System.currentTimeMillis
                     if (time - progressLogTime >= 1e4) {
