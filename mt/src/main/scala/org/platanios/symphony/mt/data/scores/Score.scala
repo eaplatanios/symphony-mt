@@ -134,7 +134,7 @@ object Score {
 
             val scoreNames = scoreFiles.map(_.name.drop(baseFilename.length + 1).dropRight(6))
             val scoreValues = scoreFiles.map(file => {
-              mutable.ArrayBuffer(newReader(file).lines().toAutoClosedIterator.map(_.toFloat).toSeq: _*)
+              newReader(file).lines().toAutoClosedIterator.map(_.toFloat).toArray
             })
 
             var sentenceScores = mutable.HashMap(scoreNames.zip(scoreValues): _*)
@@ -169,9 +169,11 @@ object Score {
               if (sentenceScoresToCompute.nonEmpty) {
                 logger.info(s"Computing sentence scores for file '$file'.")
 
+                val numSentences = scala.io.Source.fromFile(file.path.toAbsolutePath.toString).getLines.size
+
                 // Remove the previously computed values for the scores that need to be computed now.
                 sentenceScores ++= sentenceScoresToCompute.map(_.toString)
-                    .zip(sentenceScoresToCompute.map(_ => mutable.ArrayBuffer.empty[Float]))
+                    .zip(sentenceScoresToCompute.map(_ => Array.ofDim[Float](numSentences)))
 
                 val scoresWithRequirements = sentenceScoresToCompute.map(score => {
                   val requiredSentenceScores = score.requiredSentenceScores.map(s => sentenceScores(s.toString))
@@ -184,7 +186,6 @@ object Score {
 
                 var progress = 0L
                 var progressLogTime = System.currentTimeMillis
-                val numSentences = scala.io.Source.fromFile(file.path.toAbsolutePath.toString).getLines.size
 
                 // Compute the new scores for all sentences.
                 newReader(file).lines().toAutoClosedIterator.zipWithIndex.foreach(sentence => {
@@ -194,7 +195,7 @@ object Score {
                       sentence = sentence._1,
                       requiredValues = score._1._2.map(_.apply(sentence._2)),
                       requiredSummaries = score._1._3)
-                    sentenceScores(score._1._1.toString) :+= sentenceScore.asInstanceOf[Float]
+                    sentenceScores(score._1._1.toString)(score._2) = sentenceScore.asInstanceOf[Float]
                     progress += 1
                     val time = System.currentTimeMillis
                     if (time - progressLogTime >= 1e4) {
