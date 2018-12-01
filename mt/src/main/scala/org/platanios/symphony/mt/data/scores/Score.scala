@@ -182,6 +182,10 @@ object Score {
                   (score, requiredSentenceScores, requiredSummaryScores)
                 })
 
+                var progress = 0L
+                var progressLogTime = System.currentTimeMillis
+                val numSentences = scala.io.Source.fromFile(file.path.toAbsolutePath.toString).getLines.size
+
                 // Compute the new scores for all sentences.
                 newReader(file).lines().toAutoClosedIterator.zipWithIndex.foreach(sentence => {
                   scoresWithRequirements.zipWithIndex.foreach(score => {
@@ -191,6 +195,15 @@ object Score {
                       requiredValues = score._1._2.map(_.apply(sentence._2)),
                       requiredSummaries = score._1._3)
                     sentenceScores(score._1._1.toString) :+= sentenceScore.asInstanceOf[Float]
+                    progress += 1
+                    val time = System.currentTimeMillis
+                    if (time - progressLogTime >= 1e4) {
+                      val numBars = Math.floorDiv(10 * progress, numSentences).toInt
+                      logger.info(
+                        s"│${"═" * numBars}${" " * (10 - numBars)}│ " +
+                            s"%${numSentences.toString.length}s / $numSentences sentences done.".format(progress))
+                      progressLogTime = time
+                    }
                   })
                 })
 
