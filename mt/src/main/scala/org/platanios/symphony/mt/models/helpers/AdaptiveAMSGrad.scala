@@ -16,6 +16,7 @@
 package org.platanios.symphony.mt.models.helpers
 
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.ops.Logging
 import org.platanios.tensorflow.api.ops.training.optimizers.schedules.{FixedSchedule, Schedule}
 import org.platanios.tensorflow.api.ops.variables.ZerosInitializer
 
@@ -123,9 +124,9 @@ class AdaptiveAMSGrad protected (
       zerosSlot("M", v, name)(TF.fromDataType(v.dataType))
       zerosSlot("V", v, name)(TF.fromDataType(v.dataType))
       zerosSlot("Vhat", v, name)(TF.fromDataType(v.dataType))
-      getSlot("NonZerosCount", v, INT64, ZerosInitializer, Shape(v.shape(0)), name)
-      getSlot("Beta1Power", v, FLOAT32, ZerosInitializer, Shape(v.shape(0)), name)
-      getSlot("Beta2Power", v, FLOAT32, ZerosInitializer, Shape(v.shape(0)), name)
+      getSlot("NonZerosCount", v, INT64, ZerosInitializer, v.shape, name)
+      getSlot("Beta1Power", v, FLOAT32, ZerosInitializer, v.shape, name)
+      getSlot("Beta2Power", v, FLOAT32, ZerosInitializer, v.shape, name)
     })
   }
 
@@ -151,16 +152,19 @@ class AdaptiveAMSGrad protected (
       val vHat = getSlot[T, T]("Vhat", variable)
       val beta1Power = getSlot[T, Float]("Beta1Power", variable)
       val beta2Power = getSlot[T, Float]("Beta2Power", variable)
-      val beta1 = getBeta1(variable)
-      val beta2 = getBeta2(variable)
-      val epsilon = getEpsilon(variable)
 
-      val betaShape = Shape(variable.shape(0)) ++ Shape(Array.fill(variable.rank - 1)(1))
+      val nonZerosCount = getSlot[T, Long]("NonZerosCount", variable)
+      val nonZerosCountValue = nonZerosCount.assignAdd(tf.notEqual(gradient, tf.zeros[T](Shape())).toLong)
+      val adaptationScale = tf.pow(0.5f, nonZerosCountValue.toFloat / ((iteration.get.toFloat + 1.0f) * 0.1f)).castTo[T]
+
+      val beta1 = getBeta1(variable) * adaptationScale
+      val beta2 = getBeta2(variable) * adaptationScale
+      val epsilon = getEpsilon(variable)
 
       var learningRate = getLearningRate(variable, iteration)
       val one = tf.ones[T](Shape())
-      learningRate = learningRate * tf.sqrt(one - beta2Power.value.reshape(betaShape).castTo[T])
-      learningRate = learningRate / (one - beta1Power.value.reshape(betaShape).castTo[T])
+      learningRate = learningRate * tf.sqrt(one - beta2Power.value.castTo[T])
+      learningRate = learningRate / (one - beta1Power.value.castTo[T])
 
       // m_t = beta1 * m + (1 - beta1) * gradient
       val mScaledGradient = gradient * (one - beta1)
@@ -194,20 +198,18 @@ class AdaptiveAMSGrad protected (
       val beta1Power = getSlot[T, Float]("Beta1Power", variable)
       val beta2Power = getSlot[T, Float]("Beta2Power", variable)
 
-      val betaShape = Shape(variable.shape(0)) ++ Shape(Array.fill(variable.rank - 1)(1))
-
       val nonZerosCount = getSlot[T, Long]("NonZerosCount", variable)
-      nonZerosCount.assignScatterAdd(gradient.indices, 1L)
-      val adaptationScale = tf.pow(0.5f, 10.0f - nonZerosCount.value.toFloat / (iteration.get.toFloat * 0.1f)).castTo[T]
+      val nonZerosCountValue = nonZerosCount.assignScatterAdd(gradient.indices, tf.notEqual(gradient.values, tf.zeros[T](Shape())).toLong)
+      val adaptationScale = tf.pow(0.5f, nonZerosCountValue.toFloat / (iteration.get.toFloat * 0.1f)).castTo[T]
 
-      val beta1 = getBeta1(variable) * adaptationScale.reshape(betaShape)
-      val beta2 = getBeta2(variable) * adaptationScale.reshape(betaShape)
+      val beta1 = getBeta1(variable) * adaptationScale
+      val beta2 = getBeta2(variable) * adaptationScale
       val epsilon = getEpsilon(variable)
 
       var learningRate = getLearningRate(variable, iteration)
       val one = tf.ones[T](Shape())
-      learningRate = learningRate * tf.sqrt(one - beta2Power.value.reshape(betaShape).castTo[T])
-      learningRate = learningRate / (one - beta1Power.value.reshape(betaShape).castTo[T])
+      learningRate = learningRate * tf.sqrt(one - beta2Power.value.castTo[T])
+      learningRate = learningRate / (one - beta1Power.value.castTo[T])
 
       // m_t = beta1 * m + (1 - beta1) * gradient
       val mScaledGradient = gradient.values * (one - beta1.gather(gradient.indices))
