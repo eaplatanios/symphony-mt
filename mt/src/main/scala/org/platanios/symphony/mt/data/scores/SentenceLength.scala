@@ -26,7 +26,7 @@ object SentenceLength extends SentenceScore {
   protected val whitespaceRegex: Regex = "\\s+".r
 
   override def name: String = {
-    "sentence-length"
+    "sl"
   }
 
   override def processSentence(

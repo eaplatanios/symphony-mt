@@ -35,10 +35,7 @@ class WordCounts(val caseSensitive: Boolean = false) extends SummaryScore {
   }
 
   override def name: String = {
-    if (caseSensitive)
-      "case-sensitive-word-counts"
-    else
-      "word-counts"
+    if (caseSensitive) "cs-wc" else "wc"
   }
 
   override def processSentence(

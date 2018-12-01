@@ -191,7 +191,6 @@ class BPEVocabularyGenerator protected (
 
     // Irrespective of whether a new vocabulary is being generated, or an existing one was loaded, we also convert the
     // provided tokenized files to their encoded equivalent.
-    var fileWriters = Seq.empty[BufferedWriter]
     val tokens = tokenizedFiles.flatMap(mutableFile => {
       val oldFile = mutableFile.get
       val file = oldFile.sibling(
@@ -204,21 +203,20 @@ class BPEVocabularyGenerator protected (
         BPEVocabularyGenerator.logger.info(s"Applying BPE coding to file: $oldFile.")
         val fileWriter = if (replaceExisting || file.notExists) Some(newWriter(file)) else None
         val cache = new LruMap[String, Seq[String]](cacheSize)
-        val tokens = newReader(oldFile).lines().toAutoClosedIterator
+        newReader(oldFile).lines().toAutoClosedIterator
             .filter(_.length > 0)
-            .flatMap(line => {
+            .foreach(line => {
               var sentence = BPEVocabularyGenerator.whitespaceRegex.split(line)
               sentence = encodeSentence(languages, sentence, cache).toArray
               if (sentence.nonEmpty)
                 fileWriter.foreach(_.write(s"${sentence.mkString(" ")}\n"))
-              if (replaceExisting || vocabWriter.isDefined)
-                sentence.toIterator
-              else
-                Iterator.empty
             })
-        fileWriter.foreach(fileWriters :+= _)
-        tokens
-      } else if (vocabWriter.isDefined) {
+        fileWriter.foreach(w => {
+          w.flush()
+          w.close()
+        })
+      }
+      if (replaceExisting || vocabWriter.isDefined) {
         newReader(file).lines().toAutoClosedIterator
             .flatMap(line => BPEVocabularyGenerator.whitespaceRegex.split(line))
       } else {
@@ -242,11 +240,6 @@ class BPEVocabularyGenerator protected (
       writer.flush()
       writer.close()
       BPEVocabularyGenerator.logger.info(s"Generated vocabulary file for ${languages.mkString(", ")}.")
-    })
-
-    fileWriters.foreach(fileWriter => {
-      fileWriter.flush()
-      fileWriter.close()
     })
 
     BPEVocabularyGenerator.logger.info(s"Applied BPE coding to all provided files for ${languages.mkString(", ")}.")

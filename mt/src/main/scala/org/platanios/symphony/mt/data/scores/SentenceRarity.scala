@@ -28,7 +28,7 @@ class SentenceRarity(
     val epsilon: Double = 1e-3f
 ) extends SentenceScore {
   override def name: String = {
-    s"sentence-rarity-[$wordFrequenciesPooling-$wordCounts]"
+    s"sr-$wordFrequenciesPooling-$wordCounts"
   }
 
   override def requiredSummaryScores: Seq[SummaryScore] = {
@@ -112,7 +112,7 @@ object SentenceRarity {
     }
 
     override def toString: String = {
-      "product"
+      "prod"
     }
   }
 
