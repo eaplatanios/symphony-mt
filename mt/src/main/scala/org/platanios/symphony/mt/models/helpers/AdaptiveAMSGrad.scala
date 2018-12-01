@@ -155,10 +155,17 @@ class AdaptiveAMSGrad protected (
 
       val nonZerosCount = getSlot[T, Long]("NonZerosCount", variable)
       val nonZerosCountValue = nonZerosCount.assignAdd(tf.notEqual(gradient, tf.zeros[T](Shape())).toLong)
-      val adaptationScale = tf.pow(0.5f, nonZerosCountValue.toFloat / ((iteration.get.toFloat + 1.0f) * 0.1f)).castTo[T]
 
-      val beta1 = getBeta1(variable) * adaptationScale
-      val beta2 = getBeta2(variable) * adaptationScale
+      val initialBeta1 = getBeta1(variable).toFloat
+      val initialBeta2 = getBeta2(variable).toFloat
+      val aBeta1 = 1.0f - initialBeta1
+      val aBeta2 = 1.0f - initialBeta2
+      val bBeta1 = initialBeta1
+      val bBeta2 = initialBeta2
+      val rate = 1.0f - nonZerosCountValue.toFloat / (iteration.get.toFloat + 1.0f)
+      val beta1 = (aBeta1 * rate + bBeta1).castTo[T]
+      val beta2 = (aBeta2 * rate + bBeta2).castTo[T]
+
       val epsilon = getEpsilon(variable)
 
       var learningRate = getLearningRate(variable, iteration)
@@ -199,11 +206,18 @@ class AdaptiveAMSGrad protected (
       val beta2Power = getSlot[T, Float]("Beta2Power", variable)
 
       val nonZerosCount = getSlot[T, Long]("NonZerosCount", variable)
-      val nonZerosCountValue = nonZerosCount.assignScatterAdd(gradient.indices, tf.notEqual(gradient.values, tf.zeros[T](Shape())).toLong)
-      val adaptationScale = tf.pow(0.5f, nonZerosCountValue.toFloat / (iteration.get.toFloat * 0.1f)).castTo[T]
+      val nonZerosCountValue = nonZerosCount.assignScatterAdd(gradient.indices, tf.notEqual(gradient.values, tf.zeros[T](Shape())).toLong).toFloat
 
-      val beta1 = getBeta1(variable) * adaptationScale
-      val beta2 = getBeta2(variable) * adaptationScale
+      val initialBeta1 = getBeta1(variable).toFloat
+      val initialBeta2 = getBeta2(variable).toFloat
+      val aBeta1 = 1.0f - initialBeta1
+      val aBeta2 = 1.0f - initialBeta2
+      val bBeta1 = initialBeta1
+      val bBeta2 = initialBeta2
+      val rate = 1.0f - nonZerosCountValue.toFloat / (iteration.get.toFloat + 1.0f)
+      val beta1 = (aBeta1 * rate + bBeta1).castTo[T]
+      val beta2 = (aBeta2 * rate + bBeta2).castTo[T]
+
       val epsilon = getEpsilon(variable)
 
       var learningRate = getLearningRate(variable, iteration)
