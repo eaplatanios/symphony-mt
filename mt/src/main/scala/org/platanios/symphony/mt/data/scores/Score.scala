@@ -167,6 +167,8 @@ object Score {
               }
 
               if (sentenceScoresToCompute.nonEmpty) {
+                logger.info(s"Computing sentence scores for file '$file'.")
+
                 // Remove the previously computed values for the scores that need to be computed now.
                 sentenceScores ++= sentenceScoresToCompute.map(_.toString)
                     .zip(sentenceScoresToCompute.map(_ => mutable.ArrayBuffer.empty[Float]))
