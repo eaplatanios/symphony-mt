@@ -305,15 +305,7 @@ class BPEVocabularyGenerator protected (
       cache: mutable.Map[String, Seq[String]] = mutable.Map.empty
   ): Seq[String] = {
     // TODO: Add support for glossaries (i.e., words that will be encoded with the identity function.
-    sentence.flatMap(word => {
-      var parts = encodeWord(languages, word, cache)
-      var i = 0
-      while (i < parts.length - 1) {
-        parts = parts.updated(i, parts(i) + separator)
-        i += 1
-      }
-      parts
-    })
+    sentence.flatMap(word => encodeWord(languages, word, cache))
   }
 
   /** Encodes the provided word to a sequence of BPE coded words.
@@ -698,7 +690,13 @@ object BPEVocabularyGenerator {
       separator: String
   ): Seq[String] = {
     if (vocabulary.isEmpty) {
-      wordParts
+      var parts = wordParts
+      var i = 0
+      while (i < parts.length - 1) {
+        parts = parts.updated(i, parts(i) + separator)
+        i += 1
+      }
+      parts
     } else {
       wordParts.zipWithIndex.flatMap {
         case (part, index) if index < wordParts.length - 1 && vocabulary.contains(part + separator) =>
