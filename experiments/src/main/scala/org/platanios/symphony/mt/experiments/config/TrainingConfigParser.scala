@@ -24,8 +24,9 @@ import org.platanios.symphony.mt.models.SentencePairsWithScores
 import org.platanios.symphony.mt.models.curriculum.{DifficultyBasedCurriculum, SentencePairCurriculum}
 import org.platanios.symphony.mt.models.curriculum.SentencePairCurriculum.{SourceSentenceScore, TargetSentenceScore}
 import org.platanios.symphony.mt.models.curriculum.competency._
-import org.platanios.symphony.mt.models.helpers.AdaptiveAMSGrad
+import org.platanios.symphony.mt.models.helpers.{AdaptiveAMSGrad, NoamSchedule}
 import org.platanios.tensorflow.api._
+import org.platanios.tensorflow.api.ops.training.optimizers.schedules._
 
 import com.typesafe.config.Config
 
@@ -51,6 +52,13 @@ class TrainingConfigParser(
     }
     val optimizer = config.get[String]("optimization.optimizer")
     val learningRate = config.getOption[Float]("optimization.learning-rate")
+    val schedule = config.getOption[Config]("optimization.learning-rate.schedule") match {
+      case Some(c) => c.get[String]("type") match {
+        case "noam" => NoamSchedule(c.get[Int]("warmup-steps"), c.get[Int]("hidden-size"))
+        case s => throw new IllegalArgumentException(s"'$s' does not represent a valid learning rate schedule type.")
+      }
+      case None => FixedSchedule[Float]()
+    }
     TrainingConfig(
       languagePairs = languagePairs,
       useIdentityTranslations = bothDirections && config.get[Boolean]("use-identity-translations"),
@@ -62,32 +70,32 @@ class TrainingConfigParser(
       checkpointSteps = config.get[Int]("checkpoint-frequency"),
       optimization = TrainingConfig.OptimizationConfig(
         optimizer = optimizer match {
-          case "gd" => tf.train.GradientDescent(learningRate.get, learningRateSummaryTag = "LearningRate")
-          case "adadelta" => tf.train.AdaDelta(learningRate.get, learningRateSummaryTag = "LearningRate")
-          case "adafactor" => tf.train.Adafactor(learningRate, learningRateSummaryTag = "LearningRate")
-          case "adagrad" => tf.train.AdaGrad(learningRate.get, learningRateSummaryTag = "LearningRate")
-          case "rmsprop" => tf.train.RMSProp(learningRate.get, learningRateSummaryTag = "LearningRate")
+          case "gd" => tf.train.GradientDescent(learningRate.get, decay = schedule, learningRateSummaryTag = "LearningRate")
+          case "adadelta" => tf.train.AdaDelta(learningRate.get, decay = schedule, learningRateSummaryTag = "LearningRate")
+          case "adafactor" => tf.train.Adafactor(learningRate, decay = schedule, learningRateSummaryTag = "LearningRate")
+          case "adagrad" => tf.train.AdaGrad(learningRate.get, decay = schedule, learningRateSummaryTag = "LearningRate")
+          case "rmsprop" => tf.train.RMSProp(learningRate.get, decay = schedule, learningRateSummaryTag = "LearningRate")
           case "adam" =>
             val beta1 = config.get[Float]("optimization.beta1", 0.9f)
             val beta2 = config.get[Float]("optimization.beta2", 0.999f)
-            tf.train.Adam(learningRate.get, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
+            tf.train.Adam(learningRate.get, decay = schedule, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
           case "lazy_adam" =>
             val beta1 = config.get[Float]("optimization.beta1", 0.9f)
             val beta2 = config.get[Float]("optimization.beta2", 0.999f)
-            tf.train.LazyAdam(learningRate.get, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
+            tf.train.LazyAdam(learningRate.get, decay = schedule, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
           case "amsgrad" =>
             val beta1 = config.get[Float]("optimization.beta1", 0.9f)
             val beta2 = config.get[Float]("optimization.beta2", 0.999f)
-            tf.train.AMSGrad(learningRate.get, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
+            tf.train.AMSGrad(learningRate.get, decay = schedule, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
           case "lazy_amsgrad" =>
             val beta1 = config.get[Float]("optimization.beta1", 0.9f)
             val beta2 = config.get[Float]("optimization.beta2", 0.999f)
-            tf.train.LazyAMSGrad(learningRate.get, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
+            tf.train.LazyAMSGrad(learningRate.get, decay = schedule, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
           case "adaptive_amsgrad" =>
             val beta1 = config.get[Float]("optimization.beta1", 0.9f)
             val beta2 = config.get[Float]("optimization.beta2", 0.999f)
-            AdaptiveAMSGrad(learningRate.get, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
-          case "yellowfin" => tf.train.YellowFin(learningRate.get, learningRateSummaryTag = "LearningRate")
+            AdaptiveAMSGrad(learningRate.get, decay = schedule, beta1 = beta1, beta2 = beta2, learningRateSummaryTag = "LearningRate")
+          case "yellowfin" => tf.train.YellowFin(learningRate.get, decay = schedule, learningRateSummaryTag = "LearningRate")
           case _ => throw new IllegalArgumentException(s"'$optimizer' does not represent a valid optimizer.")
         },
         maxGradNorm = config.getOption[Float]("optimization.max-grad-norm"),
