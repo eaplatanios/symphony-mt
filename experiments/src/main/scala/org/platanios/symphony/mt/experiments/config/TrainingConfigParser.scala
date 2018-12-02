@@ -51,7 +51,7 @@ class TrainingConfigParser(
         languagePairs
     }
     val optimizer = config.get[String]("optimization.optimizer")
-    val learningRate = config.getOption[Float]("optimization.learning-rate")
+    val learningRate = config.getOption[Float]("optimization.learning-rate.value")
     val schedule = config.getOption[Config]("optimization.learning-rate.schedule") match {
       case Some(c) => c.get[String]("type") match {
         case "noam" => NoamSchedule(c.get[Int]("warmup-steps"), c.get[Int]("hidden-size"))
