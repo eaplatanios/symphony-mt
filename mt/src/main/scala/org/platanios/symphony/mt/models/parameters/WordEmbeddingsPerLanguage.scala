@@ -27,7 +27,7 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddingsType {
-  override type T = Seq[Output[Float]]
+  override type T = Seq[Variable[Float]]
 
   override def createStringToIndexLookupTable(
       languages: Seq[(Language, Vocabulary)]
@@ -49,7 +49,7 @@ case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddings
   ): T = {
     val embeddingsInitializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
     languages.map(l => {
-      tf.variable[Float](l._1.name, Shape(l._2.size, embeddingsSize), embeddingsInitializer).value
+      tf.variable[Float](l._1.name, Shape(l._2.size, embeddingsSize), embeddingsInitializer)
     })
   }
 
@@ -61,12 +61,12 @@ case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddings
   }
 
   override def embeddingsTable(
-      embeddingTables: Seq[Output[Float]],
+      embeddingTables: Seq[Variable[Float]],
       languageIds: Seq[Output[Int]],
       languageId: Output[Int]
   )(implicit context: ModelConstructionContext): Output[Float] = {
     val predicates = embeddingTables.zip(languageIds).map {
-      case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings)
+      case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings.value)
     }
     val assertion = tf.assert(
       tf.any(tf.stack(predicates.map(_._1))),
@@ -74,14 +74,34 @@ case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddings
         tf.constant[String]("No word embeddings table found for the provided language."),
         tf.constant[String]("Current language: "), languageId))
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
-      tf.identity(embeddingTables.head)
+      tf.identity(embeddingTables.head.value)
+    }
+    tf.cases(predicates, default)
+  }
+
+  override def embeddings(
+      embeddingTables: Seq[Variable[Float]],
+      languageIds: Seq[Output[Int]],
+      languageId: Output[Int],
+      tokenIndices: Output[Int]
+  )(implicit context: ModelConstructionContext): Output[Float] = {
+    val predicates = embeddingTables.zip(languageIds).map {
+      case (embeddings, langId) => (tf.equal(languageId, langId), () => embeddings.gather(tokenIndices))
+    }
+    val assertion = tf.assert(
+      tf.any(tf.stack(predicates.map(_._1))),
+      Seq[Output[Any]](
+        tf.constant[String]("No word embeddings table found for the provided language."),
+        tf.constant[String]("Current language: "), languageId))
+    val default = () => tf.createWith(controlDependencies = Set(assertion)) {
+      tf.identity(embeddingTables.head.gather(tokenIndices))
     }
     tf.cases(predicates, default)
   }
 
   override def projectionToWords(
       languageIds: Seq[Output[Int]],
-      projectionsToWords: mutable.Map[Int, Seq[Output[Float]]],
+      projectionsToWords: mutable.Map[Int, Seq[Variable[Float]]],
       inputSize: Int,
       languageId: Output[Int]
   )(implicit context: ModelConstructionContext): Output[Float] = {
@@ -91,12 +111,11 @@ case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddings
             tf.variable[Float](
               name = s"${l._1.name}/OutWeights",
               shape = Shape(inputSize, l._2.size),
-              initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)
-            ).value
+              initializer = tf.RandomUniformInitializer(-0.1f, 0.1f))
           })
         })
     val predicates = projectionsForSize.zip(languageIds).map {
-      case (projections, langId) => (tf.equal(languageId, langId), () => projections)
+      case (projections, langId) => (tf.equal(languageId, langId), () => projections.value)
     }
     val assertion = tf.assert(
       tf.any(tf.stack(predicates.map(_._1))),
@@ -105,7 +124,7 @@ case class WordEmbeddingsPerLanguage(embeddingsSize: Int) extends WordEmbeddings
         tf.constant[String]("Current language: "),
         languageId))
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
-      tf.identity(projectionsForSize.head)
+      tf.identity(projectionsForSize.head.value)
     }
     tf.cases(predicates, default)
   }

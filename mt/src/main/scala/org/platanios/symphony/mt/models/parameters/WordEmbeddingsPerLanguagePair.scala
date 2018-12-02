@@ -57,11 +57,11 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
         embeddings1 = tf.variable[Float](
           name = pair._1._1.name,
           shape = Shape(pair._1._2.size, embeddingsSize),
-          initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)).value,
+          initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)),
         embeddings2 = tf.variable[Float](
           name = pair._2._1.name,
           shape = Shape(pair._2._2.size, embeddingsSize),
-          initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)).value)
+          initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)))
     })
   }
 
@@ -88,8 +88,8 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
           tf.equal(context.srcLanguageID, srcLangId),
           tf.equal(context.tgtLanguageID, tgtLangId))
         Seq(
-          (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => embeddings.embeddings1),
-          (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => embeddings.embeddings2))
+          (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => embeddings.embeddings1.value),
+          (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => embeddings.embeddings2.value))
     }
     val assertion = tf.assert(
       tf.any(tf.stack(predicates.map(_._1))),
@@ -99,7 +99,40 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
         tf.constant[String]("Context target language: "), context.tgtLanguageID,
         tf.constant[String]("Current language: "), languageId))
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
-      tf.identity(embeddingTables.head.embeddings1)
+      tf.identity(embeddingTables.head.embeddings1.value)
+    }
+    tf.cases(predicates, default)
+  }
+
+  override def embeddings(
+      embeddingTables: Seq[WordEmbeddingsPerLanguagePair.EmbeddingsPair],
+      languageIds: Seq[Output[Int]],
+      languageId: Output[Int],
+      tokenIndices: Output[Int]
+  )(implicit context: ModelConstructionContext): Output[Float] = {
+    // Determine all the language index pairs that are relevant given the current model configuration.
+    val languageIndexPairs = parameters.languageIndexPairs(context.languages.map(_._1), context.trainingConfig)
+    val languageIdPairs = languageIndexPairs.map(p => (languageIds(p._1), languageIds(p._2)))
+
+    // Perform a separate word embedding lookup for each language pair.
+    val predicates = embeddingTables.zip(languageIdPairs).flatMap {
+      case (embeddings, (srcLangId, tgtLangId)) =>
+        val pairPredicate = tf.logicalAnd(
+          tf.equal(context.srcLanguageID, srcLangId),
+          tf.equal(context.tgtLanguageID, tgtLangId))
+        Seq(
+          (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => embeddings.embeddings1.gather(tokenIndices)),
+          (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => embeddings.embeddings2.gather(tokenIndices)))
+    }
+    val assertion = tf.assert(
+      tf.any(tf.stack(predicates.map(_._1))),
+      Seq(
+        tf.constant[String]("No word embeddings table found for the provided language pair."),
+        tf.constant[String]("Context source language: "), context.srcLanguageID,
+        tf.constant[String]("Context target language: "), context.tgtLanguageID,
+        tf.constant[String]("Current language: "), languageId))
+    val default = () => tf.createWith(controlDependencies = Set(assertion)) {
+      tf.identity(embeddingTables.head.embeddings1.gather(tokenIndices))
     }
     tf.cases(predicates, default)
   }
@@ -122,11 +155,11 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
               embeddings1 = tf.variable[Float](
                 name = s"${pair._1._1.name}/OutWeights",
                 shape = Shape(inputSize, pair._1._2.size),
-                initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)).value,
+                initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)),
               embeddings2 = tf.variable[Float](
                 name = s"${pair._2._1.name}/OutWeights",
                 shape = Shape(inputSize, pair._2._2.size),
-                initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)).value)
+                initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)))
           })
         })
 
@@ -137,8 +170,8 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
           tf.equal(context.srcLanguageID, srcLangId),
           tf.equal(context.tgtLanguageID, tgtLangId))
         Seq(
-          (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => projections.embeddings1),
-          (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => projections.embeddings2))
+          (tf.logicalAnd(pairPredicate, tf.equal(srcLangId, languageId)), () => projections.embeddings1.value),
+          (tf.logicalAnd(pairPredicate, tf.equal(tgtLangId, languageId)), () => projections.embeddings2.value))
     }
     val assertion = tf.assert(
       tf.any(tf.stack(predicates.map(_._1))),
@@ -148,7 +181,7 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
         tf.constant[String]("Context target language: "), context.tgtLanguageID,
         tf.constant[String]("Current language: "), languageId))
     val default = () => tf.createWith(controlDependencies = Set(assertion)) {
-      tf.identity(projectionsForSize.head.embeddings1)
+      tf.identity(projectionsForSize.head.embeddings1.value)
     }
     tf.cases(predicates, default)
   }
@@ -156,8 +189,8 @@ case class WordEmbeddingsPerLanguagePair(embeddingsSize: Int) extends WordEmbedd
 
 object WordEmbeddingsPerLanguagePair {
   case class EmbeddingsPair(
-      embeddings1: Output[Float],
-      embeddings2: Output[Float])
+      embeddings1: Variable[Float],
+      embeddings2: Variable[Float])
 
   private[WordEmbeddingsPerLanguagePair] def languagePairIdsToId(
       numLanguages: Int,

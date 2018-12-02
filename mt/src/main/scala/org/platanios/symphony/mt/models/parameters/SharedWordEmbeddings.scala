@@ -27,7 +27,7 @@ import scala.collection.mutable
   * @author Emmanouil Antonios Platanios
   */
 case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType {
-  override type T = Output[Float]
+  override type T = Variable[Float]
 
   override def createStringToIndexLookupTable(
       languages: Seq[(Language, Vocabulary)]
@@ -44,12 +44,12 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
   override def createWordEmbeddings(
       languages: Seq[(Language, Vocabulary)],
       trainingConfig: TrainingConfig
-  ): Output[Float] = {
+  ): Variable[Float] = {
     val someLanguage = languages.head
     tf.variable[Float](
       name = someLanguage._1.name,
       shape = Shape(someLanguage._2.size, embeddingsSize),
-      initializer = tf.RandomUniformInitializer(-0.1f, 0.1f)).value
+      initializer = tf.RandomUniformInitializer(-0.1f, 0.1f))
   }
 
   override def lookupTable(
@@ -60,16 +60,25 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
   }
 
   override def embeddingsTable(
-      embeddingTables: Output[Float],
+      embeddingTables: Variable[Float],
       languageIds: Seq[Output[Int]],
       languageId: Output[Int]
   )(implicit context: ModelConstructionContext): Output[Float] = {
     embeddingTables
   }
 
+  override def embeddings(
+      embeddingTables: Variable[Float],
+      languageIds: Seq[Output[Int]],
+      languageId: Output[Int],
+      tokenIndices: Output[Int]
+  )(implicit context: ModelConstructionContext): Output[Float] = {
+    embeddingTables.gather(tokenIndices)
+  }
+
   override def projectionToWords(
       languageIds: Seq[Output[Int]],
-      projectionsToWords: mutable.Map[Int, Output[Float]],
+      projectionsToWords: mutable.Map[Int, Variable[Float]],
       inputSize: Int,
       languageId: Output[Int]
   )(implicit context: ModelConstructionContext): Output[Float] = {
@@ -79,7 +88,7 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
           val someLanguage = context.languages.head
           tf.variable[Float](
             s"${someLanguage._1.name}/OutWeights",
-            Shape(inputSize, someLanguage._2.size), weightsInitializer).value
-        })
+            Shape(inputSize, someLanguage._2.size), weightsInitializer)
+        }).value
   }
 }
