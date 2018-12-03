@@ -16,7 +16,6 @@
 package org.platanios.symphony.mt.models.helpers
 
 import org.platanios.tensorflow.api._
-import org.platanios.tensorflow.api.ops.Logging
 import org.platanios.tensorflow.api.ops.training.optimizers.schedules.{FixedSchedule, Schedule}
 import org.platanios.tensorflow.api.ops.variables.ZerosInitializer
 
@@ -124,9 +123,9 @@ class AdaptiveAMSGrad protected (
       zerosSlot("M", v, name)(TF.fromDataType(v.dataType))
       zerosSlot("V", v, name)(TF.fromDataType(v.dataType))
       zerosSlot("Vhat", v, name)(TF.fromDataType(v.dataType))
-      getSlot("NonZerosCount", v, INT64, ZerosInitializer, v.shape, name)
-      getSlot("Beta1Power", v, FLOAT32, ZerosInitializer, v.shape, name)
-      getSlot("Beta2Power", v, FLOAT32, ZerosInitializer, v.shape, name)
+      getSlot("NonZerosCount", v, INT64, ZerosInitializer, Shape(v.shape(0)), name)
+      getSlot("Beta1Power", v, FLOAT32, ZerosInitializer, Shape(v.shape(0)), name)
+      getSlot("Beta2Power", v, FLOAT32, ZerosInitializer, Shape(v.shape(0)), name)
     })
   }
 
@@ -153,25 +152,30 @@ class AdaptiveAMSGrad protected (
       val beta1Power = getSlot[T, Float]("Beta1Power", variable)
       val beta2Power = getSlot[T, Float]("Beta2Power", variable)
 
-      val nonZerosCount = getSlot[T, Long]("NonZerosCount", variable)
-      val nonZerosCountValue = nonZerosCount.assignAdd(tf.notEqual(gradient, tf.zeros[T](Shape())).toLong)
+      val betaShape = Shape(variable.shape(0)) ++ Shape(Array.fill(variable.rank - 1)(1))
 
-      val initialBeta1 = getBeta1(variable).toFloat
-      val initialBeta2 = getBeta2(variable).toFloat
-      val aBeta1 = 1.0f - initialBeta1
-      val aBeta2 = 1.0f - initialBeta2
-      val bBeta1 = initialBeta1
-      val bBeta2 = initialBeta2
-      val rate = 1.0f - nonZerosCountValue.toFloat / (iteration.get.toFloat + 1.0f)
-      val beta1 = (aBeta1 * rate + bBeta1).castTo[T]
-      val beta2 = (aBeta2 * rate + bBeta2).castTo[T]
+//      val nonZerosCount = getSlot[T, Long]("NonZerosCount", variable)
+//      val nonZerosCountValue = nonZerosCount.assignAdd(tf.notEqual(gradient, tf.zeros[T](Shape())).toLong)
+
+//      val initialBeta1 = getBeta1(variable).toFloat
+//      val initialBeta2 = getBeta2(variable).toFloat
+//      val aBeta1 = 1.0f - initialBeta1
+//      val aBeta2 = 1.0f - initialBeta2
+//      val bBeta1 = initialBeta1
+//      val bBeta2 = initialBeta2
+//      val rate = 1.0f - nonZerosCountValue.toFloat / (iteration.get.toFloat + 1.0f)
+//      val beta1 = (aBeta1 * rate + bBeta1).castTo[T]
+//      val beta2 = (aBeta2 * rate + bBeta2).castTo[T]
+
+      val beta1 = getBeta1(variable)
+      val beta2 = getBeta2(variable)
 
       val epsilon = getEpsilon(variable)
 
       var learningRate = getLearningRate(variable, iteration)
       val one = tf.ones[T](Shape())
-      learningRate = learningRate * tf.sqrt(one - beta2Power.value.castTo[T])
-      learningRate = learningRate / (one - beta1Power.value.castTo[T])
+      learningRate = learningRate * tf.sqrt(one - beta2Power.value.reshape(betaShape).castTo[T])
+      learningRate = learningRate / (one - beta1Power.value.reshape(betaShape).castTo[T])
 
       // m_t = beta1 * m + (1 - beta1) * gradient
       val mScaledGradient = gradient * (one - beta1)
@@ -206,7 +210,10 @@ class AdaptiveAMSGrad protected (
       val beta2Power = getSlot[T, Float]("Beta2Power", variable)
 
       val nonZerosCount = getSlot[T, Long]("NonZerosCount", variable)
-      val nonZerosCountValue = nonZerosCount.assignScatterAdd(gradient.indices, tf.notEqual(gradient.values, tf.zeros[T](Shape())).toLong).toFloat
+      val nonZerosCountValue = nonZerosCount.assignScatterAdd(gradient.indices, 1L).toFloat
+      // nonZerosCountValue = tf.print(nonZerosCountValue, Seq(nonZerosCountValue), s"Sparse ${variable.name}: ", 10000, 10000)
+
+      val betaShape = Shape(variable.shape(0)) ++ Shape(Array.fill(variable.rank - 1)(1))
 
       val initialBeta1 = getBeta1(variable).toFloat
       val initialBeta2 = getBeta2(variable).toFloat
@@ -222,19 +229,19 @@ class AdaptiveAMSGrad protected (
 
       var learningRate = getLearningRate(variable, iteration)
       val one = tf.ones[T](Shape())
-      learningRate = learningRate * tf.sqrt(one - beta2Power.value.castTo[T])
-      learningRate = learningRate / (one - beta1Power.value.castTo[T])
+      learningRate = learningRate * tf.sqrt(one - beta2Power.value.reshape(betaShape).castTo[T])
+      learningRate = learningRate / (one - beta1Power.value.reshape(betaShape).castTo[T])
 
       // m_t = beta1 * m + (1 - beta1) * gradient
-      val mScaledGradient = gradient.values * (one - beta1.gather(gradient.indices))
-      var mT = m.assign(m.value * beta1)
+      val mScaledGradient = gradient.values * (one - beta1.reshape(betaShape).gather(gradient.indices))
+      var mT = m.assign(m.value * beta1.reshape(betaShape))
       mT = tf.createWith(controlDependencies = Set(mT.op)) {
         m.assignScatterAdd(gradient.indices, mScaledGradient)
       }
 
       // v_t = beta2 * v + (1 - beta2) * gradient * gradient
-      val vScaledGradient = gradient.values * gradient.values * (one - beta2.gather(gradient.indices))
-      var vT = v.assign(v.value * beta2)
+      val vScaledGradient = gradient.values * gradient.values * (one - beta2.reshape(betaShape).gather(gradient.indices))
+      var vT = v.assign(v.value * beta2.reshape(betaShape))
       vT = tf.createWith(controlDependencies = Set(vT.op)) {
         v.assignScatterAdd(gradient.indices, vScaledGradient)
       }
