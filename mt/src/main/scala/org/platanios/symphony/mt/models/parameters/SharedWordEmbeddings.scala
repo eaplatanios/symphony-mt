@@ -47,7 +47,7 @@ case class SharedWordEmbeddings(embeddingsSize: Int) extends WordEmbeddingsType 
   ): Variable[Float] = {
     val someLanguage = languages.head
     tf.variable[Float](
-      name = someLanguage._1.name,
+      name = languages.map(_._1.name).mkString(""),
       shape = Shape(someLanguage._2.size, embeddingsSize),
       initializer = tf.RandomUniformInitializer(-0.1f, 0.1f))
   }
