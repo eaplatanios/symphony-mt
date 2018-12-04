@@ -160,7 +160,7 @@ class BPEVocabularyGenerator protected (
             reversedMergePairs(languages) += mostFrequent._2._1 + mostFrequent._2._2 -> mostFrequent._2
             mergePairsWriter.write(s"${mostFrequent._2._1}\t${mostFrequent._2._2}\n")
           }
-          val changes = BPEVocabularyGenerator.replacePair(mostFrequent._2, tokens, indices)
+          val changes = BPEVocabularyGenerator.replacePair(mostFrequent._2, tokens, indices, caseSensitive)
           BPEVocabularyGenerator.updatePairStatistics(mostFrequent._2, changes, counts, indices)
         }
 
@@ -501,11 +501,12 @@ object BPEVocabularyGenerator {
   private[BPEVocabularyGenerator] def replacePair(
       pair: (String, String),
       words: mutable.Seq[(Long, Seq[String])],
-      indices: ParMap[(String, String), mutable.LongMap[Long]]
+      indices: ParMap[(String, String), mutable.LongMap[Long]],
+      caseSensitive: Boolean
   ): Seq[Change] = {
     indices(pair).toSeq.filter(_._2 >= 1).map(_._1.toInt).map(index => {
       val (count, word) = words(index)
-      val newWord = replacePair(pair, word, caseSensitive = false)
+      val newWord = replacePair(pair, word, caseSensitive)
       words.update(index, (count, newWord))
       Change(index, word, newWord, count)
     }).seq
