@@ -59,7 +59,7 @@ class BPEVocabularyGenerator protected (
     val caseSensitive: Boolean = true,
     val countThreshold: Int = -1,
     val replaceExisting: Boolean = false,
-    val cacheSize: Int = 10000,
+    val cacheSize: Int = 1000,
     val bufferSize: Int = 8192
 ) extends VocabularyGenerator {
   protected val glossaryRegex: Regex = BPEVocabularyGenerator.glossaryRegex(glossary)
@@ -191,7 +191,7 @@ class BPEVocabularyGenerator protected (
 
     // Irrespective of whether a new vocabulary is being generated, or an existing one was loaded, we also convert the
     // provided tokenized files to their encoded equivalent.
-    val tokens = tokenizedFiles.flatMap(mutableFile => {
+    val tokens = tokenizedFiles.toIterator.flatMap(mutableFile => {
       val oldFile = mutableFile.get
       val file = oldFile.sibling(
         s"${oldFile.nameWithoutExtension(includeAll = false)}" +
@@ -399,7 +399,7 @@ object BPEVocabularyGenerator {
       caseSensitive: Boolean = true,
       countThreshold: Int = -1,
       replaceExisting: Boolean = false,
-      cacheSize: Int = 10000,
+      cacheSize: Int = 1000,
       bufferSize: Int = 8192
   ): BPEVocabularyGenerator = {
     new BPEVocabularyGenerator(
@@ -530,7 +530,7 @@ object BPEVocabularyGenerator {
       val joinedPair = word(j) + word(j + 1)
       (word(j), word(j + 1)) match {
         case p if caseSensitive && p == pair => newWord += joinedPair; j += 2
-        case p if (p._1.toLowerCase(), p._2.toLowerCase()) == pair => newWord += joinedPair; j += 2
+        case p if !caseSensitive && (p._1.toLowerCase(), p._2.toLowerCase()) == pair => newWord += joinedPair; j += 2
         case _ => newWord += word(j); j += 1
       }
     }
