@@ -24,8 +24,6 @@ import com.twitter.util.LruMap
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
-import java.io.BufferedWriter
-
 import scala.collection.mutable
 import scala.collection.parallel.mutable.ParMap
 import scala.util.matching.Regex
@@ -161,7 +159,7 @@ class BPEVocabularyGenerator protected (
             mergePairsWriter.write(s"${mostFrequent._2._1}\t${mostFrequent._2._2}\n")
           }
           val changes = BPEVocabularyGenerator.replacePair(mostFrequent._2, tokens, indices, caseSensitive)
-          BPEVocabularyGenerator.updatePairStatistics(mostFrequent._2, changes, counts, indices)
+          BPEVocabularyGenerator.updatePairStatistics(mostFrequent._2, changes, counts, indices, caseSensitive)
         }
 
         currentSymbol += 1
@@ -417,7 +415,8 @@ object BPEVocabularyGenerator {
     "e.g", "i.e", "&amp;", "&#124;", "&lt;", "&gt;", "&apos;", "&quot;", "&#91;", "&#93;")
 
   private[BPEVocabularyGenerator] def glossaryRegex(glossary: Set[String]): Regex = {
-    s"(?:${glossary.mkString("|")})|(?!${glossary.mkString("|")})".r
+    val escapedGlossary = glossary.map(java.util.regex.Pattern.quote)
+    s"(?:${escapedGlossary.mkString("|")})|(?!${escapedGlossary.mkString("|")})".r
   }
 
   private[BPEVocabularyGenerator] def splitWithDelimiters(
@@ -528,11 +527,15 @@ object BPEVocabularyGenerator {
     val newWord = mutable.ListBuffer.empty[String]
     var j = 0
     while (j < word.length - 1) {
-      val joinedPair = word(j) + word(j + 1)
-      (word(j), word(j + 1)) match {
-        case p if caseSensitive && p == pair => newWord += joinedPair; j += 2
-        case p if !caseSensitive && (p._1.toLowerCase(), p._2.toLowerCase()) == pair => newWord += joinedPair; j += 2
-        case _ => newWord += word(j); j += 1
+      val part1 = if (caseSensitive) word(j) else word(j).toLowerCase()
+      val part2 = if (caseSensitive) word(j + 1) else word(j + 1).toLowerCase()
+      if (part1 == pair._1 && part2 == pair._2) {
+        val joinedPair = word(j) + word(j + 1)
+        newWord += joinedPair
+        j += 2
+      } else {
+        newWord += word(j)
+        j += 1
       }
     }
     if (j == word.length - 1)
@@ -555,7 +558,8 @@ object BPEVocabularyGenerator {
       pair: (String, String),
       changes: Seq[Change],
       counts: PriorityCounter[(String, String)],
-      indices: ParMap[(String, String), mutable.LongMap[Long]]
+      indices: ParMap[(String, String), mutable.LongMap[Long]],
+      caseSensitive: Boolean
   ): Unit = {
     val joinedPair = pair._1 + pair._2
 
@@ -566,50 +570,60 @@ object BPEVocabularyGenerator {
       // Find all instances of the pair, and update the corresponding statistics.
       var i = 0
       while (i < change.word.length - 1) {
-        (change.word(i), change.word(i + 1)) match {
-          case p if p == pair =>
-            // Assuming a symbol sequence "A B C", if "B C" is merged, we reduce the frequency of "A B".
-            if (i > 0) {
-              val prevPair = (change.word(i - 1), change.word(i))
-              counts.add(prevPair, -change.count)
-              updateIndices(indices, prevPair, change.index, -1)
-            }
-            // Assuming a symbol sequence "A B C B", if "B C" is merged, we reduce the frequency of "C B". However, we
-            // skip this if the sequence is "A B C B C", because the frequency of "C B" will have already been reduced
-            // by the previous code block.
-            if (i < change.word.length - 2 &&
-                (change.word(i + 2) != pair._1 || i >= change.word.length - 3 || change.word(i + 3) != pair._2)) {
-              val nextPair = (change.word(i + 1), change.word(i + 2))
+        val wordI = if (caseSensitive) change.word(i) else change.word(i).toLowerCase()
+        val wordIPlus1 = if (caseSensitive) change.word(i + 1) else change.word(i + 1).toLowerCase()
+        if (wordI == pair._1 && wordIPlus1 == pair._2) {
+          // Assuming a symbol sequence "A B C", if "B C" is merged, we reduce the frequency of "A B".
+          if (i > 0) {
+            val wordIMinus1 = if (caseSensitive) change.word(i - 1) else change.word(i - 1).toLowerCase()
+            val prevPair = (wordIMinus1, wordI)
+            counts.add(prevPair, -change.count)
+            updateIndices(indices, prevPair, change.index, -1)
+          }
+          // Assuming a symbol sequence "A B C B", if "B C" is merged, we reduce the frequency of "C B". However, we
+          // skip this if the sequence is "A B C B C", because the frequency of "C B" will have already been reduced
+          // by the previous code block.
+          if (i < change.word.length - 2) {
+            val wordIPlus2 = if (caseSensitive) change.word(i + 2) else change.word(i + 2).toLowerCase()
+            if (wordIPlus2 != pair._1 ||
+                i >= change.word.length - 3 ||
+                (if (caseSensitive) change.word(i + 3) else change.word(i + 3).toLowerCase()) != pair._2) {
+              val nextPair = (wordIPlus1, wordIPlus2)
               counts.add(nextPair, -change.count)
               updateIndices(indices, nextPair, change.index, -1)
             }
-            i += 2
-          case _ => i += 1
+          }
+          i += 2
+        } else {
+          i += 1
         }
       }
 
       // Find all instances of the joined pair, and update the corresponding statistics.
       i = 0
       while (i < change.newWord.length) {
-        change.newWord(i) match {
-          case w if w == joinedPair =>
-            // Assuming a symbol sequence "A BC D", if "B C" is merged, we increase the frequency of "A BC".
-            if (i > 0) {
-              val prevPair = (change.newWord(i - 1), change.newWord(i))
-              counts.add(prevPair, change.count)
-              updateIndices(indices, prevPair, change.index, 1)
-            }
-            // Assuming a symbol sequence "A BC B", if "B C" is merged, we increase the frequency of "BC B". However, we
-            // skip this if the sequence is "A BC BC", because the count of "BC BC" will have already been incremented
-            // by the previous code block.
-            if (i < change.newWord.length - 1 && change.newWord(i + 1) != joinedPair) {
-              val nextPair = (change.newWord(i), change.newWord(i + 1))
+        val newWordI = if (caseSensitive) change.newWord(i) else change.newWord(i).toLowerCase()
+        if (newWordI == joinedPair) {
+          // Assuming a symbol sequence "A BC D", if "B C" is merged, we increase the frequency of "A BC".
+          if (i > 0) {
+            val newWordIMinus1 = if (caseSensitive) change.newWord(i - 1) else change.newWord(i - 1).toLowerCase()
+            val prevPair = (newWordIMinus1, newWordI)
+            counts.add(prevPair, change.count)
+            updateIndices(indices, prevPair, change.index, 1)
+          }
+          // Assuming a symbol sequence "A BC B", if "B C" is merged, we increase the frequency of "BC B". However, we
+          // skip this if the sequence is "A BC BC", because the count of "BC BC" will have already been incremented
+          // by the previous code block.
+          if (i < change.newWord.length - 1) {
+            val newWordIPlus1 = if (caseSensitive) change.newWord(i + 1) else change.newWord(i + 1).toLowerCase()
+            if (newWordIPlus1 != joinedPair) {
+              val nextPair = (newWordI, newWordIPlus1)
               counts.add(nextPair, change.count)
               updateIndices(indices, nextPair, change.index, -1)
             }
-            i += 1
-          case _ => i += 1
+          }
         }
+        i += 1
       }
     })
   }
