@@ -57,7 +57,7 @@ class BPEVocabularyGenerator protected (
     val caseSensitive: Boolean = true,
     val countThreshold: Int = -1,
     val replaceExisting: Boolean = false,
-    val cacheSize: Int = 1000,
+    val cacheSize: Int = 10000,
     val bufferSize: Int = 8192
 ) extends VocabularyGenerator {
   protected val glossaryRegex: Regex = BPEVocabularyGenerator.glossaryRegex(glossary)
@@ -397,7 +397,7 @@ object BPEVocabularyGenerator {
       caseSensitive: Boolean = true,
       countThreshold: Int = -1,
       replaceExisting: Boolean = false,
-      cacheSize: Int = 1000,
+      cacheSize: Int = 10000,
       bufferSize: Int = 8192
   ): BPEVocabularyGenerator = {
     new BPEVocabularyGenerator(
