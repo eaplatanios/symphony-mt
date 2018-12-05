@@ -502,13 +502,14 @@ object BPEVocabularyGenerator {
       words: mutable.Seq[(Long, Seq[String])],
       indices: ParMap[(String, String), mutable.LongMap[Long]],
       caseSensitive: Boolean
-  ): Seq[Change] = {
-    indices(pair).toSeq.filter(_._2 >= 1).map(_._1.toInt).map(index => {
+  ): Iterable[Change] = {
+    indices(pair).filter(_._2 >= 1).map(p => {
+      val index = p._1.toInt
       val (count, word) = words(index)
       val newWord = replacePair(pair, word, caseSensitive)
       words.update(index, (count, newWord))
       Change(index, word, newWord, count)
-    }).seq
+    })
   }
 
   /** Replaces all occurrences of the provided symbol pair in `word` with the joined symbol.
@@ -524,23 +525,28 @@ object BPEVocabularyGenerator {
       word: Seq[String],
       caseSensitive: Boolean
   ): Seq[String] = {
-    val newWord = mutable.ListBuffer.empty[String]
+    val newWord = Array.ofDim[String](word.size)
     var j = 0
+    var k = 0
     while (j < word.length - 1) {
       val part1 = if (caseSensitive) word(j) else word(j).toLowerCase()
       val part2 = if (caseSensitive) word(j + 1) else word(j + 1).toLowerCase()
       if (part1 == pair._1 && part2 == pair._2) {
         val joinedPair = word(j) + word(j + 1)
-        newWord += joinedPair
+        newWord(k) = joinedPair
+        k += 1
         j += 2
       } else {
-        newWord += word(j)
+        newWord(k) = word(j)
+        k += 1
         j += 1
       }
     }
-    if (j == word.length - 1)
-      newWord += word(j)
-    newWord
+    if (j == word.length - 1) {
+      newWord(k) = word(j)
+      k += 1
+    }
+    newWord.take(k)
   }
 
   /** Minimally updates the symbol pair statistics, based on the provided list of changes.
@@ -556,7 +562,7 @@ object BPEVocabularyGenerator {
     */
   private[BPEVocabularyGenerator] def updatePairStatistics(
       pair: (String, String),
-      changes: Seq[Change],
+      changes: Iterable[Change],
       counts: PriorityCounter[(String, String)],
       indices: ParMap[(String, String), mutable.LongMap[Long]],
       caseSensitive: Boolean
