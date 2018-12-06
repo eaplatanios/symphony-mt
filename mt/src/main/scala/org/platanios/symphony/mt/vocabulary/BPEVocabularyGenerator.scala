@@ -196,7 +196,7 @@ class BPEVocabularyGenerator protected (
 
     // Irrespective of whether a new vocabulary is being generated, or an existing one was loaded, we also convert the
     // provided tokenized files to their encoded equivalent.
-    val tokens = tokenizedFiles.toIterator.flatMap(mutableFile => {
+    tokenizedFiles.foreach(mutableFile => {
       val oldFile = mutableFile.get
       val file = oldFile.sibling(
         s"${oldFile.nameWithoutExtension(includeAll = false)}" +
@@ -221,15 +221,17 @@ class BPEVocabularyGenerator protected (
           w.close()
         })
       }
-      if (replaceExisting || vocabWriter.isDefined) {
-        newReader(file).lines().toAutoClosedIterator
-            .flatMap(line => BPEVocabularyGenerator.whitespaceRegex.split(line))
-      } else {
-        Iterator.empty
-      }
     })
 
     vocabWriter.foreach(writer => {
+      val tokens = tokenizedFiles.toIterator.flatMap(mutableFile => {
+        if (replaceExisting || vocabWriter.isDefined) {
+          newReader(mutableFile.get).lines().toAutoClosedIterator
+              .flatMap(line => BPEVocabularyGenerator.whitespaceRegex.split(line))
+        } else {
+          Iterator.empty
+        }
+      })
       tokens.foldLeft(TrieWordCounter())((counter, word) => {
         counter.insertWord(word.trim)
         counter
