@@ -146,7 +146,7 @@ case class TrainingLogger(
         val elapsed = internalTrigger.updateLastTrigger(lastStep.toInt)
         val elapsedTime = elapsed.map(_._1)
         val totalWordCount = (totalSrcWordCount + totalTgtWordCount) * dataParallelFactor
-        val avgPerplexity = Math.exp(totalLoss / totalTgtWordCount).toFloat
+        val avgPerplexity = Math.exp(totalLoss).toFloat
         val avgGradientsNorm = totalGradientsNorm / elapsed.map(_._2).getOrElse(1)
         val avgSrcSentenceLength = totalSrcWordCount * dataParallelFactor / totalNumSamples
         val avgTgtSentenceLength = totalTgtWordCount * dataParallelFactor / totalNumSamples
