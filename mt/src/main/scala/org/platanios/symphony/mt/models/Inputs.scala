@@ -92,10 +92,12 @@ object Inputs {
 
     val languageIds = languages.map(_._1).zipWithIndex.toMap
     val files = dataset.files(srcLanguage).map(file => {
-      if (useTFRecords)
-        createTFRecordsFile(file, env, curriculum = None)
-      else
+      if (useTFRecords) {
+        val filename = file.path.toAbsolutePath.normalize.toString.replace('/', '_') + ".tfrecords"
+        createTFRecordsFile(filename, Seq(file), Seq.empty, env, curriculum = None, shuffle = false)
+      } else {
         file
+      }
     }).map(_.path.toAbsolutePath.toString()): Tensor[String]
 
     tf.data.datasetFromTensorSlices(files)
@@ -155,34 +157,36 @@ object Inputs {
       val filesDataset = filteredDatasets
           .map {
             case ((srcLanguage, tgtLanguage), parallelDatasets) =>
-              val srcFiles = parallelDatasets.flatMap(_.files(srcLanguage)).map(f => createTFRecordsFile(f, env, trainingConfig.curriculum))
-              val tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage)).map(f => createTFRecordsFile(f, env, trainingConfig.curriculum))
+              val tfRecordsFile = createTFRecordsFile(
+                filename = "train.tfrecords",
+                srcFiles = parallelDatasets.flatMap(_.files(srcLanguage)),
+                tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage)),
+                env = env,
+                curriculum = trainingConfig.curriculum,
+                shuffle = true)
               val srcLanguageDataset = tf.data.datasetFromTensors(languageIds(srcLanguage): Tensor[Int])
               val tgtLanguageDataset = tf.data.datasetFromTensors(languageIds(tgtLanguage): Tensor[Int])
-              val srcFilesDataset = tf.data.datasetFromTensors(srcFiles.map(_.path.toAbsolutePath.toString()): Tensor[String])
-              val tgtFilesDataset = tf.data.datasetFromTensors(tgtFiles.map(_.path.toAbsolutePath.toString()): Tensor[String])
-              srcLanguageDataset.zip(tgtLanguageDataset)
-                  .zip(srcFilesDataset.zip(tgtFilesDataset))
-                  .map(d => (d._1._1, d._1._2, d._2._1, d._2._2), name = "AddLanguageIDs")
+              val tfRecordFilesDataset = tf.data.datasetFromTensors(Tensor[String](tfRecordsFile.path.toAbsolutePath.toString()))
+              srcLanguageDataset.zip(tgtLanguageDataset).zip(tfRecordFilesDataset)
+                  .map(d => (d._1._1, d._1._2, d._2), name = "AddLanguageIDs")
           }.reduce((d1, d2) => d1.concatenateWith(d2))
 
-      val datasetCreator = createSingleParallelDataset(dataConfig, trainingConfig, cache, repeat, isEval)(_, _, _, _)
+      val datasetCreator = createSingleParallelDataset(dataConfig, trainingConfig, cache, repeat, isEval)(_, _, _)
 
       filesDataset
           .shuffle(filteredDatasets.size)
           .interleave(
             function = d => {
-              val (srcLanguage, tgtLanguage, srcFiles, tgtFiles) = d
+              val (srcLanguage, tgtLanguage, files) = d
               val srcLanguageDataset = tf.data.datasetFromOutputs(srcLanguage).repeat()
               val tgtLanguageDataset = tf.data.datasetFromOutputs(tgtLanguage).repeat()
-              val srcFilesDataset = tf.data.datasetFromOutputSlices(srcFiles)
-              val tgtFilesDataset = tf.data.datasetFromOutputSlices(tgtFiles)
+              val filesDataset = tf.data.datasetFromOutputSlices(files)
               srcLanguageDataset.zip(tgtLanguageDataset)
-                  .zip(srcFilesDataset.zip(tgtFilesDataset))
-                  .map(d => (d._1._1, d._1._2, d._2._1, d._2._2), name = "AddLanguageIDs")
+                  .zip(filesDataset)
+                  .map(d => (d._1._1, d._1._2, d._2), name = "AddLanguageIDs")
                   .shuffle(maxNumFiles)
                   .interleave(
-                    function = d => datasetCreator(d._1, d._2, d._3, d._4),
+                    function = d => datasetCreator(d._1, d._2, d._3),
                     cycleLength = maxNumFiles,
                     name = "FilesInterleave")
             },
@@ -235,8 +239,7 @@ object Inputs {
   )(
       srcLanguage: Output[Int],
       tgtLanguage: Output[Int],
-      srcFile: Output[String],
-      tgtFile: Output[String]
+      tfRecordsFile: Output[String]
   ): tf.data.Dataset[(SentencesWithLanguagePair[String], Sentences[String])] = {
     val batchSize = if (!isEval) dataConfig.trainBatchSize else dataConfig.evalBatchSize
     val shuffleBufferSize = if (dataConfig.shuffleBufferSize == -1L) 10L * batchSize else dataConfig.shuffleBufferSize
@@ -244,15 +247,13 @@ object Inputs {
     val srcLanguageDataset = tf.data.datasetFromOutputs(srcLanguage).repeat()
     val tgtLanguageDataset = tf.data.datasetFromOutputs(tgtLanguage).repeat()
 
-    val srcDataset = tf.data.datasetFromDynamicTFRecordFiles(srcFile, bufferSize = dataConfig.loaderBufferSize)
-    val tgtDataset = tf.data.datasetFromDynamicTFRecordFiles(tgtFile, bufferSize = dataConfig.loaderBufferSize)
+    val dataset = tf.data.datasetFromDynamicTFRecordFiles(tfRecordsFile, bufferSize = dataConfig.loaderBufferSize)
 
     val includeScore = trainingConfig.curriculum.isDefined
-    var datasetBeforeCurriculum = srcLanguageDataset.zip(tgtLanguageDataset).zip(srcDataset.zip(tgtDataset))
+    var datasetBeforeCurriculum = srcLanguageDataset.zip(tgtLanguageDataset).zip(dataset)
         .map(d => {
-          (d._1,
-              parseTFRecord(d._2._1, includeScore = includeScore),
-              parseTFRecord(d._2._2, includeScore = includeScore))
+          val parsedExamples = parseParallelTFRecord(d._2, includeScore = includeScore)
+          (d._1, parsedExamples._1, parsedExamples._2)
         }, name = "Map/ParseExample")
 
     // Crop based on the maximum allowed sequence lengths.
@@ -376,39 +377,99 @@ object Inputs {
     (parsedExample._1, parsedExample._2.toInt, parsedExample._3)
   }
 
+  private def parseParallelTFRecord(
+      serialized: Output[String],
+      includeScore: Boolean
+  ): ((Output[String], Output[Int], Option[Output[Float]]), (Output[String], Output[Int], Option[Output[Float]])) = {
+    val parsedExample: (Output[String], Output[Long], Option[Output[Float]], Output[String], Output[Long], Option[Output[Float]]) = {
+      if (includeScore) {
+        tf.parseSingleExample(
+          serialized = serialized,
+          features = (
+              FixedLengthFeature[String](key = "src-sentence", shape = Shape(-1)),
+              FixedLengthFeature[Long](key = "src-length", shape = Shape()),
+              Some(FixedLengthFeature[Float](key = "src-score", shape = Shape())): Option[FixedLengthFeature[Float]],
+              FixedLengthFeature[String](key = "tgt-sentence", shape = Shape(-1)),
+              FixedLengthFeature[Long](key = "tgt-length", shape = Shape()),
+              Some(FixedLengthFeature[Float](key = "tgt-score", shape = Shape())): Option[FixedLengthFeature[Float]]),
+          name = "ParseExample")
+      } else {
+        tf.parseSingleExample(
+          serialized = serialized,
+          features = (
+              FixedLengthFeature[String](key = "src-sentence", shape = Shape(-1)),
+              FixedLengthFeature[Long](key = "src-length", shape = Shape()),
+              None: Option[FixedLengthFeature[Float]],
+              FixedLengthFeature[String](key = "tgt-sentence", shape = Shape(-1)),
+              FixedLengthFeature[Long](key = "tgt-length", shape = Shape()),
+              None: Option[FixedLengthFeature[Float]]),
+          name = "ParseExample")
+      }
+    }
+    ((parsedExample._1, parsedExample._2.toInt, parsedExample._3),
+        (parsedExample._4, parsedExample._5.toInt, parsedExample._6))
+  }
+
   private val whitespaceRegex: Regex = "\\s+".r
 
   private def createTFRecordsFile(
-      file: File,
+      filename: String,
+      srcFiles: Seq[File],
+      tgtFiles: Seq[File],
       env: Environment,
-      curriculum: Option[DifficultyBasedCurriculum[SentencePairsWithScores[String]]]
+      curriculum: Option[DifficultyBasedCurriculum[SentencePairsWithScores[String]]],
+      shuffle: Boolean
   ): File = {
     val logger = Logger(LoggerFactory.getLogger("Models / Inputs / TF Records Converter"))
 
-    val baseFilename = file.path.toAbsolutePath.normalize.toString.replace('/', '_')
-    val scoresDir = this.scoresDir(env)
-
-    val tfRecordsFile = curriculum match {
-      case None => file.sibling(file.name + ".tfrecords")
-      case Some(_) => File(env.workingDir.resolve("data").resolve(baseFilename + ".tfrecords"))
-    }
-
+    val tfRecordsFilename = if (shuffle) s"$filename.shuffled" else filename
+    val tfRecordsFile = File(env.workingDir.resolve("data").resolve(tfRecordsFilename))
     tfRecordsFile.parent.createDirectories()
 
-    val scoreFile = curriculum.map(c => {
-      scoresDir.resolve("sentence_scores").resolve(s"$baseFilename.${c.cdfScore}.score")
-    })
-
     if (tfRecordsFile.notExists) {
-      logger.info(s"Converting file '$file' to TF records file '$tfRecordsFile'.")
-      val reader = newReader(file)
+      logger.info(s"Creating TF records file '$tfRecordsFile'.")
+
       val writer = new TFRecordWriter(tfRecordsFile.path)
 
-      scoreFile match {
-        case Some(f) =>
-          val scoresReader = newReader(f)
-          reader.lines().toAutoClosedIterator.zip(scoresReader.lines().toAutoClosedIterator).foreach {
-            case (line, scoreLine) =>
+      def processFile(file: File): Iterator[Example] = {
+        val baseFilename = file.path.toAbsolutePath.normalize.toString.replace('/', '_')
+        val scoresDir = this.scoresDir(env)
+
+        val scoreFile = curriculum.map(c => {
+          scoresDir.resolve("sentence_scores").resolve(s"$baseFilename.${c.cdfScore}.score")
+        })
+
+        logger.info(s"Processing file '$file'.")
+
+        val reader = newReader(file)
+        scoreFile match {
+          case Some(f) =>
+            val scoresReader = newReader(f)
+            reader.lines().toAutoClosedIterator.zip(scoresReader.lines().toAutoClosedIterator).map {
+              case (line, scoreLine) =>
+                val sentence = whitespaceRegex.split(line)
+                val features = Features.newBuilder()
+                features.putFeature(
+                  "sentence",
+                  Feature.newBuilder()
+                      .setBytesList(
+                        BytesList.newBuilder()
+                            .addAllValue(sentence.map(ByteString.copyFromUtf8).toSeq.asJava))
+                      .build())
+                features.putFeature(
+                  "length",
+                  Feature.newBuilder()
+                      .setInt64List(Int64List.newBuilder().addValue(sentence.length))
+                      .build())
+                features.putFeature(
+                  "score",
+                  Feature.newBuilder()
+                      .setFloatList(FloatList.newBuilder().addValue(scoreLine.toFloat))
+                      .build())
+                Example.newBuilder().setFeatures(features).build()
+            }
+          case None =>
+            reader.lines().toAutoClosedIterator.map(line => {
               val sentence = whitespaceRegex.split(line)
               val features = Features.newBuilder()
               features.putFeature(
@@ -423,38 +484,143 @@ object Inputs {
                 Feature.newBuilder()
                     .setInt64List(Int64List.newBuilder().addValue(sentence.length))
                     .build())
-              features.putFeature(
-                "score",
-                Feature.newBuilder()
-                    .setFloatList(FloatList.newBuilder().addValue(scoreLine.toFloat))
-                    .build())
-              writer.write(Example.newBuilder().setFeatures(features).build())
-          }
-        case None =>
-          reader.lines().toAutoClosedIterator.foreach(line => {
-            val sentence = whitespaceRegex.split(line)
-            val features = Features.newBuilder()
-            features.putFeature(
-              "sentence",
-              Feature.newBuilder()
-                  .setBytesList(
-                    BytesList.newBuilder()
-                        .addAllValue(sentence.map(ByteString.copyFromUtf8).toSeq.asJava))
-                  .build())
-            features.putFeature(
-              "length",
-              Feature.newBuilder()
-                  .setInt64List(Int64List.newBuilder().addValue(sentence.length))
-                  .build())
-            writer.write(Example.newBuilder().setFeatures(features).build())
-          })
+              Example.newBuilder().setFeatures(features).build()
+            })
+        }
+      }
+
+      def processFiles(srcFile: File, tgtFile: File): Iterator[Example] = {
+        val srcBaseFilename = srcFile.path.toAbsolutePath.normalize.toString.replace('/', '_')
+        val tgtBaseFilename = tgtFile.path.toAbsolutePath.normalize.toString.replace('/', '_')
+        val scoresDir = this.scoresDir(env)
+
+        val srcScoreFile = curriculum.map(c => {
+          scoresDir.resolve("sentence_scores").resolve(s"$srcBaseFilename.${c.cdfScore}.score")
+        })
+        val tgtScoreFile = curriculum.map(c => {
+          scoresDir.resolve("sentence_scores").resolve(s"$tgtBaseFilename.${c.cdfScore}.score")
+        })
+
+        logger.info(s"Processing files '$srcFile' and '$tgtFile'.")
+
+        val srcReader = newReader(srcFile)
+        val tgtReader = newReader(tgtFile)
+        (srcScoreFile, tgtScoreFile) match {
+          case (Some(srcF), Some(tgtF)) =>
+            val srcScoresReader = newReader(srcF)
+            val tgtScoresReader = newReader(tgtF)
+            val srcLines = srcReader.lines().toAutoClosedIterator.zip(srcScoresReader.lines().toAutoClosedIterator)
+            val tgtLines = tgtReader.lines().toAutoClosedIterator.zip(tgtScoresReader.lines().toAutoClosedIterator)
+            srcLines.zip(tgtLines).map {
+              case ((srcLine, srcScoreLine), (tgtLine, tgtScoreLine)) =>
+                val srcSentence = whitespaceRegex.split(srcLine)
+                val tgtSentence = whitespaceRegex.split(tgtLine)
+                val features = Features.newBuilder()
+                features.putFeature(
+                  "src-sentence",
+                  Feature.newBuilder()
+                      .setBytesList(
+                        BytesList.newBuilder()
+                            .addAllValue(srcSentence.map(ByteString.copyFromUtf8).toSeq.asJava))
+                      .build())
+                features.putFeature(
+                  "src-length",
+                  Feature.newBuilder()
+                      .setInt64List(Int64List.newBuilder().addValue(srcSentence.length))
+                      .build())
+                features.putFeature(
+                  "src-score",
+                  Feature.newBuilder()
+                      .setFloatList(FloatList.newBuilder().addValue(srcScoreLine.toFloat))
+                      .build())
+                features.putFeature(
+                  "tgt-sentence",
+                  Feature.newBuilder()
+                      .setBytesList(
+                        BytesList.newBuilder()
+                            .addAllValue(tgtSentence.map(ByteString.copyFromUtf8).toSeq.asJava))
+                      .build())
+                features.putFeature(
+                  "tgt-length",
+                  Feature.newBuilder()
+                      .setInt64List(Int64List.newBuilder().addValue(tgtSentence.length))
+                      .build())
+                features.putFeature(
+                  "tgt-score",
+                  Feature.newBuilder()
+                      .setFloatList(FloatList.newBuilder().addValue(tgtScoreLine.toFloat))
+                      .build())
+                Example.newBuilder().setFeatures(features).build()
+            }
+          case _ =>
+            val srcLines = srcReader.lines().toAutoClosedIterator
+            val tgtLines = tgtReader.lines().toAutoClosedIterator
+            srcLines.zip(tgtLines).map {
+              case (srcLine, tgtLine) =>
+                val srcSentence = whitespaceRegex.split(srcLine)
+                val tgtSentence = whitespaceRegex.split(tgtLine)
+                val features = Features.newBuilder()
+                features.putFeature(
+                  "src-sentence",
+                  Feature.newBuilder()
+                      .setBytesList(
+                        BytesList.newBuilder()
+                            .addAllValue(srcSentence.map(ByteString.copyFromUtf8).toSeq.asJava))
+                      .build())
+                features.putFeature(
+                  "src-length",
+                  Feature.newBuilder()
+                      .setInt64List(Int64List.newBuilder().addValue(srcSentence.length))
+                      .build())
+                features.putFeature(
+                  "tgt-sentence",
+                  Feature.newBuilder()
+                      .setBytesList(
+                        BytesList.newBuilder()
+                            .addAllValue(tgtSentence.map(ByteString.copyFromUtf8).toSeq.asJava))
+                      .build())
+                features.putFeature(
+                  "tgt-length",
+                  Feature.newBuilder()
+                      .setInt64List(Int64List.newBuilder().addValue(tgtSentence.length))
+                      .build())
+                Example.newBuilder().setFeatures(features).build()
+            }
+        }
+      }
+
+      val examples = {
+        if (tgtFiles.isEmpty) {
+          srcFiles.toIterator.flatMap(processFile)
+        } else {
+          srcFiles.toIterator.zip(tgtFiles.toIterator).flatMap(p => processFiles(p._1, p._2))
+        }
+      }
+
+      if (shuffle) {
+        val shuffledExamples = examples.toArray
+        fisherYatesShuffle(shuffledExamples, env)
+        shuffledExamples.foreach(writer.write)
+      } else {
+        examples.foreach(writer.write)
       }
 
       writer.flush()
       writer.close()
-      logger.info(s"Converted file '$file' to TF records file '$tfRecordsFile'.")
+      logger.info(s"Created TF records file '$tfRecordsFile'.")
     }
     tfRecordsFile
+  }
+
+  private def fisherYatesShuffle[T](values: Array[T], env: Environment): Array[T] = {
+    val random = env.randomSeed.map(new scala.util.Random(_)).getOrElse(new scala.util.Random())
+    values.indices.foreach(n => {
+      val randomIndex = n + random.nextInt(values.length - n)
+      val temp = values(randomIndex)
+      values.update(randomIndex, values(n))
+      values(n) = temp
+    })
+    values
   }
 
   private def scoresDir(env: Environment): Path = {
