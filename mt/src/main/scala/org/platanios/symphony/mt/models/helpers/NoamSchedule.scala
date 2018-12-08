@@ -59,8 +59,12 @@ class NoamSchedule protected (
       val stepValue = step.get.value.toFloat
       val warmUpStepsValue = tf.constant[Int](warmUpSteps).toFloat
       val hiddenSizeValue = tf.constant[Int](hiddenSize).toFloat
-      value * 5000.0f * (hiddenSizeValue ** -0.5f) *
-          tf.minimum((stepValue + 1) * (warmUpStepsValue ** -1.5f), (stepValue + 1) ** -0.5f)
+      val linearWarmup = tf.minimum(1.0f, stepValue / warmUpStepsValue)
+      val rsqrtDecay = tf.rsqrt(tf.maximum(stepValue, warmUpStepsValue))
+      val rsqrtHidden = hiddenSizeValue ** -0.5f
+      value * linearWarmup * rsqrtDecay * rsqrtHidden
+      // value * 5000.0f * (hiddenSizeValue ** -0.5f) *
+      //     tf.minimum((stepValue + 1) * (warmUpStepsValue ** -1.5f), (stepValue + 1) ** -0.5f)
     }
   }
 }
