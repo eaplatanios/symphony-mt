@@ -515,11 +515,11 @@ class Model[Code](
       tgtSequences: Output[Int],
       tgtSequenceLengths: Output[Int]
   ): Output[Float] = {
-    val (lossSum, _) = Common.paddedCrossEntropy(
+    val (lossSum, lossWeights) = Common.paddedCrossEntropy(
       logits = predictedSequences,
       labels = tgtSequences,
       labelLengths = tgtSequenceLengths,
       labelSmoothing = trainingConfig.labelSmoothing)
-    lossSum / tf.size(tgtSequenceLengths).toFloat
+    lossSum / lossWeights
   }
 }
