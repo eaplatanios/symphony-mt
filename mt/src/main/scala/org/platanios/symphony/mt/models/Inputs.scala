@@ -121,7 +121,8 @@ object Inputs {
       cache: Boolean = false,
       repeat: Boolean = true,
       isEval: Boolean = false,
-      languagePairs: Option[Set[(Language, Language)]] = None
+      languagePairs: Option[Set[(Language, Language)]] = None,
+      name: String = ""
   ): () => tf.data.Dataset[(SentencesWithLanguagePair[String], Sentences[String])] = () => {
     // If there exists a training curriculum, compute any scores it may require.
     trainingConfig.curriculum match {
@@ -158,12 +159,12 @@ object Inputs {
           .map {
             case ((srcLanguage, tgtLanguage), parallelDatasets) =>
               val tfRecordsFile = createTFRecordsFile(
-                filename = "train.tfrecords",
+                filename = if (isEval) s"eval-$name.tfrecords" else "train.tfrecords",
                 srcFiles = parallelDatasets.flatMap(_.files(srcLanguage)),
                 tgtFiles = parallelDatasets.flatMap(_.files(tgtLanguage)),
                 env = env,
                 curriculum = trainingConfig.curriculum,
-                shuffle = true)
+                shuffle = !isEval)
               val srcLanguageDataset = tf.data.datasetFromTensors(languageIds(srcLanguage): Tensor[Int])
               val tgtLanguageDataset = tf.data.datasetFromTensors(languageIds(tgtLanguage): Tensor[Int])
               val tfRecordFilesDataset = tf.data.datasetFromTensors(Tensor[String](tfRecordsFile.path.toAbsolutePath.toString()))
@@ -225,7 +226,8 @@ object Inputs {
                 trainingConfig = trainingConfig.copy(curriculum = None),
                 Seq(dataset), languages,
                 includeIdentityTranslations = false, cache = false, repeat = false, isEval = true,
-                languagePairs = Some(Set((srcLanguage, tgtLanguage))))()
+                languagePairs = Some(Set((srcLanguage, tgtLanguage))),
+                name = datasetName)()
             })
         }
   }
