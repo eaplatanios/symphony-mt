@@ -17,16 +17,6 @@
     color: rgb(227, 4, 0);
 }
 
-.md-logo {
-    margin-left: 10px;
-    padding: 0.2rem;
-}
-
-.md-logo img {
-    width: 40px;
-    height: 40px;
-}
-
 .md-header-nav__title {
     font-family: 'Lato', sans-serif;
     font-weight: 400;

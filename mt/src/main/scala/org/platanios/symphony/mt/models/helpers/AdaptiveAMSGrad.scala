@@ -213,7 +213,7 @@ class AdaptiveAMSGrad protected (
       ).castTo[T]
 
       val gradientValuesSquare = gradient.values * gradient.values
-      val beta2 = computeBeta(
+      var beta2 = computeBeta(
         step = iteration.get.toFloat,
         initialBeta = getBeta2(variable).toFloat,
         previousBeta = getSlot[T, Float]("Beta2", variable),
@@ -223,6 +223,9 @@ class AdaptiveAMSGrad protected (
         a = v.gather(gradient.indices).toFloat,
         epsilon = epsilonTensor
       ).castTo[T]
+
+
+      beta2 = tf.print(beta2, Seq(beta1, beta2), variable.name, 1000, 1000)
 
       val epsilon = getEpsilon(variable)
 
@@ -289,10 +292,7 @@ class AdaptiveAMSGrad protected (
     val logGNorm = tf.log(gNorm + epsilon)
     val logANorm = tf.log(aNorm + epsilon)
     val logBeta = (logGNorm - logANorm + logInitialBeta) / stepsTillNextNonZero
-    val beta = tf.maximum(0.0f, tf.minimum(1.0f, tf.exp(logBeta)))
-    //    beta = tf.print(beta, Seq(gNorm), "GNorm: ", 1000, 1000)
-    //    beta = tf.print(beta, Seq(logANorm), "LogANorm: ", 1000, 1000)
-    //    beta = tf.print(beta, Seq(beta), "Beta: ", 1000, 1000)
+    val beta = tf.maximum(0.001f, tf.minimum(0.9f, tf.exp(logBeta)))
     previousBeta.assignScatter(nonZeroIndices, beta)
   }
 }
