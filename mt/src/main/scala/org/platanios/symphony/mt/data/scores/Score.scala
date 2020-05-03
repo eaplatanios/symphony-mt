@@ -169,7 +169,9 @@ object Score {
               if (sentenceScoresToCompute.nonEmpty) {
                 logger.info(s"Computing sentence scores for file '$file'.")
 
-                val numSentences = scala.io.Source.fromFile(file.path.toAbsolutePath.toString).getLines.size
+                val fileSource = scala.io.Source.fromFile(file.path.toAbsolutePath.toString)
+                val numSentences = fileSource.getLines.size
+                fileSource.close()
 
                 // Remove the previously computed values for the scores that need to be computed now.
                 sentenceScores ++= sentenceScoresToCompute.map(_.toString)

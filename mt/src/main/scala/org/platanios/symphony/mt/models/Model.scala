@@ -249,9 +249,9 @@ class Model[Code](
           }
 
           val srcDecoded = decodeSequenceBatch(pair._1._1, pair._1._3, pair._1._4)
-          val tgtDecoded = decodeSequenceBatch(pair._1._2, pair._2._2, pair._2._3)
+          val tgtDecoded = decodeSequenceBatch(pair._2._1, pair._2._2, pair._2._3)
 
-          ((pair._1._1, pair._1._2, srcDecoded._1, srcDecoded._2), (pair._1._2, tgtDecoded._1, tgtDecoded._2))
+          ((pair._1._1, pair._1._2, srcDecoded._1, srcDecoded._2), (pair._2._1, tgtDecoded._1, tgtDecoded._2))
         })
   }
 
