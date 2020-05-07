@@ -18,8 +18,8 @@ import sbtrelease.Vcs
 
 import scala.sys.process.Process
 
-scalaVersion in ThisBuild := "2.12.7"
-crossScalaVersions in ThisBuild := Seq("2.11.12", "2.12.7")
+scalaVersion in ThisBuild := "2.12.11"
+crossScalaVersions in ThisBuild := Seq("2.12.11")
 
 organization in ThisBuild := "org.platanios"
 
@@ -30,8 +30,9 @@ organization in ThisBuild := "org.platanios"
 // every 24 hours.
 resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
 
-val tensorFlowScalaVersion = "0.4.2-SNAPSHOT"
+val tensorFlowScalaVersion = "0.5.0-SNAPSHOT"
 
+fork in ThisBuild := true
 autoCompilerPlugins in ThisBuild := true
 
 scalacOptions in ThisBuild ++= Seq(
@@ -63,16 +64,14 @@ lazy val commonSettings = loggingSettings ++ Seq(
 lazy val testSettings = Seq(
   libraryDependencies ++= Seq(
     "junit"         %  "junit"     % "4.12",
-    "org.scalactic" %% "scalactic" % "3.0.4",
-    "org.scalatest" %% "scalatest" % "3.0.4" % "test"),
+    "org.scalatest" %% "scalatest" % "3.1.1" % "test"),
   logBuffered in Test := false,
-  fork in test := false,
   testForkedParallel in Test := false,
   parallelExecution in Test := false,
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oDF"))
 
 lazy val tensorFlowSettings = Seq(
-  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowScalaVersion, // classifier "darwin-cpu-x86_64",
+  libraryDependencies += "org.platanios" %% "tensorflow" % tensorFlowScalaVersion, // classifier "linux-gpu-x86_64",
 )
 
 lazy val all = (project in file("."))
@@ -228,7 +227,6 @@ lazy val publishSettings = Seq(
   releaseVcs := Vcs.detect(baseDirectory.value),
   releaseVcsSign := true,
   releaseIgnoreUntrackedFiles := true,
-  useGpg := true,  // Bouncy Castle has bugs with sub-keys, so we use gpg instead
   pgpPassphrase := sys.env.get("PGP_PASSWORD").map(_.toArray),
   pgpPublicRing := file("~/.gnupg/pubring.gpg"),
   pgpSecretRing := file("~/.gnupg/secring.gpg"),
