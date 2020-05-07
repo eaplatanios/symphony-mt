@@ -27,6 +27,10 @@ sealed trait Metric {
   val header: String
 }
 
+case object ExactMatchAccuracy extends Metric {
+  override val header: String = "ExactMatchAccuracy"
+}
+
 case object BLEU extends Metric {
   override val header: String = "BLEU"
 }
@@ -55,6 +59,7 @@ object Metric {
   @throws[IllegalArgumentException]
   def fromHeader(header: String): Metric = {
     header match {
+      case "ExactMatchAccuracy" => ExactMatchAccuracy
       case "BLEU" => BLEU
       case "Meteor" => Meteor
       case "TER" => TER
@@ -68,6 +73,7 @@ object Metric {
   @throws[IllegalArgumentException]
   def cliToMTMetric(metric: String)(implicit languages: Seq[(Language, Vocabulary)]): MTMetric = {
     metric.split(":") match {
+      case Array("exact_match_accuracy") => evaluation.ExactMatchAccuracy()(languages)
       case Array("bleu") => evaluation.BLEU()(languages)
       case Array("bleu", maxOrder) => evaluation.BLEU(maxOrder.toInt)(languages)
       case Array("bleu_nist") => evaluation.BLEU(smoothing = evaluation.BLEU.NISTSmoothing)(languages)
