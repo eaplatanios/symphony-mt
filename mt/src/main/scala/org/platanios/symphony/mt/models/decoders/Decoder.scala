@@ -72,6 +72,13 @@ abstract class Decoder[
   /** Returns a zero-valued output for this decoder. */
   def zeroOutput: DecOut
 
+  /** Returns the shape invariants for this decoder loop.
+    *
+    * @return Tuple containing: (i) the shape invariant for the "finished" signal, (ii) the decoder input shape
+    *         invariant, (iii) the decoder output shape invariant, and (iv) the decoder state shape invariant.
+    */
+  def shapeInvariants: (Shape, OutShape, DecOutShape, DecStateShape)
+
   /** This method is called before any decoding iterations. It computes the initial input values and the initial state.
     *
     * @return Tuple containing: (i) a scalar tensor specifying whether initialization has finished,
@@ -208,12 +215,17 @@ abstract class Decoder[
           (time + 1, nextOutputTensorArrays, nextState, nextInput, nextFinished, nextSequenceLengths)
         }
 
+
+        val (finishedShapeInvariant, inputShapeInvariant, outputShapeInvariant, stateShapeInvariant) = shapeInvariants
         val (_, finalOutputTensorArrays, preFinalState, _, _, preFinalSequenceLengths): LoopVariables =
           tf.whileLoop(
             (loopVariables: LoopVariables) => condition(loopVariables),
             (loopVariables: LoopVariables) => body(loopVariables),
             (initialTime, initialOutputTensorArrays, initialState,
                 initialInput, initialFinished, initialSequenceLengths),
+            shapeInvariants = Some((
+                Shape(), evZeroDecOut.evOutputToShape.shapeStructure.shapes(outputShapeInvariant).map(_ => Shape()),
+                stateShapeInvariant, inputShapeInvariant, finishedShapeInvariant, Shape(-1, -1))),
             parallelIterations = parallelIterations,
             swapMemory = swapMemory)
 

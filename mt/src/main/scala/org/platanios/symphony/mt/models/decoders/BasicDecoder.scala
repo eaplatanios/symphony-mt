@@ -75,6 +75,32 @@ class BasicDecoder[
       sample = helper.zeroSample(batchSize, "ZeroSample"))
   }
 
+  /** Returns the shape invariants for this decoder loop.
+    *
+    * @return Tuple containing: (i) the shape invariant for the "finished" signal, (ii) the decoder input shape
+    *         invariant, (iii) the decoder output shape invariant, and (iv) the decoder state shape invariant.
+    */
+  override def shapeInvariants: (Shape, OutShape, (OutShape, SampleShape), StateShape) = {
+    def _shapeConverter(shape: Shape): Shape = {
+      val newShape = Array.fill[Int](shape.rank)(-1)
+      newShape(0) = shape(0)
+      if (shape.rank > 1)
+        newShape(newShape.length - 1) = shape(shape.rank - 1)
+      Shape(newShape)
+    }
+    val zeroOutput = this.zeroOutput
+    val initialInput = helper.initialize()._2
+    val inputShapeInvariant = evOutputToShapeOut.shapeStructure.map(
+      evOutputToShapeOut.shape(initialInput), _shapeConverter)
+    val modelOutputShapeInvariant = evOutputToShapeOut.shapeStructure.map(
+      evOutputToShapeOut.shape(zeroOutput.modelOutput), _shapeConverter)
+    val sampleShapeInvariant = evOutputToShapeSample.shapeStructure.map(
+      evOutputToShapeSample.shape(zeroOutput.sample), _shapeConverter)
+    val cellStateShapeInvariant = evOutputToShapeState.shapeStructure.map(
+      evOutputToShapeState.shape(initialCellState), _shapeConverter)
+    (Shape(-1), inputShapeInvariant, (modelOutputShapeInvariant, sampleShapeInvariant), cellStateShapeInvariant)
+  }
+
   /** This method is called before any decoding iterations. It computes the initial input values and the initial state.
     *
     * @return Tuple containing: (i) a scalar tensor specifying whether initialization has finished,

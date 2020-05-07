@@ -117,6 +117,27 @@ class BeamSearchDecoder[T: TF, State: OutputStructure, StateShape](
     BeamSearchDecoder.BeamSearchDecoderOutput(zScores, zPredictedIDs, zParentIDs)
   }
 
+  /** Returns the shape invariants for this decoder loop.
+    *
+    * @return Tuple containing: (i) the shape invariant for the "finished" signal, (ii) the decoder input shape
+    *         invariant, (iii) the decoder output shape invariant, and (iv) the decoder state shape invariant.
+    */
+  override def shapeInvariants: (Shape, Shape, (Shape, Shape, Shape), (StateShape, Shape, Shape, Shape)) = {
+    def _shapeConverter(shape: Shape): Shape = {
+      val newShape = Array.fill[Int](shape.rank + 1)(-1)
+      newShape(0) = shape(0)
+      newShape(1) = beamWidth
+      if (shape.rank > 1)
+        newShape(newShape.length - 1) = shape(shape.rank - 1)
+      Shape(newShape)
+    }
+    val cellStateShapeInvariant = evOutputToShapeState.shapeStructure.map(
+      evOutputToShapeState.shape(initialCellState), _shapeConverter)
+    (Shape(-1, beamWidth), Shape(-1, beamWidth, beginInput.shape(2)),
+        (Shape(-1, beamWidth), Shape(-1, beamWidth), Shape(-1, beamWidth)),
+        (cellStateShapeInvariant, Shape(-1, beamWidth), Shape(-1, beamWidth), Shape(-1, beamWidth)))
+  }
+
   /** This method is called before any decoding iterations. It computes the initial input values and the initial state.
     *
     * @return Tuple containing: (i) a scalar tensor specifying whether initialization has finished,
@@ -470,26 +491,22 @@ object BeamSearchDecoder {
     @throws[InvalidShapeException]
     override def apply[T](value: Output[T], shape: Option[Shape]): Output[T] = {
       implicit val evTTF: TF[T] = TF.fromDataType(value.dataType)
-      if (shape.isDefined && shape.get.rank == 0) {
-        value
-      } else {
-        val valueShape = tf.shape(value)
-        val reshapedValue = tf.reshape(value, tf.concatenate(Seq(
-          batchSize.expandDims(0),
-          Output[Int](beamWidth),
-          valueShape(1 ::)), axis = 0))
-        val staticBatchSize = Output.constantValue(batchSize).map(_.scalar).getOrElse(-1)
-        val expectedReshapedShape = Shape(staticBatchSize, beamWidth) ++ shape.get
-        if (!reshapedValue.shape.isCompatibleWith(expectedReshapedShape)) {
-          throw InvalidShapeException(
-            "Unexpected behavior when reshaping between beam width and batch size. " +
-                s"The reshaped tensor has shape: ${reshapedValue.shape}. " +
-                s"We expected it to have shape [batchSize, beamWidth, depth] == $expectedReshapedShape. " +
-                "Perhaps you forgot to create a zero state with batchSize = encoderBatchSize * beamWidth?")
-        }
-        reshapedValue.setShape(expectedReshapedShape)
-        reshapedValue
+      val valueShape = tf.shape(value)
+      val reshapedValue = tf.reshape(value, tf.concatenate(Seq(
+        batchSize.expandDims(0),
+        Output[Int](beamWidth),
+        valueShape(1 ::)), axis = 0))
+      val staticBatchSize = Output.constantValue(batchSize).map(_.scalar).getOrElse(-1)
+      val expectedReshapedShape = Shape(staticBatchSize, beamWidth) ++ shape.get
+      if (!reshapedValue.shape.isCompatibleWith(expectedReshapedShape)) {
+        throw InvalidShapeException(
+          "Unexpected behavior when reshaping between beam width and batch size. " +
+              s"The reshaped tensor has shape: ${reshapedValue.shape}. " +
+              s"We expected it to have shape [batchSize, beamWidth, depth] == $expectedReshapedShape. " +
+              "Perhaps you forgot to create a zero state with batchSize = encoderBatchSize * beamWidth?")
       }
+      reshapedValue.setShape(expectedReshapedShape)
+      reshapedValue
     }
 
     @throws[InvalidArgumentException]
