@@ -165,7 +165,7 @@ object Attention {
     *
     * This bias prevents individual sequences of the same batch from attending to each other.
     *
-    * @param  batchCoordinatesQ Tensor with shape [lengthQ, 1]`, containing the coordinates of the batches.
+    * @param  batchCoordinatesQ Tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
     * @param  batchCoordinatesK Tensor with shape `[lengthQ, 1]`, containing the coordinates of the batches.
     * @return Tensor with shape `[lengthQ, lengthK]`, containing either `0` or `-infinity` (i.e., `-1e9f`).
     */

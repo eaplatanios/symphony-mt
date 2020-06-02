@@ -105,27 +105,18 @@ class Model[Code](
 
   protected val estimator: TranslationEstimator = {
     tf.device(deviceManager.nextDevice(env, moveToNext = false)) {
-      val model = trainingConfig.optimization.maxGradNorm match {
-        case Some(norm) =>
-          tf.learn.Model.supervised(
-            input = input,
-            trainInput = trainInput,
-            layer = inferLayer,
-            trainLayer = trainLayer,
-            loss = lossLayer,
-            optimizer = trainingConfig.optimization.optimizer,
-            clipGradients = tf.learn.ClipGradientsByGlobalNorm(norm),
-            colocateGradientsWithOps = trainingConfig.optimization.colocateGradientsWithOps)
-        case None =>
-          tf.learn.Model.supervised(
-            input = input,
-            trainInput = trainInput,
-            layer = inferLayer,
-            trainLayer = trainLayer,
-            loss = lossLayer,
-            optimizer = trainingConfig.optimization.optimizer,
-            colocateGradientsWithOps = trainingConfig.optimization.colocateGradientsWithOps)
-      }
+      val gradientNormClipping = trainingConfig.optimization.maxGradNorm
+          .map(tf.learn.ClipGradientsByGlobalNorm)
+          .getOrElse(tf.learn.NoClipGradients)
+      val model = tf.learn.Model.supervised(
+        input = input,
+        trainInput = trainInput,
+        layer = inferLayer,
+        trainLayer = trainLayer,
+        loss = lossLayer,
+        optimizer = trainingConfig.optimization.optimizer,
+        clipGradients = gradientNormClipping,
+        colocateGradientsWithOps = trainingConfig.optimization.colocateGradientsWithOps)
 
       val summaryDir = trainingConfig.summaryDir.resolve(name)
 

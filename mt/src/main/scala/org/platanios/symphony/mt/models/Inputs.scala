@@ -24,12 +24,12 @@ import org.platanios.symphony.mt.vocabulary.Vocabulary
 import org.platanios.tensorflow.api._
 import org.platanios.tensorflow.api.io.TFRecordWriter
 import org.platanios.tensorflow.api.ops.Parsing.FixedLengthFeature
+import org.platanios.tensorflow.proto.{BytesList, Example, Feature, Features, FloatList, Int64List}
 
 import better.files._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
-import org.tensorflow.example._
 
 import java.nio.file.Path
 

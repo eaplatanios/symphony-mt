@@ -215,7 +215,6 @@ abstract class Decoder[
           (time + 1, nextOutputTensorArrays, nextState, nextInput, nextFinished, nextSequenceLengths)
         }
 
-
         val (finishedShapeInvariant, inputShapeInvariant, outputShapeInvariant, stateShapeInvariant) = shapeInvariants
         val (_, finalOutputTensorArrays, preFinalState, _, _, preFinalSequenceLengths): LoopVariables =
           tf.whileLoop(
